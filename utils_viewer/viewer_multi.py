@@ -51,7 +51,8 @@ def _kept_builder(names: List[str],
     fit : Optional[dict]
         Fit dictionary, or None.
     context : dict
-        {summaries, limits, details, export_root} of the run so far.
+        {summaries, limits, details, export_root} of the run so far. The processed
+        files are kept in it (key '_processed') while one figure is being built.
 
     ---- Globals read ----
     None.
@@ -85,7 +86,11 @@ def _kept_builder(names: List[str],
                                             'haem_ocr': False,
                                             },
                               )
-        processed = experiment_data_processor(info, cfg, fit)
+        key = (name, repr(info['custom']), id(fit))
+        processed = context.setdefault('_processed', {}).get(key)
+        if processed is None:  # reading and decomposing is slow, so it is kept
+            processed = experiment_data_processor(info, cfg, fit)
+            context['_processed'][key] = processed
         experiment = processed['experiment']
         haem_panels = answers['plot_haems'] and 'haem_conc' in experiment
         kept[name] = {'experiment': experiment,
@@ -232,7 +237,9 @@ def multi_figure_checker_builder(context: dict,
     ---- Outputs ----
     Callable[[str, dict], bool]
         Function (kind, payload) that returns True when the figure is accepted, or when
-        it could not be previewed (the questions then carry on).
+        it could not be previewed (the questions then carry on). A payload with
+        'question' and 'change' is a step of a figure being built, which is asked with
+        that wording; without them it is the finished figure.
 
     ---- Globals mutated ----
     None. The checker reads the files and prints to the terminal (side effects).
@@ -251,6 +258,7 @@ def multi_figure_checker_builder(context: dict,
         info_printer('Drawing the figure from the data (this can take a moment) ...',
                      depth=2,
                      )
+        question_asked = payload.get('question')
         pictures, notes = _pictures_builder(kind, payload, context, makers, window)
         if notes:
             info_printer(notes, depth=2)
@@ -258,14 +266,20 @@ def multi_figure_checker_builder(context: dict,
             info_printer('This figure could not be previewed, so it is kept as it is.',
                          depth=2,
                          )
+            if question_asked is None:
+                context.pop('_processed', None)
             return True
         window.pictures_publisher(pictures)
-        choice = choice_asker('Do you accept this figure?',
+        question = payload.get('question')
+        choice = choice_asker(question or 'Do you accept this figure?',
                               [('yes', 'Yes, accept'),
-                               ('no', 'No, change its settings'),
+                               ('no', payload.get('change', 'No, change its settings')),
                                ],
                               'yes',
+                              depth=2 if question else 1,
                               )
+        if question is None:  # the finished figure: the processed files are not needed
+            context.pop('_processed', None)
         return choice == 'yes'
 
     return checker

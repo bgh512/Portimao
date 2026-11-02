@@ -1,4 +1,4 @@
-# DePalencify - Data Format
+# Albufeira - Data Format
 
 ## 1. Structures
 
@@ -19,7 +19,7 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
 | `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem |
 | `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum |
-| `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so the mean of the baseline window is 0 |
+| `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the mean of its highest 30 s window (outside the ignored start and end) is 0 |
 | `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. The matching tables divided by dilution factor x OD x volume |
 | `'haem_percent'` | pd.DataFrame | (n_spectra, 2 + n_haems) | % | Optional. `haem_conc` scaled to 0-100 % |
 | `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; dropped after the special figures are prepared |
@@ -56,6 +56,7 @@ Event-window statistics of one experiment. Created by `experiment_averages_calcu
 |---|---|---|---|---|
 | `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key` |
 | `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window, then `average1` ... one per event |
+| `'skipped'` | dict | | | `{window name: {start_time, end_time, reason}}` of the windows that do not fit between two additions (or after the last one); they have no record in `'windows'` and are drawn red in the previews |
 
 Window record:
 
@@ -286,7 +287,7 @@ Structure: see `last_answers` in section 1.1.
 | Property | Value |
 |---|---|
 | File type | `.png` |
-| Location and name | `DePalencify_preview.png` in the system temporary folder |
+| Location and name | `Albufeira_preview.png` in the system temporary folder |
 
 Written, and opened in the default picture viewer, only when the experiment browser window cannot open. Overwritten by each preview.
 

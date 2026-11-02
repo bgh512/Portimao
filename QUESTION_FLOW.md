@@ -1,4 +1,4 @@
-# DePalencify question flow (V2.6)
+# Albufeira question flow (V2.7)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -105,7 +105,7 @@ The data is **not** scaled by OD here. The values are only checked; the scaling 
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
-| 3.6 | Do you accept these averaging windows? | **3.7** | **3.5** |
+| 3.6 | Do you accept these averaging windows? Windows that do not fit are skipped; they are drawn red with a warning sign and listed in red in the terminal first. | **3.7** | **3.5** |
 
 ### 3.D Event labels
 
@@ -262,20 +262,24 @@ Both summary figures need the haem fit. If no fit was chosen in 3.1, the fit que
 
 File names need a group word and the hours, for example `control_7hours`.
 
+The figure is built up in the plot window: the drop-down lists the individual experiment plots (marked locked, final) and the time response being built. Panels not chosen yet are empty boxes ("Kinetic trace 1", "Decomposition 1" ...). After every choice below the figure is redrawn **(plot)** and an accept question is asked (shown in the second table).
+
 | # | Question | Leads to |
 |---|---|---|
-| 6.1.1 | What are the two group words, separated by a comma? | **6.1.2**. If there are not exactly two words, if either group has no file, or if fewer than two files have hours in their name, the time response is skipped and the next step is **6.2**. |
-| 6.1.2 | Which experiment should the first kinetic trace show? | **6.1.3** |
-| 6.1.3 | Which experiment should the second kinetic trace show? | **6.1.4** |
-| 6.1.4 | Which experiment should decomposition plot 1 show? | **6.1.5** |
-| 6.1.5 | Which experiment should decomposition plot 2 show? | **6.1.6** |
-| 6.1.6 | Which experiment should decomposition plot 3 show? | **6.1.7** |
-| 6.1.7 | Which time points (hours) should be skipped in the waterfall plots? Separate them with commas, or type none. | **6.1.8** |
-| 6.1.8 | Which journal format would you like? (then width and height, as in 4.10) | the figure is drawn **(plot)**, then **6.1.9** |
+| 6.1.1 | What are the two group words, separated by a comma? | **6.1.2**. If there are not exactly two words, if either group has no file, or if fewer than two files have hours in their name, the time response is skipped and the next step is **6.2** |
+| 6.1.2 | Which time points (hours) should be skipped in the waterfall plots? Separate them with commas, or type none. | the waterfalls are drawn **(plot)**, then the accept question, then **6.1.3** |
+| 6.1.3 | Which experiment should the first kinetic trace show? | drawn **(plot)**, accept question, then **6.1.4** |
+| 6.1.4 | Which experiment should the second kinetic trace show? | drawn **(plot)**, accept question, then **6.1.5** |
+| 6.1.5 | Which experiment should decomposition plot 1 show? | drawn **(plot)**, accept question, then **6.1.6** |
+| 6.1.6 | Which experiment should decomposition plot 2 show? | drawn **(plot)**, accept question, then **6.1.7** |
+| 6.1.7 | Which experiment should decomposition plot 3 show? | drawn **(plot)**, accept question, then **6.1.8** |
+| 6.1.8 | Which journal format would you like? (then width and height, as in 4.10) | the figure is drawn **(plot)**, then the final accept question |
 
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 6.1.9 | Do you accept this figure? | **6.2** | **6.1** |
+| Question | 1 → | 2 → |
+|---|---|---|
+| Do you accept these waterfall plots? | the next question | **6.1.2** again |
+| Do you accept this plot? (after each kinetic trace and decomposition plot) | the next question | the same choice again |
+| Do you accept this figure? (final) | **6.2** | **6.1** |
 
 ### 6.B Haem and OCR response
 
@@ -285,17 +289,22 @@ File names need a group word and the hours, for example `control_7hours`.
 
 File names need the strain, the addition order and the run number, for example `knockdown_kcn_then_bd_run1`. The files found are listed. If no file name fits, the figure is skipped and the next step is **7.1**.
 
+The figure is built up in the plot window in stages. First only the baseline OCR and the OCR response are drawn, then all the haems are added, then they are redrawn with the haems and order you chose. Each stage has its own accept question (second table).
+
 | # | Question | Leads to |
 |---|---|---|
-| 6.2.1 | Which OCR would you like to use? (the same options as 4.2.1) | **6.2.2** |
-| 6.2.2 | How would you like to show the haems? (the same options as 4.6) | **6.2.3** if you said yes to OD scaling in 3.3 and did not choose % oxidised, otherwise **6.2.4** |
-| 6.2.3 | Do you want to scale the haems by OD as well? `(Y/n)` | **6.2.4** |
-| 6.2.4 | Which haems should get a row, and in which order? | **6.2.5** |
-| 6.2.5 | Which journal format would you like? (then width and height, as in 4.10) | the figure is drawn **(plot)**, then **6.2.6** |
+| 6.2.1 | Which OCR would you like to use? (the same options as 4.2.1) | the OCR plots are drawn **(plot)**, accept question, then **6.2.2** |
+| 6.2.2 | How would you like to show the haems? (the same options as 4.6) | **6.2.3** if you said yes to OD scaling in 3.3 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **6.2.4** |
+| 6.2.3 | Do you want to scale the haems by OD as well? `(Y/n)` | all the haems are drawn **(plot)**, accept question, then **6.2.4** |
+| 6.2.4 | Which haems should get a row, and in which order? | drawn **(plot)**, accept question, then **6.2.5** |
+| 6.2.5 | Which journal format would you like? (then width and height, as in 4.10) | the figure is drawn **(plot)**, then the final accept question |
 
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 6.2.6 | Do you accept this figure? | **7.1** | **6.2** |
+| Question | 1 → | 2 → |
+|---|---|---|
+| Do you accept the OCR plots? | **6.2.2** | **6.2.1** again |
+| Do you accept these haem plots? | **6.2.4** | **6.2.2** again |
+| Do you accept these haem rows? | **6.2.5** | **6.2.4** again |
+| Do you accept this figure? (final) | **7.1** | **6.2** |
 
 ---
 
@@ -324,6 +333,6 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 
 The questions and their order are the same. These differ:
 
-- In **2** and **3** the picture of the current file is saved to `DePalencify_preview.png` and opened in your picture viewer.
+- In **2** and **3** the picture of the current file is saved to `Albufeira_preview.png` and opened in your picture viewer.
 - Before **2.1** a small menu steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring.
 - Every "Do you accept...?" question has a third answer, **3) Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.

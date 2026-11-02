@@ -190,10 +190,12 @@ def experiment_data_processor(info: dict,
                                   haemfactor=settings.HAEM_FACTOR,
                                   delta_exclude_first_minutes=ignore_first,
                                   delta_window_seconds=delta_window_seconds,
+                                  delta_exclude_last_minutes=ignore_last,
                                   )
             reference = experiment['haem_delta_abs'].attrs['delta_abs_baseline']
-            print(f"  Decomposed with {a['fit_file']}; delta A reference: "
-                  f"{reference['start_time']:.2f}-{reference['end_time']:.2f} min",
+            print(f"  Decomposed with {a['fit_file']}; delta A zero is the highest "
+                  f'{delta_window_seconds:g} s average of each haem '
+                  f"({reference['start_time']:.2f}-{reference['end_time']:.2f} min)",
                   )
         except (KeyError, ValueError, PafError) as exc:
             print(f'  Decomposition skipped: {exc}')
@@ -255,6 +257,11 @@ def experiment_data_processor(info: dict,
                 print(f"  Calculated {len(experiment['averages']['windows'])} event "
                       f'averages',
                       )
+                skipped = experiment['averages']['skipped']
+                if skipped:
+                    print(f"  Warning: averaging skipped for {', '.join(skipped)} "
+                          '(not enough time for the window and gap)',
+                          )
             except (KeyError, ValueError, TypeError) as exc:
                 print(f'  Averaging skipped: {exc}')
 

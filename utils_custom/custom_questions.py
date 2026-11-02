@@ -6,6 +6,7 @@ Numbered terminal questions of the time response and the OCR and haem response.
 from pathlib import Path
 from typing import Callable, List, Optional
 
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import group_assigner, hours_parser, run_name_lister
 from utils_shared.questions import (choice_asker,
@@ -65,6 +66,7 @@ def _haem_ocr_asker(names: List[str],
                     answers: dict,
                     defaults: dict,
                     fit: dict,
+                    step_checker: Optional[Callable[[object, str, str], bool]] = None,
                     ) -> Optional[List[str]]:
     """
     ---- Summary ----
@@ -79,6 +81,10 @@ def _haem_ocr_asker(names: List[str],
         Default answers.
     fit : dict
         Fit dictionary (haem_list) used to list the haems.
+    step_checker : Optional[Callable[[object, str, str], bool]]
+        Function (names, question, change label) that draws the figure as built so far,
+        asks whether it is accepted and returns True when it is; None skips the
+        previews.
 
     ---- Globals read ----
     None.
@@ -95,6 +101,7 @@ def _haem_ocr_asker(names: List[str],
     None.
 
     ---- Helpers ----
+    _step_checker
     choice_asker
     haem_form_option_builder
     haem_name_formatter
@@ -140,39 +147,75 @@ def _haem_ocr_asker(names: List[str],
         left_text = ', '.join(left_out)
         info_printer(f'Left out (name not recognised): {left_text}', depth=2)
 
-    # ---- 2 What is shown -------------------------------------------------------------
+    # ---- 2 What is shown, drawn as each choice is made -------------------------------
+    names_used = [r['name'] for r in usable]
     ocr_keys = ['raw'] + (['od'] if answers['normalise_od'] else []) + ['percent']
-    answers['ho_ocr_mode'] = choice_asker('Which OCR would you like to use?',
-                                          ocr_option_builder(ocr_keys),
-                                          defaults['ho_ocr_mode']
-                                          if defaults['ho_ocr_mode'] in ocr_keys
-                                          else ocr_keys[0],
+    answers.update({'ho_haem_mode': defaults['ho_haem_mode'],
+                    'ho_per_od': False,
+                    'ho_metric': 'delta',
+                    'ho_haems': [],
+                    'ho_blocks': ('baseline', 'ocr_response'),
+                    })
+    ocr_default = (defaults['ho_ocr_mode']
+                   if defaults['ho_ocr_mode'] in ocr_keys
+                   else ocr_keys[0]
+                   )
+    while True:
+        answers['ho_ocr_mode'] = choice_asker('Which OCR would you like to use?',
+                                              ocr_option_builder(ocr_keys),
+                                              ocr_default,
+                                              depth=2,
+                                              )
+        if _step_checker(step_checker,
+                         names_used,
+                         'Do you accept the OCR plots?',
+                         'No, choose the OCR again',
+                         ):
+            break
+        ocr_default = answers['ho_ocr_mode']
+
+    # All the haems are drawn as soon as the way to show them is chosen.
+    answers['ho_blocks'] = ('baseline', 'ocr_response', 'haem_response')
+    mode_default = defaults['ho_haem_mode']
+    while True:
+        answers['ho_haem_mode'] = choice_asker('How would you like to show the haems?',
+                                               haem_form_option_builder(True),
+                                               mode_default,
+                                               depth=2,
+                                               )
+        answers['ho_per_od'] = False
+        if answers['normalise_od'] and answers['ho_haem_mode'] != 'percent':
+            answers['ho_per_od'] = yes_no_asker('Do you want to scale the haems by OD '
+                                                'as well?',
+                                                defaults['ho_per_od'],
+                                                depth=2,
+                                                )
+        if _step_checker(step_checker,
+                         names_used,
+                         'Do you accept these haem plots?',
+                         'No, choose how to show the haems again',
+                         ):
+            break
+        mode_default = answers['ho_haem_mode']
+    haems_default = defaults['ho_haems'] or list(fit['haem_list'])
+    while True:
+        answers['ho_haems'] = multi_asker('Which haems should get a row, and in which '
+                                          'order?',
+                                          haem_name_sorter(fit['haem_list']),
+                                          default_all=True,
+                                          keep_order=True,
                                           depth=2,
+                                          default_values=haems_default,
+                                          label_formatter=haem_name_formatter,
                                           )
-    answers['ho_haem_mode'] = choice_asker('How would you like to show the haems?',
-                                           haem_form_option_builder(True),
-                                           defaults['ho_haem_mode'],
-                                           depth=2,
-                                           )
-    answers['ho_per_od'] = False
-    if answers['normalise_od'] and answers['ho_haem_mode'] != 'percent':
-        answers['ho_per_od'] = yes_no_asker('Do you want to scale the haems by OD as '
-                                            'well?',
-                                            defaults['ho_per_od'],
-                                            depth=2,
-                                            )
-    answers['ho_metric'] = 'delta'
-    answers['ho_haems'] = multi_asker('Which haems should get a row, and in which '
-                                      'order?',
-                                      haem_name_sorter(fit['haem_list']),
-                                      default_all=True,
-                                      keep_order=True,
-                                      depth=2,
-                                      default_values=(defaults['ho_haems']
-                                                      or list(fit['haem_list'])
-                                                      ),
-                                      label_formatter=haem_name_formatter,
-                                      )
+        if _step_checker(step_checker,
+                         names_used,
+                         'Do you accept these haem rows?',
+                         'No, choose the haems again',
+                         ):
+            break
+        haems_default = answers['ho_haems']
+    answers.pop('ho_blocks', None)
 
     # ---- 3 Figure size ---------------------------------------------------------------
     size_asker(answers,
@@ -185,7 +228,103 @@ def _haem_ocr_asker(names: List[str],
                (2, 0.75),
                depth=2,
                )
-    return [r['name'] for r in usable]
+    return names_used
+
+
+# ---- _hours_reader -------------------------------------------------------------------
+def _hours_reader(text: str) -> List[float]:
+    """
+    ---- Summary ----
+    Helper function to read the hours typed for the time points to skip.
+
+    ---- Inputs ----
+    text : str
+        Numbers separated by commas or semicolons, or "none".
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[float]
+        The hours. Words that are not numbers are reported and left out.
+
+    ---- Globals mutated ----
+    None. Prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    """
+
+    hours: List[float] = []
+    for word in (text or '').replace(';', ',').split(','):
+        try:
+            hours.append(float(word))
+        except ValueError:
+            if word.strip() and word.strip().lower() != 'none':
+                info_printer(f'{word.strip()!r} is not a number, so it is ignored.',
+                             depth=2,
+                             )
+    return hours
+
+
+# ---- _panel_chooser ------------------------------------------------------------------
+def _panel_chooser(question: str,
+                   options: list,
+                   default: str,
+                   slot: tuple,
+                   step_checker: Optional[Callable[[object, str, str], bool]],
+                   ) -> str:
+    """
+    ---- Summary ----
+    Helper function to ask which experiment a panel of the time response shows, put it
+    in the figure and ask whether the figure so far is accepted.
+
+    ---- Inputs ----
+    question : str
+        The question.
+    options : list
+        [(experiment name, text)] to choose from.
+    default : str
+        Experiment offered when only Enter is pressed.
+    slot : tuple
+        (list the pair is stored in, position in that list, {experiment name: group}).
+    step_checker : Optional[Callable[[object, str, str], bool]]
+        Function that draws the figure so far and asks whether it is accepted; None
+        accepts without drawing.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        Name of the experiment chosen.
+
+    ---- Globals mutated ----
+    None. Stores the (group, hours) pair in the list of ``slot`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _example_pair_maker
+    _step_checker
+    choice_asker
+    """
+
+    values, position, members = slot
+    while True:
+        choice = choice_asker(question, options, default, depth=2)
+        values[position] = _example_pair_maker(members, choice)
+        if _step_checker(step_checker,
+                         members,
+                         'Do you accept this plot?',
+                         'No, choose another experiment',
+                         ):
+            return choice
+        default = choice
 
 
 # ---- _saved_example_finder -----------------------------------------------------------
@@ -233,10 +372,106 @@ def _saved_example_finder(defaults: dict,
             ]
 
 
+# ---- _step_checker -------------------------------------------------------------------
+def _step_checker(step_checker: Optional[Callable[[object, str, str], bool]],
+                  members: object,
+                  question: str,
+                  change: str,
+                  ) -> bool:
+    """
+    ---- Summary ----
+    Helper function to show the figure as built so far and ask whether it is accepted.
+
+    ---- Inputs ----
+    step_checker : Optional[Callable[[object, str, str], bool]]
+        Function (members, question, change label) that draws the figure and returns
+        True when it is accepted; None when there is nothing to draw with.
+    members : object
+        The experiments of the figure: {name: group} or a list of names.
+    question : str
+        The accept question.
+    change : str
+        Label of the answer that asks the question again.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when accepted (or when there is no way to draw).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return True if step_checker is None else step_checker(members, question, change)
+
+
+# ---- _step_wirer ---------------------------------------------------------------------
+def _step_wirer(figure_checker: Optional[Callable[[str, dict], bool]],
+                key: str,
+                fit: Optional[dict],
+                result: dict,
+                ) -> Optional[Callable[[object, str, str], bool]]:
+    """
+    ---- Summary ----
+    Helper function to turn the figure checker of the whole figure into the checker of
+    one step: the figure drawn from the choices made so far.
+
+    ---- Inputs ----
+    figure_checker : Optional[Callable[[str, dict], bool]]
+        The figure checker (see summary_figure_asker), or None.
+    key : str
+        'time_response' or 'haem_ocr'.
+    fit : Optional[dict]
+        Fit dictionary.
+    result : dict
+        {'time_response': ..., 'haem_ocr': ...} of the figures so far.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[Callable[[object, str, str], bool]]
+        Function (members, question, change label) giving True when the user accepts
+        the figure so far, or None when there is no figure checker.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if figure_checker is None:
+        return None
+
+    def check(members: object, question: str, change: str) -> bool:
+        payload = {'fit': fit,
+                   'custom': dict(result, **{key: members}),
+                   'question': question,
+                   'change': change,
+                   }
+        return figure_checker(key, payload)
+
+    return check
+
+
 # ---- _time_response_asker ------------------------------------------------------------
 def _time_response_asker(names: List[str],
                          answers: dict,
                          defaults: dict,
+                         step_checker: Optional[Callable[[object, str, str], bool]]
+                         = None,
                          ) -> Optional[dict]:
     """
     ---- Summary ----
@@ -249,6 +484,10 @@ def _time_response_asker(names: List[str],
         Answers dictionary the settings are stored in.
     defaults : dict
         Default answers.
+    step_checker : Optional[Callable[[object, str, str], bool]]
+        Function (members, question, change label) that draws the figure as built so
+        far, asks whether it is accepted and returns True when it is; None skips the
+        previews.
 
     ---- Globals read ----
     None.
@@ -265,9 +504,10 @@ def _time_response_asker(names: List[str],
     None.
 
     ---- Helpers ----
-    _example_pair_maker
+    _hours_reader
+    _panel_chooser
     _saved_example_finder
-    choice_asker
+    _step_checker
     group_assigner
     hours_parser
     info_printer
@@ -303,7 +543,7 @@ def _time_response_asker(names: List[str],
         return None
     answers['tr_groups'] = groups
 
-    # ---- 2 The two example experiments -----------------------------------------------
+    # ---- 2 The time points left out of the waterfalls --------------------------------
     timed = [n for n in members if hours_parser(n) is not None]
     options = [(n, f'{n} ({members[n]}, {hours_parser(n):g} hours)') for n in timed]
     if len(options) < 2:
@@ -313,36 +553,55 @@ def _time_response_asker(names: List[str],
                      depth=2,
                      )
         return None
+    # Nothing but the waterfalls is chosen yet; the other panels are empty boxes.
+    answers['tr_examples'] = [None, None]
+    answers['tr_decompositions'] = [None, None, None]
+    answers['tr_skip_hours'] = []
+    skip_default = ', '.join(f'{h:g}' for h in defaults.get('tr_skip_hours') or [])
+    while True:
+        skipped = text_asker('Which time points (hours) should be skipped in the '
+                             'waterfall plots? Separate them with commas, or type '
+                             'none.',
+                             skip_default or 'none',
+                             depth=2,
+                             )
+        answers['tr_skip_hours'] = _hours_reader(skipped)
+        if _step_checker(step_checker,
+                         members,
+                         'Do you accept these waterfall plots?',
+                         'No, choose the time points again',
+                         ):
+            break
+        skip_default = ', '.join(f'{h:g}' for h in answers['tr_skip_hours']) or 'none'
+
+    # ---- 3 The two kinetic traces and the three decomposition plots ------------------
     first_group = [n for n in timed if members[n] == groups[0]]
     saved = _saved_example_finder(defaults, 'tr_examples', members, timed)[:2]
     top_default = saved[0] if saved else first_group[0]
-    left = choice_asker('Which experiment should the first kinetic trace show?',
-                        options,
-                        top_default,
-                        depth=2,
-                        )
+    left = _panel_chooser('Which experiment should the first kinetic trace show?',
+                          options,
+                          top_default,
+                          (answers['tr_examples'], 0, members),
+                          step_checker,
+                          )
     if len(saved) > 1:
         bottom_default = saved[1]
     elif first_group[-1] != left:
         bottom_default = first_group[-1]
     else:
         bottom_default = options[-1][0]
-    right = choice_asker('Which experiment should the second kinetic trace show?',
-                         options,
-                         bottom_default,
-                         depth=2,
-                         )
-    answers['tr_examples'] = [_example_pair_maker(members, left),
-                              _example_pair_maker(members, right),
-                              ]
-    # The three decomposition plots are chosen separately from the kinetic traces.
+    right = _panel_chooser('Which experiment should the second kinetic trace show?',
+                           options,
+                           bottom_default,
+                           (answers['tr_examples'], 1, members),
+                           step_checker,
+                           )
     saved = _saved_example_finder(defaults,
                                   'tr_decompositions',
                                   members,
                                   timed,
                                   )[:3]
     unused = [n for n, _ in options if n not in (left, right)]
-    picks = []
     for number in range(3):
         if number < len(saved):
             default = saved[number]
@@ -352,44 +611,23 @@ def _time_response_asker(names: List[str],
             default = right
         else:
             default = (unused or [options[-1][0]])[0]
-        picks.append(choice_asker(f'Which experiment should decomposition plot '
-                                  f'{number + 1} show?',
-                                  options,
-                                  default,
-                                  depth=2,
-                                  ),
-                     )
-    answers['tr_decompositions'] = [_example_pair_maker(members, name)
-                                    for name in picks
-                                    ]
-    # Time points left out of the waterfall plots.
-    skipped = text_asker('Which time points (hours) should be skipped in the waterfall '
-                         'plots? Separate them with commas, or type none.',
-                         ', '.join(f'{h:g}'
-                                   for h in defaults.get('tr_skip_hours') or []
-                                   )
-                         or 'none',
-                         depth=2,
-                         )
-    answers['tr_skip_hours'] = []
-    for word in (skipped or '').replace(';', ',').split(','):
-        try:
-            answers['tr_skip_hours'].append(float(word))
-        except ValueError:
-            if word.strip() and word.strip().lower() != 'none':
-                info_printer(f'{word.strip()!r} is not a number, so it is ignored.',
-                             depth=2,
-                             )
+        _panel_chooser(f'Which experiment should decomposition plot {number + 1} '
+                       f'show?',
+                       options,
+                       default,
+                       (answers['tr_decompositions'], number, members),
+                       step_checker,
+                       )
 
     # ---- 3 Figure size ---------------------------------------------------------------
     size_asker(answers,
                defaults,
-               {'journal': 'tr_journal',
-                'columns': 'tr_columns',
-                'height': 'tr_height',
-                'mode': 'tr_size_mode',
+               {'journal': 'ho_journal',
+                'columns': 'ho_pub_columns',
+                'height': 'ho_pub_height',
+                'mode': 'ho_size_mode',
                 },
-               (2, 1.0),
+               (2, 0.75),
                depth=2,
                )
     return members
@@ -538,10 +776,11 @@ def summary_figure_asker(names: List[str],
 
             # ---- 2 Ask the settings of the figure ------------------------------------
             _window_ensurer(answers, defaults)
+            checker = _step_wirer(figure_checker, key, fit, result)
             if key == 'time_response':
-                result[key] = _time_response_asker(names, answers, defaults)
+                result[key] = _time_response_asker(names, answers, defaults, checker)
             else:
-                result[key] = _haem_ocr_asker(names, answers, defaults, fit)
+                result[key] = _haem_ocr_asker(names, answers, defaults, fit, checker)
             answers[f'plot_{key}'] = result[key] is not None
             if (result[key] is None or figure_checker is None or
                     figure_checker(key, {'fit': fit, 'custom': result})

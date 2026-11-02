@@ -42,7 +42,8 @@ ANSWER_HINT = ('Type your answer and press Enter. If you type nothing, the value
 FILES_HELP = ('Select a file using the drop-down, or use the arrows to browse the '
               'data.')
 FIGURES_HELP = ('Select a figure using the drop-down, or use the arrows to look at '
-                'each one.')
+                'each one. Experiment plots marked [locked] are final; the figure '
+                'being built is listed after them.')
 ENTRY_BACKGROUND = '#2b2b2b'
 PLOT_BACKGROUND = '#f2f2f2'
 _CLOSED = object()
@@ -183,6 +184,7 @@ class ViewerGui:
         self._fonts: Dict[tuple, Any] = {}
         root.title(title)
         self._is_pictures = False
+        self._file_count = 0
         self._widgets_builder()
         self._icon_setter()
 
@@ -258,7 +260,7 @@ class ViewerGui:
 
         if not self._is_finished:
             from tkinter import messagebox
-            if not messagebox.askokcancel('Close DePalencify',
+            if not messagebox.askokcancel('Close Albufeira',
                                           'The program has not finished. Close the '
                                           'window and stop it? A file that is being '
                                           'written may be left incomplete.',
@@ -326,6 +328,39 @@ class ViewerGui:
         flush()
         self._root.after(25, self._drain_runner)
 
+    # ---- _display_names --------------------------------------------------------------
+    def _display_names(self) -> List[str]:
+        """
+        ---- Summary ----
+        Method to give the names for the drop-down: the experiment files are marked as
+        locked once the figures built from them are shown.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        List[str]
+            One text per entry of the list.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if not self._is_pictures:
+            return list(self._names)
+        return [f'[locked] {name}' if i < self._file_count else name
+                for i, name in enumerate(self._names)
+                ]
+
     # ---- _event_handler --------------------------------------------------------------
     def _event_handler(self, event: tuple) -> None:
         """
@@ -367,6 +402,7 @@ class ViewerGui:
         elif kind == 'session':
             self._session = event[1]
             self._names = [s['name'] for s in self._session.summaries]
+            self._file_count = len(self._names)
             self._combo.configure(values=self._names)
             self._renderer = PreviewRenderer(self._session, self._image_deliverer)
             self._renderer.start()
@@ -375,16 +411,21 @@ class ViewerGui:
             self._nav_state(True)
             self._navigator(self._session.current)
         elif kind == 'pictures':
+            # The experiment files stay (locked, as last drawn) and the figures being
+            # built are listed after them.
+            files = self._names[:self._file_count]
             self._is_pictures = True
-            self._version += 1
-            self._names = [title for title, _ in event[1]]
-            self._images = {title: png for title, png in event[1]}
-            self._previous, self._notes, self._failures = {}, {}, {}
+            self._names = files + [title for title, _ in event[1]]
+            kept = {name: png for name, png in self._images.items() if name in files}
+            self._images = {**kept, **{title: png for title, png in event[1]}}
+            for title, _ in event[1]:
+                self._failures.pop(title, None)
+                self._notes.pop(title, None)
             self._has_spec = True
-            self._combo.configure(values=self._names)
+            self._combo.configure(values=self._display_names())
             self._help.configure(text=FIGURES_HELP)
             self._nav_state(len(self._names) > 1)
-            self._navigator(0)
+            self._navigator(len(files))
         elif kind == 'spec':
             spec, name = event[1], event[2]
             self._version += 1
@@ -447,7 +488,7 @@ class ViewerGui:
     def _icon_setter(self) -> None:
         """
         ---- Summary ----
-        Method to give the window (and so the taskbar or dock) the DePalencify icon. A
+        Method to give the window (and so the taskbar or dock) the Albufeira icon. A
         missing icon file or an unsupported system is ignored.
 
         ---- Inputs ----
@@ -539,6 +580,46 @@ class ViewerGui:
             self._notes[name] = notes
         if self._names and name == self._names[self._index]:
             self._picture_shower()
+
+    # ---- _lock_drawer ----------------------------------------------------------------
+    def _lock_drawer(self) -> None:
+        """
+        ---- Summary ----
+        Method to draw a small padlock and "Locked" in the corner of the plot area, to
+        show that this experiment plot is final and cannot be changed any more.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        right = self._canvas.winfo_width() - 14
+        top = 10
+        colour = '#555555'
+        self._canvas.create_arc(right - 44, top, right - 28, top + 16, start=0,
+                                extent=180, style='arc', outline=colour, width=2,
+                                )
+        self._canvas.create_rectangle(right - 48, top + 8, right - 24, top + 24,
+                                      fill=colour, outline=colour,
+                                      )
+        self._canvas.create_text(right - 54, top + 16, text='Locked', anchor='e',
+                                 fill=colour,
+                                 )
 
     # ---- _logic_runner ---------------------------------------------------------------
     def _logic_runner(self) -> None:
@@ -682,9 +763,9 @@ class ViewerGui:
         self._index = index % len(self._names)
         self._combo.current(self._index)
         self._counter.configure(text=f'{self._index + 1} of {len(self._names)}')
-        if self._session is not None and not self._is_pictures:
+        if self._session is not None and self._index < self._file_count:
             self._session.current = self._index
-        if self._renderer is not None and not self._is_pictures:
+        if self._renderer is not None and self._index < self._file_count:
             self._renderer.wanted_setter(self._index)
         self._picture_shower()
         if is_from_user and self._is_waiting:
@@ -820,6 +901,8 @@ class ViewerGui:
                                   self._canvas.winfo_height() // 2,
                                   image=self._photo,
                                   )
+        if self._is_pictures and self._index < self._file_count:
+            self._lock_drawer()
         note = self._notes.get(name, '')
         if is_stale:
             note = 'Redrawing ... (this is the previous picture)'
@@ -1447,85 +1530,6 @@ def active_gui_getter() -> Optional[ViewerGui]:
     return _active_gui
 
 
-# ---- console_closer ------------------------------------------------------------------
-def console_closer() -> bool:
-    """
-    ---- Summary ----
-    Main function to close the black terminal window the program was started from, once
-    the browser window is open. It only does so on Windows and only when the launcher
-    asked for it (DEPALENCIFY_CLOSE_CONSOLE is set), so a terminal the user opened
-    themselves is left alone.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    os.environ["DEPALENCIFY_CLOSE_CONSOLE"] (set by run.bat).
-
-    ---- Outputs ----
-    bool
-        True when the terminal window was closed.
-
-    ---- Globals mutated ----
-    None. Points sys.stdout and sys.stderr at the null device, so nothing printed later
-    fails, and detaches the process from its console (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    if sys.platform != 'win32' or not os.environ.get('DEPALENCIFY_CLOSE_CONSOLE'):
-        return False
-    try:
-        import ctypes
-        sys.stdout = open(os.devnull, 'w', encoding='utf-8')
-        sys.stderr = open(os.devnull, 'w', encoding='utf-8')
-        return bool(ctypes.windll.kernel32.FreeConsole())
-    except Exception:  # a console that stays open is harmless
-        return False
-
-
-# ---- console_waiter ------------------------------------------------------------------
-def console_waiter() -> None:
-    """
-    ---- Summary ----
-    Main function to keep the terminal window open at the end of the program when the
-    launcher started it in a window of its own and the terminal is still in use (the
-    browser window did not open, or the program failed), so the messages can be read.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    os.environ["DEPALENCIFY_CLOSE_CONSOLE"] (set by run.bat).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Waits for Enter (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    if sys.platform != 'win32' or not os.environ.get('DEPALENCIFY_CLOSE_CONSOLE'):
-        return
-    try:
-        import ctypes
-        if ctypes.windll.kernel32.GetConsoleWindow():
-            input('\nPress Enter to close this window ...')
-    except (EOFError, KeyboardInterrupt, OSError, AttributeError):
-        pass
-
-
 # ---- gui_runner ----------------------------------------------------------------------
 def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
     """
@@ -1541,7 +1545,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
         Window title.
 
     ---- Globals read ----
-    os.environ["DEPALENCIFY_NO_GUI"] (set to anything to keep the terminal).
+    os.environ["ALBUFEIRA_NO_GUI"] (set to anything to keep the terminal).
 
     ---- Outputs ----
     Optional[int]
@@ -1556,12 +1560,11 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
 
     ---- Helpers ----
     ViewerGui
-    console_closer
     """
 
     try:
-        if os.environ.get('DEPALENCIFY_NO_GUI'):
-            raise GuiUnavailable('DEPALENCIFY_NO_GUI is set')
+        if os.environ.get('ALBUFEIRA_NO_GUI'):
+            raise GuiUnavailable('ALBUFEIRA_NO_GUI is set')
         try:
             import tkinter as tk
         except ImportError:
@@ -1577,7 +1580,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
                 ctypes.windll.shcore.SetProcessDpiAwareness(1)  # sharp text
                 # own taskbar group, so the taskbar shows our icon, not Python's
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                    'DePalencify.ExperimentBrowser',
+                    'Albufeira.ExperimentBrowser',
                 )
             except Exception:
                 pass
@@ -1590,5 +1593,4 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
               f'run in this terminal and previews are saved as a picture.',
               )
         return None
-    console_closer()
     return ViewerGui(tk, root, program, title).run()

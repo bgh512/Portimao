@@ -1,7 +1,7 @@
-# DePalencify - Function List
+# Albufeira - Function List
 
-- **Project:** DePalencify
-- **Version:** V2.6
+- **Project:** Albufeira
+- **Version:** V2.7
 - **Date:** 02/11/2026
 
 ## Contents
@@ -9,6 +9,8 @@
 - [`config.py`](#configpy)
     - [`Config`](#config)
     - [`haem_colour_mapper`](#haem_colour_mapper)
+- [`launchers/make_icons.py`](#launchersmake_iconspy)
+    - [`main`](#main)
 - [`main.py`](#mainpy)
     - [`comparison_maker`](#comparison_maker)
     - [`everything_asker`](#everything_asker)
@@ -30,7 +32,11 @@
 - [`utils_custom/custom_questions.py`](#utils_customcustom_questionspy)
     - [`_example_pair_maker`](#_example_pair_maker)
     - [`_haem_ocr_asker`](#_haem_ocr_asker)
+    - [`_hours_reader`](#_hours_reader)
+    - [`_panel_chooser`](#_panel_chooser)
     - [`_saved_example_finder`](#_saved_example_finder)
+    - [`_step_checker`](#_step_checker)
+    - [`_step_wirer`](#_step_wirer)
     - [`_time_response_asker`](#_time_response_asker)
     - [`_window_ensurer`](#_window_ensurer)
     - [`summary_figure_asker`](#summary_figure_asker)
@@ -161,6 +167,7 @@
     - [`_haem_scale_sharer`](#_haem_scale_sharer)
     - [`_haem_window_drawer`](#_haem_window_drawer)
     - [`_legend_drawer`](#_legend_drawer)
+    - [`_placeholder_drawer`](#_placeholder_drawer)
     - [`_time_axes_styler`](#_time_axes_styler)
     - [`_time_gap_calculator`](#_time_gap_calculator)
     - [`_title_styler`](#_title_styler)
@@ -212,6 +219,7 @@
     - [`figure_capture_setter`](#figure_capture_setter)
     - [`figure_saver`](#figure_saver)
     - [`file_name_sanitiser`](#file_name_sanitiser)
+    - [`program_title_builder`](#program_title_builder)
     - [`name_simplifier`](#name_simplifier)
 - [`utils_shared/individual_experiment_exporter.py`](#utils_sharedindividual_experiment_exporterpy)
     - [`_frame_writer`](#_frame_writer)
@@ -230,6 +238,7 @@
     - [`_min_ticks_setter`](#_min_ticks_setter)
     - [`_panel_builder`](#_panel_builder)
     - [`_vo2_ymax_calculator`](#_vo2_ymax_calculator)
+    - [`_skipped_window_drawer`](#_skipped_window_drawer)
     - [`_window_drawer`](#_window_drawer)
     - [`_window_label_builder`](#_window_label_builder)
     - [`_ylim_calculator`](#_ylim_calculator)
@@ -296,6 +305,7 @@
     - [`time_getter`](#time_getter)
     - [`value_getter`](#value_getter)
 - [`utils_shared/spectral_decomposer.py`](#utils_sharedspectral_decomposerpy)
+    - [`_best_window_finder`](#_best_window_finder)
     - [`_wavelength_masker`](#_wavelength_masker)
     - [`data_filterer`](#data_filterer)
     - [`delta_abs_calculator`](#delta_abs_calculator)
@@ -345,8 +355,6 @@
     - [`GuiUnavailable`](#guiunavailable)
     - [`ViewerGui`](#viewergui)
     - [`active_gui_getter`](#active_gui_getter)
-    - [`console_closer`](#console_closer)
-    - [`console_waiter`](#console_waiter)
     - [`gui_runner`](#gui_runner)
 - [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
     - [`_kept_builder`](#_kept_builder)
@@ -360,6 +368,7 @@
     - [`preview_info_builder`](#preview_info_builder)
     - [`preview_drawer`](#preview_drawer)
     - [`preview_figure_builder`](#preview_figure_builder)
+    - [`skipped_windows_finder`](#skipped_windows_finder)
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
     - [`PreviewRenderer`](#previewrenderer)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
@@ -369,6 +378,7 @@
     - [`_limits_lister`](#_limits_lister)
     - [`_od_lister`](#_od_lister)
     - [`_review_asker`](#_review_asker)
+    - [`_skipped_lister`](#_skipped_lister)
     - [`analysis_stage_runner`](#analysis_stage_runner)
     - [`browser_stage_runner`](#browser_stage_runner)
     - [`plots_stage_runner`](#plots_stage_runner)
@@ -384,7 +394,7 @@
 
 ## `config.py`
 
-Settings and defaults of DePalencify: figure styles, journal sizes and colours.
+Settings and defaults of Albufeira: figure styles, journal sizes and colours.
 
 ### CLASSES
 
@@ -578,6 +588,39 @@ None.
 name_simplifier
 ```
 
+## `launchers/make_icons.py`
+
+Makes every icon file from one picture: put the new icon at assets/icon.png (square,
+
+### FUNCTIONS
+
+#### `main`
+
+```text
+---- Summary ----
+Main function to turn assets/icon.png into the Windows icon (assets/icon.ico) and
+the Mac icon (inside Albufeira.app).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ROOT, SOURCE, WINDOWS_SIZES, MAC_FILE (module constants).
+
+---- Outputs ----
+int
+    0 when the icons were made, 1 when the picture is missing.
+
+---- Globals mutated ----
+None. Writes the icon files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `main.py`
 
 Main program: read .paf files, process them and export figures and workbooks.
@@ -769,7 +812,7 @@ the left, plots on the right), or in the terminal when the window cannot open.
 None.
 
 ---- Globals read ----
-VERSION (shown in the window title).
+PROGRAM_TITLE (shown in the window title).
 
 ---- Outputs ----
 int
@@ -797,7 +840,7 @@ the comparison and special figures, logging the output to a file.
 None.
 
 ---- Globals read ----
-VERSION (written to the log).
+PROGRAM_TITLE (written to the log).
 
 ---- Outputs ----
 int
@@ -969,7 +1012,8 @@ Main function to build the settings of the OCR and haem response figure.
 cfg : Config
     Figure style derived from the answers (config.py).
 answers : dict
-    Terminal answers; uses ho_haems, ho_metric, ho_pub_columns and ho_pub_height.
+    Terminal answers; uses ho_haems, ho_metric, ho_pub_columns and ho_pub_height,
+    and ho_blocks (the blocks drawn so far while the figure is being built).
 haem_names : list
     Haem names of the fit, in fit order.
 
@@ -1034,7 +1078,8 @@ cfg : Config
     Figure style derived from the answers (config.py).
 answers : dict
     Terminal answers; uses tr_groups, tr_examples, tr_decompositions,
-    tr_skip_hours, tr_columns and tr_height.
+    tr_skip_hours, tr_columns and tr_height. An example that is None has not been
+    chosen yet (the figure is being built) and is drawn as an empty box.
 haem_names : list
     Haem names of the fit, used to colour the decomposition panels.
 
@@ -1146,6 +1191,10 @@ defaults : dict
     Default answers.
 fit : dict
     Fit dictionary (haem_list) used to list the haems.
+step_checker : Optional[Callable[[object, str, str], bool]]
+    Function (names, question, change label) that draws the figure as built so far,
+    asks whether it is accepted and returns True when it is; None skips the
+    previews.
 
 ---- Globals read ----
 None.
@@ -1162,6 +1211,7 @@ None. Stores the settings in ``answers`` (side effect).
 None.
 
 ---- Helpers ----
+_step_checker
 choice_asker
 haem_form_option_builder
 haem_name_formatter
@@ -1172,6 +1222,72 @@ ocr_option_builder
 run_name_lister
 size_asker
 yes_no_asker
+```
+
+#### `_hours_reader`
+
+```text
+---- Summary ----
+Helper function to read the hours typed for the time points to skip.
+
+---- Inputs ----
+text : str
+    Numbers separated by commas or semicolons, or "none".
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[float]
+    The hours. Words that are not numbers are reported and left out.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+```
+
+#### `_panel_chooser`
+
+```text
+---- Summary ----
+Helper function to ask which experiment a panel of the time response shows, put it
+in the figure and ask whether the figure so far is accepted.
+
+---- Inputs ----
+question : str
+    The question.
+options : list
+    [(experiment name, text)] to choose from.
+default : str
+    Experiment offered when only Enter is pressed.
+slot : tuple
+    (list the pair is stored in, position in that list, {experiment name: group}).
+step_checker : Optional[Callable[[object, str, str], bool]]
+    Function that draws the figure so far and asks whether it is accepted; None
+    accepts without drawing.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Name of the experiment chosen.
+
+---- Globals mutated ----
+None. Stores the (group, hours) pair in the list of ``slot`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_example_pair_maker
+_step_checker
+choice_asker
 ```
 
 #### `_saved_example_finder`
@@ -1208,6 +1324,75 @@ None.
 hours_parser
 ```
 
+#### `_step_checker`
+
+```text
+---- Summary ----
+Helper function to show the figure as built so far and ask whether it is accepted.
+
+---- Inputs ----
+step_checker : Optional[Callable[[object, str, str], bool]]
+    Function (members, question, change label) that draws the figure and returns
+    True when it is accepted; None when there is nothing to draw with.
+members : object
+    The experiments of the figure: {name: group} or a list of names.
+question : str
+    The accept question.
+change : str
+    Label of the answer that asks the question again.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when accepted (or when there is no way to draw).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_step_wirer`
+
+```text
+---- Summary ----
+Helper function to turn the figure checker of the whole figure into the checker of
+one step: the figure drawn from the choices made so far.
+
+---- Inputs ----
+figure_checker : Optional[Callable[[str, dict], bool]]
+    The figure checker (see summary_figure_asker), or None.
+key : str
+    'time_response' or 'haem_ocr'.
+fit : Optional[dict]
+    Fit dictionary.
+result : dict
+    {'time_response': ..., 'haem_ocr': ...} of the figures so far.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Callable[[object, str, str], bool]]
+    Function (members, question, change label) giving True when the user accepts
+    the figure so far, or None when there is no figure checker.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_time_response_asker`
 
 ```text
@@ -1221,6 +1406,10 @@ answers : dict
     Answers dictionary the settings are stored in.
 defaults : dict
     Default answers.
+step_checker : Optional[Callable[[object, str, str], bool]]
+    Function (members, question, change label) that draws the figure as built so
+    far, asks whether it is accepted and returns True when it is; None skips the
+    previews.
 
 ---- Globals read ----
 None.
@@ -1237,9 +1426,10 @@ None. Stores the settings in ``answers`` (side effect).
 None.
 
 ---- Helpers ----
-_example_pair_maker
+_hours_reader
+_panel_chooser
 _saved_example_finder
-choice_asker
+_step_checker
 group_assigner
 hours_parser
 info_printer
@@ -5588,6 +5778,37 @@ None.
 None.
 ```
 
+#### `_placeholder_drawer`
+
+```text
+---- Summary ----
+Helper function to draw an empty labelled box where a panel has not been chosen yet.
+
+---- Inputs ----
+fig : Any
+    The figure, already fitted to its final layout.
+hidden : dict
+    {panel letter: [axes that were hidden]} of the panels not chosen yet.
+config : dict
+    Time response settings from custom_config.time_response_config_builder.
+
+---- Globals read ----
+PLACEHOLDER_NAMES (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Hides the axes and adds a dashed box and its text to the figure (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_time_axes_styler`
 
 ```text
@@ -5861,6 +6082,7 @@ _event_label_height_calculator
 _example_finder
 _example_viewer
 _haem_scale_sharer
+_placeholder_drawer
 _time_gap_calculator
 _title_styler
 decomposition_plotter
@@ -6338,17 +6560,18 @@ schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES; schema.resolve_source, get_ti
 ---- Outputs ----
 dict
     The same experiment dictionary. Raises ValueError for invalid settings, no
-    source, no events, invalid times or windows that do not fit between the
-    additions.
+    source, no events or invalid times. A window that does not fit between two
+    additions (or after the last one) is skipped, not an error.
 
 ---- Globals mutated ----
-experiment: adds experiment["averages"] = {"settings", "windows"} (layout in
-DATA_FORMAT.md).
+experiment: adds experiment["averages"] = {"settings", "windows", "skipped"}
+(layout in DATA_FORMAT.md).
 
 ---- Equations ----
 average0 ends gap_minutes before the first event; averageN ends gap_minutes before
 event N+1 (final_window_gap_minutes before the end of the recording for the last
-event); each window starts window_minutes before its end. change = mean /
+event); each window starts window_minutes before its end and is skipped when that
+is before its own event. change = mean /
 mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0).
 
 ---- Helpers ----
@@ -7135,6 +7358,38 @@ None.
 None.
 ```
 
+#### `program_title_builder`
+
+```text
+---- Summary ----
+Main function to build the name shown at the top of the terminal, in the window
+title and in the log: the program name, the git branch it was installed from (when
+the folder is a git clone) and the version.
+
+---- Inputs ----
+root : Path
+    Program folder.
+version : str
+    Version text from the VERSION file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    For example "Albufeira dev V2.7"; without a branch (a folder from a zip file)
+    "Albufeira V2.7".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `name_simplifier`
 
 ```text
@@ -7717,6 +7972,38 @@ top = max(smooth) + noise + headroom x max(smooth).
 None.
 ```
 
+#### `_skipped_window_drawer`
+
+```text
+---- Summary ----
+Helper function to draw an averaging window that could not be calculated: a red
+band on every axis with a warning sign above it. Only used in the previews.
+
+---- Inputs ----
+axes : List[Axes]
+    Axes of the experiment, top to bottom.
+window_name : str
+    Window name, for example 'average3'.
+window : dict
+    {start_time, end_time, reason} of the skipped window.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds a shaded span and a warning sign to the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_window_drawer`
 
 ```text
@@ -7746,6 +8033,7 @@ None. Adds shaded spans and labels to the axes (side effect).
 None.
 
 ---- Helpers ----
+_skipped_window_drawer
 _window_label_builder
 ```
 
@@ -9882,8 +10170,9 @@ Main function to start copying everything printed to a timestamped log file.
 ---- Inputs ----
 export_root : Path
     Results folder; the log goes to <export_root>/logs/YYYY_MM_DD-HH_MM_SS.log.
-version : str
-    Project version (as in the VERSION file), written on the first line of the log.
+title : str
+    Program name, branch and version (program_title_builder), written on the first
+    line of the log.
 settings : dict
     Terminal answers of the run, written at the top of the log.
 
@@ -9896,7 +10185,7 @@ dict
     tee_stdout, tee_stderr, closed}, to be passed to logging_stopper.
 
 ---- Globals mutated ----
-None. Creates the log folder and file, writes the version, seed and settings to
+None. Creates the log folder and file, writes the title, seed and settings to
 its first lines, replaces sys.stdout and sys.stderr with copying streams and
 prints the log location (side effects).
 
@@ -10094,6 +10383,44 @@ Spectral fit loading and haem decomposition routines.
 
 ### SPECTRAL DECOMPOSER HELPERS
 
+#### `_best_window_finder`
+
+```text
+---- Summary ----
+Helper function to find the window of a given length with the highest average.
+
+---- Inputs ----
+times : np.ndarray
+    Time of each spectrum in minutes.
+values : np.ndarray
+    Value at each spectrum.
+start : float
+    Earliest time that may be used.
+stop : float
+    Latest time that may be used.
+width : float
+    Window length in minutes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Tuple[float, float, float]]
+    (highest average, time of its first spectrum, time of its last spectrum), or
+    None when there is no finite value between start and stop. When the usable
+    part is shorter than the window, all of it is one window.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Window average = (running sum at the window end - running sum at its start) /
+number of spectra in the window.
+
+---- Helpers ----
+None.
+```
+
 #### `_wavelength_masker`
 
 ```text
@@ -10160,35 +10487,41 @@ _wavelength_masker
 ```text
 ---- Summary ----
 Main function to shift each haem absorbance so that its reference level is 0, giving
-a change in absorbance (mOD).
+a change in absorbance (mOD). The reference level of each haem is the average of its
+highest window (for example the fully oxidised point), wherever it occurs in the
+run outside the ignored start and end.
 
 ---- Inputs ----
 haem_abs : pd.DataFrame
     Haem absorbance table in mOD (time, spectrum index and one column per haem).
 exclude_first_minutes : float
-    Start of the reference window, in minutes after the first measurement.
+    Minutes after the first measurement that are ignored at the start.
 window_seconds : float
     Length of the reference window, in seconds (> 0).
 label : str
     Name used in error messages.
+exclude_last_minutes : float
+    Minutes before the last measurement that are ignored at the end.
 
 ---- Globals read ----
 schema.get_times, get_values, measurement_columns.
 
 ---- Outputs ----
 pd.DataFrame
-    Shifted copy; the reference window and the means are stored in
+    Shifted copy; the means and the window of each haem are stored in
     result.attrs["delta_abs_baseline"]. Raises ValueError for invalid settings or
-    when no spectra fall in the window.
+    when no spectra are left after the ignored parts.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-delta_abs = abs - mean(abs inside the reference window), per haem. Only a constant
-is subtracted, so differences between points are unchanged.
+delta_abs = abs - max over windows of mean(abs inside the window), per haem. The
+windows start at each spectrum and last window_seconds. Only a constant is
+subtracted, so differences between points are unchanged.
 
 ---- Helpers ----
+_best_window_finder
 measurement_column_finder
 time_getter
 value_getter
@@ -10219,6 +10552,9 @@ delta_exclude_first_minutes : float
     spectrum.
 delta_window_seconds : float
     Length of the delta absorbance reference window, in seconds.
+delta_exclude_last_minutes : float
+    Minutes before the last spectrum that are ignored when finding the delta
+    absorbance reference.
 
 ---- Globals read ----
 schema.TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
@@ -10236,7 +10572,7 @@ experiment: adds haem_conc (time, spectrum index, one column per haem), haem_abs
 ---- Equations ----
 c = (S^T S)^-1 S^T a for every spectrum (projector built once); haem_abs = c x peak
 amplitude of the haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs -
-mean over the reference window.
+mean of the highest window.
 
 ---- Helpers ----
 _wavelength_masker
@@ -11735,6 +12071,33 @@ _event_handler
 _pane_writer
 ```
 
+##### `_display_names`
+
+```text
+---- Summary ----
+Method to give the names for the drop-down: the experiment files are marked as
+locked once the figures built from them are shown.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    One text per entry of the list.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_event_handler`
 
 ```text
@@ -11797,7 +12160,7 @@ None.
 
 ```text
 ---- Summary ----
-Method to give the window (and so the taskbar or dock) the DePalencify icon. A
+Method to give the window (and so the taskbar or dock) the Albufeira icon. A
 missing icon file or an unsupported system is ignored.
 
 ---- Inputs ----
@@ -11852,6 +12215,33 @@ None.
 
 ---- Helpers ----
 _picture_shower
+```
+
+##### `_lock_drawer`
+
+```text
+---- Summary ----
+Method to draw a small padlock and "Locked" in the corner of the plot area, to
+show that this experiment plot is final and cannot be changed any more.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_logic_runner`
@@ -12447,64 +12837,6 @@ None.
 None.
 ```
 
-#### `console_closer`
-
-```text
----- Summary ----
-Main function to close the black terminal window the program was started from, once
-the browser window is open. It only does so on Windows and only when the launcher
-asked for it (DEPALENCIFY_CLOSE_CONSOLE is set), so a terminal the user opened
-themselves is left alone.
-
----- Inputs ----
-None.
-
----- Globals read ----
-os.environ["DEPALENCIFY_CLOSE_CONSOLE"] (set by run.bat).
-
----- Outputs ----
-bool
-    True when the terminal window was closed.
-
----- Globals mutated ----
-None. Points sys.stdout and sys.stderr at the null device, so nothing printed later
-fails, and detaches the process from its console (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `console_waiter`
-
-```text
----- Summary ----
-Main function to keep the terminal window open at the end of the program when the
-launcher started it in a window of its own and the terminal is still in use (the
-browser window did not open, or the program failed), so the messages can be read.
-
----- Inputs ----
-None.
-
----- Globals read ----
-os.environ["DEPALENCIFY_CLOSE_CONSOLE"] (set by run.bat).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Waits for Enter (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `gui_runner`
 
 ```text
@@ -12520,7 +12852,7 @@ title : str
     Window title.
 
 ---- Globals read ----
-os.environ["DEPALENCIFY_NO_GUI"] (set to anything to keep the terminal).
+os.environ["ALBUFEIRA_NO_GUI"] (set to anything to keep the terminal).
 
 ---- Outputs ----
 Optional[int]
@@ -12535,7 +12867,6 @@ None.
 
 ---- Helpers ----
 ViewerGui
-console_closer
 ```
 
 ## `utils_viewer/viewer_multi.py`
@@ -12561,7 +12892,8 @@ answers : dict
 fit : Optional[dict]
     Fit dictionary, or None.
 context : dict
-    {summaries, limits, details, export_root} of the run so far.
+    {summaries, limits, details, export_root} of the run so far. The processed
+    files are kept in it (key '_processed') while one figure is being built.
 
 ---- Globals read ----
 None.
@@ -12646,7 +12978,9 @@ PREVIEW_FILE (imported constant).
 ---- Outputs ----
 Callable[[str, dict], bool]
     Function (kind, payload) that returns True when the figure is accepted, or when
-    it could not be previewed (the questions then carry on).
+    it could not be previewed (the questions then carry on). A payload with
+    'question' and 'change' is a step of a figure being built, which is asked with
+    that wording; without them it is the finished figure.
 
 ---- Globals mutated ----
 None. The checker reads the files and prints to the terminal (side effects).
@@ -12870,6 +13204,42 @@ None.
 preview_info_builder
 _loaded_experiment_getter
 _overlay_drawer
+```
+
+#### `skipped_windows_finder`
+
+```text
+---- Summary ----
+Main function to find, for every file, the averaging windows that do not fit
+between the additions (or after the last one) with the current window and gap.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache).
+answers : dict
+    Answers so far, with averaging turned on and the window and gap chosen.
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}}.
+details : dict
+    {file name: {OD, volume, dilution_factor, events}}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Dict[str, dict]]
+    {file name: {window name: {start_time, end_time, reason}}}; files with nothing
+    skipped are left out. A file that cannot be read is left out as well.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_loaded_experiment_getter
+preview_info_builder
 ```
 
 ## `utils_viewer/viewer_renderer.py`
@@ -13291,6 +13661,43 @@ _file_chooser
 choice_asker
 ```
 
+#### `_skipped_lister`
+
+```text
+---- Summary ----
+Helper function to tell the user, in red, which averaging windows were skipped in
+which files because there is not enough time for them, so they can be checked before
+the averaging is accepted. Prints nothing when every window fits.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers so far, with the averaging window and gap.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file.
+
+---- Globals read ----
+WARNING_COLOUR (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reads the files and prints to the terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+skipped_windows_finder
+text_colourer
+```
+
 ### MAIN FUNCTIONS
 
 #### `analysis_stage_runner`
@@ -13334,6 +13741,7 @@ None.
 _answers_previewer
 _od_lister
 _review_asker
+_skipped_lister
 averaging_asker
 decomposition_asker
 event_asker

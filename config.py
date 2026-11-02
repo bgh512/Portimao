@@ -1,5 +1,5 @@
 """
-Settings and defaults of DePalencify: figure styles, journal sizes and colours.
+Settings and defaults of Albufeira: figure styles, journal sizes and colours.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------

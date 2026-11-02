@@ -4,7 +4,7 @@ Spectral fit loading and haem decomposition routines.
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
@@ -20,6 +20,67 @@ from utils_shared.schema import (measurement_column_finder,
 
 
 # ---- SPECTRAL DECOMPOSER HELPERS -----------------------------------------------------
+
+
+# ---- _best_window_finder -------------------------------------------------------------
+def _best_window_finder(times: np.ndarray,
+                        values: np.ndarray,
+                        start: float,
+                        stop: float,
+                        width: float,
+                        ) -> Optional[Tuple[float, float, float]]:
+    """
+    ---- Summary ----
+    Helper function to find the window of a given length with the highest average.
+
+    ---- Inputs ----
+    times : np.ndarray
+        Time of each spectrum in minutes.
+    values : np.ndarray
+        Value at each spectrum.
+    start : float
+        Earliest time that may be used.
+    stop : float
+        Latest time that may be used.
+    width : float
+        Window length in minutes.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[Tuple[float, float, float]]
+        (highest average, time of its first spectrum, time of its last spectrum), or
+        None when there is no finite value between start and stop. When the usable
+        part is shorter than the window, all of it is one window.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Window average = (running sum at the window end - running sum at its start) /
+    number of spectra in the window.
+
+    ---- Helpers ----
+    None.
+    """
+
+    order = np.argsort(times)
+    times, values = times[order], values[order]
+    usable = (np.isfinite(times) & np.isfinite(values)
+              & (times >= start) & (times <= stop))
+    times, values = times[usable], values[usable]
+    if times.size == 0:
+        return None
+    firsts = np.arange(times.size)
+    ends = np.searchsorted(times, times + width, side='right')
+    running = np.concatenate(([0.0], np.cumsum(values)))
+    means = (running[ends] - running[firsts]) / (ends - firsts)
+    fits = times + width <= stop + 1e-9
+    if fits.any():
+        means = np.where(fits, means, -np.inf)
+    best = int(np.argmax(means))
+    return float(means[best]), float(times[best]), float(times[ends[best] - 1])
 
 
 # ---- _wavelength_masker --------------------------------------------------------------
@@ -98,39 +159,46 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
                          exclude_first_minutes: float = 5.0,
                          window_seconds: float = 30.0,
                          label: str = 'haem_abs',
+                         exclude_last_minutes: float = 0.0,
                          ) -> pd.DataFrame:
     """
     ---- Summary ----
     Main function to shift each haem absorbance so that its reference level is 0, giving
-    a change in absorbance (mOD).
+    a change in absorbance (mOD). The reference level of each haem is the average of its
+    highest window (for example the fully oxidised point), wherever it occurs in the
+    run outside the ignored start and end.
 
     ---- Inputs ----
     haem_abs : pd.DataFrame
         Haem absorbance table in mOD (time, spectrum index and one column per haem).
     exclude_first_minutes : float
-        Start of the reference window, in minutes after the first measurement.
+        Minutes after the first measurement that are ignored at the start.
     window_seconds : float
         Length of the reference window, in seconds (> 0).
     label : str
         Name used in error messages.
+    exclude_last_minutes : float
+        Minutes before the last measurement that are ignored at the end.
 
     ---- Globals read ----
     schema.get_times, get_values, measurement_columns.
 
     ---- Outputs ----
     pd.DataFrame
-        Shifted copy; the reference window and the means are stored in
+        Shifted copy; the means and the window of each haem are stored in
         result.attrs["delta_abs_baseline"]. Raises ValueError for invalid settings or
-        when no spectra fall in the window.
+        when no spectra are left after the ignored parts.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    delta_abs = abs - mean(abs inside the reference window), per haem. Only a constant
-    is subtracted, so differences between points are unchanged.
+    delta_abs = abs - max over windows of mean(abs inside the window), per haem. The
+    windows start at each spectrum and last window_seconds. Only a constant is
+    subtracted, so differences between points are unchanged.
 
     ---- Helpers ----
+    _best_window_finder
     measurement_column_finder
     time_getter
     value_getter
@@ -139,10 +207,10 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
     # ---- 1 Validate the inputs -------------------------------------------------------
     if window_seconds <= 0:
         raise ValueError('window_seconds must be positive.')
-    if exclude_first_minutes < 0:
-        raise ValueError('exclude_first_minutes cannot be negative.')
+    if exclude_first_minutes < 0 or exclude_last_minutes < 0:
+        raise ValueError('The ignored minutes cannot be negative.')
 
-    # ---- 2 Find the baseline window --------------------------------------------------
+    # ---- 2 Find the usable part of the run -------------------------------------------
     columns = measurement_column_finder(haem_abs)
     times = time_getter(haem_abs)
     finite_times = times[np.isfinite(times)]
@@ -151,31 +219,28 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
                          f'delta absorbance.',
                          )
     start = float(finite_times.min()) + exclude_first_minutes
-    end = start + window_seconds / 60.0
-    in_window = np.isfinite(times) & (times >= start) & (times <= end)
-    if not in_window.any():
-        raise ValueError(f'{label}: no spectra between {start:.2f} and {end:.2f} min '
-                         f'for the delta absorbance reference. '
-                         'Reduce the excluded start period or increase the window '
-                         'length.',
-                         )
+    stop = float(finite_times.max()) - exclude_last_minutes
 
-    # ---- 3 Subtract the baseline -----------------------------------------------------
+    # ---- 3 Subtract the highest window of each haem ----------------------------------
     result = haem_abs.copy()
-    reference = {}
+    reference: Dict[str, float] = {}
+    windows: Dict[str, Tuple[float, float]] = {}
     for column in columns:
         values = value_getter(haem_abs, column)
-        selected = values[in_window & np.isfinite(values)]
-        if selected.size == 0:
-            raise ValueError(f'{label}: no finite {column!r} values in the delta '
-                             f'absorbance reference window.',
+        found = _best_window_finder(times, values, start, stop, window_seconds / 60.0)
+        if found is None:
+            raise ValueError(f'{label}: no finite {column!r} values between '
+                             f'{start:.2f} and {stop:.2f} min for the delta '
+                             'absorbance reference. Reduce the ignored start or end.',
                              )
-        reference[str(column)] = float(np.mean(selected))
+        reference[str(column)], first, last = found
+        windows[str(column)] = (first, last)
         result[column] = values - reference[str(column)]
+    spans = list(windows.values())
     result.attrs['delta_abs_baseline'] = {'mean_by_haem': reference,
-                                          'start_time': float(times[in_window].min()),
-                                          'end_time': float(times[in_window].max()),
-                                          'n_spectra': int(in_window.sum()),
+                                          'window_by_haem': windows,
+                                          'start_time': min(w[0] for w in spans),
+                                          'end_time': max(w[1] for w in spans),
                                           }
     return result
 
@@ -189,6 +254,7 @@ def experiment_decomposer(experiment: dict,
                           haemfactor: float = 1000000,
                           delta_exclude_first_minutes: float = 5.0,
                           delta_window_seconds: float = 30.0,
+                          delta_exclude_last_minutes: float = 0.0,
                           ) -> dict:
     """
     ---- Summary ----
@@ -213,6 +279,9 @@ def experiment_decomposer(experiment: dict,
         spectrum.
     delta_window_seconds : float
         Length of the delta absorbance reference window, in seconds.
+    delta_exclude_last_minutes : float
+        Minutes before the last spectrum that are ignored when finding the delta
+        absorbance reference.
 
     ---- Globals read ----
     schema.TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
@@ -230,7 +299,7 @@ def experiment_decomposer(experiment: dict,
     ---- Equations ----
     c = (S^T S)^-1 S^T a for every spectrum (projector built once); haem_abs = c x peak
     amplitude of the haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs -
-    mean over the reference window.
+    mean of the highest window.
 
     ---- Helpers ----
     _wavelength_masker
@@ -302,6 +371,8 @@ def experiment_decomposer(experiment: dict,
                                                         delta_exclude_first_minutes,
                                                         delta_window_seconds,
                                                         label=f'{name}/haem_abs',
+                                                        exclude_last_minutes=(
+                                                            delta_exclude_last_minutes),
                                                         )
     return experiment
 

@@ -11,8 +11,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.gridspec import GridSpec
+from matplotlib.patches import Rectangle
 from matplotlib.ticker import AutoLocator
 from matplotlib.transforms import ScaledTranslation
+
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import hours_parser
@@ -24,6 +26,15 @@ from utils_shared.figure_layout import (figure_canvas_fitter,
                                         )
 from utils_shared.helpers import concentration_formatter, name_simplifier
 from utils_shared.individual_experiment_plotter import experiment_drawer
+
+
+# ---- CONSTANTS -----------------------------------------------------------------------
+PLACEHOLDER_NAMES = {'B': 'Kinetic trace 1',
+                     'D': 'Kinetic trace 2',
+                     'E': 'Decomposition 1',
+                     'F': 'Decomposition 2',
+                     'G': 'Decomposition 3',
+                     }
 
 
 # ---- TIME RESPONSE PLOTTER HELPERS ---------------------------------------------------
@@ -329,6 +340,65 @@ def _legend_drawer(ax: Axes,
     if config['LEGEND_FRAME']:
         legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
     return legend
+
+
+# ---- _placeholder_drawer -------------------------------------------------------------
+def _placeholder_drawer(fig: Any, hidden: dict, config: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to draw an empty labelled box where a panel has not been chosen yet.
+
+    ---- Inputs ----
+    fig : Any
+        The figure, already fitted to its final layout.
+    hidden : dict
+        {panel letter: [axes that were hidden]} of the panels not chosen yet.
+    config : dict
+        Time response settings from custom_config.time_response_config_builder.
+
+    ---- Globals read ----
+    PLACEHOLDER_NAMES (module constant).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Hides the axes and adds a dashed box and its text to the figure (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    for letter, members in hidden.items():
+        boxes = [member.get_position() for member in members]
+        left = min(box.x0 for box in boxes)
+        bottom = min(box.y0 for box in boxes)
+        right = max(box.x1 for box in boxes)
+        top = max(box.y1 for box in boxes)
+        for member in members:
+            member.set_visible(False)
+        fig.add_artist(Rectangle((left, bottom),
+                                 right - left,
+                                 top - bottom,
+                                 transform=fig.transFigure,
+                                 facecolor='0.95',
+                                 edgecolor='0.55',
+                                 linestyle='--',
+                                 linewidth=config['THIN_LINE_WIDTH'],
+                                 ),
+                       )
+        fig.text((left + right) / 2,
+                 (bottom + top) / 2,
+                 PLACEHOLDER_NAMES[letter],
+                 ha='center',
+                 va='center',
+                 color='0.45',
+                 fontsize=config['AXIS_LABEL_FONT_SIZE'],
+                 )
 
 
 # ---- _time_axes_styler ---------------------------------------------------------------
@@ -758,6 +828,7 @@ def time_response_figure_plotter(experiments: dict,
     _example_finder
     _example_viewer
     _haem_scale_sharer
+    _placeholder_drawer
     _time_gap_calculator
     _title_styler
     decomposition_plotter
@@ -784,15 +855,26 @@ def time_response_figure_plotter(experiments: dict,
     if config['PANEL_LETTER_CASE'] not in ('upper', 'lower'):
         raise ValueError('PANEL_LETTER_CASE must be "upper" or "lower".')
     groups = group_collector(experiments, config)
-    kinetic_picks = [(group,) + _example_finder(groups, group, hours)
-                     for group, hours in config['EXAMPLES']
-                     ]
-    decomposition_picks = [(group,) + _example_finder(groups, group, hours)
-                           for group, hours in config['DECOMPOSITION_EXAMPLES']
-                           ]
+    placeholders: set = set()
+    kinetic_picks = []
+    for letter, row_group, spec in zip('BD', group_order, config['EXAMPLES']):
+        if spec is None:
+            placeholders.add(letter)
+            kinetic_picks.append((row_group,) + groups[row_group][0])
+        else:
+            kinetic_picks.append((spec[0],) + _example_finder(groups, *spec))
+    decomposition_picks = []
+    for letter, spec in zip('EFG', config['DECOMPOSITION_EXAMPLES']):
+        if spec is None:
+            placeholders.add(letter)
+            decomposition_picks.append((group_order[0],) + groups[group_order[0]][0])
+        else:
+            decomposition_picks.append((spec[0],) + _example_finder(groups, *spec))
     # The letter of each kinetic trace panel, written beside its waterfall trace.
-    marks = {}
+    marks: dict = {}
     for letter, (picked, label, _) in zip('BD', kinetic_picks):
+        if letter in placeholders:
+            continue
         letter = letter.lower() if config['PANEL_LETTER_CASE'] == 'lower' else letter
         text = marks.setdefault(picked, {}).get(label)
         marks[picked][label] = f'{text}, {letter})' if text else f'{letter})'
@@ -889,7 +971,7 @@ def time_response_figure_plotter(experiments: dict,
                                                   )
 
     # ---- 4 Draw the waterfalls and the kinetic traces --------------------------------
-    axes, panels = {}, []
+    axes, panels, hidden = {}, [], {}
     for row, group in enumerate(group_order):
         ax = fig.add_subplot(rows[row][0, 0])
         _title_styler(ax, config['GROUP_TITLES'].get(group, group), config)
@@ -914,6 +996,8 @@ def time_response_figure_plotter(experiments: dict,
         letter = 'BD'[row]
         axes[letter] = stack
         panels.append((letter, stack[0], members))
+        if letter in placeholders:
+            hidden[letter] = members
 
     # ---- 5 Draw the decomposition plots ----------------------------------------------
     decomposition_axes = []
@@ -935,6 +1019,8 @@ def time_response_figure_plotter(experiments: dict,
         letter = 'EFG'[column]
         axes[letter] = ax
         panels.append((letter, ax, [ax]))
+        if letter in placeholders:
+            hidden[letter] = [ax]
 
     # ---- 6 Give each haem one scale across the two kinetic traces --------------------
     _haem_scale_sharer([axes['B'], axes['D']], example_config)
@@ -957,26 +1043,28 @@ def time_response_figure_plotter(experiments: dict,
                           )
     if config['LEGEND_FRAME']:
         legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
-    legend = stack_legend_drawer(axes['D'],
-                                 example_config,
-                                 below_pt=below_pt,
-                                 columns=kinetic_columns,
-                                 )
-    if legend is not None and config['LEGEND_FRAME']:
-        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+    if not placeholders & {'B', 'D'}:
+        legend = stack_legend_drawer(axes['D'],
+                                     example_config,
+                                     below_pt=below_pt,
+                                     columns=kinetic_columns,
+                                     )
+        if legend is not None and config['LEGEND_FRAME']:
+            legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
     legend_ax = fig.add_subplot(bottom[0, 1], frameon=False)
     legend_ax.axis('off')
     handles, labels = decomposition_axes[-1].get_legend_handles_labels()
-    legend = legend_ax.legend(handles,
-                              labels,
-                              loc='center left',
-                              bbox_to_anchor=(0.0, 0.5),
-                              frameon=config['LEGEND_FRAME'],
-                              fontsize=font,
-                              borderaxespad=0,
-                              )
-    if config['LEGEND_FRAME']:
-        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+    if not placeholders & {'E', 'F', 'G'}:
+        legend = legend_ax.legend(handles,
+                                  labels,
+                                  loc='center left',
+                                  bbox_to_anchor=(0.0, 0.5),
+                                  frameon=config['LEGEND_FRAME'],
+                                  fontsize=font,
+                                  borderaxespad=0,
+                                  )
+        if config['LEGEND_FRAME']:
+            legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
 
     # ---- 8 Fit margins and add panel letters -----------------------------------------
     panels.sort(key=lambda panel: panel[0])
@@ -996,6 +1084,7 @@ def time_response_figure_plotter(experiments: dict,
                            config['PANEL_LETTER_CASE'],
                            )
     figure_canvas_fitter(fig, pad, suptitle, gap)
+    _placeholder_drawer(fig, hidden, config)
     fig.time_response_picks = {'kinetic': [(group, label, experiment['experiment_name'])
                                            for group, label, experiment
                                            in kinetic_picks

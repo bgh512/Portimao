@@ -115,17 +115,18 @@ def experiment_averages_calculator(experiment: dict,
     ---- Outputs ----
     dict
         The same experiment dictionary. Raises ValueError for invalid settings, no
-        source, no events, invalid times or windows that do not fit between the
-        additions.
+        source, no events or invalid times. A window that does not fit between two
+        additions (or after the last one) is skipped, not an error.
 
     ---- Globals mutated ----
-    experiment: adds experiment["averages"] = {"settings", "windows"} (layout in
-    DATA_FORMAT.md).
+    experiment: adds experiment["averages"] = {"settings", "windows", "skipped"}
+    (layout in DATA_FORMAT.md).
 
     ---- Equations ----
     average0 ends gap_minutes before the first event; averageN ends gap_minutes before
     event N+1 (final_window_gap_minutes before the end of the recording for the last
-    event); each window starts window_minutes before its end. change = mean /
+    event); each window starts window_minutes before its end and is skipped when that
+    is before its own event. change = mean /
     mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0).
 
     ---- Helpers ----
@@ -172,6 +173,7 @@ def experiment_averages_calculator(experiment: dict,
                    first_event - gap_minutes,
                    ),
                   ]
+    skipped: Dict[str, dict] = {}
     for i, event in enumerate(events):
         event_time = float(event['time'])
         if i + 1 < len(events):
@@ -182,8 +184,12 @@ def experiment_averages_calculator(experiment: dict,
             problem = 'insufficient recording time after the final addition.'
         start = end - window_minutes
         if start < event_time:
-            raise ValueError(f'{name}: {problem}')
-        boundaries.append((f'average{i + 1}', start, end))
+            skipped[f'average{i + 1}'] = {'start_time': start,
+                                          'end_time': end,
+                                          'reason': problem.capitalize(),
+                                          }
+        else:
+            boundaries.append((f'average{i + 1}', start, end))
 
     # ---- 4 Calculate the window statistics -------------------------------------------
     windows = {}
@@ -220,6 +226,7 @@ def experiment_averages_calculator(experiment: dict,
                                            'haem_key': haem_key,
                                            },
                               'windows': windows,
+                              'skipped': skipped,
                               }
     return experiment
 

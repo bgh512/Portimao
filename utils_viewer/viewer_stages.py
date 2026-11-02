@@ -15,6 +15,7 @@ from utils_shared.questions import (choice_asker,
                                     numbering_getter,
                                     numbering_setter,
                                     section_starter,
+                                    text_colourer,
                                     )
 from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
@@ -32,6 +33,7 @@ from utils_shared.survey import (averaging_asker,
                                  )
 from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          preview_drawer,
+                                         skipped_windows_finder,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
@@ -39,7 +41,8 @@ from utils_viewer.viewer_window import PictureWindow
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-PREVIEW_FILE = Path(tempfile.gettempdir()) / 'DePalencify_preview.png'
+PREVIEW_FILE = Path(tempfile.gettempdir()) / 'Albufeira_preview.png'
+WARNING_COLOUR = '\x1b[1;31m'  # bold red
 STAGE_TITLES = {'browser': 'Experiment browser',
                 'trim': 'Trimming and ignoring',
                 'analysis': 'Analysis',
@@ -315,6 +318,65 @@ def _review_asker(session: ViewerSession,
         redraw()
 
 
+# ---- _skipped_lister -----------------------------------------------------------------
+def _skipped_lister(session: ViewerSession,
+                    answers: dict,
+                    limits: Dict[str, dict],
+                    details: Dict[str, dict],
+                    ) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the user, in red, which averaging windows were skipped in
+    which files because there is not enough time for them, so they can be checked before
+    the averaging is accepted. Prints nothing when every window fits.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    answers : dict
+        Answers so far, with the averaging window and gap.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    details : Dict[str, dict]
+        OD values and events of every file.
+
+    ---- Globals read ----
+    WARNING_COLOUR (module constant).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Reads the files and prints to the terminal (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    skipped_windows_finder
+    text_colourer
+    """
+
+    info_printer('Checking that the averaging windows fit in every file ...')
+    skipped = skipped_windows_finder(session,
+                                     _answers_previewer(answers, None, 'analysis'),
+                                     limits,
+                                     details,
+                                     )
+    if not skipped:
+        return
+    info_printer(text_colourer('WARNING: averaging was skipped for these windows '
+                               '(not enough time). They are shown in red with a '
+                               'warning sign in the plot. Please check this is OK:',
+                               WARNING_COLOUR,
+                               ),
+                 )
+    for name, windows in skipped.items():
+        info_printer(f"  {name}: {', '.join(windows)}")
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -365,6 +427,7 @@ def analysis_stage_runner(session: ViewerSession,
     _answers_previewer
     _od_lister
     _review_asker
+    _skipped_lister
     averaging_asker
     decomposition_asker
     event_asker
@@ -430,6 +493,7 @@ def analysis_stage_runner(session: ViewerSession,
         if not answers['averaging']:
             break
         redraw()
+        _skipped_lister(session, answers, limits, details)
         if _review_asker(session,
                          'Do you accept these averaging windows?',
                          'No, change the window and gap',

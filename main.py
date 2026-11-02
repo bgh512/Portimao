@@ -31,16 +31,14 @@ from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.questions import section_starter, UserQuit, yes_no_asker
+from utils_shared.helpers import program_title_builder
 from utils_shared.run_logging import logging_starter, logging_stopper
 from utils_shared.survey import (files_asker,
                                  haem_name_formatter,
                                  JOURNAL_NAMES,
                                  multi_experiment_asker,
                                  )
-from utils_viewer.viewer_gui import (active_gui_getter,
-                                     console_waiter,
-                                     gui_runner,
-                                     )
+from utils_viewer.viewer_gui import active_gui_getter, gui_runner
 from utils_viewer.viewer_multi import multi_figure_checker_builder
 from utils_viewer.viewer_stages import viewer_asker
 
@@ -50,6 +48,7 @@ HERE = Path(__file__).resolve().parent
 FITS_FOLDER = HERE / 'fits'
 LAST_ANSWERS_FILE = HERE / 'last_answers.json'
 VERSION = (HERE / 'VERSION').read_text().strip()
+PROGRAM_TITLE = program_title_builder(HERE, VERSION)
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -192,7 +191,7 @@ def everything_asker() -> Tuple[dict,
     remembered = last.get('files', {})
 
     # ---- 2 Print the banner ----------------------------------------------------------
-    print(f'DePalencify V{VERSION}')
+    print(PROGRAM_TITLE)
     if active_gui_getter() is None:  # the window explains this itself
         print('Questions are in colour and numbered. Type your answer on the line '
               'below each question; Enter accepts the value shown in [brackets].',
@@ -567,7 +566,7 @@ def main() -> int:
     None.
 
     ---- Globals read ----
-    VERSION (shown in the window title).
+    PROGRAM_TITLE (shown in the window title).
 
     ---- Outputs ----
     int
@@ -584,7 +583,7 @@ def main() -> int:
     program_runner
     """
 
-    code = gui_runner(program_runner, f'DePalencify V{VERSION}')
+    code = gui_runner(program_runner, PROGRAM_TITLE)
     if code is None:
         code = program_runner()
     return code
@@ -601,7 +600,7 @@ def program_runner() -> int:
     None.
 
     ---- Globals read ----
-    VERSION (written to the log).
+    PROGRAM_TITLE (written to the log).
 
     ---- Outputs ----
     int
@@ -647,7 +646,7 @@ def program_runner() -> int:
     cfg = settings.Config(answers)
     plt.rcParams.update(cfg.RC_PARAMS)
     start = time.perf_counter()
-    log_session = logging_starter(export_root, VERSION, answers)
+    log_session = logging_starter(export_root, PROGRAM_TITLE, answers)
     failed = []
     kept = {}
 
@@ -794,10 +793,4 @@ def special_figures_maker(kept: dict,
 
 
 if __name__ == '__main__':
-    try:
-        exit_code = main()
-    except Exception:  # keep the window open so the error can be read
-        traceback.print_exc()
-        exit_code = 1
-    console_waiter()
-    sys.exit(exit_code)
+    sys.exit(main())
