@@ -1,8 +1,8 @@
 # DePalencify - Function List
 
 - **Project:** DePalencify
-- **Version:** V2.5
-- **Date:** 31/10/2026
+- **Version:** V2.6
+- **Date:** 02/11/2026
 
 ## Contents
 
@@ -345,6 +345,8 @@
     - [`GuiUnavailable`](#guiunavailable)
     - [`ViewerGui`](#viewergui)
     - [`active_gui_getter`](#active_gui_getter)
+    - [`console_closer`](#console_closer)
+    - [`console_waiter`](#console_waiter)
     - [`gui_runner`](#gui_runner)
 - [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
     - [`_kept_builder`](#_kept_builder)
@@ -12445,6 +12447,64 @@ None.
 None.
 ```
 
+#### `console_closer`
+
+```text
+---- Summary ----
+Main function to close the black terminal window the program was started from, once
+the browser window is open. It only does so on Windows and only when the launcher
+asked for it (DEPALENCIFY_CLOSE_CONSOLE is set), so a terminal the user opened
+themselves is left alone.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+os.environ["DEPALENCIFY_CLOSE_CONSOLE"] (set by run.bat).
+
+---- Outputs ----
+bool
+    True when the terminal window was closed.
+
+---- Globals mutated ----
+None. Points sys.stdout and sys.stderr at the null device, so nothing printed later
+fails, and detaches the process from its console (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `console_waiter`
+
+```text
+---- Summary ----
+Main function to keep the terminal window open at the end of the program when the
+launcher started it in a window of its own and the terminal is still in use (the
+browser window did not open, or the program failed), so the messages can be read.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+os.environ["DEPALENCIFY_CLOSE_CONSOLE"] (set by run.bat).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Waits for Enter (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `gui_runner`
 
 ```text
@@ -12475,6 +12535,7 @@ None.
 
 ---- Helpers ----
 ViewerGui
+console_closer
 ```
 
 ## `utils_viewer/viewer_multi.py`

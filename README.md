@@ -144,7 +144,7 @@ The program has no command-line options. It asks numbered questions in the termi
 
 ### 2.2 Using the launcher
 
-- Windows: double-click `run.bat`.
+- Windows: double-click `run.bat`. The black terminal window closes by itself once the DePalencify window is open (it stays open if something goes wrong, so the message can be read).
 - macOS: double-click `run.command`.
 - Linux: run `./run.sh`.
 

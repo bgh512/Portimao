@@ -1,4 +1,4 @@
-# DePalencify question flow (V2.5)
+# DePalencify question flow (V2.6)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 

@@ -37,7 +37,10 @@ from utils_shared.survey import (files_asker,
                                  JOURNAL_NAMES,
                                  multi_experiment_asker,
                                  )
-from utils_viewer.viewer_gui import active_gui_getter, gui_runner
+from utils_viewer.viewer_gui import (active_gui_getter,
+                                     console_waiter,
+                                     gui_runner,
+                                     )
 from utils_viewer.viewer_multi import multi_figure_checker_builder
 from utils_viewer.viewer_stages import viewer_asker
 
@@ -791,4 +794,10 @@ def special_figures_maker(kept: dict,
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        exit_code = main()
+    except Exception:  # keep the window open so the error can be read
+        traceback.print_exc()
+        exit_code = 1
+    console_waiter()
+    sys.exit(exit_code)

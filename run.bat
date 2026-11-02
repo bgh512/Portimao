@@ -59,6 +59,15 @@ if not exist ".venv\Scripts\python.exe" (
     echo.
 )
 
+rem --- start the program in its own window and close this one -----------------
+rem If anything is missing, run it here instead so the message can be read.
+".venv\Scripts\python.exe" -c "import numpy, pandas, scipy, matplotlib, xlsxwriter, openpyxl, tkinter" >nul 2>&1
+if errorlevel 1 goto :run_here
+set "DEPALENCIFY_CLOSE_CONSOLE=1"
+start "DePalencify" ".venv\Scripts\python.exe" main.py
+exit /b 0
+
+:run_here
 ".venv\Scripts\python.exe" main.py
 echo.
 pause

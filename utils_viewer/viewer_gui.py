@@ -1447,6 +1447,85 @@ def active_gui_getter() -> Optional[ViewerGui]:
     return _active_gui
 
 
+# ---- console_closer ------------------------------------------------------------------
+def console_closer() -> bool:
+    """
+    ---- Summary ----
+    Main function to close the black terminal window the program was started from, once
+    the browser window is open. It only does so on Windows and only when the launcher
+    asked for it (DEPALENCIFY_CLOSE_CONSOLE is set), so a terminal the user opened
+    themselves is left alone.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    os.environ["DEPALENCIFY_CLOSE_CONSOLE"] (set by run.bat).
+
+    ---- Outputs ----
+    bool
+        True when the terminal window was closed.
+
+    ---- Globals mutated ----
+    None. Points sys.stdout and sys.stderr at the null device, so nothing printed later
+    fails, and detaches the process from its console (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if sys.platform != 'win32' or not os.environ.get('DEPALENCIFY_CLOSE_CONSOLE'):
+        return False
+    try:
+        import ctypes
+        sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+        sys.stderr = open(os.devnull, 'w', encoding='utf-8')
+        return bool(ctypes.windll.kernel32.FreeConsole())
+    except Exception:  # a console that stays open is harmless
+        return False
+
+
+# ---- console_waiter ------------------------------------------------------------------
+def console_waiter() -> None:
+    """
+    ---- Summary ----
+    Main function to keep the terminal window open at the end of the program when the
+    launcher started it in a window of its own and the terminal is still in use (the
+    browser window did not open, or the program failed), so the messages can be read.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    os.environ["DEPALENCIFY_CLOSE_CONSOLE"] (set by run.bat).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Waits for Enter (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if sys.platform != 'win32' or not os.environ.get('DEPALENCIFY_CLOSE_CONSOLE'):
+        return
+    try:
+        import ctypes
+        if ctypes.windll.kernel32.GetConsoleWindow():
+            input('\nPress Enter to close this window ...')
+    except (EOFError, KeyboardInterrupt, OSError, AttributeError):
+        pass
+
+
 # ---- gui_runner ----------------------------------------------------------------------
 def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
     """
@@ -1477,6 +1556,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
 
     ---- Helpers ----
     ViewerGui
+    console_closer
     """
 
     try:
@@ -1510,4 +1590,5 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
               f'run in this terminal and previews are saved as a picture.',
               )
         return None
+    console_closer()
     return ViewerGui(tk, root, program, title).run()
