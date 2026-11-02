@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.questions import (choice_asker,
                                     heading_printer,
@@ -19,9 +20,14 @@ from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
                                  event_asker,
                                  file_focus_setter,
+                                 haem_choice_asker,
+                                 haem_form_asker,
+                                 haem_scaling_asker,
+                                 label_angle_asker,
                                  od_scaling_asker,
-                                 plot_asker,
                                  saved_values_reader,
+                                 signal_asker,
+                                 size_asker,
                                  trim_asker,
                                  )
 from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
@@ -57,8 +63,9 @@ def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
     fit : Optional[dict]
         Fit dictionary, used to list the haems to show.
     kind : str
-        'raw' (O2 and the raw OCR only), 'analysis' (also the haems and the OD scaling
-        chosen so far, in a wide preview) or 'final' (exactly as the figure will be).
+        'raw' (O2 and the raw OCR only), 'analysis' (also the haems, still without OD
+        scaling), 'plots' (the choices made so far for the individual figures, in a
+        wide preview) or 'final' (exactly as the figure will be).
 
     ---- Globals read ----
     BROWSING_ANSWERS (module constant).
@@ -81,6 +88,8 @@ def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
     if kind == 'final':
         return result
     result.update(BROWSING_ANSWERS)
+    if kind == 'plots':
+        return result
     result.update({'plot_o2': True, 'plot_ocr': True, 'plot_haems': False})
     if kind == 'raw':
         result.update({'decompose': False,
@@ -89,14 +98,51 @@ def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
                        'ocr_mode': 'raw',
                        })
         return result
-    result['ocr_mode'] = 'od' if result['normalise_od'] else 'raw'
+    result.update({'normalise_od': False, 'ocr_mode': 'raw', 'haem_per_od': False})
     if result['decompose'] and fit is not None:
         result.update({'plot_haems': True,
                        'haems': list(fit['haem_list']),
                        'haem_mode': 'delta',
-                       'haem_per_od': bool(result['normalise_od']),
                        })
     return result
+
+
+# ---- _empty_limits_builder -----------------------------------------------------------
+def _empty_limits_builder(summaries: List[dict]) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Helper function to build limits that trim and ignore nothing, for drawing the data
+    before any question is answered.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} with None for the
+        trims and 0.0 for the ignores.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return {s['name']: {'trim_start': None,
+                        'trim_end': None,
+                        'ignore_start': 0.0,
+                        'ignore_end': 0.0,
+                        }
+            for s in summaries
+            }
 
 
 # ---- _file_chooser -------------------------------------------------------------------
@@ -179,6 +225,41 @@ def _limits_lister(summaries: List[dict], limits: Dict[str, dict]) -> None:
                      )
 
 
+# ---- _od_lister ----------------------------------------------------------------------
+def _od_lister(details: Dict[str, dict]) -> None:
+    """
+    ---- Summary ----
+    Helper function to print the OD values entered for every file in one list, so they
+    can be checked.
+
+    ---- Inputs ----
+    details : Dict[str, dict]
+        {file name: {OD, volume, dilution_factor, ...}} as od_scaling_asker returns it.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    """
+
+    info_printer('OD values:')
+    for name, values in details.items():
+        info_printer(f"  {name}: OD {values['OD']:g}, volume {values['volume']:g} mL, "
+                     f"dilution factor {values['dilution_factor']:g}",
+                     )
+
+
 # ---- _review_asker -------------------------------------------------------------------
 def _review_asker(session: ViewerSession,
                   question: str,
@@ -247,9 +328,10 @@ def analysis_stage_runner(session: ViewerSession,
                           ) -> Tuple[Optional[dict], Dict[str, dict]]:
     """
     ---- Summary ----
-    Main function to ask the analysis questions (haem decomposition, OD scaling, event
-    averaging and event labels) one at a time, redrawing the plot window after each so
-    the result can be accepted or asked again.
+    Main function to ask the analysis questions (haem decomposition, OD values, event
+    averaging and event labels) one at a time. The plot is redrawn after each, except
+    the OD values, which are only checked: the data is scaled by OD in the individual
+    plots.
 
     ---- Inputs ----
     session : ViewerSession
@@ -281,6 +363,7 @@ def analysis_stage_runner(session: ViewerSession,
 
     ---- Helpers ----
     _answers_previewer
+    _od_lister
     _review_asker
     averaging_asker
     decomposition_asker
@@ -324,16 +407,17 @@ def analysis_stage_runner(session: ViewerSession,
             break
         defaults = dict(defaults, decompose=True, fit_file=answers['fit_file'])
 
-    # ---- 2 OD scaling ----------------------------------------------------------------
+    # ---- 2 OD values -----------------------------------------------------------------
+    # Only checked here; the data is scaled by OD in the individual plots
     while True:
         details = od_scaling_asker(summaries, answers, defaults, saved)
         if not answers['normalise_od']:
             break
-        redraw()
+        _od_lister(details)
         if _review_asker(session,
-                         'Do you accept this OD scaling?',
+                         'Do you accept these OD values?',
                          'No, enter the OD values again',
-                         redraw,
+                         lambda: True,
                          ):
             break
         defaults = dict(defaults, normalise_od=True)
@@ -374,9 +458,10 @@ def analysis_stage_runner(session: ViewerSession,
 def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
     """
     ---- Summary ----
-    Main function to let the user look through the files in the plot window (the set and
-    measured O2 and the OCR, with the events) before answering any questions about
-    them.
+    Main function to show the files in the plot window (the set and measured O2 and the
+    OCR, with the events) before any question is asked about them. In the browser window
+    the user can look through them while answering, so the questions carry straight on;
+    with the picture fallback a small menu steps through the files.
 
     ---- Inputs ----
     session : ViewerSession
@@ -415,14 +500,6 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
                        {},
                        show_ignored=False,
                        )
-        info_printer(f'{total} file(s) are shown on the right. Use the arrows or the '
-                     f'list under the plot (or Page Up / Page Down) to look through '
-                     f'them.',
-                     )
-        choice_asker('Have you finished looking through the files?',
-                     [('continue', 'Yes, continue to trimming and ignoring')],
-                     'continue',
-                     )
         return
     options = [('next', 'Next file'),
                ('previous', 'Previous file'),
@@ -465,8 +542,10 @@ def plots_stage_runner(session: ViewerSession,
                        ) -> bool:
     """
     ---- Summary ----
-    Main function to ask what the individual figures show and how they are sized, then
-    draw the figure as it will be saved and ask whether to accept it.
+    Main function to ask how the figure saved for each file looks, one choice at a
+    time: the oxygen and OCR, the haems and their order, how the haems are shown (and
+    whether they are scaled by OD), the event labels and finally the journal and size.
+    The plot is redrawn after each choice and the user accepts it or chooses again.
 
     ---- Inputs ----
     session : ViewerSession
@@ -487,7 +566,7 @@ def plots_stage_runner(session: ViewerSession,
 
     ---- Outputs ----
     bool
-        True when at least one panel is plotted (as plot_asker returns it).
+        True when at least one panel is plotted.
 
     ---- Globals mutated ----
     None. Stores the answers in ``answers`` (side effect).
@@ -498,28 +577,112 @@ def plots_stage_runner(session: ViewerSession,
     ---- Helpers ----
     _answers_previewer
     _review_asker
-    plot_asker
+    haem_choice_asker
+    haem_form_asker
+    haem_scaling_asker
+    label_angle_asker
     preview_drawer
+    signal_asker
+    size_asker
     """
 
-    def redraw() -> bool:
+    # ---- 1 Explain the section -------------------------------------------------------
+    info_printer('Now you choose how the figure saved for each file will look. The '
+                 'plot is redrawn after each choice, and you can look at every file '
+                 'before accepting it.',
+                 )
+    answers.update({'plot_haems': False, 'haem_per_od': False})
+
+    def redraw(kind: str = 'plots') -> bool:
         return preview_drawer(session,
-                              _answers_previewer(answers, fit, 'final'),
+                              _answers_previewer(answers, fit, kind),
                               limits,
                               fit,
                               details,
                               show_ignored=False,
                               )
 
+    # ---- 2 Oxygen and OCR ------------------------------------------------------------
     while True:
-        plotted = plot_asker(answers, defaults, fit)
-        if not plotted:
-            return False
+        if not signal_asker(answers, defaults):
+            break
         redraw()
         if _review_asker(session,
-                         'Do you accept this figure?',
-                         'No, change what is plotted or its size',
+                         'Do you accept the oxygen and OCR plots?',
+                         'No, choose them again',
                          redraw,
+                         ):
+            break
+        defaults = dict(defaults, **{key: answers[key]
+                                     for key in ('plot_o2', 'plot_ocr', 'ocr_mode')
+                                     if key in answers
+                                     })
+
+    # ---- 3 Haems and their order -----------------------------------------------------
+    while True:
+        if not haem_choice_asker(answers, defaults, fit):
+            break
+        redraw()
+        if _review_asker(session,
+                         'Do you accept these haems and their order?',
+                         'No, choose the haems again',
+                         redraw,
+                         ):
+            break
+        defaults = dict(defaults, plot_haems=True, haems=answers['haems'])
+
+    # ---- 4 How the haems are shown ---------------------------------------------------
+    while answers['plot_haems']:
+        haem_form_asker(answers, defaults)
+        redraw()
+        if haem_scaling_asker(answers, defaults):
+            redraw()
+        if _review_asker(session,
+                         'Do you accept this haem presentation?',
+                         'No, choose how the haems are shown again',
+                         redraw,
+                         ):
+            break
+        defaults = dict(defaults,
+                        haem_mode=answers['haem_mode'],
+                        haem_per_od=answers['haem_per_od'],
+                        )
+
+    # ---- 5 Event labels --------------------------------------------------------------
+    plotted = answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems']
+    if not plotted:
+        info_printer('Nothing is set to be plotted, so no individual figures will be '
+                     'made.',
+                     )
+    while plotted:
+        label_angle_asker(answers, defaults)
+        redraw()
+        if _review_asker(session,
+                         'Do you accept the event labels?',
+                         'No, change the angle',
+                         redraw,
+                         ):
+            break
+        defaults = dict(defaults, event_label_angle=answers['event_label_angle'])
+
+    # ---- 6 Journal and size ----------------------------------------------------------
+    while True:
+        size_asker(answers,
+                   defaults,
+                   {'journal': 'journal',
+                    'columns': 'columns',
+                    'height': 'height',
+                    'mode': 'size_mode',
+                    },
+                   (1, 0.5),
+                   )
+        if not plotted:
+            return False
+        redraw('final')
+        if _review_asker(session,
+                         'Do you accept this figure?',
+                         'No, change the journal or size',
+                         lambda: redraw('final'),
                          ):
             return plotted
         defaults = dict(answers)
@@ -532,8 +695,8 @@ def trim_stage_runner(session: ViewerSession,
                       ) -> Dict[str, dict]:
     """
     ---- Summary ----
-    Main function to ask the trim and ignore questions, shade the trimmed and ignored
-    parts in the plot window, and ask whether to accept them.
+    Main function to ask the trim and ignore questions, adding the shaded trimmed and
+    ignored parts to the plot window after every answer, and ask whether to accept them.
 
     ---- Inputs ----
     session : ViewerSession
@@ -560,30 +723,31 @@ def trim_stage_runner(session: ViewerSession,
 
     ---- Helpers ----
     _answers_previewer
+    _empty_limits_builder
     _limits_lister
     _review_asker
     preview_drawer
     trim_asker
     """
 
+    def draw(limits: Dict[str, dict]) -> bool:
+        return preview_drawer(session,
+                              _answers_previewer(answers, None, 'raw'),
+                              limits,
+                              None,
+                              {},
+                              show_trim=True,
+                              )
+
     while True:
-        limits = trim_asker(session.summaries, remembered)
+        draw(_empty_limits_builder(session.summaries))
+        limits = trim_asker(session.summaries, remembered, draw)
         _limits_lister(session.summaries, limits)
-
-        def redraw() -> bool:
-            return preview_drawer(session,
-                                  _answers_previewer(answers, None, 'raw'),
-                                  limits,
-                                  None,
-                                  {},
-                                  show_trim=True,
-                                  )
-
-        redraw()
+        draw(limits)
         if _review_asker(session,
                          'Do you accept these limits?',
                          'No, enter the limits again',
-                         redraw,
+                         lambda: draw(limits),
                          ):
             return limits
         remembered = dict(remembered, **limits)
@@ -702,13 +866,19 @@ def viewer_asker(summaries: List[dict],
     # ---- 2 Ask every step once -------------------------------------------------------
     try:
         for key, runner in steps:
+            if key == 'browser' and window.is_interactive:
+                runner()  # the window needs no section of its own
+                continue
             section_starter(STAGE_TITLES[key])
             runner()
         last_section, last_question = numbering_getter(0), numbering_getter(1)
 
         # ---- 3 Go back to any step ---------------------------------------------------
+        visible = [key for key, _ in steps
+                   if not (key == 'browser' and window.is_interactive)
+                   ]
         options = [('done', 'No, continue')]
-        options += [(key, STAGE_TITLES[key]) for key, _ in steps]
+        options += [(key, STAGE_TITLES[key]) for key in visible]
         while True:
             numbering_setter(0, last_section)
             numbering_setter(1, last_question)
@@ -719,7 +889,7 @@ def viewer_asker(summaries: List[dict],
             if chosen == 'done':
                 break
             index = [key for key, _ in steps].index(chosen)
-            number = index + 2
+            number = visible.index(chosen) + 2
             numbering_setter(0, number)
             heading_printer(f'{number}. {STAGE_TITLES[chosen]} (again)')
             steps[index][1]()

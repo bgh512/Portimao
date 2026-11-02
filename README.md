@@ -152,38 +152,35 @@ The launchers create their own environment on the first run, install what is mis
 
 ### 2.3 The questions
 
-1. **Your files:** the `.paf` folder, the results folder, and whether to use the experiment browser (see section 2.4).
-2. **Experiment browser** (only with the browser on): look through the files in the plot window.
-3. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. Ignore times count from the new 0 after trimming.
-4. **Analysis:** decompose the haems (which fit), scale by OD, average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
-5. **Individual experiment plots:** oxygen, OCR, haems, event-label angle, journal and size.
-6. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
-7. **Experiment summaries:** time response, OCR and haem response.
-8. **Data export**, then a summary and the start question.
-
-The numbers above are those with the experiment browser on; with it off, section 2 is left out and the later sections move up by one.
+1. **Your files:** the `.paf` folder and the results folder. The plots of the files then appear on the right.
+2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. The four questions (trim start, trim end, ignore start, ignore end) all work the same way: yes/no, how many minutes for ALL the data, then optionally how many minutes for each specific file. Ignore times count from the new 0 after trimming.
+3. **Analysis:** decompose the haems (which fit), enter the OD values (they are only checked here), average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
+4. **Individual experiment plots:** how the figure saved for each file looks, one choice at a time: oxygen and OCR, the haems and their order, how the haems are shown and whether they are scaled by OD, the event labels, then the journal and size.
+5. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
+6. **Experiment summaries:** time response, OCR and haem response.
+7. **Data export**, then a summary and the start question.
 
 Every figure asks for its own journal. Answering `None` uses Nature with the default size.
 
 ### 2.4 The experiment browser
 
-The program runs in one window (the experiment browser). The left side is a text terminal that asks the questions, with a box at the bottom to type your answers in (press Enter to send; the up and down keys recall earlier answers). The right side shows the plots of your files, with a **< Prev** and **Next >** button and a drop-down list of the files under the plot. The arrows loop round, and Page Up and Page Down do the same from the keyboard.
+The program runs in one window. The left side is a text terminal that asks the questions, with a box at the bottom to type your answers in (press Enter to send; the up and down keys recall earlier answers). If you type nothing, the value in [brackets] is used. The right side shows the plots of your files, with **< Prev** and **Next >** buttons and a drop-down list of the files under the plot. The arrows loop round, and Page Up and Page Down do the same from the keyboard. The window and the taskbar show the DePalencify icon (on macOS the Dock icon needs the optional `pyobjc` package).
 
 The plot stays usable while a question waits. You can flick through every file at any time without answering, and the accept questions wait while you look. All files are drawn in the background with the latest answers, so flicking between them is quick. The plot is for looking: it cannot be clicked to change anything.
 
-With the browser on (the default, question 1.3):
-
-- **Experiment browser:** look through the files (the set and measured O2, the OCR and the events), then answer *Yes, continue*.
-- **Trimming and ignoring:** while you are asked about each file, the plot shows that file. After the four questions every file is drawn whole, with the TRIMMED part grey and hatched and the IGNORED part amber. Answer *Yes, accept* or *No, enter the limits again* (your answers are offered as the defaults).
-- **Analysis:** the decomposition, OD scaling, averaging windows and event labels are each drawn for every file and accepted or asked again in the same way. Questions about one file (OD values, event labels) show that file.
-- **Individual experiment plots:** the figures are drawn at the journal size you chose, and can be accepted or changed.
+- **Trimming and ignoring:** the plot shows the raw data, and after every answer the TRIMMED part (grey, hatched) or IGNORED part (amber) is added, so the shading builds up as you answer; for a specific file the plot switches to that file. Answer *Yes, accept* or *No, enter the limits again* (your answers are offered as the defaults).
+- **Analysis:** the decomposition, averaging windows and event labels are each drawn for every file and accepted or asked again in the same way. The OD values are listed and checked, but the data is not scaled by OD yet; that is chosen in the individual plots. Questions about one file (OD values, event labels) show that file.
+- **Individual experiment plots:** the figure is built up choice by choice. After each of these the plot is redrawn and you accept it or choose again: oxygen and OCR (and which OCR), the haems and their order, how the haems are shown (and whether they are scaled by OD), the event labels, and the journal and size.
+- **Multi-experiment plots and summaries:** after the questions of each figure (side by side, 2x2, time response, haem and OCR response) it is drawn from your data, shown in the plot area (the drop-down then lists the figures) and accepted or changed. This reads the files again, so it can take a moment. Nothing is written to the results folder until the run starts.
 - **Going back:** after the individual plots you can go back to any earlier step. Its questions are asked again with your answers as the defaults, and your answers to the later steps are kept.
 
-The previews use the same processing as the final run, so what is shown is what is saved. The multi-experiment figures (sections 6 and 7) are made after the questions, as before, and have no preview. When the browser steps are over the file controls switch off and the last picture stays on show; the rest of the run (processing and saving) writes its progress in the terminal on the left. When the run has finished, close the window.
+The previews use the same processing as the final run, so what is shown is what is saved. When the browser steps are over the file controls switch off and the last picture stays on show; the rest of the run (processing and saving) writes its progress in the terminal on the left. When the run has finished, close the window.
 
 Closing the window while the program is still running stops it (a file that is being written may be left incomplete).
 
-**If the window cannot open.** The window needs Python's tkinter. It is included with the python.org installers for Windows and macOS. On Linux install it with your package manager (for example `sudo apt install python3-tk`), and a display is needed. When the window cannot open, the program says why and runs in the terminal as before: each preview is saved as a picture (`DePalencify_preview.png` in the temporary folder) and opened in the default picture viewer, and the file is chosen by a question instead of the arrows. To use the terminal on purpose, set the environment variable `DEPALENCIFY_NO_GUI` to any value. Answer `n` to question 1.3 to use the questions without the previews.
+**If the window cannot open.** The window needs Python's tkinter. It is included with the python.org installers for Windows and macOS. On Linux install it with your package manager (for example `sudo apt install python3-tk`), and a display is needed. When the window cannot open, the program says why and runs in the terminal as before: each preview is saved as a picture (`DePalencify_preview.png` in the temporary folder) and opened in the default picture viewer, and the file is chosen by a question instead of the arrows. To use the terminal on purpose, set the environment variable `DEPALENCIFY_NO_GUI` to any value.
+
+The full list of questions, with where each answer leads, is in [QUESTION_FLOW.md](QUESTION_FLOW.md).
 
 ### 2.5 Outputs
 
@@ -225,7 +222,8 @@ DePalencify/
         viewer_renderer.py  the thread that draws the previews of every file
         viewer_window.py    the preview picture used when the window cannot open
         viewer_preview.py   processes and draws one file as a preview
-        viewer_stages.py    the browser, trim, analysis and plot steps and going back
+        viewer_stages.py    the trim, analysis and plot steps and going back
+        viewer_multi.py     previews of the multi-experiment figures
     utils_custom/           the multi-experiment figures and their workbooks
         __init__.py
         ocr_and_haem_response_plotter.py

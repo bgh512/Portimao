@@ -1,7 +1,7 @@
-# . - Function List
+# DePalencify - Function List
 
-- **Project:** .
-- **Version:** V2.3
+- **Project:** DePalencify
+- **Version:** V2.5
 - **Date:** 31/10/2026
 
 ## Contents
@@ -15,8 +15,8 @@
     - [`experiment_processor`](#experiment_processor)
     - [`last_answers_loader`](#last_answers_loader)
     - [`last_answers_saver`](#last_answers_saver)
-    - [`program_runner`](#program_runner)
     - [`main`](#main)
+    - [`program_runner`](#program_runner)
     - [`special_figures_maker`](#special_figures_maker)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
     - [`exemplar_config_builder`](#exemplar_config_builder)
@@ -209,6 +209,7 @@
 - [`utils_shared/helpers.py`](#utils_sharedhelperspy)
     - [`concentration_formatter`](#concentration_formatter)
     - [`excel_sheet_namer`](#excel_sheet_namer)
+    - [`figure_capture_setter`](#figure_capture_setter)
     - [`figure_saver`](#figure_saver)
     - [`file_name_sanitiser`](#file_name_sanitiser)
     - [`name_simplifier`](#name_simplifier)
@@ -303,13 +304,17 @@
     - [`s_array_generator`](#s_array_generator)
     - [`spectrum_decomposer`](#spectrum_decomposer)
 - [`utils_shared/survey.py`](#utils_sharedsurveypy)
-    - [`_file_focuser`](#_file_focuser)
     - [`_columns_text_builder`](#_columns_text_builder)
     - [`_event_line_builder`](#_event_line_builder)
+    - [`_file_focuser`](#_file_focuser)
     - [`_first_event_finder`](#_first_event_finder)
     - [`_last_event_finder`](#_last_event_finder)
+    - [`_limit_converter`](#_limit_converter)
+    - [`_limit_maximum_getter`](#_limit_maximum_getter)
     - [`_limits_asker`](#_limits_asker)
+    - [`_limits_filler`](#_limits_filler)
     - [`_maths_converter`](#_maths_converter)
+    - [`_minutes_remembered`](#_minutes_remembered)
     - [`_natural_sorter`](#_natural_sorter)
     - [`_subscript_stripper`](#_subscript_stripper)
     - [`analysis_asker`](#analysis_asker)
@@ -318,16 +323,20 @@
     - [`event_asker`](#event_asker)
     - [`file_focus_setter`](#file_focus_setter)
     - [`files_asker`](#files_asker)
+    - [`haem_choice_asker`](#haem_choice_asker)
+    - [`haem_form_asker`](#haem_form_asker)
     - [`haem_form_option_builder`](#haem_form_option_builder)
     - [`haem_name_formatter`](#haem_name_formatter)
     - [`haem_name_sorter`](#haem_name_sorter)
+    - [`haem_scaling_asker`](#haem_scaling_asker)
+    - [`label_angle_asker`](#label_angle_asker)
     - [`multi_experiment_asker`](#multi_experiment_asker)
     - [`ocr_option_builder`](#ocr_option_builder)
     - [`od_asker`](#od_asker)
     - [`od_scaling_asker`](#od_scaling_asker)
     - [`paf_finder`](#paf_finder)
-    - [`plot_asker`](#plot_asker)
     - [`saved_values_reader`](#saved_values_reader)
+    - [`signal_asker`](#signal_asker)
     - [`size_asker`](#size_asker)
     - [`trim_asker`](#trim_asker)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
@@ -337,20 +346,26 @@
     - [`ViewerGui`](#viewergui)
     - [`active_gui_getter`](#active_gui_getter)
     - [`gui_runner`](#gui_runner)
+- [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
+    - [`_kept_builder`](#_kept_builder)
+    - [`_pictures_builder`](#_pictures_builder)
+    - [`multi_figure_checker_builder`](#multi_figure_checker_builder)
 - [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
     - [`PreviewSpec`](#previewspec)
     - [`ViewerSession`](#viewersession)
-    - [`_info_builder`](#_info_builder)
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
+    - [`preview_info_builder`](#preview_info_builder)
     - [`preview_drawer`](#preview_drawer)
     - [`preview_figure_builder`](#preview_figure_builder)
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
     - [`PreviewRenderer`](#previewrenderer)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
     - [`_answers_previewer`](#_answers_previewer)
+    - [`_empty_limits_builder`](#_empty_limits_builder)
     - [`_file_chooser`](#_file_chooser)
     - [`_limits_lister`](#_limits_lister)
+    - [`_od_lister`](#_od_lister)
     - [`_review_asker`](#_review_asker)
     - [`analysis_stage_runner`](#analysis_stage_runner)
     - [`browser_stage_runner`](#browser_stage_runner)
@@ -631,16 +646,15 @@ last_answers_saver (side effects).
 None.
 
 ---- Helpers ----
-analysis_asker
+active_gui_getter
 files_asker
 haem_name_formatter
 last_answers_loader
 last_answers_saver
 multi_experiment_asker
-plot_asker
+multi_figure_checker_builder
 section_starter
 summary_figure_asker
-trim_asker
 viewer_asker
 yes_no_asker
 ```
@@ -742,6 +756,34 @@ None.
 None.
 ```
 
+#### `main`
+
+```text
+---- Summary ----
+Main function of the program: run it in the experiment browser window (terminal on
+the left, plots on the right), or in the terminal when the window cannot open.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VERSION (shown in the window title).
+
+---- Outputs ----
+int
+    0 when every file finished, 1 when the run was cancelled or a file failed.
+
+---- Globals mutated ----
+None. Opens the window or runs in the terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+gui_runner
+program_runner
+```
+
 #### `program_runner`
 
 ```text
@@ -776,34 +818,6 @@ logging_stopper
 special_figures_maker
 ```
 
-#### `main`
-
-```text
----- Summary ----
-Main function of the program: run it in the experiment browser window (terminal on
-the left, plots on the right), or in the terminal when the window cannot open.
-
----- Inputs ----
-None.
-
----- Globals read ----
-VERSION (shown in the window title).
-
----- Outputs ----
-int
-    0 when every file finished, 1 when the run was cancelled or a file failed.
-
----- Globals mutated ----
-None. Opens the window or runs in the terminal (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-gui_runner
-program_runner
-```
-
 #### `special_figures_maker`
 
 ```text
@@ -823,6 +837,9 @@ export_root : Path
     Results folder.
 exemplar_names : Optional[List[str]]
     Names of the four experiments of the 2x2 grid, or None.
+is_preview : bool
+    True to draw the figures only (for the experiment browser): no workbook is
+    written.
 
 ---- Globals read ----
 settings.Config; time_response_runner, ocr_and_haem_response_runner and
@@ -1283,6 +1300,10 @@ fit : Optional[dict]
     Fit dictionary chosen in section 3, or None.
 fits_folder : Path
     Folder holding the fit .csv files.
+figure_checker : Optional[Callable[[str, dict], bool]]
+    Function called after the questions of each figure with (key, {'fit': fit,
+    'custom': result so far}); it shows the figure and returns True when the user
+    accepts it. When it returns False the figure's questions are asked again.
 
 ---- Globals read ----
 None.
@@ -1484,6 +1505,9 @@ fit : dict
     Fit dictionary from import_fit.
 export_root : Path
     Results folder.
+is_preview : bool
+    True to draw the figure only (for the experiment browser): the workbook is not
+    written.
 
 ---- Globals read ----
 None.
@@ -1526,6 +1550,9 @@ fit : dict
     Fit dictionary from import_fit.
 export_root : Path
     Results folder.
+is_preview : bool
+    True to draw the figure only (for the experiment browser): the workbook is not
+    written.
 
 ---- Globals read ----
 None.
@@ -7005,6 +7032,36 @@ None.
 None.
 ```
 
+#### `figure_capture_setter`
+
+```text
+---- Summary ----
+Main function to switch figure saving to preview mode (or back). While a capture
+function is set, figure_saver hands each figure to it and writes no file, so the
+experiment browser can show a figure before it is made for real.
+
+---- Inputs ----
+capture : Optional[Callable[[Figure, str], None]]
+    Function called with (figure, file name stem) instead of saving, or None for
+    normal saving.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+Sets _figure_capture (module state).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `figure_saver`
 
 ```text
@@ -7030,14 +7087,15 @@ tight : bool
     True to crop the canvas around the artists (bbox_inches="tight").
 
 ---- Globals read ----
-None.
+_figure_capture (module state).
 
 ---- Outputs ----
 List[Path]
-    Paths of the saved files, in the order of ``formats``.
+    Paths of the saved files, in the order of ``formats``; empty in preview mode.
 
 ---- Globals mutated ----
-None. Resizes the figure to ``size`` and writes the files (side effects).
+None. Resizes the figure to ``size`` and writes the files, or in preview mode only
+hands the figure to the capture function (side effects).
 
 ---- Equations ----
 None.
@@ -10293,34 +10351,6 @@ Numbered terminal questions of the main program (sections 1 to 5).
 
 ### SURVEY HELPERS
 
-#### `_file_focuser`
-
-```text
----- Summary ----
-Helper function to tell the experiment browser which file the next question is
-about, so its window shows that file. Does nothing without the browser.
-
----- Inputs ----
-name : str
-    File name.
-
----- Globals read ----
-_file_focus_hook (module state).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Calls the hook (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `_columns_text_builder`
 
 ```text
@@ -10371,6 +10401,34 @@ str
 
 ---- Globals mutated ----
 None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_file_focuser`
+
+```text
+---- Summary ----
+Helper function to tell the experiment browser which file the next question is
+about, so its window shows that file. Does nothing without the browser.
+
+---- Inputs ----
+name : str
+    File name.
+
+---- Globals read ----
+_file_focus_hook (module state).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the hook (side effect).
 
 ---- Equations ----
 None.
@@ -10433,35 +10491,136 @@ None.
 None.
 ```
 
+#### `_limit_converter`
+
+```text
+---- Summary ----
+Helper function to turn the minutes a user typed into the value the program keeps
+for a trim or ignore limit.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with duration_min.
+kind : str
+    'trim' or 'ignore'.
+edge : str
+    'start' or 'end'.
+minutes : float
+    Minutes to remove from that edge of the recording; 0 means none.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    Trim limits: the time on the original recording, or None for no trim. Ignore
+    limits: the minutes (0.0 for none).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim start = minutes. Trim end = duration - minutes.
+
+---- Helpers ----
+None.
+```
+
+#### `_limit_maximum_getter`
+
+```text
+---- Summary ----
+Helper function to find the most minutes that can be trimmed from an edge of a file
+without cutting off an event.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with events and duration_min.
+kind : str
+    'trim' or 'ignore'.
+edge : str
+    'start' or 'end'.
+so_far : dict
+    Limits already asked for this file ({key: value}).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    Largest accepted number of minutes, or None when there is no limit (ignore).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Start: the first event time. End: duration - the later of the last event time and
+the trim start.
+
+---- Helpers ----
+_first_event_finder
+_last_event_finder
+```
+
 #### `_limits_asker`
 
 ```text
 ---- Summary ----
-Helper function to ask one yes/no question and then one number per file (trim or
-ignore, start or end), offering the values remembered from the last run.
+Helper function to ask the questions for one edge of the data (trim start, trim end,
+ignore start or ignore end): whether to do it at all, how many minutes for ALL the
+files, and then optionally how many for each file. The limits are stored and passed
+to ``progress`` after every answer, so a plot can show them building up.
 
 ---- Inputs ----
 summaries : List[dict]
     File summaries (DATA_FORMAT.md).
 remembered : dict
-    {file name: {key: value}} from the last run.
-key : str
-    Name of the limit, for example 'trim_start'.
-question : str
-    The yes/no question.
-per_file : str
-    Question for each file; {name} is replaced by the file name.
-fallback : Optional[float]
-    Default for a file with no remembered value; None means 'none' and one
-    value is asked per file. A number means one value is asked for all files,
-    then optionally one per file.
-all_text : str
-    The question for the value that applies to all files (ignore only).
-bounds_builder : Callable[[dict, dict], dict]
-    Function (summary, limits collected so far for that file) giving the
-    minimum and maximum accepted for the file.
-note_builder : Callable[[dict], str]
-    Function (summary) giving the information line shown before the question.
+    {file name: {key: value}} from the last run, offered as the defaults.
+kind : str
+    'trim' or 'ignore'.
+edge : str
+    'start' or 'end'.
+collected : dict
+    {file name: {key: value}} of the limits asked so far; this question adds its
+    own key.
+progress : Callable[[Dict[str, dict]], None]
+    Function called with the limits of every file after each answer.
+
+---- Globals read ----
+config.DEFAULT_ANSWERS (default ignore time at the start).
+
+---- Outputs ----
+None
+    Nothing; the answers are stored in ``collected``.
+
+---- Globals mutated ----
+collected (adds the key of this question for every file). Reads from and prints to
+the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_focuser
+_limit_converter
+_limit_maximum_getter
+_limits_filler
+_minutes_remembered
+info_printer
+number_asker
+yes_no_asker
+```
+
+#### `_limits_filler`
+
+```text
+---- Summary ----
+Helper function to give every file all four limits, using "none" for the ones not
+asked yet.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
 collected : dict
     {file name: {key: value}} of the limits asked so far.
 
@@ -10469,20 +10628,18 @@ collected : dict
 None.
 
 ---- Outputs ----
-Dict[str, Optional[float]]
-    {file name: minutes or None}.
+Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}}; the trim limits
+    are None and the ignore limits 0.0 when not set.
 
 ---- Globals mutated ----
-None. Reads from and prints to the terminal (side effect).
+None.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-_file_focuser
-info_printer
-number_asker
-yes_no_asker
+None.
 ```
 
 #### `_maths_converter`
@@ -10513,6 +10670,38 @@ yes_no_asker
     _subscript_stripper
 text_italiser
     
+```
+
+#### `_minutes_remembered`
+
+```text
+---- Summary ----
+Helper function to turn a limit remembered from the last run back into the minutes
+the question asks for.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with name and duration_min.
+remembered : dict
+    {file name: {key: value}} from the last run.
+key : str
+    'trim_start', 'trim_end', 'ignore_start' or 'ignore_end'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    Minutes removed from that edge, or None when nothing is remembered.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim end minutes = duration - remembered end time.
+
+---- Helpers ----
+None.
 ```
 
 #### `_natural_sorter`
@@ -10791,6 +10980,71 @@ progress_printer
 text_asker
 ```
 
+#### `haem_choice_asker`
+
+```text
+---- Summary ----
+Main function to ask whether the haems are plotted, and which ones in which order.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers.
+fit : Optional[dict]
+    Fit dictionary (haem_list) used to list the haems, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the haems are plotted.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+haem_name_formatter
+haem_name_sorter
+multi_asker
+yes_no_asker
+```
+
+#### `haem_form_asker`
+
+```text
+---- Summary ----
+Main function to ask how the haems are shown (absorbance change, concentration,
+percentage and so on).
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores the answer in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+haem_form_option_builder
+```
+
 #### `haem_form_option_builder`
 
 ```text
@@ -10876,6 +11130,66 @@ None.
 name_simplifier
 ```
 
+#### `haem_scaling_asker`
+
+```text
+---- Summary ----
+Main function to ask whether the haems are also scaled by OD. Nothing is asked when
+no OD values were entered or the haems are shown as percentages.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers.
+    Must hold normalise_od and haem_mode.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the question was asked.
+
+---- Globals mutated ----
+None. Stores the answer in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+yes_no_asker
+```
+
+#### `label_angle_asker`
+
+```text
+---- Summary ----
+Main function to ask at what angle the event labels are written.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores the answer in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+number_asker
+```
+
 #### `multi_experiment_asker`
 
 ```text
@@ -10892,6 +11206,11 @@ defaults : dict
     Default answers.
 plotted : bool
     True when section 4 plots at least one panel (both figures reuse its choices).
+figure_checker : Optional[Callable[[str, dict], bool]]
+    Function called after the questions of each figure with a name and a dictionary:
+    ('comparison', {'comparison': ...}) or ('exemplar', {'exemplar_names': ...}). It
+    shows the figure and returns True when the user accepts it. When it returns
+    False the figure's questions are asked again with the answers as the defaults.
 
 ---- Globals read ----
 None.
@@ -11043,48 +11362,6 @@ None.
 _natural_sorter
 ```
 
-#### `plot_asker`
-
-```text
----- Summary ----
-Main function to ask section 4: what the individual experiment figures show and
-how they are sized.
-
----- Inputs ----
-answers : dict
-    Answers dictionary the values are stored in; must hold normalise_od and
-    decompose.
-defaults : dict
-    Default answers.
-fit : Optional[dict]
-    Fit dictionary (haem_list) used to list the haems, or None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-bool
-    True when at least one panel is plotted.
-
----- Globals mutated ----
-None. Stores the answers in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-choice_asker
-haem_form_option_builder
-haem_name_formatter
-haem_name_sorter
-info_printer
-multi_asker
-number_asker
-ocr_option_builder
-size_asker
-yes_no_asker
-```
-
 #### `saved_values_reader`
 
 ```text
@@ -11116,6 +11393,38 @@ info_printer
 progress_clearer
 progress_printer
 saved_settings_reader
+```
+
+#### `signal_asker`
+
+```text
+---- Summary ----
+Main function to ask whether the oxygen traces and the OCR are plotted, and which
+OCR.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in; must hold normalise_od.
+defaults : dict
+    Default answers.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the oxygen or the OCR is plotted.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+ocr_option_builder
+yes_no_asker
 ```
 
 #### `size_asker`
@@ -11161,7 +11470,9 @@ number_asker
 ```text
 ---- Summary ----
 Main function to ask section 2: which data is trimmed away (start, end) and which
-is ignored in the calculations (start, end), per file.
+is ignored in the calculations (start, end). Each edge is asked in turn with the
+same questions: do it at all, how many minutes for ALL the data, and optionally how
+many for each file.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -11169,9 +11480,12 @@ summaries : List[dict]
 remembered : dict
     {file name: {trim_start, trim_end, ignore_start, ignore_end}} from the last
     run; offered as the defaults.
+progress : Optional[Callable[[Dict[str, dict]], None]]
+    Function called with the limits of every file after each answer (so a plot can
+    show them building up), or None.
 
 ---- Globals read ----
-config.DEFAULT_ANSWERS (default ignore time at the start).
+None.
 
 ---- Outputs ----
 Dict[str, dict]
@@ -11185,9 +11499,8 @@ None. Reads from and prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
-_first_event_finder
-_last_event_finder
 _limits_asker
+_limits_filler
 info_printer
 ```
 
@@ -11283,6 +11596,7 @@ _closing_handler
 _drain_runner
 _event_handler
 _history_stepper
+_icon_setter
 _image_receiver
 _logic_runner
 _navigator
@@ -11294,6 +11608,7 @@ file_focuser
 figure_shower
 input_reader
 output_capturer
+pictures_publisher
 run
 session_attacher
 spec_publisher
@@ -11334,228 +11649,6 @@ None.
 _widgets_builder
 ```
 
-##### `_widgets_builder`
-
-```text
----- Summary ----
-Method to build the terminal, the answer box, the plot and its file controls.
-
----- Inputs ----
-None.
-
----- Globals read ----
-MONO_FONTS and the colour constants (module constants).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Creates the widgets (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `_nav_state`
-
-```text
----- Summary ----
-Method to switch the file selector and arrows on or off.
-
----- Inputs ----
-enabled : bool
-    True to allow navigation.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Changes the widget states (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `_message_shower`
-
-```text
----- Summary ----
-Method to replace the plot with a short message.
-
----- Inputs ----
-text : str
-    Message to show.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Redraws the plot area (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `_resizer`
-
-```text
----- Summary ----
-Method to redraw the picture at the new size once the window has stopped
-changing size.
-
----- Inputs ----
-event : Any
-    The Tk configure event (unused).
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Schedules a redraw (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_picture_shower
-```
-
-##### `_picture_shower`
-
-```text
----- Summary ----
-Method to show the picture of the current file, scaled to fit the plot area, or
-say why there is none yet.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Redraws the plot area and the status line (side effect).
-
----- Equations ----
-scale = min(width / picture width, height / picture height), at most 1.5.
-
----- Helpers ----
-_message_shower
-```
-
-##### `_navigator`
-
-```text
----- Summary ----
-Method to make a file the current one and show it.
-
----- Inputs ----
-index : int
-    Position of the file in the list.
-is_from_user : bool
-    True when the user chose it, so the answer box gets the keyboard back.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Updates the selector, the plot and the renderer's order (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_picture_shower
-```
-
-##### `_step_taker`
-
-```text
----- Summary ----
-Method to move to the next or previous file, looping round at the ends.
-
----- Inputs ----
-step : int
-    +1 for the next file, -1 for the previous one.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Changes the current file (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_navigator
-```
-
-##### `_pane_writer`
-
-```text
----- Summary ----
-Method to add text to the terminal, with its colours, overwriting the line when
-the text starts with a carriage return (progress messages).
-
----- Inputs ----
-text : str
-    Text as printed.
-kind : str
-    'out' (normal), 'err' (error text) or 'answer' (what the user typed).
-
----- Globals read ----
-ANSWER_COLOUR, ERROR_COLOUR (module constants).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Adds text to the terminal and scrolls it (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-ansi_splitter
-ansi_style_updater
-```
-
 ##### `_answer_sender`
 
 ```text
@@ -11584,6 +11677,93 @@ None.
 _pane_writer
 ```
 
+##### `_closing_handler`
+
+```text
+---- Summary ----
+Method to close the window. While the program is still running the user is asked
+first, and a question that is waiting is ended so the program stops cleanly.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stops the threads and closes the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_drain_runner`
+
+```text
+---- Summary ----
+Method that runs on the window thread every few milliseconds and carries out the
+messages the other threads have queued, joining consecutive text into one
+insert.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window and schedules itself again (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_event_handler
+_pane_writer
+```
+
+##### `_event_handler`
+
+```text
+---- Summary ----
+Method to carry out one message from the other threads, on the window thread.
+
+---- Inputs ----
+event : tuple
+    (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
+    'image', 'closed' or 'finished'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_image_receiver
+_navigator
+_pane_writer
+_picture_shower
+```
+
 ##### `_history_stepper`
 
 ```text
@@ -11603,6 +11783,33 @@ None
 
 ---- Globals mutated ----
 None. Changes the text of the answer box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_icon_setter`
+
+```text
+---- Summary ----
+Method to give the window (and so the taskbar or dock) the DePalencify icon. A
+missing icon file or an unsupported system is ignored.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ICON_PATH (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the window icon (side effect).
 
 ---- Equations ----
 None.
@@ -11645,93 +11852,6 @@ None.
 _picture_shower
 ```
 
-##### `_event_handler`
-
-```text
----- Summary ----
-Method to carry out one message from the other threads, on the window thread.
-
----- Inputs ----
-event : tuple
-    (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'image',
-    'closed' or 'finished'.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Changes the window (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_image_receiver
-_navigator
-_pane_writer
-_picture_shower
-```
-
-##### `_drain_runner`
-
-```text
----- Summary ----
-Method that runs on the window thread every few milliseconds and carries out the
-messages the other threads have queued, joining consecutive text into one
-insert.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Changes the window and schedules itself again (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_event_handler
-_pane_writer
-```
-
-##### `_closing_handler`
-
-```text
----- Summary ----
-Method to close the window. While the program is still running the user is asked
-first, and a question that is waiting is ended so the program stops cleanly.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Stops the threads and closes the window (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 ##### `_logic_runner`
 
 ```text
@@ -11750,6 +11870,256 @@ None
 
 ---- Globals mutated ----
 None. Sets exit_code and queues the finished message (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_message_shower`
+
+```text
+---- Summary ----
+Method to replace the plot with a short message.
+
+---- Inputs ----
+text : str
+    Message to show.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Redraws the plot area (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_nav_state`
+
+```text
+---- Summary ----
+Method to switch the file selector and arrows on or off.
+
+---- Inputs ----
+enabled : bool
+    True to allow navigation.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widget states (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_navigator`
+
+```text
+---- Summary ----
+Method to make a file the current one and show it.
+
+---- Inputs ----
+index : int
+    Position of the file in the list.
+is_from_user : bool
+    True when the user chose it, so the answer box gets the keyboard back.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Updates the selector, the plot and the renderer's order (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_pane_writer`
+
+```text
+---- Summary ----
+Method to add text to the terminal, with its colours, overwriting the line when
+the text starts with a carriage return (progress messages).
+
+---- Inputs ----
+text : str
+    Text as printed.
+kind : str
+    'out' (normal), 'err' (error text) or 'answer' (what the user typed).
+
+---- Globals read ----
+ANSWER_COLOUR, ERROR_COLOUR (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds text to the terminal and scrolls it (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+ansi_splitter
+ansi_style_updater
+```
+
+##### `_picture_shower`
+
+```text
+---- Summary ----
+Method to show the picture of the current file, scaled to fit the plot area, or
+say why there is none yet.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Redraws the plot area and the status line (side effect).
+
+---- Equations ----
+scale = min(width / picture width, height / picture height), at most 1.5.
+
+---- Helpers ----
+_message_shower
+```
+
+##### `_resizer`
+
+```text
+---- Summary ----
+Method to redraw the picture at the new size once the window has stopped
+changing size.
+
+---- Inputs ----
+event : Any
+    The Tk configure event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Schedules a redraw (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_step_taker`
+
+```text
+---- Summary ----
+Method to move to the next or previous file, looping round at the ends.
+
+---- Inputs ----
+step : int
+    +1 for the next file, -1 for the previous one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the current file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_navigator
+```
+
+##### `_widgets_builder`
+
+```text
+---- Summary ----
+Method to build the terminal, the answer box, the plot and its file controls.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MONO_FONTS and the colour constants (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `figure_shower`
+
+```text
+---- Summary ----
+Method that is never needed: the window draws its own previews from the
+settings (spec_publisher).
+
+---- Inputs ----
+figure : Any
+    A drawn figure (ignored).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
 
 ---- Equations ----
 None.
@@ -11786,16 +12156,21 @@ None.
 None.
 ```
 
-##### `figure_shower`
+##### `_image_deliverer`
 
 ```text
 ---- Summary ----
-Method that is never needed: the window draws its own previews from the
-settings (spec_publisher).
+Method to queue a finished preview from the preview thread for the window.
 
 ---- Inputs ----
-figure : Any
-    A drawn figure (ignored).
+version : int
+    Number of the request it was drawn for.
+name : str
+    File name.
+png : Optional[bytes]
+    Picture, or None when it could not be drawn.
+notes : str
+    Warnings, or the reason when there is no picture.
 
 ---- Globals read ----
 None.
@@ -11805,7 +12180,7 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None.
+None. Queues the preview (side effect).
 
 ---- Equations ----
 None.
@@ -11868,6 +12243,34 @@ None.
 
 ---- Helpers ----
 output_capturer
+```
+
+##### `pictures_publisher`
+
+```text
+---- Summary ----
+Method to show finished pictures (the multi-experiment figures) instead of the
+files: the selector then lists the pictures by title.
+
+---- Inputs ----
+pictures : List[Tuple[str, bytes]]
+    [(title, PNG bytes)] in the order they are listed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the pictures for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `run`
@@ -12014,39 +12417,6 @@ None.
 None.
 ```
 
-##### `_image_deliverer`
-
-```text
----- Summary ----
-Method to queue a finished preview from the preview thread for the window.
-
----- Inputs ----
-version : int
-    Number of the request it was drawn for.
-name : str
-    File name.
-png : Optional[bytes]
-    Picture, or None when it could not be drawn.
-notes : str
-    Warnings, or the reason when there is no picture.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Queues the preview (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 ### MAIN FUNCTIONS
 
 #### `active_gui_getter`
@@ -12107,6 +12477,128 @@ None.
 ViewerGui
 ```
 
+## `utils_viewer/viewer_multi.py`
+
+Previews of the multi-experiment figures while their questions are answered.
+
+### MULTI-FIGURE HELPERS
+
+#### `_kept_builder`
+
+```text
+---- Summary ----
+Helper function to read and process the files a multi-experiment figure needs, the
+way the real run does (without plotting or exporting them).
+
+---- Inputs ----
+names : List[str]
+    Names of the files the figure uses.
+customs : Dict[str, dict]
+    {file name: {'time_response_group', 'haem_ocr'}} for the summary figures.
+answers : dict
+    Answers so far, ready to build the figure style from.
+fit : Optional[dict]
+    Fit dictionary, or None.
+context : dict
+    {summaries, limits, details, export_root} of the run so far.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {experiment, vo2_source, haem_source, prepared}}, as the run keeps
+    them for the special figures.
+
+---- Globals mutated ----
+None. Reads the files and prints what the processing says (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+preview_info_builder
+experiment_data_processor
+experiment_preparer
+```
+
+#### `_pictures_builder`
+
+```text
+---- Summary ----
+Helper function to make one multi-experiment figure the way the run will, but hand
+the finished figure over as a picture instead of saving files.
+
+---- Inputs ----
+kind : str
+    'comparison', 'exemplar', 'time_response' or 'haem_ocr'.
+payload : dict
+    What the questions decided: {'comparison': ...}, {'exemplar_names': ...} or
+    {'fit': ..., 'custom': {...}} (see the figure_checker of the askers).
+context : dict
+    {answers, fit, summaries, limits, details, export_root} of the run so far.
+makers : Dict[str, Callable]
+    {'comparison': comparison_maker, 'special': special_figures_maker} of main.py.
+window : Any
+    The browser window (or the picture fallback), which captures the printed text.
+
+---- Globals read ----
+PREVIEW_DPI, WARNING_WORDS (module constants).
+
+---- Outputs ----
+Tuple[List[Tuple[str, bytes]], str]
+    ([(title, PNG bytes)], notes). The notes are the lines saying why a figure was
+    not made, and may be empty.
+
+---- Globals mutated ----
+None. Reads the files, switches figure saving to preview mode while it runs and
+puts it back (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_kept_builder
+figure_capture_setter
+```
+
+### MAIN FUNCTIONS
+
+#### `multi_figure_checker_builder`
+
+```text
+---- Summary ----
+Main function to build the figure checker the multi-experiment questions call after
+each figure: it draws the figure from the data, shows it in the browser window and
+asks whether to accept it.
+
+---- Inputs ----
+context : dict
+    {answers, fit, summaries, limits, details, export_root} of the run so far. The
+    dictionary is read each time, so later changes to it are seen.
+makers : Dict[str, Callable]
+    {'comparison': comparison_maker, 'special': special_figures_maker} of main.py.
+
+---- Globals read ----
+PREVIEW_FILE (imported constant).
+
+---- Outputs ----
+Callable[[str, dict], bool]
+    Function (kind, payload) that returns True when the figure is accepted, or when
+    it could not be previewed (the questions then carry on).
+
+---- Globals mutated ----
+None. The checker reads the files and prints to the terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_pictures_builder
+choice_asker
+info_printer
+```
+
 ## `utils_viewer/viewer_preview.py`
 
 Processing and drawing of one experiment as a preview figure.
@@ -12132,39 +12624,6 @@ Detailed structure can be found in DATA_FORMAT.md.
 ```
 
 ### PREVIEW HELPERS
-
-#### `_info_builder`
-
-```text
----- Summary ----
-Helper function to build the per-file information dictionary that
-experiment_data_processor needs, from the answers given so far.
-
----- Inputs ----
-summary : dict
-    File summary (DATA_FORMAT.md).
-limits : dict
-    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes; may
-    lack the file.
-details : dict
-    {file name: {OD, volume, dilution_factor, events}}; may lack the file.
-
----- Globals read ----
-None.
-
----- Outputs ----
-dict
-    Per-file information (as built in everything_asker).
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
 
 #### `_loaded_experiment_getter`
 
@@ -12226,6 +12685,39 @@ None
 
 ---- Globals mutated ----
 None. Adds shaded regions and the note to the figure (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `preview_info_builder`
+
+```text
+---- Summary ----
+Helper function to build the per-file information dictionary that
+experiment_data_processor needs, from the answers given so far.
+
+---- Inputs ----
+summary : dict
+    File summary (DATA_FORMAT.md).
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes; may
+    lack the file.
+details : dict
+    {file name: {OD, volume, dilution_factor, events}}; may lack the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    Per-file information (as built in everything_asker).
+
+---- Globals mutated ----
+None.
 
 ---- Equations ----
 None.
@@ -12314,7 +12806,7 @@ printed; the caller decides where the notes go.
 None.
 
 ---- Helpers ----
-_info_builder
+preview_info_builder
 _loaded_experiment_getter
 _overlay_drawer
 ```
@@ -12567,8 +13059,9 @@ answers : dict
 fit : Optional[dict]
     Fit dictionary, used to list the haems to show.
 kind : str
-    'raw' (O2 and the raw OCR only), 'analysis' (also the haems and the OD scaling
-    chosen so far, in a wide preview) or 'final' (exactly as the figure will be).
+    'raw' (O2 and the raw OCR only), 'analysis' (also the haems, still without OD
+    scaling), 'plots' (the choices made so far for the individual figures, in a
+    wide preview) or 'final' (exactly as the figure will be).
 
 ---- Globals read ----
 BROWSING_ANSWERS (module constant).
@@ -12576,6 +13069,35 @@ BROWSING_ANSWERS (module constant).
 ---- Outputs ----
 dict
     A copy of the answers with the preview settings; ``answers`` is not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_empty_limits_builder`
+
+```text
+---- Summary ----
+Helper function to build limits that trim and ignore nothing, for drawing the data
+before any question is answered.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} with None for the
+    trims and 0.0 for the ignores.
 
 ---- Globals mutated ----
 None.
@@ -12644,6 +13166,34 @@ None.
 info_printer
 ```
 
+#### `_od_lister`
+
+```text
+---- Summary ----
+Helper function to print the OD values entered for every file in one list, so they
+can be checked.
+
+---- Inputs ----
+details : Dict[str, dict]
+    {file name: {OD, volume, dilution_factor, ...}} as od_scaling_asker returns it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+```
+
 #### `_review_asker`
 
 ```text
@@ -12686,9 +13236,10 @@ choice_asker
 
 ```text
 ---- Summary ----
-Main function to ask the analysis questions (haem decomposition, OD scaling, event
-averaging and event labels) one at a time, redrawing the plot window after each so
-the result can be accepted or asked again.
+Main function to ask the analysis questions (haem decomposition, OD values, event
+averaging and event labels) one at a time. The plot is redrawn after each, except
+the OD values, which are only checked: the data is scaled by OD in the individual
+plots.
 
 ---- Inputs ----
 session : ViewerSession
@@ -12720,6 +13271,7 @@ None.
 
 ---- Helpers ----
 _answers_previewer
+_od_lister
 _review_asker
 averaging_asker
 decomposition_asker
@@ -12733,9 +13285,10 @@ saved_values_reader
 
 ```text
 ---- Summary ----
-Main function to let the user look through the files in the plot window (the set and
-measured O2 and the OCR, with the events) before answering any questions about
-them.
+Main function to show the files in the plot window (the set and measured O2 and the
+OCR, with the events) before any question is asked about them. In the browser window
+the user can look through them while answering, so the questions carry straight on;
+with the picture fallback a small menu steps through the files.
 
 ---- Inputs ----
 session : ViewerSession
@@ -12769,8 +13322,10 @@ preview_drawer
 
 ```text
 ---- Summary ----
-Main function to ask what the individual figures show and how they are sized, then
-draw the figure as it will be saved and ask whether to accept it.
+Main function to ask how the figure saved for each file looks, one choice at a
+time: the oxygen and OCR, the haems and their order, how the haems are shown (and
+whether they are scaled by OD), the event labels and finally the journal and size.
+The plot is redrawn after each choice and the user accepts it or chooses again.
 
 ---- Inputs ----
 session : ViewerSession
@@ -12791,7 +13346,7 @@ None.
 
 ---- Outputs ----
 bool
-    True when at least one panel is plotted (as plot_asker returns it).
+    True when at least one panel is plotted.
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers`` (side effect).
@@ -12802,16 +13357,21 @@ None.
 ---- Helpers ----
 _answers_previewer
 _review_asker
-plot_asker
+haem_choice_asker
+haem_form_asker
+haem_scaling_asker
+label_angle_asker
 preview_drawer
+signal_asker
+size_asker
 ```
 
 #### `trim_stage_runner`
 
 ```text
 ---- Summary ----
-Main function to ask the trim and ignore questions, shade the trimmed and ignored
-parts in the plot window, and ask whether to accept them.
+Main function to ask the trim and ignore questions, adding the shaded trimmed and
+ignored parts to the plot window after every answer, and ask whether to accept them.
 
 ---- Inputs ----
 session : ViewerSession
@@ -12838,6 +13398,7 @@ None.
 
 ---- Helpers ----
 _answers_previewer
+_empty_limits_builder
 _limits_lister
 _review_asker
 preview_drawer
@@ -13246,6 +13807,7 @@ _file_opener
 figure_shower
 file_focuser
 output_capturer
+pictures_publisher
 session_attacher
 window_closer
 ```
@@ -13384,6 +13946,34 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+##### `pictures_publisher`
+
+```text
+---- Summary ----
+Method to save finished pictures (the multi-experiment figures), one file each,
+tell the user where they are and open the first one.
+
+---- Inputs ----
+pictures : List[Tuple[str, bytes]]
+    [(title, PNG bytes)].
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the picture files and prints their paths (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_opener
 ```
 
 ##### `session_attacher`

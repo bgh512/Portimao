@@ -32,15 +32,13 @@ from utils_shared.individual_experiment_exporter import experiment_workbook_expo
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.questions import section_starter, UserQuit, yes_no_asker
 from utils_shared.run_logging import logging_starter, logging_stopper
-from utils_shared.survey import (analysis_asker,
-                                 files_asker,
+from utils_shared.survey import (files_asker,
                                  haem_name_formatter,
                                  JOURNAL_NAMES,
                                  multi_experiment_asker,
-                                 plot_asker,
-                                 trim_asker,
                                  )
-from utils_viewer.viewer_gui import gui_runner
+from utils_viewer.viewer_gui import active_gui_getter, gui_runner
+from utils_viewer.viewer_multi import multi_figure_checker_builder
 from utils_viewer.viewer_stages import viewer_asker
 
 
@@ -171,16 +169,15 @@ def everything_asker() -> Tuple[dict,
     None.
 
     ---- Helpers ----
-    analysis_asker
+    active_gui_getter
     files_asker
     haem_name_formatter
     last_answers_loader
     last_answers_saver
     multi_experiment_asker
-    plot_asker
+    multi_figure_checker_builder
     section_starter
     summary_figure_asker
-    trim_asker
     viewer_asker
     yes_no_asker
     """
@@ -192,11 +189,11 @@ def everything_asker() -> Tuple[dict,
     remembered = last.get('files', {})
 
     # ---- 2 Print the banner ----------------------------------------------------------
-    print('=' * 70)
-    print('  DePalencify  V2.0 beta')
-    print('  Questions are in colour and numbered. Type your answer on the line below')
-    print('  each question; Enter accepts the value shown in [brackets].')
-    print('=' * 70)
+    print(f'DePalencify V{VERSION}')
+    if active_gui_getter() is None:  # the window explains this itself
+        print('Questions are in colour and numbered. Type your answer on the line '
+              'below each question; Enter accepts the value shown in [brackets].',
+              )
 
     # ---- 3 Ask the questions ---------------------------------------------------------
     # ---- 3.1 Files -------------------------------------------------------------------
@@ -205,42 +202,33 @@ def everything_asker() -> Tuple[dict,
     names = [s['name'] for s in summaries]
 
     # ---- 3.2 Trimming and ignoring, analysis and individual plots --------------------
-    answers['use_viewer'] = yes_no_asker('Do you want to check each step in a plot '
-                                         'window as you answer (the experiment '
-                                         'browser)?',
-                                         defaults['use_viewer'],
-                                         )
-    if answers['use_viewer']:
-        limits, fit, details, plotted = viewer_asker(summaries,
-                                                     answers,
-                                                     defaults,
-                                                     remembered,
-                                                     FITS_FOLDER,
-                                                     export_root,
-                                                     )
-    else:
-        section_starter('Trimming and ignoring')
-        limits = trim_asker(summaries, remembered)
-        answers['ignore_first_minutes'] = max(v['ignore_start']
-                                              for v in limits.values()
-                                              )
-        answers['ignore_last_minutes'] = max(v['ignore_end'] for v in limits.values())
-        section_starter('Analysis')
-        fit, details = analysis_asker(summaries,
-                                      answers,
-                                      defaults,
-                                      FITS_FOLDER,
-                                      export_root,
-                                      )
-        section_starter('Individual experiment plots')
-        plotted = plot_asker(answers, defaults, fit)
+    limits, fit, details, plotted = viewer_asker(summaries,
+                                                 answers,
+                                                 defaults,
+                                                 remembered,
+                                                 FITS_FOLDER,
+                                                 export_root,
+                                                 )
 
     # ---- 3.5 Multi-experiment plots --------------------------------------------------
+    context = {'answers': answers,
+               'fit': fit,
+               'summaries': summaries,
+               'limits': limits,
+               'details': details,
+               'export_root': export_root,
+               }
+    checker = multi_figure_checker_builder(context,
+                                           {'comparison': comparison_maker,
+                                            'special': special_figures_maker,
+                                            },
+                                           )
     section_starter('Multi-experiment plots')
     comparison, exemplar_names = multi_experiment_asker(summaries,
                                                         answers,
                                                         defaults,
                                                         plotted,
+                                                        checker,
                                                         )
 
     # ---- 3.6 Experiment summaries ----------------------------------------------------
@@ -251,6 +239,7 @@ def everything_asker() -> Tuple[dict,
                                        summaries,
                                        fit,
                                        FITS_FOLDER,
+                                       checker,
                                        )
 
     # ---- 3.7 Data export -------------------------------------------------------------
@@ -564,6 +553,40 @@ def last_answers_saver(values: dict) -> None:
         pass  # a read-only folder just means the defaults are not remembered
 
 
+# ---- main ----------------------------------------------------------------------------
+def main() -> int:
+    """
+    ---- Summary ----
+    Main function of the program: run it in the experiment browser window (terminal on
+    the left, plots on the right), or in the terminal when the window cannot open.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    VERSION (shown in the window title).
+
+    ---- Outputs ----
+    int
+        0 when every file finished, 1 when the run was cancelled or a file failed.
+
+    ---- Globals mutated ----
+    None. Opens the window or runs in the terminal (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    gui_runner
+    program_runner
+    """
+
+    code = gui_runner(program_runner, f'DePalencify V{VERSION}')
+    if code is None:
+        code = program_runner()
+    return code
+
+
 # ---- program_runner ------------------------------------------------------------------
 def program_runner() -> int:
     """
@@ -662,46 +685,13 @@ def program_runner() -> int:
     return 1 if failed else 0
 
 
-# ---- main ----------------------------------------------------------------------------
-def main() -> int:
-    """
-    ---- Summary ----
-    Main function of the program: run it in the experiment browser window (terminal on
-    the left, plots on the right), or in the terminal when the window cannot open.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    VERSION (shown in the window title).
-
-    ---- Outputs ----
-    int
-        0 when every file finished, 1 when the run was cancelled or a file failed.
-
-    ---- Globals mutated ----
-    None. Opens the window or runs in the terminal (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    gui_runner
-    program_runner
-    """
-
-    code = gui_runner(program_runner, f'DePalencify V{VERSION}')
-    if code is None:
-        code = program_runner()
-    return code
-
-
 # ---- special_figures_maker -----------------------------------------------------------
 def special_figures_maker(kept: dict,
                           cfg: settings.Config,
                           fit: Optional[dict],
                           export_root: Path,
                           exemplar_names: Optional[List[str]],
+                          is_preview: bool = False,
                           ) -> None:
     """
     ---- Summary ----
@@ -720,6 +710,9 @@ def special_figures_maker(kept: dict,
         Results folder.
     exemplar_names : Optional[List[str]]
         Names of the four experiments of the 2x2 grid, or None.
+    is_preview : bool
+        True to draw the figures only (for the experiment browser): no workbook is
+        written.
 
     ---- Globals read ----
     settings.Config; time_response_runner, ocr_and_haem_response_runner and
@@ -771,7 +764,7 @@ def special_figures_maker(kept: dict,
             continue
         try:
             figure_cfg = settings.Config(dict(a, journal=a[journals[key]]))
-            runner(prepared, figure_cfg, a, fit, export_root)
+            runner(prepared, figure_cfg, a, fit, export_root, is_preview)
         except Exception as exc:  # one special figure must not stop the others
             print(f'  Not made: {type(exc).__name__}: {exc}')
             print(traceback.format_exc())

@@ -143,8 +143,6 @@ Saved to `last_answers.json` next to `main.py` and offered as the defaults on th
 | `'answers'` | dict | | | Terminal answers |
 | `'files'` | dict | | min | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}}`; trim times are on the original recording, ignore times count from the new 0 after trimming |
 
-The terminal answers include `'use_viewer'` (bool): whether the experiment browser is used.
-
 ### 1.2 Dataclasses
 
 #### `Spectra`

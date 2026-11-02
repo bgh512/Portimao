@@ -313,6 +313,7 @@ def ocr_and_haem_response_runner(experiments: dict,
                                  answers: dict,
                                  fit: dict,
                                  export_root: Path,
+                                 is_preview: bool = False,
                                  ) -> None:
     """
     ---- Summary ----
@@ -331,6 +332,9 @@ def ocr_and_haem_response_runner(experiments: dict,
         Fit dictionary from import_fit.
     export_root : Path
         Results folder.
+    is_preview : bool
+        True to draw the figure only (for the experiment browser): the workbook is not
+        written.
 
     ---- Globals read ----
     None.
@@ -374,6 +378,8 @@ def ocr_and_haem_response_runner(experiments: dict,
         plt.close('all')
 
     # ---- 3 Write the workbook --------------------------------------------------------
+    if is_preview:
+        return
     ocr_and_haem_response_exporter(triplicates,
                                    tests,
                                    baseline,
@@ -387,6 +393,7 @@ def time_response_runner(experiments: dict,
                          answers: dict,
                          fit: dict,
                          export_root: Path,
+                         is_preview: bool = False,
                          ) -> None:
     """
     ---- Summary ----
@@ -405,6 +412,9 @@ def time_response_runner(experiments: dict,
         Fit dictionary from import_fit.
     export_root : Path
         Results folder.
+    is_preview : bool
+        True to draw the figure only (for the experiment browser): the workbook is not
+        written.
 
     ---- Globals read ----
     None.
@@ -445,6 +455,8 @@ def time_response_runner(experiments: dict,
     plt.close(fig)
 
     # ---- 3 Write the workbook --------------------------------------------------------
+    if is_preview:
+        return
     time_response_exporter(experiments,
                            config,
                            picks,

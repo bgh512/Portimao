@@ -10,7 +10,7 @@ import subprocess
 import sys
 from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, List, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 from matplotlib.figure import Figure
@@ -44,6 +44,7 @@ class PictureWindow:
     figure_shower
     file_focuser
     output_capturer
+    pictures_publisher
     session_attacher
     window_closer
     """
@@ -216,6 +217,45 @@ class PictureWindow:
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             yield buffer
+
+    # ---- pictures_publisher ----------------------------------------------------------
+    def pictures_publisher(self, pictures: List[Tuple[str, bytes]]) -> None:
+        """
+        ---- Summary ----
+        Method to save finished pictures (the multi-experiment figures), one file each,
+        tell the user where they are and open the first one.
+
+        ---- Inputs ----
+        pictures : List[Tuple[str, bytes]]
+            [(title, PNG bytes)].
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Writes the picture files and prints their paths (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _file_opener
+        """
+
+        for number, (title, png) in enumerate(pictures, start=1):
+            path = self.preview_path.with_name(f'{self.preview_path.stem}_{number}.png')
+            path.write_bytes(png)
+            print(f'  Preview picture ({title}): {path}')
+            if number == 1:
+                self._opened_path = path
+        self.preview_path, kept = self._opened_path, self.preview_path
+        self._has_opened_file = False
+        self._file_opener()
+        self.preview_path = kept
 
     # ---- session_attacher ------------------------------------------------------------
     def session_attacher(self, session: Any) -> None:

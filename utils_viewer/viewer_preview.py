@@ -13,6 +13,7 @@ from typing import Any, List, Optional, Tuple
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.experiment_processing import experiment_data_processor
@@ -70,53 +71,6 @@ class ViewerSession:
 
 
 # ---- PREVIEW HELPERS -----------------------------------------------------------------
-
-
-# ---- _info_builder -------------------------------------------------------------------
-def _info_builder(summary: dict, limits: dict, details: dict) -> dict:
-    """
-    ---- Summary ----
-    Helper function to build the per-file information dictionary that
-    experiment_data_processor needs, from the answers given so far.
-
-    ---- Inputs ----
-    summary : dict
-        File summary (DATA_FORMAT.md).
-    limits : dict
-        {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes; may
-        lack the file.
-    details : dict
-        {file name: {OD, volume, dilution_factor, events}}; may lack the file.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    dict
-        Per-file information (as built in everything_asker).
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    name = summary['name']
-    own = limits.get(name, {})
-    info = {'path': summary['path'],
-            'name': name,
-            'duration': summary['duration_min'],
-            'trim_start': own.get('trim_start'),
-            'trim_end': own.get('trim_end'),
-            'ignore_start': own.get('ignore_start') or 0.0,
-            'ignore_end': own.get('ignore_end') or 0.0,
-            }
-    info.update(details.get(name, {}))
-    return info
 
 
 # ---- _loaded_experiment_getter -------------------------------------------------------
@@ -228,6 +182,53 @@ def _overlay_drawer(fig: Figure,
         mark = fig.text(0.995, 0.005, note, ha='right', va='bottom', fontsize=6,
                         color='0.35', alpha=0.9)
         mark.set_in_layout(False)
+
+
+# ---- preview_info_builder ------------------------------------------------------------
+def preview_info_builder(summary: dict, limits: dict, details: dict) -> dict:
+    """
+    ---- Summary ----
+    Helper function to build the per-file information dictionary that
+    experiment_data_processor needs, from the answers given so far.
+
+    ---- Inputs ----
+    summary : dict
+        File summary (DATA_FORMAT.md).
+    limits : dict
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes; may
+        lack the file.
+    details : dict
+        {file name: {OD, volume, dilution_factor, events}}; may lack the file.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    dict
+        Per-file information (as built in everything_asker).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    name = summary['name']
+    own = limits.get(name, {})
+    info = {'path': summary['path'],
+            'name': name,
+            'duration': summary['duration_min'],
+            'trim_start': own.get('trim_start'),
+            'trim_end': own.get('trim_end'),
+            'ignore_start': own.get('ignore_start') or 0.0,
+            'ignore_end': own.get('ignore_end') or 0.0,
+            }
+    info.update(details.get(name, {}))
+    return info
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -348,7 +349,7 @@ def preview_figure_builder(session: ViewerSession,
     None.
 
     ---- Helpers ----
-    _info_builder
+    preview_info_builder
     _loaded_experiment_getter
     _overlay_drawer
     """
@@ -356,7 +357,10 @@ def preview_figure_builder(session: ViewerSession,
     # ---- 1 Set up the file and the settings ------------------------------------------
     summary = next(s for s in session.summaries if s['name'] == name)
     own = spec.limits.get(name, {})
-    info = _info_builder(summary, {name: {} if spec.show_trim else own}, spec.details)
+    info = preview_info_builder(summary,
+                                {name: {} if spec.show_trim else own},
+                                spec.details,
+                                )
     preview_answers = dict(settings.DEFAULT_ANSWERS,
                            **dict(spec.answers, export_spectra=False),
                            )

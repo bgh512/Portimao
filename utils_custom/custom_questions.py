@@ -4,7 +4,7 @@ Numbered terminal questions of the time response and the OCR and haem response.
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import group_assigner, hours_parser, run_name_lister
@@ -448,6 +448,7 @@ def summary_figure_asker(names: List[str],
                          summaries: List[dict],
                          fit: Optional[dict],
                          fits_folder: Path,
+                         figure_checker: Optional[Callable[[str, dict], bool]] = None,
                          ) -> tuple:
     """
     ---- Summary ----
@@ -468,6 +469,10 @@ def summary_figure_asker(names: List[str],
         Fit dictionary chosen in section 3, or None.
     fits_folder : Path
         Folder holding the fit .csv files.
+    figure_checker : Optional[Callable[[str, dict], bool]]
+        Function called after the questions of each figure with (key, {'fit': fit,
+        'custom': result so far}); it shows the figure and returns True when the user
+        accepts it. When it returns False the figure's questions are asked again.
 
     ---- Globals read ----
     None.
@@ -504,35 +509,43 @@ def summary_figure_asker(names: List[str],
                                   None,
                                   ),
                                  ):
-        if not yes_no_asker(question, defaults[f'plot_{key}']):
-            continue
+        while True:
+            result[key] = None
+            answers[f'plot_{key}'] = False
+            if not yes_no_asker(question, defaults[f'plot_{key}']):
+                break
 
-        # ---- 1 Make sure the haems are decomposed ------------------------------------
-        if fit is None:
-            info_printer('This figure needs the haems, so they are decomposed.',
-                         depth=2,
-                         )
-            (answers['decompose'],
-             answers['fit_file'],
-             fit,
-             answers['decomposition_dataset'],
-             ) = decomposition_asker(summaries,
-                                     defaults,
-                                     fits_folder,
-                                     forced=True,
-                                     depth=2,
-                                     )
+            # ---- 1 Make sure the haems are decomposed --------------------------------
             if fit is None:
-                info_printer('No haem fit is available, so this figure is skipped.',
+                info_printer('This figure needs the haems, so they are decomposed.',
                              depth=2,
                              )
-                continue
+                (answers['decompose'],
+                 answers['fit_file'],
+                 fit,
+                 answers['decomposition_dataset'],
+                 ) = decomposition_asker(summaries,
+                                         defaults,
+                                         fits_folder,
+                                         forced=True,
+                                         depth=2,
+                                         )
+                if fit is None:
+                    info_printer('No haem fit is available, so this figure is skipped.',
+                                 depth=2,
+                                 )
+                    break
 
-        # ---- 2 Ask the settings of the figure ----------------------------------------
-        _window_ensurer(answers, defaults)
-        if key == 'time_response':
-            result[key] = _time_response_asker(names, answers, defaults)
-        else:
-            result[key] = _haem_ocr_asker(names, answers, defaults, fit)
-        answers[f'plot_{key}'] = result[key] is not None
+            # ---- 2 Ask the settings of the figure ------------------------------------
+            _window_ensurer(answers, defaults)
+            if key == 'time_response':
+                result[key] = _time_response_asker(names, answers, defaults)
+            else:
+                result[key] = _haem_ocr_asker(names, answers, defaults, fit)
+            answers[f'plot_{key}'] = result[key] is not None
+            if (result[key] is None or figure_checker is None or
+                    figure_checker(key, {'fit': fit, 'custom': result})
+                    ):
+                break
+            defaults = dict(answers)
     return fit, result
