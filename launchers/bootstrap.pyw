@@ -30,7 +30,9 @@ ENVIRONMENT_PYTHON = ENVIRONMENT / ('Scripts/python.exe'
                                     )
 ENVIRONMENT_WINDOWLESS = ENVIRONMENT / 'Scripts/pythonw.exe'
 LOG_FILE = ROOT / 'logs' / 'launch.log'
-SHORTCUT_MARK = ROOT / '.shortcut_made'
+SHORTCUT_MARK = ROOT / '.shortcut_made_albufeira'  # the old program used .shortcut_made
+OLD_NAME = 'DePalencify'
+REPOSITORY_NAME = 'Albufeira'  # the name of the GitHub repository after it is renamed
 HIDDEN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 REQUIRED_IMPORTS = 'import numpy, pandas, scipy, matplotlib, xlsxwriter, openpyxl, PIL'
 WAIT_SECONDS = 8.0
@@ -130,6 +132,55 @@ def _message_shower(title: str, text: str) -> None:
     print(f'{title}: {text}', file=sys.stderr)
 
 
+# ---- _old_shortcut_remover -----------------------------------------------------------
+def _old_shortcut_remover() -> None:
+    """
+    ---- Summary ----
+    Helper function to delete the shortcuts of the program under its old name, so only
+    the Albufeira ones are left after an update.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    OLD_NAME, IS_WINDOWS (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing. Anything that cannot be deleted is left.
+
+    ---- Globals mutated ----
+    None. Deletes shortcut files (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    home = Path.home()
+    places = [home / 'Desktop']
+    if IS_WINDOWS:
+        appdata = Path(os.environ.get('APPDATA', home / 'AppData/Roaming'))
+        places += [appdata / 'Microsoft/Windows/Start Menu/Programs']
+        names = [f'{OLD_NAME}.lnk']
+    else:
+        places += [Path(os.environ.get('XDG_DATA_HOME',
+                                       home / '.local/share')) / 'applications']
+        names = [f'{OLD_NAME}.desktop', f'{OLD_NAME}.app']
+    for place in places:
+        for name in names:
+            target = place / name
+            try:
+                if target.is_dir():
+                    shutil.rmtree(target)
+                elif target.exists():
+                    target.unlink()
+            except OSError:
+                pass
+
+
 # ---- _python_finder ------------------------------------------------------------------
 def _python_finder() -> Optional[str]:
     """
@@ -169,6 +220,48 @@ def _python_finder() -> Optional[str]:
         if check.returncode == 0:
             return candidate
     return None
+
+
+# ---- _remote_renamer -----------------------------------------------------------------
+def _remote_renamer() -> None:
+    """
+    ---- Summary ----
+    Helper function to point the git remote of an old install at the renamed
+    repository, so updates no longer depend on GitHub's redirect from the old name. The
+    remote is only changed when the new address answers.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    OLD_NAME, REPOSITORY_NAME (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing. Any problem leaves the remote as it was.
+
+    ---- Globals mutated ----
+    None. May change the git remote of the folder (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _command_runner
+    """
+
+    try:
+        shown = _command_runner(['git', 'remote', 'get-url', 'origin'])
+        url = shown.stdout.strip()
+        if shown.returncode != 0 or OLD_NAME.lower() not in url.lower():
+            return
+        start = url.lower().rindex(OLD_NAME.lower())
+        new_url = url[:start] + REPOSITORY_NAME + url[start + len(OLD_NAME):]
+        if _command_runner(['git', 'ls-remote', new_url, 'HEAD'],
+                           timeout=20).returncode == 0:
+            _command_runner(['git', 'remote', 'set-url', 'origin', new_url])
+    except Exception:
+        pass
 
 
 # ---- _status_window_maker ------------------------------------------------------------
@@ -294,154 +387,6 @@ def environment_builder(show: Callable[[str], None]) -> None:
     (ENVIRONMENT / '.complete').write_text('ok')
 
 
-# ---- program_starter -----------------------------------------------------------------
-def program_starter() -> 'subprocess.Popen':
-    """
-    ---- Summary ----
-    Main function to start the program in the private environment, with no terminal
-    window. What it prints goes to logs/launch.log.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    ROOT, LOG_FILE, ENVIRONMENT_PYTHON, ENVIRONMENT_WINDOWLESS, IS_WINDOWS.
-
-    ---- Outputs ----
-    subprocess.Popen
-        The running program.
-
-    ---- Globals mutated ----
-    None. Starts a process and writes the log file (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    log = open(LOG_FILE, 'w', encoding='utf-8')
-    program = str(ROOT / 'main.py')
-    environment = dict(os.environ, PYTHONIOENCODING='utf-8', PYTHONUTF8='1')
-    if IS_WINDOWS:
-        python = ENVIRONMENT_WINDOWLESS
-        if not python.exists():
-            python = ENVIRONMENT_PYTHON
-        flags = HIDDEN | getattr(subprocess, 'DETACHED_PROCESS', 0)
-        return subprocess.Popen([str(python), program], cwd=ROOT, env=environment,
-                                stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                                creationflags=flags)
-    return subprocess.Popen([str(ENVIRONMENT_PYTHON), program], cwd=ROOT,
-                            env=environment, stdin=subprocess.DEVNULL, stdout=log,
-                            stderr=log, start_new_session=True)
-
-
-# ---- shortcut_maker ------------------------------------------------------------------
-def shortcut_maker() -> None:
-    """
-    ---- Summary ----
-    Main function to make the clickable icon the first time (and again if the folder
-    is moved): Desktop and Start menu shortcuts on Windows, an entry in the applications
-    menu and on the Desktop on Linux. A Mac uses the Albufeira.app in the folder.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    ROOT, SHORTCUT_MARK, APP_NAME (module constants).
-
-    ---- Outputs ----
-    None
-        Nothing. A missing shortcut never stops the program.
-
-    ---- Globals mutated ----
-    None. Writes shortcut files and a marker file (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _command_runner
-    """
-
-    try:
-        if SHORTCUT_MARK.exists() and SHORTCUT_MARK.read_text() == str(ROOT):
-            return
-        if IS_WINDOWS:
-            script = ROOT / 'launchers' / 'make_shortcut.ps1'
-            windowless = Path(sys.executable).with_name('pythonw.exe')
-            target = windowless if windowless.exists() else Path(sys.executable)
-            _command_runner(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-                             '-WindowStyle', 'Hidden', '-File', str(script),
-                             str(ROOT), str(target), str(ROOT / 'Albufeira.pyw')])
-        elif sys.platform.startswith('linux'):
-            entry = (f'[Desktop Entry]\nType=Application\nName={APP_NAME}\n'
-                     'Comment=Convert chamber .paf files to figures and data\n'
-                     f'Exec={shutil.which("python3") or "python3"} '
-                     f'"{ROOT / "launchers" / "bootstrap.pyw"}"\n'
-                     f'Path={ROOT}\nIcon={ROOT / "assets" / "icon.png"}\n'
-                     'Terminal=false\nCategories=Science;Education;\n')
-            menu = Path(os.environ.get('XDG_DATA_HOME',
-                                       Path.home() / '.local/share')) / 'applications'
-            for folder in (menu, Path.home() / 'Desktop'):
-                if folder.is_dir() or folder == menu:
-                    folder.mkdir(parents=True, exist_ok=True)
-                    path = folder / f'{APP_NAME}.desktop'
-                    path.write_text(entry, encoding='utf-8')
-                    path.chmod(0o755)
-                    if shutil.which('gio'):
-                        _command_runner(['gio', 'set', str(path),
-                                         'metadata::trusted', 'true'])
-        SHORTCUT_MARK.write_text(str(ROOT))
-    except Exception:  # a missing shortcut must never stop the program
-        pass
-
-
-# ---- update_checker ------------------------------------------------------------------
-def update_checker() -> bool:
-    """
-    ---- Summary ----
-    Main function to install a newer version from GitHub when this folder is a git
-    clone and one is available. Anything that goes wrong (no internet, files edited
-    here) is ignored and the current version runs.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    ROOT (module constant); os.environ["ALBUFEIRA_UPDATED"].
-
-    ---- Outputs ----
-    bool
-        True when an update was installed, so the launcher must start again.
-
-    ---- Globals mutated ----
-    None. May change the files of the program (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _command_runner
-    """
-
-    if not (ROOT / '.git').exists() or os.environ.get('ALBUFEIRA_UPDATED'):
-        return False
-    if shutil.which('git') is None:
-        return False
-    try:
-        if _command_runner(['git', 'fetch', '--quiet'], timeout=20).returncode != 0:
-            return False
-        behind = _command_runner(['git', 'rev-list', '--count', 'HEAD..@{u}'])
-        if behind.returncode != 0 or int(behind.stdout.strip() or 0) == 0:
-            return False
-        return _command_runner(['git', 'pull', '--ff-only', '--quiet']).returncode == 0
-    except Exception:
-        return False
-
-
 # ---- launcher_runner -----------------------------------------------------------------
 def launcher_runner(show: Callable[[str], None]) -> int:
     """
@@ -545,3 +490,155 @@ def main() -> int:
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+# ---- program_starter -----------------------------------------------------------------
+def program_starter() -> 'subprocess.Popen':
+    """
+    ---- Summary ----
+    Main function to start the program in the private environment, with no terminal
+    window. What it prints goes to logs/launch.log.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    ROOT, LOG_FILE, ENVIRONMENT_PYTHON, ENVIRONMENT_WINDOWLESS, IS_WINDOWS.
+
+    ---- Outputs ----
+    subprocess.Popen
+        The running program.
+
+    ---- Globals mutated ----
+    None. Starts a process and writes the log file (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    log = open(LOG_FILE, 'w', encoding='utf-8')
+    program = str(ROOT / 'main.py')
+    environment = dict(os.environ, PYTHONIOENCODING='utf-8', PYTHONUTF8='1')
+    if IS_WINDOWS:
+        python = ENVIRONMENT_WINDOWLESS
+        if not python.exists():
+            python = ENVIRONMENT_PYTHON
+        flags = HIDDEN | getattr(subprocess, 'DETACHED_PROCESS', 0)
+        return subprocess.Popen([str(python), program], cwd=ROOT, env=environment,
+                                stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                                creationflags=flags)
+    return subprocess.Popen([str(ENVIRONMENT_PYTHON), program], cwd=ROOT,
+                            env=environment, stdin=subprocess.DEVNULL, stdout=log,
+                            stderr=log, start_new_session=True)
+
+
+# ---- shortcut_maker ------------------------------------------------------------------
+def shortcut_maker() -> None:
+    """
+    ---- Summary ----
+    Main function to make the clickable icon the first time (and again if the folder
+    is moved): Desktop and Start menu shortcuts on Windows, an entry in the applications
+    menu and on the Desktop on Linux. A Mac uses the Albufeira.app in the folder.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    ROOT, SHORTCUT_MARK, APP_NAME (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing. A missing shortcut never stops the program.
+
+    ---- Globals mutated ----
+    None. Writes shortcut files and a marker file (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _command_runner
+    _old_shortcut_remover
+    """
+
+    try:
+        if SHORTCUT_MARK.exists() and SHORTCUT_MARK.read_text() == str(ROOT):
+            return
+        _old_shortcut_remover()
+        if IS_WINDOWS:
+            script = ROOT / 'launchers' / 'make_shortcut.ps1'
+            windowless = Path(sys.executable).with_name('pythonw.exe')
+            target = windowless if windowless.exists() else Path(sys.executable)
+            _command_runner(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                             '-WindowStyle', 'Hidden', '-File', str(script),
+                             str(ROOT), str(target), str(ROOT / 'Albufeira.pyw')])
+        elif sys.platform.startswith('linux'):
+            entry = (f'[Desktop Entry]\nType=Application\nName={APP_NAME}\n'
+                     'Comment=Convert chamber .paf files to figures and data\n'
+                     f'Exec={shutil.which("python3") or "python3"} '
+                     f'"{ROOT / "launchers" / "bootstrap.pyw"}"\n'
+                     f'Path={ROOT}\nIcon={ROOT / "assets" / "icon.png"}\n'
+                     'Terminal=false\nCategories=Science;Education;\n')
+            menu = Path(os.environ.get('XDG_DATA_HOME',
+                                       Path.home() / '.local/share')) / 'applications'
+            for folder in (menu, Path.home() / 'Desktop'):
+                if folder.is_dir() or folder == menu:
+                    folder.mkdir(parents=True, exist_ok=True)
+                    path = folder / f'{APP_NAME}.desktop'
+                    path.write_text(entry, encoding='utf-8')
+                    path.chmod(0o755)
+                    if shutil.which('gio'):
+                        _command_runner(['gio', 'set', str(path),
+                                         'metadata::trusted', 'true'])
+        SHORTCUT_MARK.write_text(str(ROOT))
+    except Exception:  # a missing shortcut must never stop the program
+        pass
+
+
+# ---- update_checker ------------------------------------------------------------------
+def update_checker() -> bool:
+    """
+    ---- Summary ----
+    Main function to install a newer version from GitHub when this folder is a git
+    clone and one is available. Anything that goes wrong (no internet, files edited
+    here) is ignored and the current version runs.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    ROOT (module constant); os.environ["ALBUFEIRA_UPDATED"].
+
+    ---- Outputs ----
+    bool
+        True when an update was installed, so the launcher must start again.
+
+    ---- Globals mutated ----
+    None. May change the files of the program (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _command_runner
+    _remote_renamer
+    """
+
+    if not (ROOT / '.git').exists() or os.environ.get('ALBUFEIRA_UPDATED'):
+        return False
+    if shutil.which('git') is None:
+        return False
+    try:
+        _remote_renamer()
+        if _command_runner(['git', 'fetch', '--quiet'], timeout=20).returncode != 0:
+            return False
+        behind = _command_runner(['git', 'rev-list', '--count', 'HEAD..@{u}'])
+        if behind.returncode != 0 or int(behind.stdout.strip() or 0) == 0:
+            return False
+        return _command_runner(['git', 'pull', '--ff-only', '--quiet']).returncode == 0
+    except Exception:
+        return False

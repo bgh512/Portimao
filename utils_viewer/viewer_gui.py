@@ -22,7 +22,7 @@ from PIL import Image
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.output_capture import output_capturer
-from utils_viewer.viewer_preview import PreviewSpec, ViewerSession
+from utils_viewer.viewer_preview import KEY_PREFIX, PreviewSpec, ViewerSession
 from utils_viewer.viewer_renderer import PreviewRenderer
 from utils_viewer.viewer_terminal import (ansi_splitter,
                                           ansi_style_updater,
@@ -185,6 +185,7 @@ class ViewerGui:
         root.title(title)
         self._is_pictures = False
         self._file_count = 0
+        self._help_base = ''
         self._widgets_builder()
         self._icon_setter()
 
@@ -407,6 +408,7 @@ class ViewerGui:
             self._renderer = PreviewRenderer(self._session, self._image_deliverer)
             self._renderer.start()
             self._is_pictures = False
+            self._help_base = FILES_HELP
             self._help.configure(text=FILES_HELP)
             self._nav_state(True)
             self._navigator(self._session.current)
@@ -423,6 +425,7 @@ class ViewerGui:
                 self._notes.pop(title, None)
             self._has_spec = True
             self._combo.configure(values=self._display_names())
+            self._help_base = FIGURES_HELP
             self._help.configure(text=FIGURES_HELP)
             self._nav_state(len(self._names) > 1)
             self._navigator(len(files))
@@ -903,10 +906,13 @@ class ViewerGui:
                                   )
         if self._is_pictures and self._index < self._file_count:
             self._lock_drawer()
-        note = self._notes.get(name, '')
+        lines = self._notes.get(name, '').splitlines()
+        key = [line[len(KEY_PREFIX):] for line in lines if line.startswith(KEY_PREFIX)]
+        note = '\n'.join(line for line in lines if not line.startswith(KEY_PREFIX))
         if is_stale:
             note = 'Redrawing ... (this is the previous picture)'
         self._status.configure(text=note)
+        self._help.configure(text='\n'.join([self._help_base] + key))
 
     # ---- _resizer --------------------------------------------------------------------
     def _resizer(self, event: Any) -> None:

@@ -150,7 +150,7 @@ The launchers open Albufeira without leaving a terminal window open.
 - macOS: double-click `Albufeira.app`.
 - Linux: run `./run.sh`; the first time it adds Albufeira to the applications menu and the Desktop.
 
-A small "Starting Albufeira" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone. If something goes wrong a message box says what, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way.
+A small "Starting Albufeira" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way.
 
 Windows and macOS may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. On Windows right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. On macOS right-click `Albufeira.app` and choose Open the first time.
 

@@ -520,7 +520,8 @@ def _minutes_remembered(summary: dict, remembered: dict, key: str) -> Optional[f
 
     ---- Outputs ----
     Optional[float]
-        Minutes removed from that edge, or None when nothing is remembered.
+        Minutes removed from that edge (0.0 when the file was remembered as not
+        trimmed there), or None when nothing is remembered for the file.
 
     ---- Globals mutated ----
     None.
@@ -532,9 +533,12 @@ def _minutes_remembered(summary: dict, remembered: dict, key: str) -> Optional[f
     None.
     """
 
-    value = remembered.get(summary['name'], {}).get(key)
-    if value is None:
+    entry = remembered.get(summary['name'])
+    if not entry or key not in entry:
         return None
+    value = entry[key]
+    if value is None:  # remembered as "not trimmed"
+        return 0.0
     return summary['duration_min'] - value if key == 'trim_end' else value
 
 

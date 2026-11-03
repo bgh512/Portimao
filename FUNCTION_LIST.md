@@ -2,7 +2,7 @@
 
 - **Project:** Albufeira
 - **Version:** V2.7
-- **Date:** 02/11/2026
+- **Date:** 03/11/2026
 
 ## Contents
 
@@ -11030,7 +11030,8 @@ None.
 
 ---- Outputs ----
 Optional[float]
-    Minutes removed from that edge, or None when nothing is remembered.
+    Minutes removed from that edge (0.0 when the file was remembered as not
+    trimmed there), or None when nothing is remembered for the file.
 
 ---- Globals mutated ----
 None.
@@ -13191,7 +13192,8 @@ settings.Config; PREVIEW_DPI (module constant).
 Tuple[Optional[Figure], str]
     (figure, notes). The figure is None when the preview could not be drawn, and
     the notes then say why. Otherwise the notes are the warnings of the processing
-    (a skipped step, a missing OD), one per line, and may be empty.
+    (a skipped step, a missing OD), one per line, and may be empty. A line starting
+    with KEY_PREFIX explains the shading and belongs by the controls.
 
 ---- Globals mutated ----
 None. Sets the matplotlib rcParams of the figure style (side effect). Nothing is

@@ -31,6 +31,7 @@ BROWSING_ANSWERS = {key: settings.DEFAULT_ANSWERS[key]
                     for key in ('journal', 'columns', 'height', 'size_mode')
                     }
 _cache_lock = threading.Lock()
+KEY_PREFIX = 'Key: '
 TRIM_COLOUR = '0.45'
 IGNORE_COLOUR = '#e8a317'
 
@@ -341,7 +342,8 @@ def preview_figure_builder(session: ViewerSession,
     Tuple[Optional[Figure], str]
         (figure, notes). The figure is None when the preview could not be drawn, and
         the notes then say why. Otherwise the notes are the warnings of the processing
-        (a skipped step, a missing OD), one per line, and may be empty.
+        (a skipped step, a missing OD), one per line, and may be empty. A line starting
+        with KEY_PREFIX explains the shading and belongs by the controls.
 
     ---- Globals mutated ----
     None. Sets the matplotlib rcParams of the figure style (side effect). Nothing is
@@ -428,7 +430,9 @@ def preview_figure_builder(session: ViewerSession,
         note = 'grey hatched = trimmed away, amber = ignored in calculations'
     elif spec.show_ignored and any(r[2] == 'ignore' and r[1] > r[0] for r in regions):
         note = 'amber = ignored in calculations'
-    _overlay_drawer(fig, axes, regions, note)
+    _overlay_drawer(fig, axes, regions, '')
+    if note:  # shown above the file selector, not inside the picture
+        notes = '\n'.join(line for line in (notes, f'{KEY_PREFIX}{note}') if line)
     return fig, notes
 
 
