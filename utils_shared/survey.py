@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_custom.run_namer import run_name_lister
@@ -31,6 +32,7 @@ from utils_shared.spectral_decomposer import fit_importer
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+_file_focus_hook: Optional[Callable[[str], None]] = None
 JOURNAL_NAMES = {'nature': 'Nature',
                  'science': 'Science',
                  'cell': 'Cell',
@@ -40,6 +42,7 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'od': 'OCR / OD (µM min⁻¹ OD⁻¹)',
               'percent': 'OCR (% of the range)',
               }
+PCA_CHOICE = '__pca__'
 
 
 # ---- SURVEY HELPERS ------------------------------------------------------------------
@@ -114,6 +117,38 @@ def _event_line_builder(event: dict, entry: dict) -> str:
     return f"  {event['time']:.2f} min: {entry['label']}{conc}{note}"
 
 
+# ---- _file_focuser -------------------------------------------------------------------
+def _file_focuser(name: str) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the experiment browser which file the next question is
+    about, so its window shows that file. Does nothing without the browser.
+
+    ---- Inputs ----
+    name : str
+        File name.
+
+    ---- Globals read ----
+    _file_focus_hook (module state).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Calls the hook (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if _file_focus_hook is not None:
+        _file_focus_hook(name)
+
+
 # ---- _first_event_finder -------------------------------------------------------------
 def _first_event_finder(summary: dict) -> float:
     """
@@ -176,45 +211,233 @@ def _last_event_finder(summary: dict) -> float:
     return max((e['time'] for e in summary['events']), default=0.0)
 
 
+# ---- _limit_converter ----------------------------------------------------------------
+def _limit_converter(summary: dict,
+                     kind: str,
+                     edge: str,
+                     minutes: float,
+                     ) -> Optional[float]:
+    """
+    ---- Summary ----
+    Helper function to turn the minutes a user typed into the value the program keeps
+    for a trim or ignore limit.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with duration_min.
+    kind : str
+        'trim' or 'ignore'.
+    edge : str
+        'start' or 'end'.
+    minutes : float
+        Minutes to remove from that edge of the recording; 0 means none.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[float]
+        Trim limits: the time on the original recording, or None for no trim. Ignore
+        limits: the minutes (0.0 for none).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Trim start = minutes. Trim end = duration - minutes.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if kind == 'ignore':
+        return float(minutes or 0.0)
+    if not minutes:
+        return None
+    return float(minutes) if edge == 'start' else summary['duration_min'] - minutes
+
+
+# ---- _limit_maximum_getter -----------------------------------------------------------
+def _limit_maximum_getter(summary: dict,
+                          kind: str,
+                          edge: str,
+                          so_far: dict,
+                          ) -> Optional[float]:
+    """
+    ---- Summary ----
+    Helper function to find the most minutes that can be trimmed from an edge of a file
+    without cutting off an event.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with events and duration_min.
+    kind : str
+        'trim' or 'ignore'.
+    edge : str
+        'start' or 'end'.
+    so_far : dict
+        Limits already asked for this file ({key: value}).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[float]
+        Largest accepted number of minutes, or None when there is no limit (ignore).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Start: the first event time. End: duration - the later of the last event time and
+    the trim start.
+
+    ---- Helpers ----
+    _first_event_finder
+    _last_event_finder
+    """
+
+    if kind == 'ignore':
+        return None
+    if edge == 'start':
+        return _first_event_finder(summary)
+    kept_from = max(_last_event_finder(summary), so_far.get('trim_start') or 0.0)
+    return max(summary['duration_min'] - kept_from, 0.0)
+
+
 # ---- _limits_asker -------------------------------------------------------------------
 def _limits_asker(summaries: List[dict],
                   remembered: dict,
-                  key: str,
-                  question: str,
-                  per_file: str,
-                  fallback: Optional[float],
-                  all_text: str,
-                  bounds_builder: Callable[[dict, dict], dict],
-                  note_builder: Callable[[dict], str],
+                  kind: str,
+                  edge: str,
                   collected: dict,
-                  ) -> Dict[str, Optional[float]]:
+                  progress: Callable[[Dict[str, dict]], None],
+                  ) -> None:
     """
     ---- Summary ----
-    Helper function to ask one yes/no question and then one number per file (trim or
-    ignore, start or end), offering the values remembered from the last run.
+    Helper function to ask the questions for one edge of the data (trim start, trim end,
+    ignore start or ignore end): whether to do it at all, how many minutes for ALL the
+    files, and then optionally how many for each file. The limits are stored and passed
+    to ``progress`` after every answer, so a plot can show them building up.
 
     ---- Inputs ----
     summaries : List[dict]
         File summaries (DATA_FORMAT.md).
     remembered : dict
-        {file name: {key: value}} from the last run.
-    key : str
-        Name of the limit, for example 'trim_start'.
-    question : str
-        The yes/no question.
-    per_file : str
-        Question for each file; {name} is replaced by the file name.
-    fallback : Optional[float]
-        Default for a file with no remembered value; None means 'none' and one
-        value is asked per file. A number means one value is asked for all files,
-        then optionally one per file.
-    all_text : str
-        The question for the value that applies to all files (ignore only).
-    bounds_builder : Callable[[dict, dict], dict]
-        Function (summary, limits collected so far for that file) giving the
-        minimum and maximum accepted for the file.
-    note_builder : Callable[[dict], str]
-        Function (summary) giving the information line shown before the question.
+        {file name: {key: value}} from the last run, offered as the defaults.
+    kind : str
+        'trim' or 'ignore'.
+    edge : str
+        'start' or 'end'.
+    collected : dict
+        {file name: {key: value}} of the limits asked so far; this question adds its
+        own key.
+    progress : Callable[[Dict[str, dict]], None]
+        Function called with the limits of every file after each answer.
+
+    ---- Globals read ----
+    config.DEFAULT_ANSWERS (default ignore time at the start).
+
+    ---- Outputs ----
+    None
+        Nothing; the answers are stored in ``collected``.
+
+    ---- Globals mutated ----
+    collected (adds the key of this question for every file). Reads from and prints to
+    the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _file_focuser
+    _limit_converter
+    _limit_maximum_getter
+    _limits_filler
+    _minutes_remembered
+    info_printer
+    number_asker
+    yes_no_asker
+    """
+
+    key = f'{kind}_{edge}'
+    verb, place = kind.upper(), edge.upper()
+    past = 'TRIMMED' if kind == 'trim' else 'IGNORED'
+    fallback = (settings.DEFAULT_ANSWERS['ignore_first_minutes']
+                if key == 'ignore_start' else 0.0
+                )
+    old = {s['name']: _minutes_remembered(s, remembered, key) for s in summaries}
+    known = [value for value in old.values() if value is not None]
+    default_yes = any(known) or (fallback > 0 and not known)
+    if not yes_no_asker(f'Do you want to {verb} the {place} of any of the data?',
+                        default_yes,
+                        ):
+        for summary in summaries:
+            collected[summary['name']][key] = _limit_converter(summary, kind, edge, 0)
+        return
+
+    # ---- 1 One value for ALL the data ------------------------------------------------
+    maxima = {s['name']: _limit_maximum_getter(s, kind, edge, collected[s['name']])
+              for s in summaries
+              }
+    caps = [value for value in maxima.values() if value is not None]
+    common_default = max(set(known), key=known.count) if known else fallback
+    if caps:
+        common_default = min(common_default, min(caps))
+    common = number_asker(f'How many minutes should be {past} from the {place} of '
+                          'ALL the data?',
+                          common_default,
+                          minimum=0,
+                          maximum=min(caps, default=None),
+                          depth=2,
+                          )
+    for summary in summaries:
+        collected[summary['name']][key] = _limit_converter(summary, kind, edge, common)
+    progress(_limits_filler(summaries, collected))
+    differs = any(value != common for value in known)
+    if not yes_no_asker('Do you want to adjust this for any specific file?',
+                        differs,
+                        depth=2,
+                        ):
+        return
+
+    # ---- 2 One value per file, drawn as it is answered -------------------------------
+    for summary in summaries:
+        name = summary['name']
+        _file_focuser(name)
+        if kind == 'trim':
+            event = (_first_event_finder(summary) if edge == 'start'
+                     else _last_event_finder(summary)
+                     )
+            which = 'first' if edge == 'start' else 'last'
+            info_printer(f'{name}: {which} event at {event:.1f} min, recording '
+                         f"{summary['duration_min']:.1f} min",
+                         depth=2,
+                         )
+        default = old[name] if old[name] is not None else common
+        if maxima[name] is not None:
+            default = min(default, maxima[name])
+        minutes = number_asker(f'How many minutes should be {past} from the {place} '
+                               f'of {name}?',
+                               default,
+                               minimum=0,
+                               maximum=maxima[name],
+                               depth=2,
+                               )
+        collected[name][key] = _limit_converter(summary, kind, edge, minutes)
+        progress(_limits_filler(summaries, collected))
+
+
+# ---- _limits_filler ------------------------------------------------------------------
+def _limits_filler(summaries: List[dict], collected: dict) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Helper function to give every file all four limits, using "none" for the ones not
+    asked yet.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
     collected : dict
         {file name: {key: value}} of the limits asked so far.
 
@@ -222,62 +445,27 @@ def _limits_asker(summaries: List[dict],
     None.
 
     ---- Outputs ----
-    Dict[str, Optional[float]]
-        {file name: minutes or None}.
+    Dict[str, dict]
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}}; the trim limits
+        are None and the ignore limits 0.0 when not set.
 
     ---- Globals mutated ----
-    None. Reads from and prints to the terminal (side effect).
+    None.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    info_printer
-    number_asker
-    yes_no_asker
+    None.
     """
 
-    remembered_values = [remembered.get(s['name'], {}).get(key) for s in summaries]
-    any_remembered = any(value for value in remembered_values)
-    nothing_remembered = not any(v is not None for v in remembered_values)
-    default_yes = (any_remembered or
-                   (fallback is not None and fallback > 0 and nothing_remembered)
-                   )
-    limits = {s['name']: None for s in summaries}
-    if not yes_no_asker(question, default_yes):
-        if fallback is not None:
-            limits = {s['name']: 0.0 for s in summaries}
-        return limits
-
-    # ---- 1 One value for every file (ignore only) ------------------------------------
-    common = None
-    if fallback is not None:
-        known = [v for v in remembered_values if v is not None]
-        common_default = max(set(known), key=known.count) if known else fallback
-        common = number_asker(all_text, common_default, minimum=0, depth=2,)
-        differs = any(v is not None and v != common for v in known)
-        if not yes_no_asker('Do you want a different value for any file?',
-                            differs,
-                            depth=2,
-                            ):
-            return {s['name']: common for s in summaries}
-
-    # ---- 2 One value per file --------------------------------------------------------
-    for summary in summaries:
-        name = summary['name']
-        old = remembered.get(name, {}).get(key)
-        default = old if old is not None else common
-        note = note_builder(summary)
-        if note:
-            info_printer(f'{name}: {note}', depth=2)
-        bounds = bounds_builder(summary, collected.get(name, {}))
-        limits[name] = number_asker(per_file.format(name=name),
-                                    default,
-                                    allow_blank=fallback is None,
-                                    depth=2,
-                                    **bounds,
-                                    )
-    return limits
+    return {s['name']: {'trim_start': collected[s['name']].get('trim_start'),
+                        'trim_end': collected[s['name']].get('trim_end'),
+                        'ignore_start': collected[s['name']].get('ignore_start') or 0.0,
+                        'ignore_end': collected[s['name']].get('ignore_end') or 0.0,
+                        }
+            for s in summaries
+            }
 
 
 # ---- _maths_converter ----------------------------------------------------------------
@@ -311,6 +499,48 @@ text_italiser
 
     inner = re.sub(r'_\{([^}]*)\}|_(.)', _subscript_stripper, match.group(1))
     return text_italiser(inner.replace('\\', ''))
+
+
+# ---- _minutes_remembered -------------------------------------------------------------
+def _minutes_remembered(summary: dict, remembered: dict, key: str) -> Optional[float]:
+    """
+    ---- Summary ----
+    Helper function to turn a limit remembered from the last run back into the minutes
+    the question asks for.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with name and duration_min.
+    remembered : dict
+        {file name: {key: value}} from the last run.
+    key : str
+        'trim_start', 'trim_end', 'ignore_start' or 'ignore_end'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[float]
+        Minutes removed from that edge (0.0 when the file was remembered as not
+        trimmed there), or None when nothing is remembered for the file.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Trim end minutes = duration - remembered end time.
+
+    ---- Helpers ----
+    None.
+    """
+
+    entry = remembered.get(summary['name'])
+    if not entry or key not in entry:
+        return None
+    value = entry[key]
+    if value is None:  # remembered as "not trimmed"
+        return 0.0
+    return summary['duration_min'] - value if key == 'trim_end' else value
 
 
 # ---- _natural_sorter -----------------------------------------------------------------
@@ -421,12 +651,8 @@ def analysis_asker(summaries: List[dict],
     averaging_asker
     decomposition_asker
     event_asker
-    info_printer
-    od_asker
-    progress_clearer
-    progress_printer
-    saved_settings_reader
-    yes_no_asker
+    od_scaling_asker
+    saved_values_reader
     """
 
     # ---- 1 Decomposition -------------------------------------------------------------
@@ -437,57 +663,8 @@ def analysis_asker(summaries: List[dict],
      ) = decomposition_asker(summaries, defaults, fits_folder)
 
     # ---- 2 OD scaling ----------------------------------------------------------------
-    saved = {}
-    for number, summary in enumerate(summaries, start=1):
-        progress_printer(f'Looking for earlier values, file {number} of '
-                         f'{len(summaries)} ...',
-                         )
-        saved[summary['name']] = saved_settings_reader(export_root, summary['name'])
-    progress_clearer()
-    if any(saved.values()):
-        info_printer("\nEarlier OD and event values found in the experiments' "
-                     'workbooks are '
-                     'offered as defaults.',
-                     )
-    answers['normalise_od'] = yes_no_asker('Do you want to scale by OD (divide by '
-                                           'dilution factor x OD x volume)?',
-                                           defaults['normalise_od'],
-                                           )
-    details = {s['name']: {} for s in summaries}
-    if answers['normalise_od']:
-        # List what is already stored for each run and only ask about the rest unless
-        # the user wants to change them.
-        stored_keys = ('OD', 'volume', 'dilution_factor')
-        complete = [s for s in summaries
-                    if all((saved.get(s['name']) or {}).get(k) for k in stored_keys[:2])
-                    ]
-        if complete:
-            info_printer('\nStored OD information:', depth=2, tight=True)
-            for summary in summaries:
-                old = saved.get(summary['name']) or {}
-                if summary in complete:
-                    text = (f"OD {old['OD']:g}, volume {old['volume']:g} mL, dilution "
-                            f"factor {old.get('dilution_factor', 1.0):g}"
-                            )
-                else:
-                    text = 'nothing stored'
-                info_printer(f"  {summary['name']}: {text}", depth=2, tight=True)
-        change = (not complete) or yes_no_asker('Do you want to change any of these?',
-                                                False,
-                                                )
-        to_ask = summaries if change else [s for s in summaries if s not in complete]
-        for summary in complete:
-            if summary not in to_ask:
-                old = saved[summary['name']]
-                dilution = old.get('dilution_factor', 1.0)
-                details[summary['name']].update({'OD': old['OD'],
-                                                 'volume': old['volume'],
-                                                 'dilution_factor': dilution,
-                                                 },
-                                                )
-        if to_ask:
-            for name, values in od_asker(to_ask, saved).items():
-                details[name].update(values)
+    saved = saved_values_reader(summaries, export_root)
+    details = od_scaling_asker(summaries, answers, defaults, saved)
 
     # ---- 3 Averaging -----------------------------------------------------------------
     averaging_asker(answers, defaults)
@@ -571,11 +748,13 @@ def decomposition_asker(summaries: List[dict],
                         fits_folder: Path,
                         forced: bool = False,
                         depth: int = 1,
+                        pca_runner: Optional[Callable] = None,
                         ) -> tuple:
     """
     ---- Summary ----
     Main function to ask whether to decompose the spectra into haems and which fit to
-    use.
+    use: a fit file, or (when a pca_runner is given) components found from the data
+    with a principal component analysis.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -588,9 +767,13 @@ def decomposition_asker(summaries: List[dict],
         True to skip the yes/no question (a figure that needs the haems was chosen).
     depth : int
         Numbering depth of the questions (1 = 3.1, 2 = 3.1.1).
+    pca_runner : Optional[Callable]
+        Function (dataset, depth) that finds the components with a principal component
+        analysis and returns (fit file name, fit), or (None, None) when the user wants
+        a fit file instead. None leaves the option out.
 
     ---- Globals read ----
-    None.
+    PCA_CHOICE (module constant).
 
     ---- Outputs ----
     tuple
@@ -613,7 +796,7 @@ def decomposition_asker(summaries: List[dict],
     # ---- 1 Find the available fits ---------------------------------------------------
     none_chosen = (False, None, None, defaults['decomposition_dataset'])
     fits = sorted(fits_folder.glob('*.csv'), key=lambda p: p.name.lower())
-    if not fits:
+    if not fits and pca_runner is None:
         info_printer(f'No fit files (.csv) were found in {fits_folder}, so haems '
                      f'cannot be '
                      'decomposed this time. Put a fit .csv in that folder and run '
@@ -628,41 +811,61 @@ def decomposition_asker(summaries: List[dict],
         ):
         return none_chosen
 
-    # ---- 2 Choose and load the fit ---------------------------------------------------
+    def dataset_chooser(extra_depth: int) -> Optional[str]:
+        common = set(summaries[0]['datasets'])
+        for summary in summaries[1:]:
+            common &= set(summary['datasets'])
+        if not common:
+            info_printer('The files have no spectrometer in common, so haems cannot '
+                         'be decomposed.',
+                         )
+            return None
+        chosen = defaults['decomposition_dataset']
+        if chosen not in common:
+            options = sorted(common)
+            chosen = options[0]
+            if len(options) > 1:
+                chosen = choice_asker('Which spectrometer holds the haem spectra?',
+                                      [(o, o) for o in options],
+                                      options[0],
+                                      depth=depth + extra_depth,
+                                      )
+        return chosen
+
+    # ---- 2 Choose the fit, and the spectral dataset ----------------------------------
     names = [p.name for p in fits]
     default_fit = defaults.get('fit_file')
-    fit_file = choice_asker('Which fit would you like to use?',
-                            [(n, n) for n in names],
-                            default_fit if default_fit in names else names[0],
-                            depth=depth + (0 if forced else 1),
-                            )
-    try:
-        fit = fit_importer(fits_folder / fit_file)
-    except Exception as exc:
-        info_printer(f'The fit file could not be read ({exc}); haems will not be '
-                     f'decomposed.',
-                     )
+    choices = [(n, n) for n in names]
+    if pca_runner is not None:
+        choices.append((PCA_CHOICE, 'Find the components from the data (principal '
+                                    'component analysis)',
+                        ))
+    dataset = None
+    while True:
+        fit_file = choice_asker('Which fit would you like to use?',
+                                choices,
+                                default_fit if default_fit in names else choices[0][0],
+                                depth=depth + (0 if forced else 1),
+                                )
+        if fit_file == PCA_CHOICE:
+            dataset = dataset or dataset_chooser(1)
+            if dataset is None:
+                return none_chosen
+            fit_file, fit = pca_runner(dataset, depth + (0 if forced else 1) + 1)
+            if fit is None:
+                continue
+            break
+        try:
+            fit = fit_importer(fits_folder / fit_file)
+        except Exception as exc:
+            info_printer(f'The fit file could not be read ({exc}); haems will not be '
+                         f'decomposed.',
+                         )
+            return none_chosen
+        break
+    dataset = dataset or dataset_chooser(1)
+    if dataset is None:
         return none_chosen
-
-    # ---- 3 Choose the spectral dataset -----------------------------------------------
-    common = set(summaries[0]['datasets'])
-    for summary in summaries[1:]:
-        common &= set(summary['datasets'])
-    if not common:
-        info_printer('The files have no spectrometer in common, so haems cannot be '
-                     'decomposed.',
-                     )
-        return none_chosen
-    dataset = defaults['decomposition_dataset']
-    if dataset not in common:
-        options = sorted(common)
-        dataset = options[0]
-        if len(options) > 1:
-            dataset = choice_asker('Which spectrometer holds the haem spectra?',
-                                   [(o, o) for o in options],
-                                   options[0],
-                                   depth=depth + 1,
-                                   )
     return True, fit_file, fit, dataset
 
 
@@ -695,6 +898,7 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
 
     ---- Helpers ----
     _event_line_builder
+    _file_focuser
     info_printer
     number_asker
     numbering_setter
@@ -743,6 +947,7 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
     for number in chosen:
         summary = with_events[number - 1]
         name = summary['name']
+        _file_focuser(name)
         events = result[name]
         info_printer(f'\n{name}:', depth=2)
         for event, entry in zip(summary['events'], events):
@@ -768,6 +973,38 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
                                                      blank_label='unknown',
                                                      )
     return result
+
+
+# ---- file_focus_setter ---------------------------------------------------------------
+def file_focus_setter(hook: Optional[Callable[[str], None]]) -> None:
+    """
+    ---- Summary ----
+    Main function to set (or clear, with None) the function that is told which file a
+    question is about.
+
+    ---- Inputs ----
+    hook : Optional[Callable[[str], None]]
+        Function taking the file name, or None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    Sets _file_focus_hook (module state).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    global _file_focus_hook
+    _file_focus_hook = hook
 
 
 # ---- files_asker ---------------------------------------------------------------------
@@ -860,6 +1097,98 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
                       default,
                       )
     return folder, summaries, Path(path_cleaner(text)).expanduser()
+
+
+# ---- haem_choice_asker ---------------------------------------------------------------
+def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
+    """
+    ---- Summary ----
+    Main function to ask whether the haems are plotted, and which ones in which order.
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary the values are stored in.
+    defaults : dict
+        Default answers.
+    fit : Optional[dict]
+        Fit dictionary (haem_list) used to list the haems, or None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when the haems are plotted.
+
+    ---- Globals mutated ----
+    None. Stores the answers in ``answers`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    haem_name_formatter
+    haem_name_sorter
+    multi_asker
+    yes_no_asker
+    """
+
+    answers['plot_haems'] = False
+    if not (answers['decompose'] and fit is not None):
+        return False
+    answers['plot_haems'] = yes_no_asker('Do you want to plot the haems?',
+                                         defaults['plot_haems'],
+                                         )
+    if answers['plot_haems']:
+        answers['haems'] = multi_asker('Which haems would you like to plot, and in '
+                                       'which order?',
+                                       haem_name_sorter(fit['haem_list']),
+                                       default_all=True,
+                                       keep_order=True,
+                                       depth=2,
+                                       default_values=(defaults['haems']
+                                                       or list(fit['haem_list'])
+                                                       ),
+                                       label_formatter=haem_name_formatter,
+                                       )
+    return answers['plot_haems']
+
+
+# ---- haem_form_asker -----------------------------------------------------------------
+def haem_form_asker(answers: dict, defaults: dict) -> None:
+    """
+    ---- Summary ----
+    Main function to ask how the haems are shown (absorbance change, concentration,
+    percentage and so on).
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary the values are stored in.
+    defaults : dict
+        Default answers.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Stores the answer in ``answers`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    choice_asker
+    haem_form_option_builder
+    """
+
+    answers['haem_mode'] = choice_asker('How would you like to plot the haems?',
+                                        haem_form_option_builder(True),
+                                        defaults['haem_mode'],
+                                        )
 
 
 # ---- haem_form_option_builder --------------------------------------------------------
@@ -964,11 +1293,91 @@ def haem_name_sorter(names: List[str]) -> List[str]:
     return sorted(names, key=name_simplifier)
 
 
+# ---- haem_scaling_asker --------------------------------------------------------------
+def haem_scaling_asker(answers: dict, defaults: dict) -> bool:
+    """
+    ---- Summary ----
+    Main function to ask whether the haems are also scaled by OD. Nothing is asked when
+    no OD values were entered or the haems are shown as percentages.
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary the values are stored in.
+    defaults : dict
+        Default answers.
+        Must hold normalise_od and haem_mode.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when the question was asked.
+
+    ---- Globals mutated ----
+    None. Stores the answer in ``answers`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    yes_no_asker
+    """
+
+    answers['haem_per_od'] = False
+    if not answers['normalise_od'] or answers['haem_mode'] == 'percent':
+        return False
+    answers['haem_per_od'] = yes_no_asker('Do you want to scale the haems by OD as '
+                                          'well?',
+                                          defaults['haem_per_od'],
+                                          )
+    return True
+
+
+# ---- label_angle_asker ---------------------------------------------------------------
+def label_angle_asker(answers: dict, defaults: dict) -> None:
+    """
+    ---- Summary ----
+    Main function to ask at what angle the event labels are written.
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary the values are stored in.
+    defaults : dict
+        Default answers.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Stores the answer in ``answers`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    number_asker
+    """
+
+    answers['event_label_angle'] = number_asker('At what angle should the event labels '
+                                                'be plotted (0 = horizontal, 90 = '
+                                                'vertical)?',
+                                                defaults['event_label_angle'],
+                                                minimum=0,
+                                                maximum=90,
+                                                )
+
+
 # ---- multi_experiment_asker ----------------------------------------------------------
 def multi_experiment_asker(summaries: List[dict],
                            answers: dict,
                            defaults: dict,
                            plotted: bool,
+                           figure_checker: Optional[Callable[[str, dict], bool]] = None,
                            ) -> tuple:
     """
     ---- Summary ----
@@ -984,6 +1393,11 @@ def multi_experiment_asker(summaries: List[dict],
         Default answers.
     plotted : bool
         True when section 4 plots at least one panel (both figures reuse its choices).
+    figure_checker : Optional[Callable[[str, dict], bool]]
+        Function called after the questions of each figure with a name and a dictionary:
+        ('comparison', {'comparison': ...}) or ('exemplar', {'exemplar_names': ...}). It
+        shows the figure and returns True when the user accepts it. When it returns
+        False the figure's questions are asked again with the answers as the defaults.
 
     ---- Globals read ----
     None.
@@ -1021,86 +1435,103 @@ def multi_experiment_asker(summaries: List[dict],
         return comparison, exemplar_names
 
     # ---- 1 Two experiments side by side ----------------------------------------------
-    if (len(summaries) >= 2 and
-        yes_no_asker('Do you want to plot two experiments side ' 'by side?',
-                     defaults['plot_comparison'],
-                     )
-        ):
-        names = [(s['name'], s['name']) for s in summaries]
-        first = choice_asker('Which experiment goes on the left?', names, depth=2)
-        second = choice_asker('Which experiment goes on the right?',
-                              [n for n in names if n[0] != first],
-                              depth=2,
-                              )
-        size_asker(answers,
-                   defaults,
-                   {'journal': 'comparison_journal',
-                    'columns': 'comparison_columns',
-                    'height': 'comparison_height',
-                    'mode': 'comparison_size_mode',
-                    },
-                   (1.5, 0.5),
-                   depth=2,
-                   )
-        comparison = {'runs': (first, second),
-                      'columns': answers['comparison_columns'],
-                      'height': answers['comparison_height'],
-                      }
-        answers['plot_comparison'] = True
-
-    # ---- 2 Four experiments in a 2x2 grid --------------------------------------------
-    if (len(summaries) >= 4 and
-        yes_no_asker('Do you want to plot four experiments in a '
-                     '2x2 grid (knockdown and control, two '
-                     'addition orders)?',
-                     defaults['plot_exemplar'],
-                     )
-        ):
-        info_printer('Names are read as <strain>_<order>_run<N>, e.g. '
-                     "'knockdown_kcn_then_bd_run1'.",
-                     depth=2,
-                     )
-        rows = [r
-                for r in run_name_lister([s['name'] for s in summaries])
-                if all(r[k] is not None for k in ('strain', 'order', 'run'))
-                ]
-        runs = sorted({r['run'] for r in rows})
-        if not runs:
-            info_printer('No file name fits, so this figure is skipped.', depth=2)
-        else:
-            old = defaults['ho_exemplar_run']
-            run = choice_asker('Which run number should be shown?',
-                               [(r, f'run {r}') for r in runs],
-                               old if old in runs else runs[0],
-                               depth=2,
-                               )
-            answers['ho_exemplar_run'] = int(run)
-            if not answers['averaging']:
-                info_printer('This figure starts at the baseline averaging window, so '
-                             'the '
-                             'events are averaged as in section 3.3.',
-                             depth=2,
-                             )
-                averaging_asker(answers, defaults, forced=True, depth=2)
-                answers['averaging'] = True
-            exemplar_names = [r['name'] for r in rows if r['run'] == int(run)]
-            info_printer(f"Using: {', '.join(exemplar_names)}", depth=2)
-            answers['ex_watermark'] = yes_no_asker('Do you want the run name written '
-                                                   'faintly on each plot?',
-                                                   defaults['ex_watermark'],
-                                                   depth=2,
-                                                   )
+    while True:
+        comparison = None
+        answers['plot_comparison'] = False
+        if (len(summaries) >= 2 and
+            yes_no_asker('Do you want to plot two experiments side ' 'by side?',
+                         defaults['plot_comparison'],
+                         )
+            ):
+            names = [(s['name'], s['name']) for s in summaries]
+            first = choice_asker('Which experiment goes on the left?', names, depth=2)
+            second = choice_asker('Which experiment goes on the right?',
+                                  [n for n in names if n[0] != first],
+                                  depth=2,
+                                  )
             size_asker(answers,
                        defaults,
-                       {'journal': 'ex_journal',
-                        'columns': 'ho_ex_columns',
-                        'height': 'ho_ex_height',
-                        'mode': 'ex_size_mode',
+                       {'journal': 'comparison_journal',
+                        'columns': 'comparison_columns',
+                        'height': 'comparison_height',
+                        'mode': 'comparison_size_mode',
                         },
-                       (2, 0.75),
+                       (1.5, 0.5),
                        depth=2,
                        )
-            answers['plot_exemplar'] = True
+            comparison = {'runs': (first, second),
+                          'columns': answers['comparison_columns'],
+                          'height': answers['comparison_height'],
+                          }
+            answers['plot_comparison'] = True
+        if (comparison is None or figure_checker is None or
+                figure_checker('comparison', {'comparison': comparison})
+                ):
+            break
+        defaults = dict(answers)
+
+    # ---- 2 Four experiments in a 2x2 grid --------------------------------------------
+    while True:
+        exemplar_names = None
+        answers['plot_exemplar'] = False
+        if (len(summaries) >= 4 and
+            yes_no_asker('Do you want to plot four experiments in a '
+                         '2x2 grid (knockdown and control, two '
+                         'addition orders)?',
+                         defaults['plot_exemplar'],
+                         )
+            ):
+            info_printer('Names are read as <strain>_<order>_run<N>, e.g. '
+                         "'knockdown_kcn_then_bd_run1'.",
+                         depth=2,
+                         )
+            rows = [r
+                    for r in run_name_lister([s['name'] for s in summaries])
+                    if all(r[k] is not None for k in ('strain', 'order', 'run'))
+                    ]
+            runs = sorted({r['run'] for r in rows})
+            if not runs:
+                info_printer('No file name fits, so this figure is skipped.', depth=2)
+            else:
+                old = defaults['ho_exemplar_run']
+                run = choice_asker('Which run number should be shown?',
+                                   [(r, f'run {r}') for r in runs],
+                                   old if old in runs else runs[0],
+                                   depth=2,
+                                   )
+                answers['ho_exemplar_run'] = int(run)
+                if not answers['averaging']:
+                    info_printer('This figure starts at the baseline averaging window, '
+                                 'so '
+                                 'the '
+                                 'events are averaged as in section 3.3.',
+                                 depth=2,
+                                 )
+                    averaging_asker(answers, defaults, forced=True, depth=2)
+                    answers['averaging'] = True
+                exemplar_names = [r['name'] for r in rows if r['run'] == int(run)]
+                info_printer(f"Using: {', '.join(exemplar_names)}", depth=2)
+                answers['ex_watermark'] = yes_no_asker(
+                    'Do you want the run name written faintly on each plot?',
+                    defaults['ex_watermark'],
+                    depth=2,
+                )
+                size_asker(answers,
+                           defaults,
+                           {'journal': 'ex_journal',
+                            'columns': 'ho_ex_columns',
+                            'height': 'ho_ex_height',
+                            'mode': 'ex_size_mode',
+                            },
+                           (2, 0.75),
+                           depth=2,
+                           )
+                answers['plot_exemplar'] = True
+        if (exemplar_names is None or figure_checker is None or
+                figure_checker('exemplar', {'exemplar_names': exemplar_names})
+                ):
+            break
+        defaults = dict(answers)
     return comparison, exemplar_names
 
 
@@ -1162,6 +1593,7 @@ def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
     None.
 
     ---- Helpers ----
+    _file_focuser
     info_printer
     number_asker
     numbering_restarter
@@ -1173,6 +1605,7 @@ def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
     # ---- 2 Ask for each experiment ---------------------------------------------------
     for summary in summaries:
         name = summary['name']
+        _file_focuser(name)
         old = saved.get(name) or {}
         info_printer(f'\n{name}:', depth=2, tight=True)
         numbering_restarter(2)
@@ -1201,6 +1634,96 @@ def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
                                                         ),
                         }
     return values
+
+
+# ---- od_scaling_asker ----------------------------------------------------------------
+def od_scaling_asker(summaries: List[dict],
+                     answers: dict,
+                     defaults: dict,
+                     saved: dict,
+                     ) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
+    factor of every file, offering the stored values.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    answers : dict
+        Answers dictionary the values are stored in.
+    defaults : dict
+        Default answers (normalise_od).
+    saved : dict
+        {file name: values read from its workbook} (saved_values_reader).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: {'OD', 'volume', 'dilution_factor'}}; the dictionaries are empty
+        when not scaling by OD.
+
+    ---- Globals mutated ----
+    None. Stores normalise_od in ``answers`` and reads from and prints to the terminal
+    (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    od_asker
+    yes_no_asker
+    """
+
+    # ---- 1 Ask whether to scale ------------------------------------------------------
+    answers['normalise_od'] = yes_no_asker('Do you want to scale by OD (divide by '
+                                           'dilution factor x OD x volume)?',
+                                           defaults['normalise_od'],
+                                           )
+    details = {s['name']: {} for s in summaries}
+    if not answers['normalise_od']:
+        return details
+
+    # ---- 2 List what is stored -------------------------------------------------------
+    # List what is already stored for each run and only ask about the rest unless
+    # the user wants to change them.
+    stored_keys = ('OD', 'volume', 'dilution_factor')
+    complete = [s for s in summaries
+                if all((saved.get(s['name']) or {}).get(k) for k in stored_keys[:2])
+                ]
+    if complete:
+        info_printer('\nStored OD information:', depth=2, tight=True)
+        for summary in summaries:
+            old = saved.get(summary['name']) or {}
+            if summary in complete:
+                text = (f"OD {old['OD']:g}, volume {old['volume']:g} mL, dilution "
+                        f"factor {old.get('dilution_factor', 1.0):g}"
+                        )
+            else:
+                text = 'nothing stored'
+            info_printer(f"  {summary['name']}: {text}", depth=2, tight=True)
+
+    # ---- 3 Ask for the values --------------------------------------------------------
+    change = (not complete) or yes_no_asker('Do you want to change any of these?',
+                                            False,
+                                            )
+    to_ask = summaries if change else [s for s in summaries if s not in complete]
+    for summary in complete:
+        if summary not in to_ask:
+            old = saved[summary['name']]
+            dilution = old.get('dilution_factor', 1.0)
+            details[summary['name']].update({'OD': old['OD'],
+                                             'volume': old['volume'],
+                                             'dilution_factor': dilution,
+                                             },
+                                            )
+    if to_ask:
+        for name, values in od_asker(to_ask, saved).items():
+            details[name].update(values)
+    return details
 
 
 # ---- paf_finder ----------------------------------------------------------------------
@@ -1237,28 +1760,73 @@ def paf_finder(folder: Path) -> List[Path]:
     return sorted(files, key=lambda p: _natural_sorter(p.name))
 
 
-# ---- plot_asker ----------------------------------------------------------------------
-def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
+# ---- saved_values_reader -------------------------------------------------------------
+def saved_values_reader(summaries: List[dict], export_root: Path) -> Dict[str, dict]:
     """
     ---- Summary ----
-    Main function to ask section 4: what the individual experiment figures show and
-    how they are sized.
+    Main function to read the OD and event values saved in each experiment's workbook
+    from an earlier run, so they can be offered as defaults.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    export_root : Path
+        Results folder, where the saved workbooks are looked for.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: values read from its workbook, or None when there is none}.
+
+    ---- Globals mutated ----
+    None. Prints progress and a note when earlier values are found (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    progress_clearer
+    progress_printer
+    saved_settings_reader
+    """
+
+    saved = {}
+    for number, summary in enumerate(summaries, start=1):
+        progress_printer(f'Looking for earlier values, file {number} of '
+                         f'{len(summaries)} ...',
+                         )
+        saved[summary['name']] = saved_settings_reader(export_root, summary['name'])
+    progress_clearer()
+    if any(saved.values()):
+        info_printer("\nEarlier OD and event values found in the experiments' "
+                     'workbooks are '
+                     'offered as defaults.',
+                     )
+    return saved
+
+
+# ---- signal_asker --------------------------------------------------------------------
+def signal_asker(answers: dict, defaults: dict) -> bool:
+    """
+    ---- Summary ----
+    Main function to ask whether the oxygen traces and the OCR are plotted, and which
+    OCR.
 
     ---- Inputs ----
     answers : dict
-        Answers dictionary the values are stored in; must hold normalise_od and
-        decompose.
+        Answers dictionary the values are stored in; must hold normalise_od.
     defaults : dict
         Default answers.
-    fit : Optional[dict]
-        Fit dictionary (haem_list) used to list the haems, or None.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     bool
-        True when at least one panel is plotted.
+        True when the oxygen or the OCR is plotted.
 
     ---- Globals mutated ----
     None. Stores the answers in ``answers`` (side effect).
@@ -1268,18 +1836,10 @@ def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
 
     ---- Helpers ----
     choice_asker
-    haem_form_option_builder
-    haem_name_formatter
-    haem_name_sorter
-    info_printer
-    multi_asker
-    number_asker
     ocr_option_builder
-    size_asker
     yes_no_asker
     """
 
-    # ---- 1 Oxygen and OCR ------------------------------------------------------------
     answers['plot_o2'] = yes_no_asker('Do you want to plot the set and measured [O2] '
                                       '(CsO2 and CcO2)?',
                                       defaults['plot_o2'],
@@ -1296,61 +1856,7 @@ def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
                                            else keys[0],
                                            depth=2,
                                            )
-
-    # ---- 2 Haems ---------------------------------------------------------------------
-    answers['plot_haems'] = False
-    if answers['decompose']:
-        answers['plot_haems'] = yes_no_asker('Do you want to plot the haems?',
-                                             defaults['plot_haems'],
-                                             )
-    if answers['plot_haems']:
-        answers['haems'] = multi_asker('Which haems would you like to plot, and in '
-                                       'which order?',
-                                       haem_name_sorter(fit['haem_list']),
-                                       default_all=True,
-                                       keep_order=True,
-                                       depth=2,
-                                       default_values=(defaults['haems']
-                                                       or list(fit['haem_list'])
-                                                       ),
-                                       label_formatter=haem_name_formatter,
-                                       )
-        answers['haem_mode'] = choice_asker('How would you like to plot the haems?',
-                                            haem_form_option_builder(True),
-                                            defaults['haem_mode'],
-                                            depth=2,
-                                            )
-        if answers['normalise_od'] and answers['haem_mode'] != 'percent':
-            answers['haem_per_od'] = yes_no_asker('Do you want to scale the haems by '
-                                                  'OD as well?',
-                                                  defaults['haem_per_od'],
-                                                  depth=2,
-                                                  )
-
-    # ---- 3 Labels and size -----------------------------------------------------------
-    plotted = answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems']
-    if not plotted:
-        info_printer('Nothing is set to be plotted, so no individual figures will be '
-                     'made.',
-                     )
-    else:
-        answers['event_label_angle'] = number_asker('At what angle should the event '
-                                                    'labels be plotted (0 = '
-                                                    'horizontal, 90 = vertical)?',
-                                                    defaults['event_label_angle'],
-                                                    minimum=0,
-                                                    maximum=90,
-                                                    )
-    size_asker(answers,
-               defaults,
-               {'journal': 'journal',
-                'columns': 'columns',
-                'height': 'height',
-                'mode': 'size_mode',
-                },
-               (1, 0.5),
-               )
-    return plotted
+    return answers['plot_o2'] or answers['plot_ocr']
 
 
 # ---- size_asker ----------------------------------------------------------------------
@@ -1453,11 +1959,16 @@ def size_asker(answers: dict,
 
 
 # ---- trim_asker ----------------------------------------------------------------------
-def trim_asker(summaries: List[dict], remembered: dict) -> Dict[str, dict]:
+def trim_asker(summaries: List[dict],
+               remembered: dict,
+               progress: Optional[Callable[[Dict[str, dict]], None]] = None,
+               ) -> Dict[str, dict]:
     """
     ---- Summary ----
     Main function to ask section 2: which data is trimmed away (start, end) and which
-    is ignored in the calculations (start, end), per file.
+    is ignored in the calculations (start, end). Each edge is asked in turn with the
+    same questions: do it at all, how many minutes for ALL the data, and optionally how
+    many for each file.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1465,9 +1976,12 @@ def trim_asker(summaries: List[dict], remembered: dict) -> Dict[str, dict]:
     remembered : dict
         {file name: {trim_start, trim_end, ignore_start, ignore_end}} from the last
         run; offered as the defaults.
+    progress : Optional[Callable[[Dict[str, dict]], None]]
+        Function called with the limits of every file after each answer (so a plot can
+        show them building up), or None.
 
     ---- Globals read ----
-    config.DEFAULT_ANSWERS (default ignore time at the start).
+    None.
 
     ---- Outputs ----
     Dict[str, dict]
@@ -1481,9 +1995,8 @@ def trim_asker(summaries: List[dict], remembered: dict) -> Dict[str, dict]:
     None.
 
     ---- Helpers ----
-    _first_event_finder
-    _last_event_finder
     _limits_asker
+    _limits_filler
     info_printer
     """
 
@@ -1492,70 +2005,14 @@ def trim_asker(summaries: List[dict], remembered: dict) -> Dict[str, dict]:
     info_printer('IGNORE: data that will be imported and plotted, but not used for '
                  'calculations (baselines, % ranges, axis limits).',
                  )
-    collected = {s['name']: {} for s in summaries}
 
-    # ---- 2 Describe the four questions -----------------------------------------------
-    plan = (('trim_start',
-             'Do you want to TRIM the START of any of the data?',
-             'At what time (minutes) should {name} start?',
-             None,
-             '',
-             lambda s, c: {'minimum': 0, 'maximum': _first_event_finder(s)},
-             lambda s: f'first event at {_first_event_finder(s):.1f} min, recording '
-             f"{s['duration_min']:.1f} min",
-             ),
-            ('trim_end',
-             'Do you want to TRIM the END of any of the data?',
-             'At what time (minutes) should {name} end?',
-             None,
-             '',
-             lambda s, c: {'minimum': max(_last_event_finder(s),
-                                          c.get('trim_start') or 0.0,
-                                          ),
-                           },
-             lambda s: f'last event at {_last_event_finder(s):.1f} min, recording '
-             f"{s['duration_min']:.1f} min",
-             ),
-            ('ignore_start',
-             'Do you want to IGNORE the START of any of the data?',
-             'How many minutes at the start of {name} should be ignored?',
-             settings.DEFAULT_ANSWERS['ignore_first_minutes'],
-             'How many minutes at the start of the data should be ignored?',
-             lambda s, c: {'minimum': 0},
-             lambda s: '',
-             ),
-            ('ignore_end',
-             'Do you want to IGNORE the END of any of the data?',
-             'How many minutes at the end of {name} should be ignored?',
-             0.0,
-             'How many minutes at the end of the data should be ignored?',
-             lambda s, c: {'minimum': 0},
-             lambda s: '',
-             ),
-            )
-    for key, question, per_file, fallback, all_text, bounds, note in plan:
-        limits = _limits_asker(summaries,
-                               remembered,
-                               key,
-                               question,
-                               per_file,
-                               fallback,
-                               all_text,
-                               bounds,
-                               note,
-                               collected,
-                               )
-        for name, value in limits.items():
-            collected[name][key] = value
-
-    # ---- 3 Tidy the values -----------------------------------------------------------
-    by_name = {s['name']: s for s in summaries}
-    for name, values in collected.items():
-        if not values['trim_start']:
-            values['trim_start'] = None
-        end = values['trim_end']
-        if end is not None and end >= by_name[name]['duration_min']:
-            values['trim_end'] = None
-        values['ignore_start'] = values['ignore_start'] or 0.0
-        values['ignore_end'] = values['ignore_end'] or 0.0
-    return collected
+    # ---- 2 Ask the four edges in turn ------------------------------------------------
+    collected: Dict[str, dict] = {s['name']: {} for s in summaries}
+    reporter = progress or (lambda limits: None)
+    for kind, edge in (('trim', 'start'),
+                       ('trim', 'end'),
+                       ('ignore', 'start'),
+                       ('ignore', 'end'),
+                       ):
+        _limits_asker(summaries, remembered, kind, edge, collected, reporter)
+    return _limits_filler(summaries, collected)

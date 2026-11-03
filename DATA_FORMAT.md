@@ -1,4 +1,4 @@
-# DePalencify - Data Format
+# Portimao - Data Format
 
 ## 1. Structures
 
@@ -19,7 +19,7 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
 | `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem |
 | `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum |
-| `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so the mean of the baseline window is 0 |
+| `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the mean of its highest 30 s window (outside the ignored start and end) is 0 |
 | `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. The matching tables divided by dilution factor x OD x volume |
 | `'haem_percent'` | pd.DataFrame | (n_spectra, 2 + n_haems) | % | Optional. `haem_conc` scaled to 0-100 % |
 | `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; dropped after the special figures are prepared |
@@ -56,6 +56,7 @@ Event-window statistics of one experiment. Created by `experiment_averages_calcu
 |---|---|---|---|---|
 | `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key` |
 | `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window, then `average1` ... one per event |
+| `'skipped'` | dict | | | `{window name: {start_time, end_time, reason}}` of the windows that do not fit between two additions (or after the last one); they have no record in `'windows'` and are drawn red in the previews |
 
 Window record:
 
@@ -132,6 +133,46 @@ Added to each experiment of the time response figure by `utils_custom`.
 | `'difference_spectrum'` | dict | | | `'wavelengths'` (n_wavelengths,), `'spectrum'` (n_wavelengths,), `'minuend'`, `'subtrahend'` (window names; the spectrum is minuend minus subtrahend) |
 | `'difference_decomposition'` | dict | | | `'haem_names'` (n_haems), `'coefficients'` (n_haems), `'haem_percentages'` (n_haems, %), `'percent_basis'` (signed or absolute), `'filtered_data'`, `'scatter'`, `'no_scatter'`, `'haem_total'` (each n_wavelengths) and `'haem_individual'` (n_haems arrays of n_wavelengths) |
 
+#### `fit`
+
+A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds the components found by the principal component analysis.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names, in file order |
+| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the negated response as the basis spectrum |
+
+#### `pca_analysis`
+
+Returned by `component_finder` (`utils_shared/pca_fitter.py`): the principal component analysis of the spectra of all files inside a spectral window.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'wavelengths'` | np.ndarray | (n_wavelengths) | nm | The common grid inside the window |
+| `'eigenvectors'` | np.ndarray | (n_wavelengths, n_components) | | Orthonormal principal components as columns, largest first |
+| `'eigenvalues'` | np.ndarray | (n_components) | OD^2 | Variance of each principal component (sum of squares over all spectra) |
+| `'gram'` | np.ndarray | (n_wavelengths, n_wavelengths) | OD^2 | Sum over files of X^T X, where X are the cleaned spectra |
+| `'total_variance'` | float | | OD^2 | Trace of `'gram'` |
+| `'n_values'` | int | | | Number of spectra x number of wavelengths |
+| `'n_spectra'` | int | | | Number of spectra used |
+| `'counts'` | dict | | | `{file name: number of spectra used}` |
+| `'window'` | Tuple[float, float] | | nm | First and last wavelength used |
+| `'degree_of_scatter'` | int | | | Scatter terms taken out of every spectrum first |
+
+#### `pca_result`
+
+Returned by `component_builder`: the chosen number of components, optionally rotated and in the convention of the fit files.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'wavelengths'` | np.ndarray | (n_wavelengths) | nm | As in `pca_analysis` |
+| `'components'` | np.ndarray | (n_wavelengths, count) | | Components as columns, each with its largest peak equal to +1, ordered by the variance they explain |
+| `'explained'` | np.ndarray | (count) | | Fraction of the total variance of each component |
+| `'residual_rms'` | float | | OD | Root mean square of what the components leave unexplained |
+| `'peaks'` | np.ndarray | (count) | nm | Wavelength of each component's largest peak |
+| `'count'` | int | | | Number of components |
+| `'rotated'` | bool | | | True when the varimax rotation was applied |
+
 #### `last_answers`
 
 Saved to `last_answers.json` next to `main.py` and offered as the defaults on the next run.
@@ -166,6 +207,31 @@ Defined in `utils_shared/paf_reader.py`. Created by `spectra_parser`, used by `r
 | `trailer` | list | | | `[]` | Text tokens after the data block |
 | `checks` | dict | | | `{}` | Warnings raised while parsing |
 
+#### `PreviewSpec`
+
+Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every file is drawn with the same spec.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `answers` | dict | | | | Answers so far (missing keys come from `config.DEFAULT_ANSWERS`) |
+| `limits` | dict | | min | | `{file name: {trim_start, trim_end, ignore_start, ignore_end}}` |
+| `fit` | Optional[dict] | | | | Fit dictionary from `fit_importer`, or None |
+| `details` | dict | | | | `{file name: {OD, volume, dilution_factor, events}}` |
+| `show_trim` | bool | | | `False` | Draw the whole recording and shade the trimmed part |
+| `show_ignored` | bool | | | `True` | Shade the ignored start and end |
+
+#### `ViewerSession`
+
+Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by the stage runners, `preview_drawer` and the preview thread.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `summaries` | List[dict] | (n_files,) | | | The `experiment_summary` of each file |
+| `export_root` | Path | | | | Results folder |
+| `window` | ViewerGui or PictureWindow | | | | The browser window, or the preview picture file when no window can open |
+| `current` | int | | | `0` | Index of the file being looked at |
+| `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the last 3 files read; each preview works on a deep copy |
+
 ### 1.3 Arrays
 
 #### `spectra`
@@ -197,6 +263,20 @@ Attenuation (or transmission, or intensity) of one spectral dataset.
 | measurement columns | float | see `experiment` | One per trace or haem |
 
 The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End time (min)` and, per measurement, `<name> mean`, `<name> SD` and `<name> change from baseline (%)`.
+
+#### `fit csv`
+
+| Property | Value |
+|---|---|
+| File type | CSV |
+| Delimiter | comma |
+| Encoding | UTF-8 (line ends CRLF when written by the program) |
+| Location and name | `fits/<name>.csv`; the program saves the components found by the principal component analysis here |
+
+| Column | Type | Units | Description |
+|---|---|---|---|
+| `<haem>` | float | nm | Wavelength column of one haem; the header names the haem (every second column, starting with the first) |
+| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of -1 (the decomposition negates the fit) |
 
 #### `spectral csv`
 
@@ -255,6 +335,15 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 | Location and name | `last_answers.json` next to `main.py` (not committed) |
 
 Structure: see `last_answers` in section 1.1.
+
+#### `preview picture`
+
+| Property | Value |
+|---|---|
+| File type | `.png` |
+| Location and name | `Portimao_preview.png` in the system temporary folder |
+
+Written, and opened in the default picture viewer, only when the experiment browser window cannot open. Overwritten by each preview.
 
 #### `log file`
 

@@ -25,26 +25,22 @@ from utils_custom.custom_runner import (exemplar_runner,
                                         ocr_and_haem_response_runner,
                                         time_response_runner,
                                         )
-from utils_shared.attenuation import experiment_attenuation_adder
-from utils_shared.averaging import experiment_averages_calculator
 from utils_shared.comparison_plotter import comparison_figure_plotter
+from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
-from utils_shared.normalisation import experiment_normaliser, percent_converter
-from utils_shared.paf_reader import experiment_paf_loader, PafError
 from utils_shared.questions import section_starter, UserQuit, yes_no_asker
+from utils_shared.helpers import program_title_builder
 from utils_shared.run_logging import logging_starter, logging_stopper
-from utils_shared.spectral_decomposer import experiment_decomposer
-from utils_shared.survey import (analysis_asker,
-                                 files_asker,
+from utils_shared.survey import (files_asker,
                                  haem_name_formatter,
                                  JOURNAL_NAMES,
                                  multi_experiment_asker,
-                                 plot_asker,
-                                 trim_asker,
                                  )
-from utils_shared.trimming import experiment_trimmer
+from utils_viewer.viewer_gui import active_gui_getter, gui_runner
+from utils_viewer.viewer_multi import multi_figure_checker_builder
+from utils_viewer.viewer_stages import viewer_asker
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -52,6 +48,7 @@ HERE = Path(__file__).resolve().parent
 FITS_FOLDER = HERE / 'fits'
 LAST_ANSWERS_FILE = HERE / 'last_answers.json'
 VERSION = (HERE / 'VERSION').read_text().strip()
+PROGRAM_TITLE = program_title_builder(HERE, VERSION)
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -140,55 +137,6 @@ def comparison_maker(comparison: dict,
         plt.close('all')
 
 
-# ---- event_settings_merger -----------------------------------------------------------
-def event_settings_merger(experiment: dict, events: List[dict]) -> None:
-    """
-    ---- Summary ----
-    Main function to copy the label, concentration and ignored flag entered for each
-    event onto the experiment, and to move ignored events out of the working event list.
-
-    ---- Inputs ----
-    experiment : dict
-        Experiment dictionary, as defined in DATA_FORMAT.md.
-    events : List[dict]
-        Entered events: {datapoint, label, concentration_uM, ignored}.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Updates experiment["metadata"]["events"] in place and adds
-    experiment["metadata"]["ignored_events"] (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    # ---- 1 Apply the entered settings to the events ----------------------------------
-    entered = {e['datapoint']: e for e in events}
-    for event in experiment['metadata'].get('events', []):
-        item = entered.get(event['datapoint'])
-        if item:
-            event['label'] = item['label'] or event['text']
-            event['concentration_uM'] = item['concentration_uM']
-            event['ignored'] = bool(item.get('ignored', False))
-
-    # ---- 2 Separate the ignored events -----------------------------------------------
-    # Ignored events leave the working list (so nothing plots or averages them) but are
-    # kept in metadata["ignored_events"] so the workbook still records them.
-    metadata = experiment['metadata']
-    events = metadata.get('events', [])
-    metadata['ignored_events'] = [e for e in events if e.get('ignored')]
-    metadata['events'] = [e for e in events if not e.get('ignored')]
-
-
 # ---- everything_asker ----------------------------------------------------------------
 def everything_asker() -> Tuple[dict,
                                 Path,
@@ -223,16 +171,16 @@ def everything_asker() -> Tuple[dict,
     None.
 
     ---- Helpers ----
-    analysis_asker
+    active_gui_getter
     files_asker
     haem_name_formatter
     last_answers_loader
     last_answers_saver
     multi_experiment_asker
-    plot_asker
+    multi_figure_checker_builder
     section_starter
     summary_figure_asker
-    trim_asker
+    viewer_asker
     yes_no_asker
     """
 
@@ -243,11 +191,11 @@ def everything_asker() -> Tuple[dict,
     remembered = last.get('files', {})
 
     # ---- 2 Print the banner ----------------------------------------------------------
-    print('=' * 70)
-    print('  DePalencify  V2.0 beta')
-    print('  Questions are in colour and numbered. Type your answer on the line below')
-    print('  each question; Enter accepts the value shown in [brackets].')
-    print('=' * 70)
+    print(PROGRAM_TITLE)
+    if active_gui_getter() is None:  # the window explains this itself
+        print('Questions are in colour and numbered. Type your answer on the line '
+              'below each question; Enter accepts the value shown in [brackets].',
+              )
 
     # ---- 3 Ask the questions ---------------------------------------------------------
     # ---- 3.1 Files -------------------------------------------------------------------
@@ -255,31 +203,34 @@ def everything_asker() -> Tuple[dict,
     folder, summaries, export_root = files_asker(last)
     names = [s['name'] for s in summaries]
 
-    # ---- 3.2 Trimming and ignoring ---------------------------------------------------
-    section_starter('Trimming and ignoring')
-    limits = trim_asker(summaries, remembered)
-    answers['ignore_first_minutes'] = max(v['ignore_start'] for v in limits.values())
-    answers['ignore_last_minutes'] = max(v['ignore_end'] for v in limits.values())
-
-    # ---- 3.3 Analysis ----------------------------------------------------------------
-    section_starter('Analysis')
-    fit, details = analysis_asker(summaries,
-                                  answers,
-                                  defaults,
-                                  FITS_FOLDER,
-                                  export_root,
-                                  )
-
-    # ---- 3.4 Individual experiment plots ---------------------------------------------
-    section_starter('Individual experiment plots')
-    plotted = plot_asker(answers, defaults, fit)
+    # ---- 3.2 Trimming and ignoring, analysis and individual plots --------------------
+    limits, fit, details, plotted = viewer_asker(summaries,
+                                                 answers,
+                                                 defaults,
+                                                 remembered,
+                                                 FITS_FOLDER,
+                                                 export_root,
+                                                 )
 
     # ---- 3.5 Multi-experiment plots --------------------------------------------------
+    context = {'answers': answers,
+               'fit': fit,
+               'summaries': summaries,
+               'limits': limits,
+               'details': details,
+               'export_root': export_root,
+               }
+    checker = multi_figure_checker_builder(context,
+                                           {'comparison': comparison_maker,
+                                            'special': special_figures_maker,
+                                            },
+                                           )
     section_starter('Multi-experiment plots')
     comparison, exemplar_names = multi_experiment_asker(summaries,
                                                         answers,
                                                         defaults,
                                                         plotted,
+                                                        checker,
                                                         )
 
     # ---- 3.6 Experiment summaries ----------------------------------------------------
@@ -290,6 +241,7 @@ def everything_asker() -> Tuple[dict,
                                        summaries,
                                        fit,
                                        FITS_FOLDER,
+                                       checker,
                                        )
 
     # ---- 3.7 Data export -------------------------------------------------------------
@@ -450,9 +402,7 @@ def experiment_processor(info: dict,
         Results folder.
 
     ---- Globals read ----
-    settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
-    settings.DELTA_ABS_WINDOW_SECONDS, settings.PERCENT_AVERAGE_WINDOW_SECONDS; plt
-    (matplotlib.pyplot).
+    plt (matplotlib.pyplot).
 
     ---- Outputs ----
     Optional[dict]
@@ -466,20 +416,11 @@ def experiment_processor(info: dict,
     None.
 
     ---- Helpers ----
-    event_settings_merger
-    experiment_attenuation_adder
-    experiment_averages_calculator
-    experiment_decomposer
-    experiment_normaliser
-    experiment_paf_loader
+    experiment_data_processor
     experiment_plotter
     experiment_preparer
-    experiment_trimmer
     experiment_workbook_exporter
-    percent_converter
-    percent_need_checker
     plot_config_builder
-    source_chooser
     """
 
     # ---- 1 Set up the run ------------------------------------------------------------
@@ -488,138 +429,12 @@ def experiment_processor(info: dict,
     ignore_first, ignore_last = info['ignore_start'], info['ignore_end']
     print(f'\nProcessing: {name}')
 
-    # ---- 2 Read the file -------------------------------------------------------------
-    datasets = (None
-                if a['export_spectra']
-                else ((a['decomposition_dataset'],) if a['decompose'] else ())
-                )
-    experiment = experiment_paf_loader(info['path'],
-                                       spectral_datasets=datasets,
-                                       with_intensity=a['export_spectra'],
-                                       )
+    # ---- 2 Read and process the data -------------------------------------------------
+    processed = experiment_data_processor(info, cfg, fit)
+    experiment = processed['experiment']
     metadata = experiment['metadata']
-    for key in ('OD', 'volume', 'dilution_factor'):
-        if info.get(key) is not None:
-            metadata[key] = info[key]
-    event_settings_merger(experiment, info.get('events', []))
-    skipped = len(metadata.get('ignored_events', []))
-    print(f"  Read {len(experiment['CcO2'])} points, "
-          f"{len(metadata['events'])} event(s)" +
-          (f' ({skipped} ignored)' if skipped else ''),
-          )
-
-    # ---- 3 Trim the experiment -------------------------------------------------------
-    if info.get('trim_start') is not None or info.get('trim_end') is not None:
-        experiment_trimmer(experiment,
-                           start_time=info.get('trim_start'),
-                           end_time=info.get('trim_end'),
-                           )
-        if info.get('trim_start') is not None:
-            print(f"  Trimmed: data before {info['trim_start']:g} min discarded (that "
-                  f'point is now time 0)',
-                  )
-        if info.get('trim_end') is not None:
-            print(f"  Trimmed: data after {info['trim_end']:g} min discarded")
-
-    # ---- 4 Prepare the data ----------------------------------------------------------
-    # ---- 4.1 Check OD scaling is possible --------------------------------------------
-    od_available = False
-    if a['normalise_od']:
-        od_available = all(metadata.get(k) for k in ('OD', 'volume', 'dilution_factor'))
-        if not od_available:
-            print('  Warning: OD, volume or dilution factor is missing, so this file '
-                  'is not scaled by OD (raw values are used instead).',
-                  )
-
-    # ---- 4.2 Decompose into haems ----------------------------------------------------
-    # Attenuation and decomposition into haems.
-    if a['decompose']:
-        try:
-            attenuation_datasets = (None
-                                    if a['export_spectra']
-                                    else (a['decomposition_dataset'],)
-                                    )
-            experiment_attenuation_adder(experiment,
-                                         mode=settings.TRANSMISSION_MODE,
-                                         datasets=attenuation_datasets,
-                                         )
-            print('  Decomposing ...')
-            delta_window_seconds = settings.DELTA_ABS_WINDOW_SECONDS
-            experiment_decomposer(experiment,
-                                  fit,
-                                  dataset_name=a['decomposition_dataset'],
-                                  spectrum_type='attenuation',
-                                  degree_of_scatter=settings.DEGREE_OF_SCATTER,
-                                  haemfactor=settings.HAEM_FACTOR,
-                                  delta_exclude_first_minutes=ignore_first,
-                                  delta_window_seconds=delta_window_seconds,
-                                  )
-            reference = experiment['haem_delta_abs'].attrs['delta_abs_baseline']
-            print(f"  Decomposed with {a['fit_file']}; delta A reference: "
-                  f"{reference['start_time']:.2f}-{reference['end_time']:.2f} min",
-                  )
-        except (KeyError, ValueError, PafError) as exc:
-            print(f'  Decomposition skipped: {exc}')
-    elif a['export_spectra']:
-        experiment_attenuation_adder(experiment, mode=settings.TRANSMISSION_MODE)
-
-    # ---- 4.3 Normalise by OD ---------------------------------------------------------
-    # OD scaling and relative (%) scaling.
-    if od_available:
-        try:
-            experiment_normaliser(experiment)
-            print(f"  OD scaling: OD {metadata['OD']:g}, volume {metadata['volume']:g}"
-                  f", dilution factor {metadata['dilution_factor']:g}",
-                  )
-        except (KeyError, ValueError) as exc:
-            od_available = False
-            print(f'  OD scaling skipped: {exc}')
-
-    # ---- 4.4 Convert to percentages --------------------------------------------------
-    percent_vo2, percent_haem = cfg.percent_need_checker()
-    percent_window_seconds = settings.PERCENT_AVERAGE_WINDOW_SECONDS
-    for needed, source_key, target_key in ((percent_haem, 'haem_conc', 'haem_percent'),
-                                           (percent_vo2, 'VoO2', 'VoO2_percent'),
-                                           ):
-        if needed and source_key in experiment:
-            try:
-                percent_converter(experiment,
-                                  source_key,
-                                  target_key,
-                                  exclude_first_minutes=ignore_first,
-                                  exclude_last_minutes=ignore_last,
-                                  window_seconds=percent_window_seconds,
-                                  )
-            except (KeyError, ValueError, TypeError) as exc:
-                print(f'  {target_key} skipped: {exc}')
-
-    # ---- 5 Choose the sources and average --------------------------------------------
-    vo2_source, haem_source = cfg.source_chooser(od_available)
-    if haem_source is not None and not (a['plot_haems'] or a['averaging']):
-        haem_source = None
-    # Event-window averages.
-    if a['averaging']:
-        if not metadata['events']:
-            print('  Averaging skipped: this file has no events.')
-        else:
-            try:
-                average_haem_source = (haem_source
-                                       if 'haem_conc' in experiment
-                                       else None
-                                       )
-                final_gap = a['final_gap_minutes']
-                experiment_averages_calculator(experiment,
-                                               window_minutes=a['window_minutes'],
-                                               gap_minutes=a['gap_minutes'],
-                                               final_window_gap_minutes=final_gap,
-                                               vo2_source=vo2_source,
-                                               haem_source=average_haem_source,
-                                               )
-                print(f"  Calculated {len(experiment['averages']['windows'])} event "
-                      f'averages',
-                      )
-            except (KeyError, ValueError, TypeError) as exc:
-                print(f'  Averaging skipped: {exc}')
+    od_available = processed['od_available']
+    vo2_source, haem_source = processed['vo2_source'], processed['haem_source']
 
     # ---- 6 Plot the experiment -------------------------------------------------------
     # Figure.
@@ -744,14 +559,48 @@ def last_answers_saver(values: dict) -> None:
 def main() -> int:
     """
     ---- Summary ----
-    Main function of the program: ask the questions, process every file, then draw the
-    comparison and special figures, logging the output to a file.
+    Main function of the program: run it in the experiment browser window (terminal on
+    the left, plots on the right), or in the terminal when the window cannot open.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    VERSION (written to the log).
+    PROGRAM_TITLE (shown in the window title).
+
+    ---- Outputs ----
+    int
+        0 when every file finished, 1 when the run was cancelled or a file failed.
+
+    ---- Globals mutated ----
+    None. Opens the window or runs in the terminal (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    gui_runner
+    program_runner
+    """
+
+    code = gui_runner(program_runner, PROGRAM_TITLE)
+    if code is None:
+        code = program_runner()
+    return code
+
+
+# ---- program_runner ------------------------------------------------------------------
+def program_runner() -> int:
+    """
+    ---- Summary ----
+    Main function to run the program: ask the questions, process every file, then draw
+    the comparison and special figures, logging the output to a file.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    PROGRAM_TITLE (written to the log).
 
     ---- Outputs ----
     int
@@ -797,7 +646,7 @@ def main() -> int:
     cfg = settings.Config(answers)
     plt.rcParams.update(cfg.RC_PARAMS)
     start = time.perf_counter()
-    log_session = logging_starter(export_root, VERSION, answers)
+    log_session = logging_starter(export_root, PROGRAM_TITLE, answers)
     failed = []
     kept = {}
 
@@ -844,6 +693,7 @@ def special_figures_maker(kept: dict,
                           fit: Optional[dict],
                           export_root: Path,
                           exemplar_names: Optional[List[str]],
+                          is_preview: bool = False,
                           ) -> None:
     """
     ---- Summary ----
@@ -862,6 +712,9 @@ def special_figures_maker(kept: dict,
         Results folder.
     exemplar_names : Optional[List[str]]
         Names of the four experiments of the 2x2 grid, or None.
+    is_preview : bool
+        True to draw the figures only (for the experiment browser): no workbook is
+        written.
 
     ---- Globals read ----
     settings.Config; time_response_runner, ocr_and_haem_response_runner and
@@ -913,7 +766,7 @@ def special_figures_maker(kept: dict,
             continue
         try:
             figure_cfg = settings.Config(dict(a, journal=a[journals[key]]))
-            runner(prepared, figure_cfg, a, fit, export_root)
+            runner(prepared, figure_cfg, a, fit, export_root, is_preview)
         except Exception as exc:  # one special figure must not stop the others
             print(f'  Not made: {type(exc).__name__}: {exc}')
             print(traceback.format_exc())

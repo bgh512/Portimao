@@ -16,7 +16,7 @@ from utils_shared.schema import finite_float_converter
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- TRIPLICATE EXPORTER -------------------------------------------------------------
+# ---- triplicate_exporter -------------------------------------------------------------
 def triplicate_exporter(triplicates: dict, output_path: Path) -> Path:
     """
     ---- Summary ----
@@ -78,7 +78,7 @@ def triplicate_exporter(triplicates: dict, output_path: Path) -> Path:
         # 90 displays as 90.0%
         percent_format = workbook.add_format({'num_format': '0.0"%"'})
 
-        # ---- 2.2 Define the number writer --------------------------------------------
+        # ---- _number_writer ----------------------------------------------------------
         def _number_writer(sheet: Any,
                            row: int,
                            col: int,

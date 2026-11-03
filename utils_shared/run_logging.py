@@ -9,6 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.output_capture import captured_buffer_getter
+
 
 # ---- _Tee ----------------------------------------------------------------------------
 class _Tee:
@@ -156,8 +159,9 @@ class _Tee:
     def write(self, text: str) -> int:
         """
         ---- Summary ----
-        Method to write text to every stream and flush it. The name is fixed by the
-        file-like protocol.
+        Method to write text to every stream and flush it, unless the current thread is
+        capturing its output (see output_capture), in which case it is kept by the
+        capture. The name is fixed by the file-like protocol.
 
         ---- Inputs ----
         text : str
@@ -177,9 +181,12 @@ class _Tee:
         None.
 
         ---- Helpers ----
-        None.
+        captured_buffer_getter
         """
 
+        captured = captured_buffer_getter()
+        if captured is not None:  # a thread that is capturing its output
+            return captured.write(text)
         for stream in self.streams:
             stream.write(text)
             stream.flush()
@@ -190,7 +197,7 @@ class _Tee:
 
 
 # ---- logging_starter -----------------------------------------------------------------
-def logging_starter(export_root: Path, version: str, settings: dict) -> dict:
+def logging_starter(export_root: Path, title: str, settings: dict) -> dict:
     """
     ---- Summary ----
     Main function to start copying everything printed to a timestamped log file.
@@ -198,8 +205,9 @@ def logging_starter(export_root: Path, version: str, settings: dict) -> dict:
     ---- Inputs ----
     export_root : Path
         Results folder; the log goes to <export_root>/logs/YYYY_MM_DD-HH_MM_SS.log.
-    version : str
-        Project version (as in the VERSION file), written on the first line of the log.
+    title : str
+        Program name, branch and version (program_title_builder), written on the first
+        line of the log.
     settings : dict
         Terminal answers of the run, written at the top of the log.
 
@@ -212,7 +220,7 @@ def logging_starter(export_root: Path, version: str, settings: dict) -> dict:
         tee_stdout, tee_stderr, closed}, to be passed to logging_stopper.
 
     ---- Globals mutated ----
-    None. Creates the log folder and file, writes the version, seed and settings to
+    None. Creates the log folder and file, writes the title, seed and settings to
     its first lines, replaces sys.stdout and sys.stderr with copying streams and
     prints the log location (side effects).
 
@@ -229,7 +237,7 @@ def logging_starter(export_root: Path, version: str, settings: dict) -> dict:
     log_folder.mkdir(parents=True, exist_ok=True)
     log_path = log_folder / f'{datetime.now():%Y_%m_%d-%H_%M_%S}.log'
     log_file = log_path.open('w', encoding='utf-8', buffering=1)
-    log_file.write(f'DePalencify V{version}\n')
+    log_file.write(f'{title}\n')
     log_file.write('Random seed: none (the program does not use random numbers)\n')
     log_file.write('Settings:\n')
     for key, value in sorted(settings.items()):

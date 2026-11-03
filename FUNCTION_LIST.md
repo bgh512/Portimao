@@ -1,22 +1,24 @@
-# DePalencify - Function List
+# Portimao - Function List
 
-- **Project:** DePalencify
-- **Version:** V1.0
-- **Date:** 29/10/2026
+- **Project:** Portimao
+- **Version:** V3.0
+- **Date:** 03/11/2026
 
 ## Contents
 
 - [`config.py`](#configpy)
     - [`Config`](#config)
     - [`haem_colour_mapper`](#haem_colour_mapper)
+- [`launchers/make_icons.py`](#launchersmake_iconspy)
+    - [`main`](#main)
 - [`main.py`](#mainpy)
     - [`comparison_maker`](#comparison_maker)
-    - [`event_settings_merger`](#event_settings_merger)
     - [`everything_asker`](#everything_asker)
     - [`experiment_processor`](#experiment_processor)
     - [`last_answers_loader`](#last_answers_loader)
     - [`last_answers_saver`](#last_answers_saver)
     - [`main`](#main)
+    - [`program_runner`](#program_runner)
     - [`special_figures_maker`](#special_figures_maker)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
     - [`exemplar_config_builder`](#exemplar_config_builder)
@@ -30,7 +32,11 @@
 - [`utils_custom/custom_questions.py`](#utils_customcustom_questionspy)
     - [`_example_pair_maker`](#_example_pair_maker)
     - [`_haem_ocr_asker`](#_haem_ocr_asker)
+    - [`_hours_reader`](#_hours_reader)
+    - [`_panel_chooser`](#_panel_chooser)
     - [`_saved_example_finder`](#_saved_example_finder)
+    - [`_step_checker`](#_step_checker)
+    - [`_step_wirer`](#_step_wirer)
     - [`_time_response_asker`](#_time_response_asker)
     - [`_window_ensurer`](#_window_ensurer)
     - [`summary_figure_asker`](#summary_figure_asker)
@@ -91,6 +97,47 @@
     - [`_tick_label_builder`](#_tick_label_builder)
     - [`_window_orderer`](#_window_orderer)
     - [`ocr_and_haem_response_figure_plotter`](#ocr_and_haem_response_figure_plotter)
+- [`utils_custom/publication_plotter.py`](#utils_custompublication_plotterpy)
+    - [`_axes_styler`](#_axes_styler)
+    - [`_baseline_bar_plotter`](#_baseline_bar_plotter)
+    - [`_block_gap_calculator`](#_block_gap_calculator)
+    - [`_column_chooser`](#_column_chooser)
+    - [`_condition_indexer`](#_condition_indexer)
+    - [`_crop_start_finder`](#_crop_start_finder)
+    - [`_exemplar_gap_calculator`](#_exemplar_gap_calculator)
+    - [`_exemplar_plotter`](#_exemplar_plotter)
+    - [`_exemplar_selector`](#_exemplar_selector)
+    - [`_experiment_classifier`](#_experiment_classifier)
+    - [`_experiment_cropper`](#_experiment_cropper)
+    - [`_figure_finisher`](#_figure_finisher)
+    - [`_haem_block_plotter`](#_haem_block_plotter)
+    - [`_haem_label_finder`](#_haem_label_finder)
+    - [`_haem_label_pad_calculator`](#_haem_label_pad_calculator)
+    - [`_haem_row_selector`](#_haem_row_selector)
+    - [`_haem_source_finder`](#_haem_source_finder)
+    - [`_layout_validator`](#_layout_validator)
+    - [`_legend_handle_builder`](#_legend_handle_builder)
+    - [`_mean_ylim_setter`](#_mean_ylim_setter)
+    - [`_measurement_finder`](#_measurement_finder)
+    - [`_metric_field_selector`](#_metric_field_selector)
+    - [`_ocr_block_plotter`](#_ocr_block_plotter)
+    - [`_outside_bar_drawer`](#_outside_bar_drawer)
+    - [`_p_value_adjuster`](#_p_value_adjuster)
+    - [`_reference_level_finder`](#_reference_level_finder)
+    - [`_reference_selector`](#_reference_selector)
+    - [`_response_axes_preparer`](#_response_axes_preparer)
+    - [`_response_metric_checker`](#_response_metric_checker)
+    - [`_response_series_drawer`](#_response_series_drawer)
+    - [`_response_window_tester`](#_response_window_tester)
+    - [`_row_ylim_sharer`](#_row_ylim_sharer)
+    - [`_significance_bar_drawer`](#_significance_bar_drawer)
+    - [`_significance_formatter`](#_significance_formatter)
+    - [`_test_bar_drawer`](#_test_bar_drawer)
+    - [`_tick_label_builder`](#_tick_label_builder)
+    - [`_window_orderer`](#_window_orderer)
+    - [`exemplar_figure_plotter`](#exemplar_figure_plotter)
+    - [`publication_figure_plotter`](#publication_figure_plotter)
+    - [`publication_figure_saver`](#publication_figure_saver)
 - [`utils_custom/run_namer.py`](#utils_customrun_namerpy)
     - [`_group_matcher`](#_group_matcher)
     - [`_natural_sorter`](#_natural_sorter)
@@ -120,6 +167,7 @@
     - [`_haem_scale_sharer`](#_haem_scale_sharer)
     - [`_haem_window_drawer`](#_haem_window_drawer)
     - [`_legend_drawer`](#_legend_drawer)
+    - [`_placeholder_drawer`](#_placeholder_drawer)
     - [`_time_axes_styler`](#_time_axes_styler)
     - [`_time_gap_calculator`](#_time_gap_calculator)
     - [`_title_styler`](#_title_styler)
@@ -134,6 +182,8 @@
     - [`_run_value_getter`](#_run_value_getter)
     - [`_window_sorter`](#_window_sorter)
     - [`triplicate_averager`](#triplicate_averager)
+- [`utils_custom/triplicate_exporter.py`](#utils_customtriplicate_exporterpy)
+    - [`triplicate_exporter`](#triplicate_exporter)
 - [`utils_custom/workbook_helpers.py`](#utils_customworkbook_helperspy)
     - [`formula_writer`](#formula_writer)
     - [`number_writer`](#number_writer)
@@ -149,6 +199,9 @@
     - [`_overhang_calculator`](#_overhang_calculator)
     - [`_renderer_getter`](#_renderer_getter)
     - [`comparison_figure_plotter`](#comparison_figure_plotter)
+- [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
+    - [`event_settings_merger`](#event_settings_merger)
+    - [`experiment_data_processor`](#experiment_data_processor)
 - [`utils_shared/figure_layout.py`](#utils_sharedfigure_layoutpy)
     - [`_renderer_getter`](#_renderer_getter)
     - [`figure_canvas_fitter`](#figure_canvas_fitter)
@@ -163,9 +216,11 @@
 - [`utils_shared/helpers.py`](#utils_sharedhelperspy)
     - [`concentration_formatter`](#concentration_formatter)
     - [`excel_sheet_namer`](#excel_sheet_namer)
+    - [`figure_capture_setter`](#figure_capture_setter)
     - [`figure_saver`](#figure_saver)
     - [`file_name_sanitiser`](#file_name_sanitiser)
     - [`name_simplifier`](#name_simplifier)
+    - [`program_title_builder`](#program_title_builder)
 - [`utils_shared/individual_experiment_exporter.py`](#utils_sharedindividual_experiment_exporterpy)
     - [`_frame_writer`](#_frame_writer)
     - [`_name_lister`](#_name_lister)
@@ -183,6 +238,7 @@
     - [`_min_ticks_setter`](#_min_ticks_setter)
     - [`_panel_builder`](#_panel_builder)
     - [`_vo2_ymax_calculator`](#_vo2_ymax_calculator)
+    - [`_skipped_window_drawer`](#_skipped_window_drawer)
     - [`_window_drawer`](#_window_drawer)
     - [`_window_label_builder`](#_window_label_builder)
     - [`_ylim_calculator`](#_ylim_calculator)
@@ -196,6 +252,9 @@
     - [`experiment_normaliser`](#experiment_normaliser)
     - [`percent_converter`](#percent_converter)
     - [`percent_scaler`](#percent_scaler)
+- [`utils_shared/output_capture.py`](#utils_sharedoutput_capturepy)
+    - [`captured_buffer_getter`](#captured_buffer_getter)
+    - [`output_capturer`](#output_capturer)
 - [`utils_shared/paf_reader.py`](#utils_sharedpaf_readerpy)
     - [`PafError`](#paferror)
     - [`Spectra`](#spectra)
@@ -211,6 +270,18 @@
     - [`token_reader`](#token_reader)
     - [`u32_reader`](#u32_reader)
     - [`warning_printer`](#warning_printer)
+- [`utils_shared/pca_fitter.py`](#utils_sharedpca_fitterpy)
+    - [`_component_orienter`](#_component_orienter)
+    - [`_nuisance_basis_builder`](#_nuisance_basis_builder)
+    - [`_spectra_gridder`](#_spectra_gridder)
+    - [`_varimax_rotator`](#_varimax_rotator)
+    - [`component_builder`](#component_builder)
+    - [`component_count_suggester`](#component_count_suggester)
+    - [`component_finder`](#component_finder)
+    - [`fit_saver`](#fit_saver)
+    - [`fit_table_builder`](#fit_table_builder)
+- [`utils_shared/pca_plotter.py`](#utils_sharedpca_plotterpy)
+    - [`pca_figure_builder`](#pca_figure_builder)
 - [`utils_shared/questions.py`](#utils_sharedquestionspy)
     - [`UserQuit`](#userquit)
     - [`_input_reader`](#_input_reader)
@@ -223,6 +294,7 @@
     - [`input_flusher`](#input_flusher)
     - [`multi_asker`](#multi_asker)
     - [`number_asker`](#number_asker)
+    - [`numbering_getter`](#numbering_getter)
     - [`numbering_restarter`](#numbering_restarter)
     - [`numbering_setter`](#numbering_setter)
     - [`numbers_asker`](#numbers_asker)
@@ -245,6 +317,7 @@
     - [`time_getter`](#time_getter)
     - [`value_getter`](#value_getter)
 - [`utils_shared/spectral_decomposer.py`](#utils_sharedspectral_decomposerpy)
+    - [`_best_window_finder`](#_best_window_finder)
     - [`_wavelength_masker`](#_wavelength_masker)
     - [`data_filterer`](#data_filterer)
     - [`delta_abs_calculator`](#delta_abs_calculator)
@@ -255,33 +328,91 @@
 - [`utils_shared/survey.py`](#utils_sharedsurveypy)
     - [`_columns_text_builder`](#_columns_text_builder)
     - [`_event_line_builder`](#_event_line_builder)
+    - [`_file_focuser`](#_file_focuser)
     - [`_first_event_finder`](#_first_event_finder)
     - [`_last_event_finder`](#_last_event_finder)
+    - [`_limit_converter`](#_limit_converter)
+    - [`_limit_maximum_getter`](#_limit_maximum_getter)
     - [`_limits_asker`](#_limits_asker)
+    - [`_limits_filler`](#_limits_filler)
     - [`_maths_converter`](#_maths_converter)
+    - [`_minutes_remembered`](#_minutes_remembered)
     - [`_natural_sorter`](#_natural_sorter)
     - [`_subscript_stripper`](#_subscript_stripper)
     - [`analysis_asker`](#analysis_asker)
     - [`averaging_asker`](#averaging_asker)
     - [`decomposition_asker`](#decomposition_asker)
     - [`event_asker`](#event_asker)
+    - [`file_focus_setter`](#file_focus_setter)
     - [`files_asker`](#files_asker)
+    - [`haem_choice_asker`](#haem_choice_asker)
+    - [`haem_form_asker`](#haem_form_asker)
     - [`haem_form_option_builder`](#haem_form_option_builder)
     - [`haem_name_formatter`](#haem_name_formatter)
     - [`haem_name_sorter`](#haem_name_sorter)
+    - [`haem_scaling_asker`](#haem_scaling_asker)
+    - [`label_angle_asker`](#label_angle_asker)
     - [`multi_experiment_asker`](#multi_experiment_asker)
     - [`ocr_option_builder`](#ocr_option_builder)
     - [`od_asker`](#od_asker)
+    - [`od_scaling_asker`](#od_scaling_asker)
     - [`paf_finder`](#paf_finder)
-    - [`plot_asker`](#plot_asker)
+    - [`saved_values_reader`](#saved_values_reader)
+    - [`signal_asker`](#signal_asker)
     - [`size_asker`](#size_asker)
     - [`trim_asker`](#trim_asker)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
+- [`utils_viewer/viewer_gui.py`](#utils_viewerviewer_guipy)
+    - [`GuiUnavailable`](#guiunavailable)
+    - [`ViewerGui`](#viewergui)
+    - [`active_gui_getter`](#active_gui_getter)
+    - [`gui_runner`](#gui_runner)
+- [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
+    - [`_kept_builder`](#_kept_builder)
+    - [`_pictures_builder`](#_pictures_builder)
+    - [`multi_figure_checker_builder`](#multi_figure_checker_builder)
+- [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
+    - [`PreviewSpec`](#previewspec)
+    - [`ViewerSession`](#viewersession)
+    - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
+    - [`_overlay_drawer`](#_overlay_drawer)
+    - [`preview_info_builder`](#preview_info_builder)
+    - [`pca_picture_builder`](#pca_picture_builder)
+    - [`pca_spectra_gatherer`](#pca_spectra_gatherer)
+    - [`preview_drawer`](#preview_drawer)
+    - [`preview_figure_builder`](#preview_figure_builder)
+    - [`skipped_windows_finder`](#skipped_windows_finder)
+- [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
+    - [`PreviewRenderer`](#previewrenderer)
+- [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
+    - [`_answers_previewer`](#_answers_previewer)
+    - [`_component_namer`](#_component_namer)
+    - [`_empty_limits_builder`](#_empty_limits_builder)
+    - [`_file_chooser`](#_file_chooser)
+    - [`_fit_file_saver`](#_fit_file_saver)
+    - [`_limits_lister`](#_limits_lister)
+    - [`_od_lister`](#_od_lister)
+    - [`_pca_table_lister`](#_pca_table_lister)
+    - [`_review_asker`](#_review_asker)
+    - [`_skipped_lister`](#_skipped_lister)
+    - [`analysis_stage_runner`](#analysis_stage_runner)
+    - [`browser_stage_runner`](#browser_stage_runner)
+    - [`pca_stage_runner`](#pca_stage_runner)
+    - [`plots_stage_runner`](#plots_stage_runner)
+    - [`trim_stage_runner`](#trim_stage_runner)
+    - [`viewer_asker`](#viewer_asker)
+- [`utils_viewer/viewer_terminal.py`](#utils_viewerviewer_terminalpy)
+    - [`OutputRouter`](#outputrouter)
+    - [`ansi_colour_getter`](#ansi_colour_getter)
+    - [`ansi_splitter`](#ansi_splitter)
+    - [`ansi_style_updater`](#ansi_style_updater)
+- [`utils_viewer/viewer_window.py`](#utils_viewerviewer_windowpy)
+    - [`PictureWindow`](#picturewindow)
 
 ## `config.py`
 
-Settings and defaults of DePalencify: figure styles, journal sizes and colours.
+Settings and defaults of Portimao: figure styles, journal sizes and colours.
 
 ### CLASSES
 
@@ -475,6 +606,39 @@ None.
 name_simplifier
 ```
 
+## `launchers/make_icons.py`
+
+Makes every icon file from one picture: put the new icon at assets/icon.png (square,
+
+### FUNCTIONS
+
+#### `main`
+
+```text
+---- Summary ----
+Main function to turn assets/icon.png into the Windows icon (assets/icon.ico) and
+the Mac icon (inside Portimao.app).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ROOT, SOURCE, WINDOWS_SIZES, MAC_FILE (module constants).
+
+---- Outputs ----
+int
+    0 when the icons were made, 1 when the picture is missing.
+
+---- Globals mutated ----
+None. Writes the icon files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `main.py`
 
 Main program: read .paf files, process them and export figures and workbooks.
@@ -517,37 +681,6 @@ figure_size_calculator
 plot_config_builder
 ```
 
-#### `event_settings_merger`
-
-```text
----- Summary ----
-Main function to copy the label, concentration and ignored flag entered for each
-event onto the experiment, and to move ignored events out of the working event list.
-
----- Inputs ----
-experiment : dict
-    Experiment dictionary, as defined in DATA_FORMAT.md.
-events : List[dict]
-    Entered events: {datapoint, label, concentration_uM, ignored}.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Updates experiment["metadata"]["events"] in place and adds
-experiment["metadata"]["ignored_events"] (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `everything_asker`
 
 ```text
@@ -576,16 +709,16 @@ last_answers_saver (side effects).
 None.
 
 ---- Helpers ----
-analysis_asker
+active_gui_getter
 files_asker
 haem_name_formatter
 last_answers_loader
 last_answers_saver
 multi_experiment_asker
-plot_asker
+multi_figure_checker_builder
 section_starter
 summary_figure_asker
-trim_asker
+viewer_asker
 yes_no_asker
 ```
 
@@ -609,9 +742,7 @@ export_root : Path
     Results folder.
 
 ---- Globals read ----
-settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
-settings.DELTA_ABS_WINDOW_SECONDS, settings.PERCENT_AVERAGE_WINDOW_SECONDS; plt
-(matplotlib.pyplot).
+plt (matplotlib.pyplot).
 
 ---- Outputs ----
 Optional[dict]
@@ -625,20 +756,11 @@ None. Writes the figure and the workbook files and prints progress (side effects
 None.
 
 ---- Helpers ----
-event_settings_merger
-experiment_attenuation_adder
-experiment_averages_calculator
-experiment_decomposer
-experiment_normaliser
-experiment_paf_loader
+experiment_data_processor
 experiment_plotter
 experiment_preparer
-experiment_trimmer
 experiment_workbook_exporter
-percent_converter
-percent_need_checker
 plot_config_builder
-source_chooser
 ```
 
 #### `last_answers_loader`
@@ -701,14 +823,42 @@ None.
 
 ```text
 ---- Summary ----
-Main function of the program: ask the questions, process every file, then draw the
-comparison and special figures, logging the output to a file.
+Main function of the program: run it in the experiment browser window (terminal on
+the left, plots on the right), or in the terminal when the window cannot open.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-VERSION (written to the log).
+PROGRAM_TITLE (shown in the window title).
+
+---- Outputs ----
+int
+    0 when every file finished, 1 when the run was cancelled or a file failed.
+
+---- Globals mutated ----
+None. Opens the window or runs in the terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+gui_runner
+program_runner
+```
+
+#### `program_runner`
+
+```text
+---- Summary ----
+Main function to run the program: ask the questions, process every file, then draw
+the comparison and special figures, logging the output to a file.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PROGRAM_TITLE (written to the log).
 
 ---- Outputs ----
 int
@@ -750,6 +900,9 @@ export_root : Path
     Results folder.
 exemplar_names : Optional[List[str]]
     Names of the four experiments of the 2x2 grid, or None.
+is_preview : bool
+    True to draw the figures only (for the experiment browser): no workbook is
+    written.
 
 ---- Globals read ----
 settings.Config; time_response_runner, ocr_and_haem_response_runner and
@@ -877,7 +1030,8 @@ Main function to build the settings of the OCR and haem response figure.
 cfg : Config
     Figure style derived from the answers (config.py).
 answers : dict
-    Terminal answers; uses ho_haems, ho_metric, ho_pub_columns and ho_pub_height.
+    Terminal answers; uses ho_haems, ho_metric, ho_pub_columns and ho_pub_height,
+    and ho_blocks (the blocks drawn so far while the figure is being built).
 haem_names : list
     Haem names of the fit, in fit order.
 
@@ -942,7 +1096,8 @@ cfg : Config
     Figure style derived from the answers (config.py).
 answers : dict
     Terminal answers; uses tr_groups, tr_examples, tr_decompositions,
-    tr_skip_hours, tr_columns and tr_height.
+    tr_skip_hours, tr_columns and tr_height. An example that is None has not been
+    chosen yet (the figure is being built) and is drawn as an empty box.
 haem_names : list
     Haem names of the fit, used to colour the decomposition panels.
 
@@ -1054,6 +1209,10 @@ defaults : dict
     Default answers.
 fit : dict
     Fit dictionary (haem_list) used to list the haems.
+step_checker : Optional[Callable[[object, str, str], bool]]
+    Function (names, question, change label) that draws the figure as built so far,
+    asks whether it is accepted and returns True when it is; None skips the
+    previews.
 
 ---- Globals read ----
 None.
@@ -1070,6 +1229,7 @@ None. Stores the settings in ``answers`` (side effect).
 None.
 
 ---- Helpers ----
+_step_checker
 choice_asker
 haem_form_option_builder
 haem_name_formatter
@@ -1080,6 +1240,72 @@ ocr_option_builder
 run_name_lister
 size_asker
 yes_no_asker
+```
+
+#### `_hours_reader`
+
+```text
+---- Summary ----
+Helper function to read the hours typed for the time points to skip.
+
+---- Inputs ----
+text : str
+    Numbers separated by commas or semicolons, or "none".
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[float]
+    The hours. Words that are not numbers are reported and left out.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+```
+
+#### `_panel_chooser`
+
+```text
+---- Summary ----
+Helper function to ask which experiment a panel of the time response shows, put it
+in the figure and ask whether the figure so far is accepted.
+
+---- Inputs ----
+question : str
+    The question.
+options : list
+    [(experiment name, text)] to choose from.
+default : str
+    Experiment offered when only Enter is pressed.
+slot : tuple
+    (list the pair is stored in, position in that list, {experiment name: group}).
+step_checker : Optional[Callable[[object, str, str], bool]]
+    Function that draws the figure so far and asks whether it is accepted; None
+    accepts without drawing.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Name of the experiment chosen.
+
+---- Globals mutated ----
+None. Stores the (group, hours) pair in the list of ``slot`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_example_pair_maker
+_step_checker
+choice_asker
 ```
 
 #### `_saved_example_finder`
@@ -1116,6 +1342,75 @@ None.
 hours_parser
 ```
 
+#### `_step_checker`
+
+```text
+---- Summary ----
+Helper function to show the figure as built so far and ask whether it is accepted.
+
+---- Inputs ----
+step_checker : Optional[Callable[[object, str, str], bool]]
+    Function (members, question, change label) that draws the figure and returns
+    True when it is accepted; None when there is nothing to draw with.
+members : object
+    The experiments of the figure: {name: group} or a list of names.
+question : str
+    The accept question.
+change : str
+    Label of the answer that asks the question again.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when accepted (or when there is no way to draw).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_step_wirer`
+
+```text
+---- Summary ----
+Helper function to turn the figure checker of the whole figure into the checker of
+one step: the figure drawn from the choices made so far.
+
+---- Inputs ----
+figure_checker : Optional[Callable[[str, dict], bool]]
+    The figure checker (see summary_figure_asker), or None.
+key : str
+    'time_response' or 'haem_ocr'.
+fit : Optional[dict]
+    Fit dictionary.
+result : dict
+    {'time_response': ..., 'haem_ocr': ...} of the figures so far.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Callable[[object, str, str], bool]]
+    Function (members, question, change label) giving True when the user accepts
+    the figure so far, or None when there is no figure checker.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_time_response_asker`
 
 ```text
@@ -1129,6 +1424,10 @@ answers : dict
     Answers dictionary the settings are stored in.
 defaults : dict
     Default answers.
+step_checker : Optional[Callable[[object, str, str], bool]]
+    Function (members, question, change label) that draws the figure as built so
+    far, asks whether it is accepted and returns True when it is; None skips the
+    previews.
 
 ---- Globals read ----
 None.
@@ -1145,9 +1444,10 @@ None. Stores the settings in ``answers`` (side effect).
 None.
 
 ---- Helpers ----
-_example_pair_maker
+_hours_reader
+_panel_chooser
 _saved_example_finder
-choice_asker
+_step_checker
 group_assigner
 hours_parser
 info_printer
@@ -1210,6 +1510,10 @@ fit : Optional[dict]
     Fit dictionary chosen in section 3, or None.
 fits_folder : Path
     Folder holding the fit .csv files.
+figure_checker : Optional[Callable[[str, dict], bool]]
+    Function called after the questions of each figure with (key, {'fit': fit,
+    'custom': result so far}); it shows the figure and returns True when the user
+    accepts it. When it returns False the figure's questions are asked again.
 
 ---- Globals read ----
 None.
@@ -1411,6 +1715,9 @@ fit : dict
     Fit dictionary from import_fit.
 export_root : Path
     Results folder.
+is_preview : bool
+    True to draw the figure only (for the experiment browser): the workbook is not
+    written.
 
 ---- Globals read ----
 None.
@@ -1453,6 +1760,9 @@ fit : dict
     Fit dictionary from import_fit.
 export_root : Path
     Results folder.
+is_preview : bool
+    True to draw the figure only (for the experiment browser): the workbook is not
+    written.
 
 ---- Globals read ----
 None.
@@ -3173,6 +3483,1403 @@ experiment_classifier
 figure_finisher
 ```
 
+## `utils_custom/publication_plotter.py`
+
+Publication figure (baseline OCR, OCR response, haem response), exemplars.
+
+### PUBLICATION PLOTTER HELPERS
+
+#### `_axes_styler`
+
+```text
+---- Summary ----
+Helper function to apply the tick, grid and spine style of the response and baseline
+panels.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+tick_size : float
+    Tick label size in points.
+pad : Optional[float]
+    Tick label pad in points, or None for the default.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the style of ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_baseline_bar_plotter`
+
+```text
+---- Summary ----
+Helper function to draw the baseline OCR (average0) bar chart per group, with every
+run overlaid and a Student t-test bracket between the two groups.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+Bar height = mean of the run baselines; error bar = SEM = SD / sqrt(n). Student
+t-test with equal variances between the two groups.
+
+---- Helpers ----
+_axes_styler
+_column_chooser
+_experiment_classifier
+_significance_bar_drawer
+_significance_formatter
+finite_float_converter
+```
+
+#### `_block_gap_calculator`
+
+```text
+---- Summary ----
+Helper function to calculate the gap below each block of the publication figure
+(each gap is sized for what it holds) and the gap between the response columns.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+blocks : list
+    Block names from top to bottom ('baseline', 'ocr_response', 'haem_response').
+n_columns : int
+    Number of addition-order columns.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (gaps in points, one per block but the last; wspace as a GridSpec fraction).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A gap above the first response block = x tick labels + 0.5 unit + title and legend
+row + 1.0 unit. The gap between the OCR and haem responses = two-line tick labels +
+0.5 unit + the significance bars' headroom + 0.5 unit. column_gap = 5 x 0.55 tick +
+0.5 unit + 1.5 unit (points).
+
+---- Helpers ----
+gap_space_calculator
+```
+
+#### `_column_chooser`
+
+```text
+---- Summary ----
+Helper function to choose the OCR column: the preferred one if set, else VoO2, else
+the first available.
+
+---- Inputs ----
+available : Iterable
+    Column names that are available.
+preferred : Optional[str]
+    Column requested in the settings, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    Chosen column name, or None if none is available.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_condition_indexer`
+
+```text
+---- Summary ----
+Helper function to map each (strain, order) pair to its condition name in the
+triplicate results.
+
+---- Inputs ----
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {(strain, order): condition name}. Raises ValueError if two conditions match one
+    pair.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+condition_classifier
+```
+
+#### `_crop_start_finder`
+
+```text
+---- Summary ----
+Helper function to find the time at which an exemplar crop begins.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md.
+mode : str
+    'baseline' (start of the average0 window) or 'first_addition'.
+before_minutes : float
+    Minutes kept before the first addition.
+margin_minutes : float
+    Extra minutes kept before the baseline window.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    Crop start time in minutes.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_exemplar_gap_calculator`
+
+```text
+---- Summary ----
+Helper function to calculate the gap between rows and between columns of the
+exemplar quadrants.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+individual_config : dict
+    Individual-experiment plot settings, as returned by Config.plot_config in
+    config.py.
+n_rows : int
+    Number of group rows.
+n_columns : int
+    Number of addition-order columns.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (hspace, wspace) as GridSpec fractions.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+row_gap = 1.2 tick + 0.5 unit + label pad + 1.2 label + 1.0 unit; column_gap = lines
+x 1.2 label + y label pad + 5 x 0.55 tick + 0.5 unit + 1.5 unit (points) for one
+column, 1.5 unit when there are several (the later columns have no y labels).
+
+---- Helpers ----
+gap_space_calculator
+```
+
+#### `_exemplar_plotter`
+
+```text
+---- Summary ----
+Helper function to draw one experiment exactly as the individual plotter does.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure.
+subplot_spec : SubplotSpec
+    Grid cell the experiment is drawn in.
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md.
+individual_config : dict
+    Individual-experiment plot settings, as returned by Config.plot_config in
+    config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Axes of the stacked panels.
+
+---- Globals mutated ----
+None. Adds axes to ``fig`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_drawer
+```
+
+#### `_exemplar_selector`
+
+```text
+---- Summary ----
+Helper function to pick the experiment of one run number for every (strain, order)
+cell.
+
+---- Inputs ----
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+run : int
+    Run number shown for each condition.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {(strain, order): experiment}. Raises ValueError if two experiments match one
+    cell.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_experiment_classifier
+```
+
+#### `_experiment_classifier`
+
+```text
+---- Summary ----
+Helper function to identify the strain, addition order and run number from an
+experiment name.
+
+---- Inputs ----
+name : str
+    Experiment name such as 'control_kcn_then_bd_run1'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (strain, order, run); entries are None where they cannot be identified.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+condition_classifier
+run_name_parser
+```
+
+#### `_experiment_cropper`
+
+```text
+---- Summary ----
+Helper function to copy an experiment cropped to begin at a chosen time, with time
+measured from there.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md.
+start : float
+    Time in minutes at which the crop begins.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (cropped experiment copy, last time in minutes).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+t_new = t - start; rows with t_new < 0 are dropped.
+
+---- Helpers ----
+time_getter
+```
+
+#### `_figure_finisher`
+
+```text
+---- Summary ----
+Helper function to fit the margins to the drawn content, add the panel letters at
+the top-left of each panel and fit again.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+panels : list
+    List of (letter, main axes, [axes of the panel]) tuples.
+suptitle : Any
+    Figure title text object, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Resizes the layout of ``fig`` and adds text to it (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+figure_canvas_fitter
+panel_letter_adder
+```
+
+#### `_haem_block_plotter`
+
+```text
+---- Summary ----
+Helper function to draw the haem response: one row per haem, one column per addition
+order, a line per group.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure.
+spec : SubplotSpec
+    Grid cell the block is drawn in.
+orders : tuple
+    Addition-order names (columns), in drawing order.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+conditions : dict
+    Lookup {(strain, order): condition name}.
+references : dict
+    Lookup {order: experiment or None} used for the event tick labels.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+rows : list
+    Haem row dictionaries {haem, label}.
+haem_source : str
+    Haem source key, for example 'delta_abs_od'.
+tests : Optional[list]
+    List collecting t-test comparisons, or None to skip the tests.
+bars_above : bool
+    True draws the top row's significance bars in the white space above the block
+    (between it and the block above) instead of inside the axes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (grid of axes [row][column], invisible axes carrying the shared y label).
+
+---- Globals mutated ----
+None. Adds axes to ``fig`` and appends to ``tests`` (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haem_label_finder
+_haem_label_pad_calculator
+_legend_handle_builder
+_measurement_finder
+_outside_bar_drawer
+_reference_level_finder
+_response_axes_preparer
+_response_series_drawer
+_response_window_tester
+_row_ylim_sharer
+_tick_label_builder
+_window_orderer
+```
+
+#### `_haem_label_finder`
+
+```text
+---- Summary ----
+Helper function to find the shared y label of the haem response rows.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+haem_source : str
+    Haem source key, for example 'delta_abs_od'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Label text from HAEM_RESPONSE_AXIS_LABELS for the metric and source.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_haem_label_pad_calculator`
+
+```text
+---- Summary ----
+Helper function to calculate the points between the shared haem label and the haem
+axes.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    Label pad in points.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+pad = 1.2 label font + 0.5 unit + 5 x 0.55 tick font + 0.5 unit (points).
+
+---- Helpers ----
+None.
+```
+
+#### `_haem_row_selector`
+
+```text
+---- Summary ----
+Helper function to select the haem response rows to draw, in the order listed in
+HAEM_RESPONSE_SHOW.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Row dictionaries {haem, label}. Every row is returned when HAEM_RESPONSE_SHOW is
+    empty. Entries are matched to a row label or haem name ignoring case and
+    punctuation.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+name_simplifier
+```
+
+#### `_haem_source_finder`
+
+```text
+---- Summary ----
+Helper function to find the haem source that every condition's averages were
+calculated from.
+
+---- Inputs ----
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Haem source key, for example 'delta_abs_od'. Raises ValueError if the conditions
+    differ.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_layout_validator`
+
+```text
+---- Summary ----
+Helper function to check that the layout options of the publication figure are
+recognised and to return the group and order lists.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+ORDER_TITLES, BLOCK_NAMES, RESPONSE_METRICS (module constants).
+
+---- Outputs ----
+tuple
+    (orders, strains): addition orders (columns) and groups (rows), as tuples.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_legend_handle_builder`
+
+```text
+---- Summary ----
+Helper function to build legend entries showing each group's colour, line style and
+marker.
+
+---- Inputs ----
+strains : tuple
+    Group names (rows or bars), in drawing order.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Line2D handles, one per group.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_mean_ylim_setter`
+
+```text
+---- Summary ----
+Helper function to set the y range of a response panel from the group means (and
+the baseline level) only, so that a single outlier run or a very large error bar
+does not stretch the axis. Points and error bars beyond the range are clipped.
+
+---- Inputs ----
+ax : Axes
+    Response panel, with the series already drawn.
+series_list : list
+    One list of window statistics per strain, as drawn by _response_series_drawer.
+metric : str
+    Response metric, which decides the field holding the mean.
+baseline_level : Optional[float]
+    Reference level that must stay in view (for example 100 for % of baseline).
+margin : float
+    Fraction of the mean range added above and below.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Sets the y limits of ``ax`` (side effect); does nothing when no mean is
+finite.
+
+---- Equations ----
+low = min(means) - margin x range; high = max(means) + margin x range, where the
+range is max(means) - min(means) (at least 1 % of the largest absolute mean). When
+all means are on one side of the baseline, the baseline side gets a 3 % margin.
+
+---- Helpers ----
+_metric_field_selector
+```
+
+#### `_measurement_finder`
+
+```text
+---- Summary ----
+Helper function to find the column matching a wanted name, ignoring case and
+punctuation.
+
+---- Inputs ----
+available : Iterable
+    Column names that are available.
+wanted : str
+    Name to look for.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    Matching column name, or None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+name_simplifier
+```
+
+#### `_metric_field_selector`
+
+```text
+---- Summary ----
+Helper function to name the keys of the triplicate statistics used by a response
+metric.
+
+---- Inputs ----
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (mean key, sem key, n key, per-run values key).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_ocr_block_plotter`
+
+```text
+---- Summary ----
+Helper function to draw the OCR response (percent of each run's baseline, mean and
+SEM across runs), one axes per addition order.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure.
+spec : SubplotSpec
+    Grid cell the block is drawn in.
+orders : tuple
+    Addition-order names (columns), in drawing order.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+conditions : dict
+    Lookup {(strain, order): condition name}.
+references : dict
+    Lookup {order: experiment or None} used for the event tick labels.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+tests : Optional[list]
+    List collecting t-test comparisons, or None to skip the tests.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    The axes, one per addition order.
+
+---- Globals mutated ----
+None. Adds axes to ``fig`` and appends to ``tests`` (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_column_chooser
+_legend_handle_builder
+_response_axes_preparer
+_response_series_drawer
+_response_window_tester
+_row_ylim_sharer
+_tick_label_builder
+_window_orderer
+```
+
+#### `_outside_bar_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the significance bars stored by _response_window_tester in
+the white space just above an axes, so the plot keeps its full height.
+
+---- Inputs ----
+ax : Axes
+    Response panel whose y range is final.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_test_bar_drawer
+```
+
+#### `_p_value_adjuster`
+
+```text
+---- Summary ----
+Helper function to adjust a list of p values for multiple comparisons.
+
+---- Inputs ----
+p_values : Iterable
+    Raw p values.
+method : str
+    'none', 'bonferroni' or 'holm'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    Adjusted p values, same order as the input.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Bonferroni: p_adj = min(n p, 1). Holm: sort ascending, p_adj(i) = min(max over j <=
+i of (n - j) p(j), 1) with j counted from 0.
+
+---- Helpers ----
+None.
+```
+
+#### `_reference_level_finder`
+
+```text
+---- Summary ----
+Helper function to find the height of the dashed reference line of the haem
+response.
+
+---- Inputs ----
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+haem_source : str
+    Haem source key, for example 'delta_abs_od'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    0 for a change, 100 for percent of baseline, 0 for a delta abs value, otherwise
+    None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_reference_selector`
+
+```text
+---- Summary ----
+Helper function to pick, for each addition order, the first run of the first
+available group (used for the event tick labels).
+
+---- Inputs ----
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+conditions : dict
+    Lookup {(strain, order): condition name}.
+orders : tuple
+    Addition-order names (columns), in drawing order.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {order: experiment or None}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_response_axes_preparer`
+
+```text
+---- Summary ----
+Helper function to draw the baseline reference line and set the window ticks of a
+response panel.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+window_names : list
+    Averaging window names, for example ['average0', 'average1'].
+tick_labels : list
+    Tick label of every window.
+show_xlabels : bool
+    True to write the tick labels.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+baseline_level : Optional[float]
+    Height of the reference line, or None for no line.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    x positions of the windows.
+
+---- Globals mutated ----
+None. Changes the style of ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_axes_styler
+```
+
+#### `_response_metric_checker`
+
+```text
+---- Summary ----
+Helper function to reject a percent-of-baseline response for the delta abs sources,
+which start at 0.
+
+---- Inputs ----
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+haem_source : str
+    Haem source key, for example 'delta_abs_od'.
+
+---- Globals read ----
+DELTA_HAEM_SOURCES (schema constant).
+
+---- Outputs ----
+None
+    Nothing. Raises ValueError for the combination that is not allowed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_response_series_drawer`
+
+```text
+---- Summary ----
+Helper function to plot every run as a point, the mean as a line and SEM error bars
+for one group.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+x : Iterable
+    x positions of the windows.
+stats_list : list
+    Statistics dictionary (or None) for each window.
+style : dict
+    Group style: colour, linestyle, marker.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+label : Optional[str]
+    Unused legend text.
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+offset : float
+    Horizontal shift in x units so groups sit side by side.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True if anything was drawn.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_metric_field_selector
+```
+
+#### `_response_window_tester`
+
+```text
+---- Summary ----
+Helper function to run a Student t-test between the two groups at every window of a
+response panel and mark the significant windows.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+x : np.ndarray
+    x positions of the windows.
+windows : list
+    Window names.
+series_by_strain : dict
+    {strain: [statistics per window]}.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+panel_name : str
+    Panel name written to the test table.
+tests : list
+    List collecting one dictionary per t-test comparison.
+outside : bool
+    True keeps the axis range as it is and stores the marks on ``ax`` for
+    _outside_bar_drawer, which draws them in the space above the axes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Appends one dictionary per comparison to ``tests`` and draws on ``ax`` (side
+effects); with ``outside`` it sets ``ax.outside_marks`` instead of drawing.
+
+---- Equations ----
+Equal-variance Student t-test per window; p values adjusted across the windows of
+the panel (RESPONSE_TEST_CORRECTION); significant if p_adj < RESPONSE_TEST_ALPHA.
+
+---- Helpers ----
+_metric_field_selector
+_p_value_adjuster
+_test_bar_drawer
+```
+
+#### `_row_ylim_sharer`
+
+```text
+---- Summary ----
+Helper function to give every axes in a row the union of their y ranges.
+
+---- Inputs ----
+axes_row : list
+    Axes of one row.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the y limits of the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_significance_bar_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a bracket between two x positions with text centred above
+it.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+x_left : float
+    Left end of the bracket (data units).
+x_right : float
+    Right end of the bracket (data units).
+y : float
+    Height of the bracket (data units).
+text : str
+    Text written above the bracket.
+tick_size : float
+    Tick label size in points.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_significance_formatter`
+
+```text
+---- Summary ----
+Helper function to format a p value as stars or as text.
+
+---- Inputs ----
+p_value : float
+    p value.
+style : str
+    'stars' or 'p'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    '***', '**', '*' or 'ns' (stars style) or the p value text.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_test_bar_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a small bracket joining the two groups' points at one window
+with text above it.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+x_left : float
+    Left end (data units).
+x_right : float
+    Right end (data units).
+y : float
+    Data height the clearances are measured from.
+text : str
+    Stars written above the bracket.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_offset_transformer
+```
+
+#### `_tick_label_builder`
+
+```text
+---- Summary ----
+Helper function to build the x tick labels of the averaging windows: Baseline, then
+the addition that precedes each window.
+
+---- Inputs ----
+experiment : Optional[dict]
+    Reference experiment whose events label the windows, or None.
+window_names : list
+    Averaging window names, for example ['average0', 'average1'].
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    One label per window; additions are written as label and concentration.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+finite_float_converter
+```
+
+#### `_window_orderer`
+
+```text
+---- Summary ----
+Helper function to list the averaging windows present in any condition of one
+addition order.
+
+---- Inputs ----
+order : str
+    Addition order name.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+conditions : dict
+    Lookup {(strain, order): condition name}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Window names in numerical order.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `exemplar_figure_plotter`
+
+```text
+---- Summary ----
+Main function to build the exemplar figure: one run per condition, each drawn by the
+individual plotter in its own quadrant.
+
+---- Inputs ----
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+config : dict
+    Exemplar figure settings from custom_config.exemplar_config_builder.
+individual_config : dict
+    Individual-experiment plot settings, as returned by Config.plot_config in
+    config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (fig, axes); axes maps (strain, order) to its list of axes and 'letters' to
+    {letter: experiment name}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_crop_start_finder
+_exemplar_gap_calculator
+_exemplar_plotter
+_exemplar_selector
+_experiment_cropper
+_figure_finisher
+experiment_title_builder
+stack_legend_drawer
+watermark_style_builder
+```
+
+#### `publication_figure_plotter`
+
+```text
+---- Summary ----
+Main function to build the publication figure: baseline OCR, OCR response and haem
+response blocks.
+
+---- Inputs ----
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+triplicates : dict
+    Across-run statistics from triplicate_averager.
+config : dict
+    Publication figure settings from custom_config.publication_config_builder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (fig, axes); axes holds 'baseline', 'ocr_response', 'haem_response' and
+    'letters' ({letter: panel name}).
+
+---- Globals mutated ----
+None. Stores the t-test table on the returned figure as ``fig.response_tests``.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_baseline_bar_plotter
+_block_gap_calculator
+_condition_indexer
+_experiment_classifier
+_figure_finisher
+_haem_block_plotter
+_haem_row_selector
+_haem_source_finder
+_layout_validator
+_ocr_block_plotter
+_panel_labeller
+_reference_selector
+_response_metric_checker
+```
+
+#### `publication_figure_saver`
+
+```text
+---- Summary ----
+Main function to save a publication or exemplar figure at its exact size, plus the
+t-test table when there is one.
+
+---- Inputs ----
+fig : Figure
+    Figure returned by publication_figure_plotter or exemplar_figure_plotter.
+export_root : Path
+    Results folder.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Paths of the files written.
+
+---- Globals mutated ----
+None. Writes the figure under <export_root>/<OUTPUT_SUBFOLDER> and the test table
+under <export_root>/<DATA_SUBFOLDER> (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+figure_saver
+```
+
 ## `utils_custom/run_namer.py`
 
 Experiment (run) name parsing: conditions, run numbers, groups and hours.
@@ -4013,6 +5720,37 @@ None.
 None.
 ```
 
+#### `_placeholder_drawer`
+
+```text
+---- Summary ----
+Helper function to draw an empty labelled box where a panel has not been chosen yet.
+
+---- Inputs ----
+fig : Any
+    The figure, already fitted to its final layout.
+hidden : dict
+    {panel letter: [axes that were hidden]} of the panels not chosen yet.
+config : dict
+    Time response settings from custom_config.time_response_config_builder.
+
+---- Globals read ----
+PLACEHOLDER_NAMES (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Hides the axes and adds a dashed box and its text to the figure (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_time_axes_styler`
 
 ```text
@@ -4286,6 +6024,7 @@ _event_label_height_calculator
 _example_finder
 _example_viewer
 _haem_scale_sharer
+_placeholder_drawer
 _time_gap_calculator
 _title_styler
 decomposition_plotter
@@ -4470,6 +6209,44 @@ _run_summariser
 _run_value_getter
 _window_sorter
 condition_grouper
+```
+
+## `utils_custom/triplicate_exporter.py`
+
+Export of the across-run (triplicate) statistics to an Excel workbook.
+
+### MAIN FUNCTIONS
+
+#### `triplicate_exporter`
+
+```text
+---- Summary ----
+Main function to write one worksheet per condition of the across-run statistics to
+an Excel workbook.
+
+---- Inputs ----
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+output_path : Path
+    Workbook (.xlsx) to write.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The workbook path.
+
+---- Globals mutated ----
+None. Writes the workbook (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_number_writer
+excel_sheet_namer
+finite_float_converter
 ```
 
 ## `utils_custom/workbook_helpers.py`
@@ -4725,17 +6502,18 @@ schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES; schema.resolve_source, get_ti
 ---- Outputs ----
 dict
     The same experiment dictionary. Raises ValueError for invalid settings, no
-    source, no events, invalid times or windows that do not fit between the
-    additions.
+    source, no events or invalid times. A window that does not fit between two
+    additions (or after the last one) is skipped, not an error.
 
 ---- Globals mutated ----
-experiment: adds experiment["averages"] = {"settings", "windows"} (layout in
-DATA_FORMAT.md).
+experiment: adds experiment["averages"] = {"settings", "windows", "skipped"}
+(layout in DATA_FORMAT.md).
 
 ---- Equations ----
 average0 ends gap_minutes before the first event; averageN ends gap_minutes before
 event N+1 (final_window_gap_minutes before the end of the recording for the last
-event); each window starts window_minutes before its end. change = mean /
+event); each window starts window_minutes before its end and is skipped when that
+is before its own event. change = mean /
 mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0).
 
 ---- Helpers ----
@@ -4895,6 +6673,92 @@ file_name_sanitiser
 gap_space_calculator
 panel_letter_adder
 watermark_style_builder
+```
+
+## `utils_shared/experiment_processing.py`
+
+Reading and processing of one experiment (everything before the figure and the export).
+
+### MAIN FUNCTIONS
+
+#### `event_settings_merger`
+
+```text
+---- Summary ----
+Main function to copy the label, concentration and ignored flag entered for each
+event onto the experiment, and to move ignored events out of the working event list.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md.
+events : List[dict]
+    Entered events: {datapoint, label, concentration_uM, ignored}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Updates experiment["metadata"]["events"] in place and adds
+experiment["metadata"]["ignored_events"] (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `experiment_data_processor`
+
+```text
+---- Summary ----
+Main function to read (or take) one experiment and process its data: trim, decompose
+into haems, scale by OD, convert to percentages, choose the plotted sources and
+average around the events. It draws and saves nothing.
+
+---- Inputs ----
+info : dict
+    Per-file information from everything_asker: path, name, trim and ignore times,
+    OD values and events.
+cfg : settings.Config
+    Figure style and settings derived from the answers (config.py).
+fit : Optional[dict]
+    Fit dictionary from import_fit ({haem_list, data}), or None when the haems are
+    not decomposed.
+experiment : Optional[dict]
+    An experiment already read from the file (the experiment browser keeps a copy
+    so the file is not read again). It is processed in place. None reads the file.
+
+---- Globals read ----
+settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
+settings.DELTA_ABS_WINDOW_SECONDS, settings.PERCENT_AVERAGE_WINDOW_SECONDS.
+
+---- Outputs ----
+dict
+    {experiment, od_available, vo2_source, haem_source}. Prints progress and the
+    reason when a step is skipped (side effect).
+
+---- Globals mutated ----
+None. Processes the experiment dictionary in place (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+event_settings_merger
+experiment_attenuation_adder
+experiment_averages_calculator
+experiment_decomposer
+experiment_normaliser
+experiment_paf_loader
+experiment_trimmer
+percent_converter
+percent_need_checker
+source_chooser
 ```
 
 ## `utils_shared/figure_layout.py`
@@ -5335,6 +7199,36 @@ None.
 None.
 ```
 
+#### `figure_capture_setter`
+
+```text
+---- Summary ----
+Main function to switch figure saving to preview mode (or back). While a capture
+function is set, figure_saver hands each figure to it and writes no file, so the
+experiment browser can show a figure before it is made for real.
+
+---- Inputs ----
+capture : Optional[Callable[[Figure, str], None]]
+    Function called with (figure, file name stem) instead of saving, or None for
+    normal saving.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+Sets _figure_capture (module state).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `figure_saver`
 
 ```text
@@ -5360,14 +7254,15 @@ tight : bool
     True to crop the canvas around the artists (bbox_inches="tight").
 
 ---- Globals read ----
-None.
+_figure_capture (module state).
 
 ---- Outputs ----
 List[Path]
-    Paths of the saved files, in the order of ``formats``.
+    Paths of the saved files, in the order of ``formats``; empty in preview mode.
 
 ---- Globals mutated ----
-None. Resizes the figure to ``size`` and writes the files (side effects).
+None. Resizes the figure to ``size`` and writes the files, or in preview mode only
+hands the figure to the capture function (side effects).
 
 ---- Equations ----
 None.
@@ -5422,6 +7317,38 @@ None.
 ---- Outputs ----
 str
     Lower-case letters and digits only.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `program_title_builder`
+
+```text
+---- Summary ----
+Main function to build the name shown at the top of the terminal, in the window
+title and in the log: the program name, the git branch it was installed from (when
+the folder is a git clone) and the version.
+
+---- Inputs ----
+root : Path
+    Program folder.
+version : str
+    Version text from the VERSION file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    For example "Portimao dev V2.7"; without a branch (a folder from a zip file)
+    "Portimao V2.7".
 
 ---- Globals mutated ----
 None.
@@ -5987,6 +7914,38 @@ top = max(smooth) + noise + headroom x max(smooth).
 None.
 ```
 
+#### `_skipped_window_drawer`
+
+```text
+---- Summary ----
+Helper function to draw an averaging window that could not be calculated: a red
+band on every axis with a warning sign above it. Only used in the previews.
+
+---- Inputs ----
+axes : List[Axes]
+    Axes of the experiment, top to bottom.
+window_name : str
+    Window name, for example 'average3'.
+window : dict
+    {start_time, end_time, reason} of the skipped window.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds a shaded span and a warning sign to the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_window_drawer`
 
 ```text
@@ -6016,6 +7975,7 @@ None. Adds shaded spans and labels to the axes (side effect).
 None.
 
 ---- Helpers ----
+_skipped_window_drawer
 _window_label_builder
 ```
 
@@ -6154,6 +8114,9 @@ config : dict
     config.py.
 export_root : Path
     Results folder.
+fig : Optional[Figure]
+    An existing figure to clear and draw in (the experiment browser redraws one
+    window). It is left open. None makes a new figure.
 
 ---- Globals read ----
 config keys FIGURE_SIZE, FIGURE_DPI, TITLE_STYLE, LAYOUT_PAD_PT, FIT_MARGINS,
@@ -6162,7 +8125,8 @@ settings.
 
 ---- Outputs ----
 Tuple[Figure, List[Axes]]
-    The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set) and its axes.
+    The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set or a figure was
+    given) and its axes.
 
 ---- Globals mutated ----
 None. Writes <export_root>/<name>/<name>.svg and .png and prints a message (side
@@ -6418,6 +8382,67 @@ length). Values outside the range are kept.
 ---- Helpers ----
 measurement_column_finder
 time_getter
+```
+
+## `utils_shared/output_capture.py`
+
+Per-thread capture of printed output, so one thread can print without the text reaching
+
+### MAIN FUNCTIONS
+
+#### `captured_buffer_getter`
+
+```text
+---- Summary ----
+Main function to give the buffer that the current thread's output is being captured
+in, if any. Output streams that support the capture check this before they write.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+_local (module state).
+
+---- Outputs ----
+Optional[io.StringIO]
+    The buffer of the current thread, or None when its output is not captured.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `output_capturer`
+
+```text
+---- Summary ----
+Main function to capture everything the current thread prints, while other threads
+keep printing normally. Only output streams that check captured_buffer_getter honour
+it (the experiment browser window and the log copier do).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+_local (module state).
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The buffer the output is collected in; read it with getvalue().
+
+---- Globals mutated ----
+None. Sets and clears the capture of the current thread (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_shared/paf_reader.py`
@@ -7211,6 +9236,364 @@ None.
 None.
 ```
 
+## `utils_shared/pca_fitter.py`
+
+Principal component analysis of the spectra of several experiments, to find the
+
+### PCA FITTER HELPERS
+
+#### `_component_orienter`
+
+```text
+---- Summary ----
+Helper function to give each component the same convention as the fit files: its
+largest peak positive and equal to 1.
+
+---- Inputs ----
+vectors : np.ndarray
+    Components as columns, shape (n_wavelengths, n_components).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The components, each divided by its largest absolute value and with the sign
+    that makes that value positive.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+e = v x sign(v[i]) / |v[i]|, with i the position of the largest |v|.
+
+---- Helpers ----
+None.
+```
+
+#### `_nuisance_basis_builder`
+
+```text
+---- Summary ----
+Helper function to build the offset and scatter terms that the haem decomposition
+fits alongside the haems, as an orthonormal basis, so they can be taken out of the
+spectra before the components are searched for.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths of the spectra (nm).
+degree_of_scatter : int
+    Number of 1/wavelength^k scatter terms.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    Orthonormal columns spanning the constant and the scatter terms, shape
+    (n_wavelengths, degree_of_scatter + 1).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The columns are 1 and (1/wl^k - min) / (max - min) as in s_array_generator,
+orthonormalised by QR.
+
+---- Helpers ----
+None.
+```
+
+#### `_spectra_gridder`
+
+```text
+---- Summary ----
+Helper function to put the spectra of one file on the common wavelength grid.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths of the file (nm), ascending.
+spectra : np.ndarray
+    Spectra of the file, shape (n_spectra, n_wavelengths).
+grid : np.ndarray
+    The wavelengths to give the spectra at (nm).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    Spectra on the grid, shape (n_spectra, len(grid)). Spectra already on the grid
+    are returned as they are.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Linear interpolation of each spectrum at the grid wavelengths.
+
+---- Helpers ----
+None.
+```
+
+#### `_varimax_rotator`
+
+```text
+---- Summary ----
+Helper function to find the rotation that makes the components as simple as
+possible (each concentrated on a few wavelengths), which makes them look more like
+single haem spectra than the plain principal components do.
+
+---- Inputs ----
+loadings : np.ndarray
+    Components as columns, shape (n_wavelengths, n_components).
+max_iterations : int
+    Most iterations to run.
+tolerance : float
+    The iteration stops when the criterion improves by less than this fraction.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    Orthogonal rotation matrix, shape (n_components, n_components).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Varimax: maximise the variance of the squared loadings of every component. Each
+step is R = U V^T from the SVD of L^T (Lr^3 - Lr diag(sum Lr^2) / p), Lr = L R.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `component_builder`
+
+```text
+---- Summary ----
+Main function to take the first components of an analysis, optionally rotate them
+to simpler shapes, and give them the conventions of the fit files.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+count : int
+    Number of components to keep.
+rotate : bool
+    True to apply the varimax rotation (the components then span the same space and
+    leave the same residual, but are more peak-like).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {'wavelengths', 'components' (columns, largest peak = +1), 'explained' (fraction
+    of the variance of each component), 'residual_rms' (OD left unexplained),
+    'peaks' (wavelength of each peak), 'count', 'rotated'}. Components are ordered
+    by the variance they explain. Raises ValueError for an impossible count.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+residual RMS = sqrt((total variance - variance of the kept components) / number of
+values).
+
+---- Helpers ----
+_component_orienter
+_varimax_rotator
+```
+
+#### `component_count_suggester`
+
+```text
+---- Summary ----
+Main function to suggest how many components to use. This is a rule of thumb, not a
+proof: it looks for the biggest drop between neighbouring principal components
+(where the signal ends and the noise starts) and, when there is no clear drop,
+takes enough components to explain nearly all of the variance.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+
+---- Globals read ----
+ENOUGH_VARIANCE, MINIMUM_RATIO (module constants).
+
+---- Outputs ----
+int
+    Suggested number of components, at least 2 when two or more are available.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Singular value s_j = sqrt(eigenvalue j). Suggested k = the k from 2 to K-1 with the
+largest s_k / s_(k+1), if that ratio is at least 2; otherwise the smallest k with
+cumulative variance >= 99%.
+
+---- Helpers ----
+None.
+```
+
+#### `component_finder`
+
+```text
+---- Summary ----
+Main function to run a principal component analysis on the spectra of all the files
+together, inside a spectral window. The offset and scatter terms that the haem
+decomposition fits as well are removed from every spectrum first, and each file's
+average spectrum is removed, so the components describe how the spectra change and
+differences between preparations do not become components.
+
+---- Inputs ----
+spectra_sets : List[dict]
+    One entry per file: {'name', 'wavelengths' (nm), 'spectra' (n_spectra x
+    n_wavelengths, the same attenuation the decomposition uses)}; only the part
+    kept after trimming and ignoring.
+window : Tuple[float, float]
+    (start, end) wavelength of the analysis, in nm.
+max_components : int
+    Most components worked out.
+degree_of_scatter : int
+    Number of scatter terms (the same as the haem decomposition uses).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {'wavelengths', 'eigenvectors' (columns, orthonormal), 'eigenvalues',
+    'gram', 'total_variance', 'n_values', 'n_spectra', 'counts' ({file name: number
+    of spectra used}), 'window', 'degree_of_scatter'}. Raises ValueError when the
+    window or the data cannot be analysed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+X = spectra with the nuisance terms projected out and the file mean removed;
+G = sum over files of X^T X; the components are the eigenvectors of G.
+
+---- Helpers ----
+_nuisance_basis_builder
+_spectra_gridder
+```
+
+#### `fit_saver`
+
+```text
+---- Summary ----
+Main function to save a fit in the layout of the fit files in the fits folder
+(a header naming each haem over its wavelength column, one (wavelength, response)
+pair of columns per haem).
+
+---- Inputs ----
+fit : dict
+    Fit dictionary from fit_table_builder.
+path : Path
+    File to write (.csv).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The file written.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `fit_table_builder`
+
+```text
+---- Summary ----
+Main function to turn the components found into a fit dictionary, exactly as
+fit_importer gives for a fit file, so the haem decomposition can use it.
+
+---- Inputs ----
+result : dict
+    Result of component_builder.
+names : Optional[List[str]]
+    Name of each component; None names them PC1, PC2, ...
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {'haem_list': names, 'data': table of (wavelength, response) column pairs}.
+    The responses are the negated components (a peak of -1), as in the fit files,
+    because the decomposition negates the fit again.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+response = -component.
+
+---- Helpers ----
+None.
+```
+
+## `utils_shared/pca_plotter.py`
+
+Figure of the components found by the principal component analysis.
+
+### MAIN FUNCTIONS
+
+#### `pca_figure_builder`
+
+```text
+---- Summary ----
+Main function to draw the components found: their spectra (top), the share of the
+variance each principal component explains (bottom left) and the residual left
+after each number of components (bottom right), with the chosen number marked.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+result : dict
+    Result of component_builder (the chosen components).
+names : List[str]
+    Name of each component.
+colours : List[str]
+    Colours to give the components, repeated when there are more components.
+fig : Optional[Figure]
+    Figure to draw in; None makes a new one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Figure
+    The figure; matplotlib styling (fonts and sizes) is taken from the caller's
+    rcParams.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Residual RMS after k components = sqrt((total variance - sum of the first k
+eigenvalues) / number of values).
+
+---- Helpers ----
+None.
+```
+
 ## `utils_shared/questions.py`
 
 Helpers for asking numbered questions in the terminal.
@@ -7560,6 +9943,34 @@ None.
 ---- Helpers ----
 _input_reader
 _question_printer
+```
+
+#### `numbering_getter`
+
+```text
+---- Summary ----
+Main function to read the current number at a depth, so it can be restored with
+numbering_setter after questions are asked again.
+
+---- Inputs ----
+depth : int
+    Numbering depth to read (0 = the section number).
+
+---- Globals read ----
+_counters (module state).
+
+---- Outputs ----
+int
+    Current number at that depth.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `numbering_restarter`
@@ -8023,8 +10434,9 @@ None.
 
 ```text
 ---- Summary ----
-Method to write text to every stream and flush it. The name is fixed by the
-file-like protocol.
+Method to write text to every stream and flush it, unless the current thread is
+capturing its output (see output_capture), in which case it is kept by the
+capture. The name is fixed by the file-like protocol.
 
 ---- Inputs ----
 text : str
@@ -8044,7 +10456,7 @@ None. Writes to and flushes every stream (side effect).
 None.
 
 ---- Helpers ----
-None.
+captured_buffer_getter
 ```
 
 ### MAIN FUNCTIONS
@@ -8058,8 +10470,9 @@ Main function to start copying everything printed to a timestamped log file.
 ---- Inputs ----
 export_root : Path
     Results folder; the log goes to <export_root>/logs/YYYY_MM_DD-HH_MM_SS.log.
-version : str
-    Project version (as in the VERSION file), written on the first line of the log.
+title : str
+    Program name, branch and version (program_title_builder), written on the first
+    line of the log.
 settings : dict
     Terminal answers of the run, written at the top of the log.
 
@@ -8072,7 +10485,7 @@ dict
     tee_stdout, tee_stderr, closed}, to be passed to logging_stopper.
 
 ---- Globals mutated ----
-None. Creates the log folder and file, writes the version, seed and settings to
+None. Creates the log folder and file, writes the title, seed and settings to
 its first lines, replaces sys.stdout and sys.stderr with copying streams and
 prints the log location (side effects).
 
@@ -8270,6 +10683,44 @@ Spectral fit loading and haem decomposition routines.
 
 ### SPECTRAL DECOMPOSER HELPERS
 
+#### `_best_window_finder`
+
+```text
+---- Summary ----
+Helper function to find the window of a given length with the highest average.
+
+---- Inputs ----
+times : np.ndarray
+    Time of each spectrum in minutes.
+values : np.ndarray
+    Value at each spectrum.
+start : float
+    Earliest time that may be used.
+stop : float
+    Latest time that may be used.
+width : float
+    Window length in minutes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Tuple[float, float, float]]
+    (highest average, time of its first spectrum, time of its last spectrum), or
+    None when there is no finite value between start and stop. When the usable
+    part is shorter than the window, all of it is one window.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Window average = (running sum at the window end - running sum at its start) /
+number of spectra in the window.
+
+---- Helpers ----
+None.
+```
+
 #### `_wavelength_masker`
 
 ```text
@@ -8336,35 +10787,41 @@ _wavelength_masker
 ```text
 ---- Summary ----
 Main function to shift each haem absorbance so that its reference level is 0, giving
-a change in absorbance (mOD).
+a change in absorbance (mOD). The reference level of each haem is the average of its
+highest window (for example the fully oxidised point), wherever it occurs in the
+run outside the ignored start and end.
 
 ---- Inputs ----
 haem_abs : pd.DataFrame
     Haem absorbance table in mOD (time, spectrum index and one column per haem).
 exclude_first_minutes : float
-    Start of the reference window, in minutes after the first measurement.
+    Minutes after the first measurement that are ignored at the start.
 window_seconds : float
     Length of the reference window, in seconds (> 0).
 label : str
     Name used in error messages.
+exclude_last_minutes : float
+    Minutes before the last measurement that are ignored at the end.
 
 ---- Globals read ----
 schema.get_times, get_values, measurement_columns.
 
 ---- Outputs ----
 pd.DataFrame
-    Shifted copy; the reference window and the means are stored in
+    Shifted copy; the means and the window of each haem are stored in
     result.attrs["delta_abs_baseline"]. Raises ValueError for invalid settings or
-    when no spectra fall in the window.
+    when no spectra are left after the ignored parts.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-delta_abs = abs - mean(abs inside the reference window), per haem. Only a constant
-is subtracted, so differences between points are unchanged.
+delta_abs = abs - max over windows of mean(abs inside the window), per haem. The
+windows start at each spectrum and last window_seconds. Only a constant is
+subtracted, so differences between points are unchanged.
 
 ---- Helpers ----
+_best_window_finder
 measurement_column_finder
 time_getter
 value_getter
@@ -8395,6 +10852,9 @@ delta_exclude_first_minutes : float
     spectrum.
 delta_window_seconds : float
     Length of the delta absorbance reference window, in seconds.
+delta_exclude_last_minutes : float
+    Minutes before the last spectrum that are ignored when finding the delta
+    absorbance reference.
 
 ---- Globals read ----
 schema.TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
@@ -8412,7 +10872,7 @@ experiment: adds haem_conc (time, spectrum index, one column per haem), haem_abs
 ---- Equations ----
 c = (S^T S)^-1 S^T a for every spectrum (projector built once); haem_abs = c x peak
 amplitude of the haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs -
-mean over the reference window.
+mean of the highest window.
 
 ---- Helpers ----
 _wavelength_masker
@@ -8587,6 +11047,34 @@ None.
 None.
 ```
 
+#### `_file_focuser`
+
+```text
+---- Summary ----
+Helper function to tell the experiment browser which file the next question is
+about, so its window shows that file. Does nothing without the browser.
+
+---- Inputs ----
+name : str
+    File name.
+
+---- Globals read ----
+_file_focus_hook (module state).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the hook (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_first_event_finder`
 
 ```text
@@ -8641,35 +11129,136 @@ None.
 None.
 ```
 
+#### `_limit_converter`
+
+```text
+---- Summary ----
+Helper function to turn the minutes a user typed into the value the program keeps
+for a trim or ignore limit.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with duration_min.
+kind : str
+    'trim' or 'ignore'.
+edge : str
+    'start' or 'end'.
+minutes : float
+    Minutes to remove from that edge of the recording; 0 means none.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    Trim limits: the time on the original recording, or None for no trim. Ignore
+    limits: the minutes (0.0 for none).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim start = minutes. Trim end = duration - minutes.
+
+---- Helpers ----
+None.
+```
+
+#### `_limit_maximum_getter`
+
+```text
+---- Summary ----
+Helper function to find the most minutes that can be trimmed from an edge of a file
+without cutting off an event.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with events and duration_min.
+kind : str
+    'trim' or 'ignore'.
+edge : str
+    'start' or 'end'.
+so_far : dict
+    Limits already asked for this file ({key: value}).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    Largest accepted number of minutes, or None when there is no limit (ignore).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Start: the first event time. End: duration - the later of the last event time and
+the trim start.
+
+---- Helpers ----
+_first_event_finder
+_last_event_finder
+```
+
 #### `_limits_asker`
 
 ```text
 ---- Summary ----
-Helper function to ask one yes/no question and then one number per file (trim or
-ignore, start or end), offering the values remembered from the last run.
+Helper function to ask the questions for one edge of the data (trim start, trim end,
+ignore start or ignore end): whether to do it at all, how many minutes for ALL the
+files, and then optionally how many for each file. The limits are stored and passed
+to ``progress`` after every answer, so a plot can show them building up.
 
 ---- Inputs ----
 summaries : List[dict]
     File summaries (DATA_FORMAT.md).
 remembered : dict
-    {file name: {key: value}} from the last run.
-key : str
-    Name of the limit, for example 'trim_start'.
-question : str
-    The yes/no question.
-per_file : str
-    Question for each file; {name} is replaced by the file name.
-fallback : Optional[float]
-    Default for a file with no remembered value; None means 'none' and one
-    value is asked per file. A number means one value is asked for all files,
-    then optionally one per file.
-all_text : str
-    The question for the value that applies to all files (ignore only).
-bounds_builder : Callable[[dict, dict], dict]
-    Function (summary, limits collected so far for that file) giving the
-    minimum and maximum accepted for the file.
-note_builder : Callable[[dict], str]
-    Function (summary) giving the information line shown before the question.
+    {file name: {key: value}} from the last run, offered as the defaults.
+kind : str
+    'trim' or 'ignore'.
+edge : str
+    'start' or 'end'.
+collected : dict
+    {file name: {key: value}} of the limits asked so far; this question adds its
+    own key.
+progress : Callable[[Dict[str, dict]], None]
+    Function called with the limits of every file after each answer.
+
+---- Globals read ----
+config.DEFAULT_ANSWERS (default ignore time at the start).
+
+---- Outputs ----
+None
+    Nothing; the answers are stored in ``collected``.
+
+---- Globals mutated ----
+collected (adds the key of this question for every file). Reads from and prints to
+the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_focuser
+_limit_converter
+_limit_maximum_getter
+_limits_filler
+_minutes_remembered
+info_printer
+number_asker
+yes_no_asker
+```
+
+#### `_limits_filler`
+
+```text
+---- Summary ----
+Helper function to give every file all four limits, using "none" for the ones not
+asked yet.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
 collected : dict
     {file name: {key: value}} of the limits asked so far.
 
@@ -8677,19 +11266,18 @@ collected : dict
 None.
 
 ---- Outputs ----
-Dict[str, Optional[float]]
-    {file name: minutes or None}.
+Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}}; the trim limits
+    are None and the ignore limits 0.0 when not set.
 
 ---- Globals mutated ----
-None. Reads from and prints to the terminal (side effect).
+None.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-info_printer
-number_asker
-yes_no_asker
+None.
 ```
 
 #### `_maths_converter`
@@ -8720,6 +11308,39 @@ yes_no_asker
     _subscript_stripper
 text_italiser
     
+```
+
+#### `_minutes_remembered`
+
+```text
+---- Summary ----
+Helper function to turn a limit remembered from the last run back into the minutes
+the question asks for.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with name and duration_min.
+remembered : dict
+    {file name: {key: value}} from the last run.
+key : str
+    'trim_start', 'trim_end', 'ignore_start' or 'ignore_end'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    Minutes removed from that edge (0.0 when the file was remembered as not
+    trimmed there), or None when nothing is remembered for the file.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim end minutes = duration - remembered end time.
+
+---- Helpers ----
+None.
 ```
 
 #### `_natural_sorter`
@@ -8817,12 +11438,8 @@ None.
 averaging_asker
 decomposition_asker
 event_asker
-info_printer
-od_asker
-progress_clearer
-progress_printer
-saved_settings_reader
-yes_no_asker
+od_scaling_asker
+saved_values_reader
 ```
 
 #### `averaging_asker`
@@ -8866,7 +11483,8 @@ yes_no_asker
 ```text
 ---- Summary ----
 Main function to ask whether to decompose the spectra into haems and which fit to
-use.
+use: a fit file, or (when a pca_runner is given) components found from the data
+with a principal component analysis.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -8879,9 +11497,13 @@ forced : bool
     True to skip the yes/no question (a figure that needs the haems was chosen).
 depth : int
     Numbering depth of the questions (1 = 3.1, 2 = 3.1.1).
+pca_runner : Optional[Callable]
+    Function (dataset, depth) that finds the components with a principal component
+    analysis and returns (fit file name, fit), or (None, None) when the user wants
+    a fit file instead. None leaves the option out.
 
 ---- Globals read ----
-None.
+PCA_CHOICE (module constant).
 
 ---- Outputs ----
 tuple
@@ -8930,12 +11552,41 @@ None.
 
 ---- Helpers ----
 _event_line_builder
+_file_focuser
 info_printer
 number_asker
 numbering_setter
 numbers_asker
 text_asker
 yes_no_asker
+```
+
+#### `file_focus_setter`
+
+```text
+---- Summary ----
+Main function to set (or clear, with None) the function that is told which file a
+question is about.
+
+---- Inputs ----
+hook : Optional[Callable[[str], None]]
+    Function taking the file name, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+Sets _file_focus_hook (module state).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `files_asker`
@@ -8971,6 +11622,71 @@ path_cleaner
 progress_clearer
 progress_printer
 text_asker
+```
+
+#### `haem_choice_asker`
+
+```text
+---- Summary ----
+Main function to ask whether the haems are plotted, and which ones in which order.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers.
+fit : Optional[dict]
+    Fit dictionary (haem_list) used to list the haems, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the haems are plotted.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+haem_name_formatter
+haem_name_sorter
+multi_asker
+yes_no_asker
+```
+
+#### `haem_form_asker`
+
+```text
+---- Summary ----
+Main function to ask how the haems are shown (absorbance change, concentration,
+percentage and so on).
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores the answer in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+haem_form_option_builder
 ```
 
 #### `haem_form_option_builder`
@@ -9058,6 +11774,66 @@ None.
 name_simplifier
 ```
 
+#### `haem_scaling_asker`
+
+```text
+---- Summary ----
+Main function to ask whether the haems are also scaled by OD. Nothing is asked when
+no OD values were entered or the haems are shown as percentages.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers.
+    Must hold normalise_od and haem_mode.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the question was asked.
+
+---- Globals mutated ----
+None. Stores the answer in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+yes_no_asker
+```
+
+#### `label_angle_asker`
+
+```text
+---- Summary ----
+Main function to ask at what angle the event labels are written.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores the answer in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+number_asker
+```
+
 #### `multi_experiment_asker`
 
 ```text
@@ -9074,6 +11850,11 @@ defaults : dict
     Default answers.
 plotted : bool
     True when section 4 plots at least one panel (both figures reuse its choices).
+figure_checker : Optional[Callable[[str, dict], bool]]
+    Function called after the questions of each figure with a name and a dictionary:
+    ('comparison', {'comparison': ...}) or ('exemplar', {'exemplar_names': ...}). It
+    shows the figure and returns True when the user accepts it. When it returns
+    False the figure's questions are asked again with the answers as the defaults.
 
 ---- Globals read ----
 None.
@@ -9154,9 +11935,48 @@ None. Reads from and prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
+_file_focuser
 info_printer
 number_asker
 numbering_restarter
+```
+
+#### `od_scaling_asker`
+
+```text
+---- Summary ----
+Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
+factor of every file, offering the stored values.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers (normalise_od).
+saved : dict
+    {file name: values read from its workbook} (saved_values_reader).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {'OD', 'volume', 'dilution_factor'}}; the dictionaries are empty
+    when not scaling by OD.
+
+---- Globals mutated ----
+None. Stores normalise_od in ``answers`` and reads from and prints to the terminal
+(side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+od_asker
+yes_no_asker
 ```
 
 #### `paf_finder`
@@ -9186,28 +12006,58 @@ None.
 _natural_sorter
 ```
 
-#### `plot_asker`
+#### `saved_values_reader`
 
 ```text
 ---- Summary ----
-Main function to ask section 4: what the individual experiment figures show and
-how they are sized.
+Main function to read the OD and event values saved in each experiment's workbook
+from an earlier run, so they can be offered as defaults.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+export_root : Path
+    Results folder, where the saved workbooks are looked for.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: values read from its workbook, or None when there is none}.
+
+---- Globals mutated ----
+None. Prints progress and a note when earlier values are found (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+progress_clearer
+progress_printer
+saved_settings_reader
+```
+
+#### `signal_asker`
+
+```text
+---- Summary ----
+Main function to ask whether the oxygen traces and the OCR are plotted, and which
+OCR.
 
 ---- Inputs ----
 answers : dict
-    Answers dictionary the values are stored in; must hold normalise_od and
-    decompose.
+    Answers dictionary the values are stored in; must hold normalise_od.
 defaults : dict
     Default answers.
-fit : Optional[dict]
-    Fit dictionary (haem_list) used to list the haems, or None.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 bool
-    True when at least one panel is plotted.
+    True when the oxygen or the OCR is plotted.
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers`` (side effect).
@@ -9217,14 +12067,7 @@ None.
 
 ---- Helpers ----
 choice_asker
-haem_form_option_builder
-haem_name_formatter
-haem_name_sorter
-info_printer
-multi_asker
-number_asker
 ocr_option_builder
-size_asker
 yes_no_asker
 ```
 
@@ -9271,7 +12114,9 @@ number_asker
 ```text
 ---- Summary ----
 Main function to ask section 2: which data is trimmed away (start, end) and which
-is ignored in the calculations (start, end), per file.
+is ignored in the calculations (start, end). Each edge is asked in turn with the
+same questions: do it at all, how many minutes for ALL the data, and optionally how
+many for each file.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -9279,9 +12124,12 @@ summaries : List[dict]
 remembered : dict
     {file name: {trim_start, trim_end, ignore_start, ignore_end}} from the last
     run; offered as the defaults.
+progress : Optional[Callable[[Dict[str, dict]], None]]
+    Function called with the limits of every file after each answer (so a plot can
+    show them building up), or None.
 
 ---- Globals read ----
-config.DEFAULT_ANSWERS (default ignore time at the start).
+None.
 
 ---- Outputs ----
 Dict[str, dict]
@@ -9295,9 +12143,8 @@ None. Reads from and prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
-_first_event_finder
-_last_event_finder
 _limits_asker
+_limits_filler
 info_printer
 ```
 
@@ -9339,6 +12186,2921 @@ metadata trimmed_before_minutes / trimmed_after_minutes in place (side effects).
 
 ---- Equations ----
 t_new = t - start_time; rows kept where start_time <= t <= end_time.
+
+---- Helpers ----
+None.
+```
+
+## `utils_viewer/viewer_gui.py`
+
+The experiment browser window: a text terminal on the left that asks the questions, and
+
+### CLASSES
+
+#### `GuiUnavailable`
+
+```text
+---- Summary ----
+Raised when the browser window cannot be opened (no Tkinter, no display, or the
+window was switched off), so the program can use the terminal instead.
+
+---- Attributes ----
+None.
+
+---- Globals read ----
+None.
+
+---- Methods ----
+None.
+```
+
+#### `ViewerGui`
+
+```text
+---- Summary ----
+The experiment browser window. The program's questions run in their own thread and
+their text and answers pass through the terminal on the left, so the plot on the
+right stays usable while a question waits. Previews are drawn by a third thread.
+
+---- Attributes ----
+is_interactive : bool
+    Always True: the window has its own file controls.
+logic_thread : Optional[threading.Thread]
+    The thread running the program, whose output belongs in the terminal.
+exit_code : int
+    What the program returned (1 when it was stopped).
+
+---- Globals read ----
+MONO_FONTS and the colour constants (module constants).
+
+---- Methods ----
+__init__
+_answer_sender
+_closing_handler
+_drain_runner
+_event_handler
+_history_stepper
+_icon_setter
+_image_receiver
+_logic_runner
+_navigator
+_pane_writer
+_picture_shower
+_step_taker
+_widgets_builder
+extra_publisher
+figure_shower
+file_focuser
+input_reader
+output_capturer
+pictures_publisher
+run
+session_attacher
+spec_publisher
+text_sender
+window_closer
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the window and set up the queues between its threads.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+root : Any
+    The Tk root window.
+program : Callable[[], int]
+    The program to run; it asks the questions and returns its exit code.
+title : str
+    Window title.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance and builds the widgets.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_widgets_builder
+```
+
+##### `_answer_sender`
+
+```text
+---- Summary ----
+Method to pass the typed answer to the question that is waiting for it.
+
+---- Inputs ----
+event : Any
+    The Tk key event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the answer into the terminal, clears and disables the answer box
+and wakes the question thread (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_pane_writer
+```
+
+##### `_closing_handler`
+
+```text
+---- Summary ----
+Method to close the window. While the program is still running the user is asked
+first, and a question that is waiting is ended so the program stops cleanly.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stops the threads and closes the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_display_names`
+
+```text
+---- Summary ----
+Method to give the names for the drop-down: the experiment files are marked as
+locked once the figures built from them are shown.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    One text per entry of the list.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_drain_runner`
+
+```text
+---- Summary ----
+Method that runs on the window thread every few milliseconds and carries out the
+messages the other threads have queued, joining consecutive text into one
+insert.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window and schedules itself again (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_event_handler
+_pane_writer
+```
+
+##### `_event_handler`
+
+```text
+---- Summary ----
+Method to carry out one message from the other threads, on the window thread.
+
+---- Inputs ----
+event : tuple
+    (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
+    'extra', 'image', 'closed' or 'finished'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_image_receiver
+_navigator
+_pane_writer
+_picture_shower
+```
+
+##### `_history_stepper`
+
+```text
+---- Summary ----
+Method to recall an earlier answer in the answer box with the up and down keys.
+
+---- Inputs ----
+step : int
+    -1 for the previous answer, +1 for the next one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the text of the answer box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_icon_setter`
+
+```text
+---- Summary ----
+Method to give the window (and so the taskbar or dock) the Portimao icon. A
+missing icon file or an unsupported system is ignored.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ICON_PATH (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the window icon (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_image_receiver`
+
+```text
+---- Summary ----
+Method to take a finished preview from the renderer and show it if it is the
+current file. Previews of older settings are dropped.
+
+---- Inputs ----
+version : int
+    Number of the request the preview was drawn for.
+name : str
+    File name.
+png : Optional[bytes]
+    Picture, or None when it could not be drawn.
+notes : str
+    Warnings, or the reason when there is no picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores the preview and may redraw the plot area (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_lock_drawer`
+
+```text
+---- Summary ----
+Method to draw a small padlock and "Locked" in the corner of the plot area, to
+show that this experiment plot is final and cannot be changed any more.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_logic_runner`
+
+```text
+---- Summary ----
+Method that runs the program in its own thread and reports when it is done.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets exit_code and queues the finished message (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_message_shower`
+
+```text
+---- Summary ----
+Method to replace the plot with a short message.
+
+---- Inputs ----
+text : str
+    Message to show.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Redraws the plot area (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_nav_state`
+
+```text
+---- Summary ----
+Method to switch the file selector and arrows on or off.
+
+---- Inputs ----
+enabled : bool
+    True to allow navigation.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widget states (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_navigator`
+
+```text
+---- Summary ----
+Method to make a file the current one and show it.
+
+---- Inputs ----
+index : int
+    Position of the file in the list.
+is_from_user : bool
+    True when the user chose it, so the answer box gets the keyboard back.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Updates the selector, the plot and the renderer's order (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_pane_writer`
+
+```text
+---- Summary ----
+Method to add text to the terminal, with its colours, overwriting the line when
+the text starts with a carriage return (progress messages).
+
+---- Inputs ----
+text : str
+    Text as printed.
+kind : str
+    'out' (normal), 'err' (error text) or 'answer' (what the user typed).
+
+---- Globals read ----
+ANSWER_COLOUR, ERROR_COLOUR (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds text to the terminal and scrolls it (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+ansi_splitter
+ansi_style_updater
+```
+
+##### `_picture_shower`
+
+```text
+---- Summary ----
+Method to show the picture of the current file, scaled to fit the plot area, or
+say why there is none yet.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Redraws the plot area and the status line (side effect).
+
+---- Equations ----
+scale = min(width / picture width, height / picture height), at most 1.5.
+
+---- Helpers ----
+_message_shower
+```
+
+##### `_resizer`
+
+```text
+---- Summary ----
+Method to redraw the picture at the new size once the window has stopped
+changing size.
+
+---- Inputs ----
+event : Any
+    The Tk configure event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Schedules a redraw (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_step_taker`
+
+```text
+---- Summary ----
+Method to move to the next or previous file, looping round at the ends.
+
+---- Inputs ----
+step : int
+    +1 for the next file, -1 for the previous one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the current file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_navigator
+```
+
+##### `_widgets_builder`
+
+```text
+---- Summary ----
+Method to build the terminal, the answer box, the plot and its file controls.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MONO_FONTS and the colour constants (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `extra_publisher`
+
+```text
+---- Summary ----
+Method to show one more picture, such as the components found by the principal
+component analysis, in the selector after the files. The files stay as they
+were, and the picture goes when the next preview is drawn.
+
+---- Inputs ----
+title : str
+    Name shown in the selector.
+png : bytes
+    The picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the picture for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `figure_shower`
+
+```text
+---- Summary ----
+Method that is never needed: the window draws its own previews from the
+settings (spec_publisher).
+
+---- Inputs ----
+figure : Any
+    A drawn figure (ignored).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `file_focuser`
+
+```text
+---- Summary ----
+Method to show the file a question is about. It is called from the question
+thread.
+
+---- Inputs ----
+name : str
+    Name of the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_image_deliverer`
+
+```text
+---- Summary ----
+Method to queue a finished preview from the preview thread for the window.
+
+---- Inputs ----
+version : int
+    Number of the request it was drawn for.
+name : str
+    File name.
+png : Optional[bytes]
+    Picture, or None when it could not be drawn.
+notes : str
+    Warnings, or the reason when there is no picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the preview (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `input_reader`
+
+```text
+---- Summary ----
+Method that replaces the built-in input while the window is open: it shows the
+prompt in the terminal and waits for the answer typed in the answer box. Other
+threads still use the real input.
+
+---- Inputs ----
+prompt : Any
+    The prompt text, for example "   > ".
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The typed answer. Raises EOFError when the window is closed.
+
+---- Globals mutated ----
+None. Waits for the user (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `output_capturer`
+
+```text
+---- Summary ----
+Method to capture what the current thread prints (the preview thread), without
+touching the terminal or the log file.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The buffer the output is collected in.
+
+---- Globals mutated ----
+None. Captures the output of the current thread (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+output_capturer
+```
+
+##### `pictures_publisher`
+
+```text
+---- Summary ----
+Method to show finished pictures (the multi-experiment figures) instead of the
+files: the selector then lists the pictures by title.
+
+---- Inputs ----
+pictures : List[Tuple[str, bytes]]
+    [(title, PNG bytes)] in the order they are listed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the pictures for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `run`
+
+```text
+---- Summary ----
+Method to run the program in the window: take over the output streams and the
+input, start the program thread, and run the window until it is closed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    The exit code of the program (1 when the window was closed before it
+    finished).
+
+---- Globals mutated ----
+None. Replaces sys.stdout, sys.stderr and the built-in input while the window
+runs, and restores them afterwards (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_drain_runner
+_logic_runner
+```
+
+##### `session_attacher`
+
+```text
+---- Summary ----
+Method to give the window the files of the browser session, which fills the
+file selector and starts the preview thread.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the session for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `spec_publisher`
+
+```text
+---- Summary ----
+Method to give the window new settings: every file is drawn again with them.
+
+---- Inputs ----
+spec : PreviewSpec
+    The settings to draw with.
+name : Optional[str]
+    File to show first, or None to stay on the current file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the settings for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `text_sender`
+
+```text
+---- Summary ----
+Method to queue text from the program thread for the terminal.
+
+---- Inputs ----
+text : str
+    Text as printed.
+kind : str
+    'out' or 'err'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the text (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `window_closer`
+
+```text
+---- Summary ----
+Method to end the previews when the browser steps are over: the preview thread
+is stopped (so it cannot clash with the processing that follows) and the file
+controls are switched off. The last picture stays on show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stops the preview thread and queues the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `active_gui_getter`
+
+```text
+---- Summary ----
+Main function to give the browser window that is open, if any.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+_active_gui (module state).
+
+---- Outputs ----
+Optional[ViewerGui]
+    The open window, or None when the program runs in the terminal.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `gui_runner`
+
+```text
+---- Summary ----
+Main function to run the whole program inside the browser window. It returns None
+without running anything when the window cannot be opened, so the caller can run
+the program in the terminal instead.
+
+---- Inputs ----
+program : Callable[[], int]
+    The program; it asks the questions and returns its exit code.
+title : str
+    Window title.
+
+---- Globals read ----
+os.environ["PORTIMAO_NO_GUI"] (set to anything to keep the terminal).
+
+---- Outputs ----
+Optional[int]
+    The exit code of the program, or None when the window could not be opened.
+
+---- Globals mutated ----
+None. Opens the window and runs the program (side effects); prints why the window
+could not open when it could not.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+ViewerGui
+```
+
+## `utils_viewer/viewer_multi.py`
+
+Previews of the multi-experiment figures while their questions are answered.
+
+### MULTI-FIGURE HELPERS
+
+#### `_kept_builder`
+
+```text
+---- Summary ----
+Helper function to read and process the files a multi-experiment figure needs, the
+way the real run does (without plotting or exporting them).
+
+---- Inputs ----
+names : List[str]
+    Names of the files the figure uses.
+customs : Dict[str, dict]
+    {file name: {'time_response_group', 'haem_ocr'}} for the summary figures.
+answers : dict
+    Answers so far, ready to build the figure style from.
+fit : Optional[dict]
+    Fit dictionary, or None.
+context : dict
+    {summaries, limits, details, export_root} of the run so far. The processed
+    files are kept in it (key '_processed') while one figure is being built.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {experiment, vo2_source, haem_source, prepared}}, as the run keeps
+    them for the special figures.
+
+---- Globals mutated ----
+None. Reads the files and prints what the processing says (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+preview_info_builder
+experiment_data_processor
+experiment_preparer
+```
+
+#### `_pictures_builder`
+
+```text
+---- Summary ----
+Helper function to make one multi-experiment figure the way the run will, but hand
+the finished figure over as a picture instead of saving files.
+
+---- Inputs ----
+kind : str
+    'comparison', 'exemplar', 'time_response' or 'haem_ocr'.
+payload : dict
+    What the questions decided: {'comparison': ...}, {'exemplar_names': ...} or
+    {'fit': ..., 'custom': {...}} (see the figure_checker of the askers).
+context : dict
+    {answers, fit, summaries, limits, details, export_root} of the run so far.
+makers : Dict[str, Callable]
+    {'comparison': comparison_maker, 'special': special_figures_maker} of main.py.
+window : Any
+    The browser window (or the picture fallback), which captures the printed text.
+
+---- Globals read ----
+PREVIEW_DPI, WARNING_WORDS (module constants).
+
+---- Outputs ----
+Tuple[List[Tuple[str, bytes]], str]
+    ([(title, PNG bytes)], notes). The notes are the lines saying why a figure was
+    not made, and may be empty.
+
+---- Globals mutated ----
+None. Reads the files, switches figure saving to preview mode while it runs and
+puts it back (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_kept_builder
+figure_capture_setter
+```
+
+### MAIN FUNCTIONS
+
+#### `multi_figure_checker_builder`
+
+```text
+---- Summary ----
+Main function to build the figure checker the multi-experiment questions call after
+each figure: it draws the figure from the data, shows it in the browser window and
+asks whether to accept it.
+
+---- Inputs ----
+context : dict
+    {answers, fit, summaries, limits, details, export_root} of the run so far. The
+    dictionary is read each time, so later changes to it are seen.
+makers : Dict[str, Callable]
+    {'comparison': comparison_maker, 'special': special_figures_maker} of main.py.
+
+---- Globals read ----
+PREVIEW_FILE (imported constant).
+
+---- Outputs ----
+Callable[[str, dict], bool]
+    Function (kind, payload) that returns True when the figure is accepted, or when
+    it could not be previewed (the questions then carry on). A payload with
+    'question' and 'change' is a step of a figure being built, which is asked with
+    that wording; without them it is the finished figure.
+
+---- Globals mutated ----
+None. The checker reads the files and prints to the terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_pictures_builder
+choice_asker
+info_printer
+```
+
+## `utils_viewer/viewer_preview.py`
+
+Processing and drawing of one experiment as a preview figure.
+
+### CLASSES
+
+#### `PreviewSpec`
+
+```text
+---- Summary ----
+The settings a preview is drawn with: the answers given so far. Every file is drawn
+with the same spec, so the files can be compared.
+Detailed structure can be found in DATA_FORMAT.md.
+```
+
+#### `ViewerSession`
+
+```text
+---- Summary ----
+Everything the experiment browser keeps between steps: the files, the window and the
+recently read experiments.
+Detailed structure can be found in DATA_FORMAT.md.
+```
+
+### PREVIEW HELPERS
+
+#### `_loaded_experiment_getter`
+
+```text
+---- Summary ----
+Helper function to give a fresh copy of an experiment read from its file. The file
+is read once and kept for the next previews (the last few files only), and read
+again when the spectra of a dataset are needed that were not read before.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session holding the cache.
+summary : dict
+    File summary (DATA_FORMAT.md).
+dataset : Optional[str]
+    Spectral dataset needed for the haem decomposition, or None for no spectra.
+
+---- Globals read ----
+MAX_CACHED_FILES (module constant).
+
+---- Outputs ----
+dict
+    A deep copy of the experiment dictionary, safe to trim and process in place.
+
+---- Globals mutated ----
+None. Updates the cache of the session (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_paf_loader
+```
+
+#### `_overlay_drawer`
+
+```text
+---- Summary ----
+Helper function to shade regions of the time axis on every panel of the preview.
+
+---- Inputs ----
+fig : Figure
+    The preview figure.
+axes : list
+    Panels of the preview, top to bottom.
+regions : list
+    [(start_min, end_min, kind)] with kind 'trim' (grey hatched) or 'ignore'
+    (amber).
+note : str
+    Short explanation of the shading, written in the corner of the figure; may be
+    empty.
+
+---- Globals read ----
+IGNORE_COLOUR, TRIM_COLOUR (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds shaded regions and the note to the figure (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `preview_info_builder`
+
+```text
+---- Summary ----
+Helper function to build the per-file information dictionary that
+experiment_data_processor needs, from the answers given so far.
+
+---- Inputs ----
+summary : dict
+    File summary (DATA_FORMAT.md).
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes; may
+    lack the file.
+details : dict
+    {file name: {OD, volume, dilution_factor, events}}; may lack the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    Per-file information (as built in everything_asker).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `pca_picture_builder`
+
+```text
+---- Summary ----
+Main function to draw the components of the principal component analysis as a
+picture for the plot window, in the default journal style like the other previews.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+result : dict
+    Result of component_builder (the chosen components).
+names : List[str]
+    Name of each component.
+
+---- Globals read ----
+settings.EXTRA_COLOURS; PREVIEW_DPI, BROWSING_ANSWERS (module constants).
+
+---- Outputs ----
+bytes
+    The picture (PNG).
+
+---- Globals mutated ----
+None. Sets the matplotlib rcParams of the figure style (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+pca_figure_builder
+```
+
+#### `pca_spectra_gatherer`
+
+```text
+---- Summary ----
+Main function to collect, from every file, the spectra the principal component
+analysis uses: the part kept after trimming, without the ignored start and end,
+cut to the spectral window.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache).
+dataset : str
+    Spectral dataset holding the haem spectra.
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+window : Tuple[float, float]
+    (start, end) wavelength to keep, in nm. A little outside it is kept as well so
+    the analysis can put every file on one grid.
+progress : Optional[Any]
+    Function called with (number read, number of files); may be None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[List[dict], List[str]]
+    ([{'name', 'wavelengths', 'spectra'}], problems). A file that cannot be read or
+    has no spectra left is left out and named in the problems.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+Spectra kept where ignore_start <= t <= duration - ignore_end after trimming.
+
+---- Helpers ----
+_loaded_experiment_getter
+experiment_attenuation_adder
+experiment_trimmer
+preview_info_builder
+```
+
+#### `preview_drawer`
+
+```text
+---- Summary ----
+Main function to show the answers given so far in the window. A window with its own
+controls (the experiment browser window) is given the settings and draws every file
+the user looks at with them; otherwise the current file is drawn and saved as a
+picture. Problems are reported, never raised, so the questions carry on.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache, current file).
+answers : dict
+    Answers so far; missing keys come from config.DEFAULT_ANSWERS.
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+fit : Optional[dict]
+    Fit dictionary from fit_importer, or None.
+details : dict
+    {file name: {OD, volume, dilution_factor, events}}.
+show_trim : bool
+    True to draw the whole recording and shade the part that would be trimmed, so
+    the trim limits can be judged. False draws the trimmed data.
+show_ignored : bool
+    True to shade the ignored start and end in amber.
+name : Optional[str]
+    File to show; None keeps the file being looked at.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the preview was drawn (or handed to the window), False when it could
+    not be.
+
+---- Globals mutated ----
+None. Draws in the window or writes the preview picture (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+preview_figure_builder
+```
+
+#### `preview_figure_builder`
+
+```text
+---- Summary ----
+Main function to process one file with the answers of a spec and draw it in a new
+figure. Problems are reported, never raised.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache).
+spec : PreviewSpec
+    The settings to draw with.
+name : str
+    Name of the file to draw.
+
+---- Globals read ----
+settings.Config; PREVIEW_DPI (module constant).
+
+---- Outputs ----
+Tuple[Optional[Figure], str]
+    (figure, notes). The figure is None when the preview could not be drawn, and
+    the notes then say why. Otherwise the notes are the warnings of the processing
+    (a skipped step, a missing OD), one per line, and may be empty. A line starting
+    with KEY_PREFIX explains the shading and belongs by the controls.
+
+---- Globals mutated ----
+None. Sets the matplotlib rcParams of the figure style (side effect). Nothing is
+printed; the caller decides where the notes go.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+preview_info_builder
+_loaded_experiment_getter
+_overlay_drawer
+```
+
+#### `skipped_windows_finder`
+
+```text
+---- Summary ----
+Main function to find, for every file, the averaging windows that do not fit
+between the additions (or after the last one) with the current window and gap.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache).
+answers : dict
+    Answers so far, with averaging turned on and the window and gap chosen.
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}}.
+details : dict
+    {file name: {OD, volume, dilution_factor, events}}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Dict[str, dict]]
+    {file name: {window name: {start_time, end_time, reason}}}; files with nothing
+    skipped are left out. A file that cannot be read is left out as well.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_loaded_experiment_getter
+preview_info_builder
+```
+
+## `utils_viewer/viewer_renderer.py`
+
+The background thread of the experiment browser window that draws the previews.
+
+### CLASSES
+
+#### `PreviewRenderer`
+
+```text
+---- Summary ----
+Thread that draws the preview of every file with the latest settings, the file being
+looked at first and then its neighbours, so the files can be flicked through while a
+question waits. A newer request makes it drop the work for the older one.
+
+---- Attributes ----
+None public.
+
+---- Globals read ----
+PREVIEW_DPI (imported constant).
+
+---- Methods ----
+__init__
+_next_picker
+_picture_maker
+request_setter
+run
+stopper
+wanted_setter
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to set up the thread (it is started by the caller).
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, cache).
+deliver : Callable[[int, str, Optional[bytes], str], None]
+    Function called with (version, file name, PNG bytes or None, notes) for each
+    finished preview. It is called from this thread.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_next_picker`
+
+```text
+---- Summary ----
+Method to pick the file to draw next: the nearest one to the file being looked
+at that has not been drawn with the current settings. The caller holds the lock.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    File name, or None when every file is drawn.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_picture_maker`
+
+```text
+---- Summary ----
+Method to draw one file and turn the figure into a PNG picture.
+
+---- Inputs ----
+spec : PreviewSpec
+    The settings to draw with.
+name : str
+    Name of the file.
+
+---- Globals read ----
+PREVIEW_DPI (imported constant).
+
+---- Outputs ----
+Tuple[Optional[bytes], str]
+    (PNG bytes, notes); the bytes are None when the preview could not be drawn
+    and the notes then say why.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+preview_figure_builder
+```
+
+##### `request_setter`
+
+```text
+---- Summary ----
+Method to ask for every file to be drawn again with new settings.
+
+---- Inputs ----
+spec : PreviewSpec
+    The new settings.
+version : int
+    Number of this request; results carry it so old ones can be dropped.
+wanted : int
+    Index of the file being looked at, which is drawn first.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces the work of the thread (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `run`
+
+```text
+---- Summary ----
+Method that draws previews until stopped. The name is fixed by the thread
+protocol.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Passes each finished preview to the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_next_picker
+_picture_maker
+```
+
+##### `stopper`
+
+```text
+---- Summary ----
+Method to stop the thread and wait until it has finished its current preview.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stops the thread (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `wanted_setter`
+
+```text
+---- Summary ----
+Method to say which file is being looked at, so it is drawn next.
+
+---- Inputs ----
+wanted : int
+    Index of the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the order of the work (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `utils_viewer/viewer_stages.py`
+
+The steps of the experiment browser: ask, redraw the plot window, then accept or repeat.
+
+### STAGE HELPERS
+
+#### `_answers_previewer`
+
+```text
+---- Summary ----
+Helper function to build the answers used to draw a preview: the raw data while
+browsing and trimming, and the analysis chosen so far afterwards.
+
+---- Inputs ----
+answers : dict
+    Answers given so far.
+fit : Optional[dict]
+    Fit dictionary, used to list the haems to show.
+kind : str
+    'raw' (O2 and the raw OCR only), 'analysis' (also the haems, still without OD
+    scaling), 'plots' (the choices made so far for the individual figures, in a
+    wide preview) or 'final' (exactly as the figure will be).
+
+---- Globals read ----
+BROWSING_ANSWERS (module constant).
+
+---- Outputs ----
+dict
+    A copy of the answers with the preview settings; ``answers`` is not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_component_namer`
+
+```text
+---- Summary ----
+Helper function to ask whether to name the components found (they are called PC1,
+PC2, ... otherwise) and, if so, what each is called.
+
+---- Inputs ----
+result : dict
+    Result of component_builder.
+depth : int
+    Numbering depth of the questions.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    The name of each component, all different.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+text_asker
+yes_no_asker
+```
+
+#### `_empty_limits_builder`
+
+```text
+---- Summary ----
+Helper function to build limits that trim and ignore nothing, for drawing the data
+before any question is answered.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} with None for the
+    trims and 0.0 for the ignores.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_file_chooser`
+
+```text
+---- Summary ----
+Helper function to ask which file to look at and make it the current one.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its current file is changed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets session.current and reads from and prints to the terminal (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+```
+
+#### `_fit_file_saver`
+
+```text
+---- Summary ----
+Helper function to ask whether to keep the components found as a fit file in the
+fits folder, so they can be chosen like any other fit in later runs, and to save
+them.
+
+---- Inputs ----
+fit : dict
+    Fit dictionary from fit_table_builder.
+fits_folder : Path
+    Folder holding the fit .csv files.
+count : int
+    Number of components (used in the suggested file name).
+window : Tuple[float, float]
+    Spectral window used (nm), also used in the suggested file name.
+depth : int
+    Numbering depth of the questions.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    Name of the file saved, or None when nothing was saved.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and writes the fit file (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+fit_saver
+info_printer
+text_asker
+yes_no_asker
+```
+
+#### `_limits_lister`
+
+```text
+---- Summary ----
+Helper function to print the trim and ignore limits of every file in one list.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+limits : Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+```
+
+#### `_od_lister`
+
+```text
+---- Summary ----
+Helper function to print the OD values entered for every file in one list, so they
+can be checked.
+
+---- Inputs ----
+details : Dict[str, dict]
+    {file name: {OD, volume, dilution_factor, ...}} as od_scaling_asker returns it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+```
+
+#### `_pca_table_lister`
+
+```text
+---- Summary ----
+Helper function to print how much of the changes in the spectra each principal
+component explains, and what is left over if only the first few are used, so the
+number of components can be chosen.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+suggestion : int
+    Number of components suggested.
+depth : int
+    Numbering depth of the lines.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+Residual RMS = sqrt((total variance - variance of the first k components) / number
+of values).
+
+---- Helpers ----
+info_printer
+```
+
+#### `_review_asker`
+
+```text
+---- Summary ----
+Helper function to ask whether the user accepts what the plot window shows. In the
+browser window the user flicks through the files while the question waits; with the
+picture fallback the user can ask to look at another file, which redraws it.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its current file may be changed.
+question : str
+    The accept question, for example 'Do you accept these limits?'.
+change_label : str
+    Label of the answer that asks the questions of the step again.
+redraw : Callable[[], bool]
+    Function that draws the preview of the current file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when accepted, False when the user wants to answer the step again.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and redraws the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_chooser
+choice_asker
+```
+
+#### `_skipped_lister`
+
+```text
+---- Summary ----
+Helper function to tell the user, in red, which averaging windows were skipped in
+which files because there is not enough time for them, so they can be checked before
+the averaging is accepted. Prints nothing when every window fits.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers so far, with the averaging window and gap.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file.
+
+---- Globals read ----
+WARNING_COLOUR (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reads the files and prints to the terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+skipped_windows_finder
+text_colourer
+```
+
+### MAIN FUNCTIONS
+
+#### `analysis_stage_runner`
+
+```text
+---- Summary ----
+Main function to ask the analysis questions (haem decomposition, OD values, event
+averaging and event labels) one at a time. The plot is redrawn after each, except
+the OD values, which are only checked: the data is scaled by OD in the individual
+plots.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file (trim_asker).
+fits_folder : Path
+    Folder holding the fit .csv files.
+details_before : Optional[Dict[str, dict]]
+    OD values and events from an earlier pass, offered as defaults when the step is
+    asked again.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[Optional[dict], Dict[str, dict]]
+    (fit, details) exactly as analysis_asker returns them.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_od_lister
+_review_asker
+_skipped_lister
+averaging_asker
+decomposition_asker
+event_asker
+od_scaling_asker
+pca_stage_runner
+preview_drawer
+saved_values_reader
+```
+
+#### `browser_stage_runner`
+
+```text
+---- Summary ----
+Main function to show the files in the plot window (the set and measured O2 and the
+OCR, with the events) before any question is asked about them. In the browser window
+the user can look through them while answering, so the questions carry straight on;
+with the picture fallback a small menu steps through the files.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its current file is changed.
+answers : dict
+    Answers so far, used for the figure style of the preview.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and draws the plot window (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_file_chooser
+choice_asker
+info_printer
+preview_drawer
+```
+
+#### `pca_stage_runner`
+
+```text
+---- Summary ----
+Main function to find the components of the haem spectra from the data itself with
+a principal component analysis, instead of using a fit file. The user chooses the
+spectral window and the number of components, sees the components in the plot
+window, and can save them as a fit file in the fits folder.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary; the window is stored in it (pca_start, pca_end,
+    pca_rotate).
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file (trim_asker).
+fits_folder : Path
+    Folder holding the fit .csv files.
+dataset : str
+    Spectral dataset holding the haem spectra.
+depth : int
+    Numbering depth of the questions.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[Optional[str], Optional[dict]]
+    (fit file name, fit dictionary as fit_importer gives). (None, None) when the
+    user prefers to choose a fit file instead. The name is a description when the
+    fit was not saved.
+
+---- Globals mutated ----
+None. Reads the files, reads from and prints to the terminal, draws the plot window
+and may write a fit file (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_component_namer
+_fit_file_saver
+_pca_table_lister
+component_builder
+component_count_suggester
+component_finder
+fit_table_builder
+number_asker
+pca_picture_builder
+pca_spectra_gatherer
+yes_no_asker
+```
+
+#### `plots_stage_runner`
+
+```text
+---- Summary ----
+Main function to ask how the figure saved for each file looks, one choice at a
+time: the oxygen and OCR, the haems and their order, how the haems are shown (and
+whether they are scaled by OD), the event labels and finally the journal and size.
+The plot is redrawn after each choice and the user accepts it or chooses again.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+fit : Optional[dict]
+    Fit dictionary, or None.
+details : Dict[str, dict]
+    OD values and events of every file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when at least one panel is plotted.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_review_asker
+haem_choice_asker
+haem_form_asker
+haem_scaling_asker
+label_angle_asker
+preview_drawer
+signal_asker
+size_asker
+```
+
+#### `trim_stage_runner`
+
+```text
+---- Summary ----
+Main function to ask the trim and ignore questions, adding the shaded trimmed and
+ignored parts to the plot window after every answer, and ask whether to accept them.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers so far, used for the figure style of the preview.
+remembered : Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} offered as the
+    defaults (from the last run, or from the previous attempt).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    The limits of every file, exactly as trim_asker returns them.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and draws the plot window (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_empty_limits_builder
+_limits_lister
+_review_asker
+preview_drawer
+trim_asker
+```
+
+#### `viewer_asker`
+
+```text
+---- Summary ----
+Main function to ask the questions of the experiment browser: the file browser,
+trimming and ignoring, the analysis and the individual figures. The plot window is
+redrawn after each answer, and at the end any step can be gone back to.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers offered by the questions.
+remembered : Dict[str, dict]
+    {file name: limits} from the last run.
+fits_folder : Path
+    Folder holding the fit .csv files.
+export_root : Path
+    Results folder.
+
+---- Globals read ----
+PREVIEW_FILE, STAGE_TITLES (module constants).
+
+---- Outputs ----
+Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
+    (limits, fit, details, plotted) as the same questions return them when they are
+    asked without the browser.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers``, reads from and prints to the terminal,
+draws and closes the plot window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+analysis_stage_runner
+browser_stage_runner
+choice_asker
+file_focus_setter
+heading_printer
+numbering_getter
+numbering_setter
+plots_stage_runner
+section_starter
+trim_stage_runner
+```
+
+## `utils_viewer/viewer_terminal.py`
+
+Pieces of the text terminal in the experiment browser window: colour codes and the
+
+### CLASSES
+
+#### `OutputRouter`
+
+```text
+---- Summary ----
+File-like object that replaces sys.stdout and sys.stderr while the browser window
+is open. What the program's own thread prints goes to the terminal in the window;
+what other threads print goes to the real stream; and a thread that is capturing its
+output (output_capturer) keeps it to itself.
+
+---- Attributes ----
+encoding : str
+    Always "utf-8".
+
+---- Globals read ----
+None.
+
+---- Methods ----
+__init__
+__getattr__
+fileno
+flush
+isatty
+reconfigure
+write
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to store where the text goes.
+
+---- Inputs ----
+original : Any
+    The stream that was replaced; used for other threads and after the window is
+    closed.
+sender : Callable[[str, str], None]
+    Function that passes (text, kind) to the window.
+kind : str
+    'out' for standard output or 'err' for standard error.
+owner : Callable[[], Optional[threading.Thread]]
+    Function that gives the thread whose output belongs in the window (None
+    once the window is closed).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `__getattr__`
+
+```text
+---- Summary ----
+Method to pass any other attribute lookup to the stream that was replaced.
+
+---- Inputs ----
+name : str
+    Attribute name that was not found on the instance.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Any
+    The attribute of the original stream.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `fileno`
+
+```text
+---- Summary ----
+Method that says there is no file descriptor, so libraries that ask for one fall
+back to plain writes. The name is fixed by the file-like protocol.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    Never returns; raises io.UnsupportedOperation.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `flush`
+
+```text
+---- Summary ----
+Method that does nothing: text is passed on as soon as it is written. The name
+is fixed by the file-like protocol.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `isatty`
+
+```text
+---- Summary ----
+Method to say that the stream shows colour, because the terminal in the window
+does. The name is fixed by the file-like protocol.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    Always True.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `reconfigure`
+
+```text
+---- Summary ----
+Method that accepts and ignores new stream settings, because the window shows
+every symbol.
+
+---- Inputs ----
+**kwargs : Any
+    Stream settings (ignored).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `write`
+
+```text
+---- Summary ----
+Method to send text where it belongs: the capture of the thread, the window, or
+the real stream. The name is fixed by the file-like protocol.
+
+---- Inputs ----
+text : str
+    Text to write.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    Number of characters written.
+
+---- Globals mutated ----
+None. Passes text to the window or the real stream (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### TERMINAL HELPERS
+
+#### `ansi_colour_getter`
+
+```text
+---- Summary ----
+Main function to give the colour of an entry of the 256-colour terminal palette.
+
+---- Inputs ----
+index : int
+    Palette number, 0 to 255 (0-15 basic, 16-231 colour cube, 232-255 greys).
+
+---- Globals read ----
+BASIC_COLOURS (module constant).
+
+---- Outputs ----
+str
+    The colour as "#rrggbb".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Cube colours: each of red, green and blue is 0 for level 0 and 55 + 40 * level
+for levels 1 to 5, where index - 16 = 36 * red level + 6 * green level + blue
+level. Greys: 8 + 10 * (index - 232).
+
+---- Helpers ----
+None.
+```
+
+#### `ansi_splitter`
+
+```text
+---- Summary ----
+Main function to cut printed text into plain text, colour codes and carriage
+returns, in order, so a text window can colour the text and overwrite progress
+lines.
+
+---- Inputs ----
+text : str
+    Text as printed, possibly with colour codes (ESC[...m) and carriage returns.
+
+---- Globals read ----
+_CODE_PATTERN (module constant).
+
+---- Outputs ----
+List[Tuple[str, str]]
+    [(kind, value)] with kind 'text' (the characters), 'code' (the numbers of a
+    colour code, for example "1;33") or 'return' (value empty). A carriage return
+    directly before a new line is part of the line ending and is dropped.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `ansi_style_updater`
+
+```text
+---- Summary ----
+Main function to apply one colour code to the current text style.
+
+---- Inputs ----
+style : Dict[str, Any]
+    {fg, bold, italic}: colour as "#rrggbb" or None for the default, and two flags.
+code : str
+    Numbers of the colour code, separated by semicolons ("" means reset).
+
+---- Globals read ----
+BASIC_COLOURS (module constant).
+
+---- Outputs ----
+Dict[str, Any]
+    The new style; ``style`` is not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+ansi_colour_getter
+```
+
+## `utils_viewer/viewer_window.py`
+
+The fallback preview of the experiment browser: one picture file that is rewritten after
+
+### CLASSES
+
+#### `PictureWindow`
+
+```text
+---- Summary ----
+The stand-in for the browser window when no window can be opened (no display, or no
+Tkinter). Each preview is saved as a picture file, which is opened in the default
+picture viewer the first time. It has the same methods as ViewerGui so the questions
+do not need to know which one they are using.
+
+---- Attributes ----
+preview_path : Path
+    Picture file the previews are saved to.
+is_interactive : bool
+    Always False: the picture cannot be navigated, only rewritten.
+
+---- Globals read ----
+PREVIEW_DPI (module constant).
+
+---- Methods ----
+__init__
+_file_opener
+extra_publisher
+figure_shower
+file_focuser
+output_capturer
+pictures_publisher
+session_attacher
+window_closer
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to set up the stand-in without writing anything yet.
+
+---- Inputs ----
+preview_path : Path
+    Picture file the previews are saved to.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_file_opener`
+
+```text
+---- Summary ----
+Method to open the preview picture in the default picture viewer (once).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Starts the picture viewer; a failure to start it is ignored (side
+effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `extra_publisher`
+
+```text
+---- Summary ----
+Method to show one more picture (such as the components found by the principal
+component analysis): it is saved as a picture file and opened.
+
+---- Inputs ----
+title : str
+    Name of the picture.
+png : bytes
+    The picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the picture file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+pictures_publisher
+```
+
+##### `figure_shower`
+
+```text
+---- Summary ----
+Method to save the preview figure to the picture file and tell the user where it
+is.
+
+---- Inputs ----
+figure : Figure
+    The drawn preview.
+
+---- Globals read ----
+PREVIEW_DPI (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the picture file and prints its path (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_opener
+```
+
+##### `file_focuser`
+
+```text
+---- Summary ----
+Method that does nothing: a picture file has no file selector.
+
+---- Inputs ----
+name : str
+    Name of the file being asked about.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `output_capturer`
+
+```text
+---- Summary ----
+Method to capture what the processing of a preview prints, so it does not
+clutter the questions.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The buffer the output is collected in.
+
+---- Globals mutated ----
+None. Replaces sys.stdout while the block runs (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `pictures_publisher`
+
+```text
+---- Summary ----
+Method to save finished pictures (the multi-experiment figures), one file each,
+tell the user where they are and open the first one.
+
+---- Inputs ----
+pictures : List[Tuple[str, bytes]]
+    [(title, PNG bytes)].
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the picture files and prints their paths (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_opener
+```
+
+##### `session_attacher`
+
+```text
+---- Summary ----
+Method that does nothing: the picture needs no list of files.
+
+---- Inputs ----
+session : Any
+    The browser session.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `window_closer`
+
+```text
+---- Summary ----
+Method that does nothing: the picture file stays where it is.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.

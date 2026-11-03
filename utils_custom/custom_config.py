@@ -210,7 +210,8 @@ def ocr_and_haem_response_config_builder(cfg: Config,
     cfg : Config
         Figure style derived from the answers (config.py).
     answers : dict
-        Terminal answers; uses ho_haems, ho_metric, ho_pub_columns and ho_pub_height.
+        Terminal answers; uses ho_haems, ho_metric, ho_pub_columns and ho_pub_height,
+        and ho_blocks (the blocks drawn so far while the figure is being built).
     haem_names : list
         Haem names of the fit, in fit order.
 
@@ -246,9 +247,11 @@ def ocr_and_haem_response_config_builder(cfg: Config,
              'FILE_NAME': 'ocr_and_haem_response',
              'ORDER_COLUMNS': ORDER_COLUMNS,
              'STRAIN_ROWS': STRAIN_ROWS,
-             'BLOCK_ORDER': ('baseline', 'ocr_response', 'haem_response'),
+             'BLOCK_ORDER': tuple(answers.get('ho_blocks')
+                                  or ('baseline', 'ocr_response', 'haem_response')
+                                  ),
              'HAEM_RESPONSE_ROWS': rows,
-             'HAEM_RESPONSE_SHOW': list(answers['ho_haems']),
+             'HAEM_RESPONSE_SHOW': list(answers['ho_haems'] or []),
              'HAEM_RESPONSE_METRIC': answers['ho_metric'],
              'OCR_VO2_COLUMN': None,
              'GROUP_STYLES': GROUP_STYLES,
@@ -374,7 +377,8 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
         Figure style derived from the answers (config.py).
     answers : dict
         Terminal answers; uses tr_groups, tr_examples, tr_decompositions,
-        tr_skip_hours, tr_columns and tr_height.
+        tr_skip_hours, tr_columns and tr_height. An example that is None has not been
+        chosen yet (the figure is being built) and is drawn as an empty box.
     haem_names : list
         Haem names of the fit, used to colour the decomposition panels.
 
@@ -411,10 +415,11 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
             'TIME_LABEL_FORMAT': '{hours:g} hours',
             # The two kinetic traces, the three decomposition plots and the hours the
             # waterfalls leave out.
-            'EXAMPLES': tuple((group, hours) for group, hours in answers['tr_examples']
+            'EXAMPLES': tuple(None if pair is None else tuple(pair)
+                              for pair in answers['tr_examples']
                               ),
-            'DECOMPOSITION_EXAMPLES': tuple((group, hours) for group, hours
-                                            in answers['tr_decompositions']
+            'DECOMPOSITION_EXAMPLES': tuple(None if pair is None else tuple(pair)
+                                            for pair in answers['tr_decompositions']
                                             ),
             'SKIP_HOURS': tuple(answers['tr_skip_hours']),
             'EXAMPLE_TITLE_FORMAT': '{group}, {time}',

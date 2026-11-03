@@ -5,10 +5,14 @@ Small, generic utilities shared by several modules.
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import re
 from pathlib import Path
-from typing import Any, List, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 from matplotlib.figure import Figure
+
+
+# ---- CONSTANTS -----------------------------------------------------------------------
+_figure_capture: Optional[Callable[[Figure, str], None]] = None
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -94,6 +98,40 @@ def excel_sheet_namer(name: Any, used: set) -> str:
     return candidate
 
 
+# ---- figure_capture_setter -----------------------------------------------------------
+def figure_capture_setter(capture: Optional[Callable[[Figure, str], None]]) -> None:
+    """
+    ---- Summary ----
+    Main function to switch figure saving to preview mode (or back). While a capture
+    function is set, figure_saver hands each figure to it and writes no file, so the
+    experiment browser can show a figure before it is made for real.
+
+    ---- Inputs ----
+    capture : Optional[Callable[[Figure, str], None]]
+        Function called with (figure, file name stem) instead of saving, or None for
+        normal saving.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    Sets _figure_capture (module state).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    global _figure_capture
+    _figure_capture = capture
+
+
 # ---- figure_saver --------------------------------------------------------------------
 def figure_saver(fig: Figure,
                  folder: Path,
@@ -126,14 +164,15 @@ def figure_saver(fig: Figure,
         True to crop the canvas around the artists (bbox_inches="tight").
 
     ---- Globals read ----
-    None.
+    _figure_capture (module state).
 
     ---- Outputs ----
     List[Path]
-        Paths of the saved files, in the order of ``formats``.
+        Paths of the saved files, in the order of ``formats``; empty in preview mode.
 
     ---- Globals mutated ----
-    None. Resizes the figure to ``size`` and writes the files (side effects).
+    None. Resizes the figure to ``size`` and writes the files, or in preview mode only
+    hands the figure to the capture function (side effects).
 
     ---- Equations ----
     None.
@@ -146,6 +185,9 @@ def figure_saver(fig: Figure,
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     fig.set_size_inches(*size, forward=False)
+    if _figure_capture is not None:  # preview mode: show the figure, write nothing
+        _figure_capture(fig, stem)
+        return []
 
     # ---- 2 Save every format ---------------------------------------------------------
     paths = []
@@ -222,3 +264,45 @@ def name_simplifier(value: Any) -> str:
     """
 
     return re.sub(r'[^a-z0-9]', '', str(value).lower())
+
+
+# ---- program_title_builder -----------------------------------------------------------
+def program_title_builder(root: Path, version: str) -> str:
+    """
+    ---- Summary ----
+    Main function to build the name shown at the top of the terminal, in the window
+    title and in the log: the program name, the git branch it was installed from (when
+    the folder is a git clone) and the version.
+
+    ---- Inputs ----
+    root : Path
+        Program folder.
+    version : str
+        Version text from the VERSION file.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        For example "Portimao dev V2.7"; without a branch (a folder from a zip file)
+        "Portimao V2.7".
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    branch = ''
+    try:
+        head = (root / '.git' / 'HEAD').read_text(encoding='utf-8').strip()
+        if head.startswith('ref:'):
+            branch = head.rsplit('/', 1)[-1]
+    except OSError:
+        pass
+    return ' '.join(part for part in ('Portimao', branch, f'V{version}') if part)

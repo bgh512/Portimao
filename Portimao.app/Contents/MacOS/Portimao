@@ -1,0 +1,12 @@
+#!/bin/bash
+# Starts Portimao from this folder without opening Terminal.
+DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$DIR" || exit 1
+for PY in /Library/Frameworks/Python.framework/Versions/Current/bin/python3 /opt/homebrew/bin/python3 /usr/local/bin/python3 "$(command -v python3)"; do
+    [ -x "$PY" ] && break
+done
+if [ ! -x "$PY" ]; then
+    osascript -e 'display dialog "Python 3.9 or newer was not found. Install it from https://www.python.org/downloads/ and open Portimao again." with title "Portimao" buttons {"OK"}'
+    exit 1
+fi
+exec "$PY" "$DIR/launchers/bootstrap.pyw"

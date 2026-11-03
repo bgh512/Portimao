@@ -484,6 +484,57 @@ def _vo2_ymax_calculator(y: np.ndarray,
     return top + noise + headroom * max(top, 0.0)
 
 
+# ---- _skipped_window_drawer ----------------------------------------------------------
+def _skipped_window_drawer(axes: List[Axes], window_name: str, window: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to draw an averaging window that could not be calculated: a red
+    band on every axis with a warning sign above it. Only used in the previews.
+
+    ---- Inputs ----
+    axes : List[Axes]
+        Axes of the experiment, top to bottom.
+    window_name : str
+        Window name, for example 'average3'.
+    window : dict
+        {start_time, end_time, reason} of the skipped window.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Adds a shaded span and a warning sign to the axes (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    start, end = window['start_time'], window['end_time']
+    for ax in axes:
+        ax.axvspan(start, end, facecolor='#d62728', alpha=0.18, edgecolor='#d62728',
+                   linewidth=0.8, linestyle='--', zorder=0,
+                   )
+    axes[0].text((start + end) / 2,
+                 1.0,
+                 '\u26a0',
+                 transform=axes[0].get_xaxis_transform(),
+                 ha='center',
+                 va='bottom',
+                 fontsize=12,
+                 fontfamily='DejaVu Sans',
+                 color='#d62728',
+                 clip_on=False,
+                 zorder=3,
+                 )
+
+
 # ---- _window_drawer ------------------------------------------------------------------
 def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
     """
@@ -513,6 +564,7 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
     None.
 
     ---- Helpers ----
+    _skipped_window_drawer
     _window_label_builder
     """
 
@@ -521,7 +573,12 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
     if not (config['PLOT_AVERAGING_WINDOWS'] and averages):
         return
 
-    # ---- 2 Draw each window ----------------------------------------------------------
+    # ---- 2 Draw the windows that could not be calculated, when asked -----------------
+    if config.get('SHOW_SKIPPED_WINDOWS'):
+        for window_name, window in averages.get('skipped', {}).items():
+            _skipped_window_drawer(axes, window_name, window)
+
+    # ---- 3 Draw each window ----------------------------------------------------------
     for window_name, window in averages['windows'].items():
         start, end = window['start_time'], window['end_time']
         if end <= start:
@@ -956,6 +1013,7 @@ def experiment_drawer(fig: Figure,
 def experiment_plotter(experiment: dict,
                        config: dict,
                        export_root: Path,
+                       fig: Optional[Figure] = None,
                        ) -> Tuple[Figure, List[Axes]]:
     """
     ---- Summary ----
@@ -970,6 +1028,9 @@ def experiment_plotter(experiment: dict,
         config.py.
     export_root : Path
         Results folder.
+    fig : Optional[Figure]
+        An existing figure to clear and draw in (the experiment browser redraws one
+        window). It is left open. None makes a new figure.
 
     ---- Globals read ----
     config keys FIGURE_SIZE, FIGURE_DPI, TITLE_STYLE, LAYOUT_PAD_PT, FIT_MARGINS,
@@ -978,7 +1039,8 @@ def experiment_plotter(experiment: dict,
 
     ---- Outputs ----
     Tuple[Figure, List[Axes]]
-        The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set) and its axes.
+        The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set or a figure was
+        given) and its axes.
 
     ---- Globals mutated ----
     None. Writes <export_root>/<name>/<name>.svg and .png and prints a message (side
@@ -998,7 +1060,12 @@ def experiment_plotter(experiment: dict,
     # ---- 1 Draw the figure -----------------------------------------------------------
     name = experiment['experiment_name']
     export_root = Path(export_root)
-    fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
+    is_given = fig is not None
+    if is_given:
+        fig.clf()
+        fig.set_size_inches(*config['FIGURE_SIZE'])
+    else:
+        fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
     axes, panels = experiment_drawer(fig,
                                      fig.add_gridspec(1, 1)[0, 0],
                                      experiment,
@@ -1058,7 +1125,9 @@ def experiment_plotter(experiment: dict,
               )
 
     # ---- 5 Show the figure -----------------------------------------------------------
-    if config['SHOW_INDIVIDUAL_FIGURES']:
+    if is_given:
+        pass  # the caller keeps the figure open
+    elif config['SHOW_INDIVIDUAL_FIGURES']:
         plt.show()
     else:
         plt.close(fig)
