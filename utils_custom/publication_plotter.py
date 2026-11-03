@@ -47,7 +47,7 @@ RESPONSE_METRICS = ('delta', 'change', 'value')
 # ---- PUBLICATION PLOTTER HELPERS -----------------------------------------------------
 
 
-# ---- _AXES STYLER --------------------------------------------------------------------
+# ---- _axes_styler --------------------------------------------------------------------
 def _axes_styler(ax: Axes,
                  config: dict,
                  tick_size: float,
@@ -95,7 +95,7 @@ def _axes_styler(ax: Axes,
     ax.spines['right'].set_visible(config['AXES_RIGHT_SPINE'])
 
 
-# ---- _BASELINE BAR PLOTTER -----------------------------------------------------------
+# ---- _baseline_bar_plotter -----------------------------------------------------------
 def _baseline_bar_plotter(ax: Axes,
                           experiments: dict,
                           strains: tuple,
@@ -266,7 +266,7 @@ def _baseline_bar_plotter(ax: Axes,
     _axes_styler(ax, config, tick_size)
 
 
-# ---- _BLOCK GAP CALCULATOR -----------------------------------------------------------
+# ---- _block_gap_calculator -----------------------------------------------------------
 def _block_gap_calculator(config: dict, blocks: list, n_columns: int) -> tuple:
     """
     ---- Summary ----
@@ -323,7 +323,7 @@ def _block_gap_calculator(config: dict, blocks: list, n_columns: int) -> tuple:
     return gaps, gap_space_calculator(column_gap, width_pt - 8 * unit, n_columns)
 
 
-# ---- _COLUMN CHOOSER -----------------------------------------------------------------
+# ---- _column_chooser -----------------------------------------------------------------
 def _column_chooser(available: Iterable, preferred: Optional[str]) -> Optional[str]:
     """
     ---- Summary ----
@@ -361,7 +361,7 @@ def _column_chooser(available: Iterable, preferred: Optional[str]) -> Optional[s
     return available[0] if available else None
 
 
-# ---- _CONDITION INDEXER --------------------------------------------------------------
+# ---- _condition_indexer --------------------------------------------------------------
 def _condition_indexer(triplicates: dict) -> dict:
     """
     ---- Summary ----
@@ -402,7 +402,7 @@ def _condition_indexer(triplicates: dict) -> dict:
     return lookup
 
 
-# ---- _CROP START FINDER --------------------------------------------------------------
+# ---- _crop_start_finder --------------------------------------------------------------
 def _crop_start_finder(experiment: dict,
                        mode: str,
                        before_minutes: float,
@@ -465,7 +465,7 @@ def _crop_start_finder(experiment: dict,
                      )
 
 
-# ---- _EXEMPLAR GAP CALCULATOR --------------------------------------------------------
+# ---- _exemplar_gap_calculator --------------------------------------------------------
 def _exemplar_gap_calculator(config: dict,
                              individual_config: dict,
                              n_rows: int,
@@ -540,7 +540,7 @@ def _exemplar_gap_calculator(config: dict,
             )
 
 
-# ---- _EXEMPLAR PLOTTER ---------------------------------------------------------------
+# ---- _exemplar_plotter ---------------------------------------------------------------
 def _exemplar_plotter(fig: Figure,
                       subplot_spec: SubplotSpec,
                       experiment: dict,
@@ -582,7 +582,7 @@ def _exemplar_plotter(fig: Figure,
     return axes
 
 
-# ---- _EXEMPLAR SELECTOR --------------------------------------------------------------
+# ---- _exemplar_selector --------------------------------------------------------------
 def _exemplar_selector(experiments: dict, run: int) -> dict:
     """
     ---- Summary ----
@@ -630,7 +630,7 @@ def _exemplar_selector(experiments: dict, run: int) -> dict:
     return lookup
 
 
-# ---- _EXPERIMENT CLASSIFIER ----------------------------------------------------------
+# ---- _experiment_classifier ----------------------------------------------------------
 def _experiment_classifier(name: str) -> tuple:
     """
     ---- Summary ----
@@ -667,7 +667,7 @@ def _experiment_classifier(name: str) -> tuple:
     return strain, order, run
 
 
-# ---- _EXPERIMENT CROPPER -------------------------------------------------------------
+# ---- _experiment_cropper -------------------------------------------------------------
 def _experiment_cropper(experiment: dict, start: float) -> tuple:
     """
     ---- Summary ----
@@ -733,7 +733,7 @@ def _experiment_cropper(experiment: dict, start: float) -> tuple:
     return cropped, last_time
 
 
-# ---- _FIGURE FINISHER ----------------------------------------------------------------
+# ---- _figure_finisher ----------------------------------------------------------------
 def _figure_finisher(fig: Figure,
                      config: dict,
                      panels: list,
@@ -783,7 +783,7 @@ def _figure_finisher(fig: Figure,
         figure_canvas_fitter(fig, pad, suptitle, gap)
 
 
-# ---- _HAEM BLOCK PLOTTER -------------------------------------------------------------
+# ---- _haem_block_plotter -------------------------------------------------------------
 def _haem_block_plotter(fig: Figure,
                         spec: SubplotSpec,
                         orders: tuple,
@@ -958,7 +958,7 @@ def _haem_block_plotter(fig: Figure,
     return grid_axes, span
 
 
-# ---- _HAEM LABEL FINDER --------------------------------------------------------------
+# ---- _haem_label_finder --------------------------------------------------------------
 def _haem_label_finder(config: dict, metric: str, haem_source: str) -> str:
     """
     ---- Summary ----
@@ -1001,7 +1001,7 @@ def _haem_label_finder(config: dict, metric: str, haem_source: str) -> str:
     return labels
 
 
-# ---- _HAEM LABEL PAD CALCULATOR ------------------------------------------------------
+# ---- _haem_label_pad_calculator ------------------------------------------------------
 def _haem_label_pad_calculator(config: dict) -> float:
     """
     ---- Summary ----
@@ -1037,7 +1037,7 @@ def _haem_label_pad_calculator(config: dict) -> float:
             )
 
 
-# ---- _HAEM ROW SELECTOR --------------------------------------------------------------
+# ---- _haem_row_selector --------------------------------------------------------------
 def _haem_row_selector(config: dict) -> list:
     """
     ---- Summary ----
@@ -1095,7 +1095,7 @@ def _haem_row_selector(config: dict) -> list:
     return selected
 
 
-# ---- _HAEM SOURCE FINDER -------------------------------------------------------------
+# ---- _haem_source_finder -------------------------------------------------------------
 def _haem_source_finder(triplicates: dict) -> str:
     """
     ---- Summary ----
@@ -1133,7 +1133,7 @@ def _haem_source_finder(triplicates: dict) -> str:
     return sources.pop()
 
 
-# ---- _LAYOUT VALIDATOR ---------------------------------------------------------------
+# ---- _layout_validator ---------------------------------------------------------------
 def _layout_validator(config: dict) -> tuple:
     """
     ---- Summary ----
@@ -1202,7 +1202,7 @@ def _layout_validator(config: dict) -> tuple:
     return orders, strains
 
 
-# ---- _LEGEND HANDLE BUILDER ----------------------------------------------------------
+# ---- _legend_handle_builder ----------------------------------------------------------
 def _legend_handle_builder(strains: tuple, config: dict) -> list:
     """
     ---- Summary ----
@@ -1245,7 +1245,7 @@ def _legend_handle_builder(strains: tuple, config: dict) -> list:
             ]
 
 
-# ---- _MEAN YLIM SETTER ---------------------------------------------------------------
+# ---- _mean_ylim_setter ---------------------------------------------------------------
 def _mean_ylim_setter(ax: Axes,
                       series_list: list,
                       metric: str,
@@ -1316,7 +1316,7 @@ def _mean_ylim_setter(ax: Axes,
     ax.set_ylim(low - margin * span, high + margin * span)
 
 
-# ---- _MEASUREMENT FINDER -------------------------------------------------------------
+# ---- _measurement_finder -------------------------------------------------------------
 def _measurement_finder(available: Iterable, wanted: str) -> Optional[str]:
     """
     ---- Summary ----
@@ -1353,7 +1353,7 @@ def _measurement_finder(available: Iterable, wanted: str) -> Optional[str]:
     return None
 
 
-# ---- _METRIC FIELD SELECTOR ----------------------------------------------------------
+# ---- _metric_field_selector ----------------------------------------------------------
 def _metric_field_selector(metric: str) -> tuple:
     """
     ---- Summary ----
@@ -1386,7 +1386,7 @@ def _metric_field_selector(metric: str) -> tuple:
     return f'{metric}_mean', f'{metric}_sem', f'{metric}_n', f'run_{metric}s'
 
 
-# ---- _OCR BLOCK PLOTTER --------------------------------------------------------------
+# ---- _ocr_block_plotter --------------------------------------------------------------
 def _ocr_block_plotter(fig: Figure,
                        spec: SubplotSpec,
                        orders: tuple,
@@ -1522,7 +1522,7 @@ def _ocr_block_plotter(fig: Figure,
     return axes
 
 
-# ---- _OUTSIDE BAR DRAWER -------------------------------------------------------------
+# ---- _outside_bar_drawer -------------------------------------------------------------
 def _outside_bar_drawer(ax: Axes, config: dict) -> None:
     """
     ---- Summary ----
@@ -1558,7 +1558,7 @@ def _outside_bar_drawer(ax: Axes, config: dict) -> None:
         _test_bar_drawer(ax, centre - half, centre + half, top, text, config)
 
 
-# ---- _P VALUE ADJUSTER ---------------------------------------------------------------
+# ---- _p_value_adjuster ---------------------------------------------------------------
 def _p_value_adjuster(p_values: Iterable, method: str) -> np.ndarray:
     """
     ---- Summary ----
@@ -1608,7 +1608,7 @@ def _p_value_adjuster(p_values: Iterable, method: str) -> np.ndarray:
                      )
 
 
-# ---- _REFERENCE LEVEL FINDER ---------------------------------------------------------
+# ---- _reference_level_finder ---------------------------------------------------------
 def _reference_level_finder(metric: str, haem_source: str) -> Optional[float]:
     """
     ---- Summary ----
@@ -1646,7 +1646,7 @@ def _reference_level_finder(metric: str, haem_source: str) -> Optional[float]:
     return 0 if haem_source in DELTA_HAEM_SOURCES else None
 
 
-# ---- _REFERENCE SELECTOR -------------------------------------------------------------
+# ---- _reference_selector -------------------------------------------------------------
 def _reference_selector(experiments: dict,
                         triplicates: dict,
                         conditions: dict,
@@ -1703,7 +1703,7 @@ def _reference_selector(experiments: dict,
     return references
 
 
-# ---- _RESPONSE AXES PREPARER ---------------------------------------------------------
+# ---- _response_axes_preparer ---------------------------------------------------------
 def _response_axes_preparer(ax: Axes,
                             window_names: list,
                             tick_labels: list,
@@ -1771,7 +1771,7 @@ def _response_axes_preparer(ax: Axes,
     return x
 
 
-# ---- _RESPONSE METRIC CHECKER --------------------------------------------------------
+# ---- _response_metric_checker --------------------------------------------------------
 def _response_metric_checker(metric: str, haem_source: str) -> None:
     """
     ---- Summary ----
@@ -1811,7 +1811,7 @@ def _response_metric_checker(metric: str, haem_source: str) -> None:
                          )
 
 
-# ---- _RESPONSE SERIES DRAWER ---------------------------------------------------------
+# ---- _response_series_drawer ---------------------------------------------------------
 def _response_series_drawer(ax: Axes,
                             x: Iterable,
                             stats_list: list,
@@ -1909,7 +1909,7 @@ def _response_series_drawer(ax: Axes,
     return True
 
 
-# ---- _RESPONSE WINDOW TESTER ---------------------------------------------------------
+# ---- _response_window_tester ---------------------------------------------------------
 def _response_window_tester(ax: Axes,
                             x: np.ndarray,
                             windows: list,
@@ -2066,7 +2066,7 @@ def _response_window_tester(ax: Axes,
         _test_bar_drawer(ax, centre - half, centre + half, result['top'], text, config)
 
 
-# ---- _ROW YLIM SHARER ----------------------------------------------------------------
+# ---- _row_ylim_sharer ----------------------------------------------------------------
 def _row_ylim_sharer(axes_row: list) -> None:
     """
     ---- Summary ----
@@ -2098,7 +2098,7 @@ def _row_ylim_sharer(axes_row: list) -> None:
         ax.set_ylim(min(lows), max(highs))
 
 
-# ---- _SIGNIFICANCE BAR DRAWER --------------------------------------------------------
+# ---- _significance_bar_drawer --------------------------------------------------------
 def _significance_bar_drawer(ax: Axes,
                              x_left: float,
                              x_right: float,
@@ -2171,7 +2171,7 @@ def _significance_bar_drawer(ax: Axes,
             )
 
 
-# ---- _SIGNIFICANCE FORMATTER ---------------------------------------------------------
+# ---- _significance_formatter ---------------------------------------------------------
 def _significance_formatter(p_value: float, style: str) -> str:
     """
     ---- Summary ----
@@ -2212,7 +2212,7 @@ def _significance_formatter(p_value: float, style: str) -> str:
             )
 
 
-# ---- _TEST BAR DRAWER ----------------------------------------------------------------
+# ---- _test_bar_drawer ----------------------------------------------------------------
 def _test_bar_drawer(ax: Axes,
                      x_left: float,
                      x_right: float,
@@ -2261,7 +2261,7 @@ def _test_bar_drawer(ax: Axes,
     tick = config['RESPONSE_TEST_BAR_TICK']
     width = config['RESPONSE_ERRORBAR_WIDTH']
 
-    # ---- 2 Define the offset helper --------------------------------------------------
+    # ---- _offset_transformer ---------------------------------------------------------
     def _offset_transformer(points: float) -> Any:
         """
         ---- Summary ----
@@ -2336,7 +2336,7 @@ def _test_bar_drawer(ax: Axes,
                 )
 
 
-# ---- _TICK LABEL BUILDER -------------------------------------------------------------
+# ---- _tick_label_builder -------------------------------------------------------------
 def _tick_label_builder(experiment: Optional[dict], window_names: list) -> list:
     """
     ---- Summary ----
@@ -2395,7 +2395,7 @@ def _tick_label_builder(experiment: Optional[dict], window_names: list) -> list:
     return labels
 
 
-# ---- _WINDOW ORDERER -----------------------------------------------------------------
+# ---- _window_orderer -----------------------------------------------------------------
 def _window_orderer(order: str,
                     strains: tuple,
                     triplicates: dict,
@@ -2444,7 +2444,7 @@ def _window_orderer(order: str,
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- EXEMPLAR FIGURE PLOTTER ---------------------------------------------------------
+# ---- exemplar_figure_plotter ---------------------------------------------------------
 def exemplar_figure_plotter(experiments: dict,
                             config: dict,
                             individual_config: dict,
@@ -2600,7 +2600,7 @@ def exemplar_figure_plotter(experiments: dict,
             if c == len(orders) - 1:
                 row_axes[r] = list(axes)
 
-    # ---- 5 Give each haem the same y axis in every quadrant -------------------------
+    # ---- 5 Give each haem the same y axis in every quadrant --------------------------
     by_haem = {}
     for quadrant_axes in axes_by_cell.values():
         for ax in quadrant_axes:
@@ -2634,7 +2634,7 @@ def exemplar_figure_plotter(experiments: dict,
     return fig, {**axes_by_cell, 'letters': letter_names}
 
 
-# ---- PUBLICATION FIGURE PLOTTER ------------------------------------------------------
+# ---- publication_figure_plotter ------------------------------------------------------
 def publication_figure_plotter(experiments: dict,
                                triplicates: dict,
                                config: dict,
@@ -2860,7 +2860,7 @@ def publication_figure_plotter(experiments: dict,
                  }
 
 
-# ---- PUBLICATION FIGURE SAVER --------------------------------------------------------
+# ---- publication_figure_saver --------------------------------------------------------
 def publication_figure_saver(fig: Figure, export_root: Path, config: dict) -> list:
     """
     ---- Summary ----

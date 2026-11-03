@@ -341,4 +341,4 @@ class PictureWindow:
 
         ---- Helpers ----
         None.
-        """
+        """

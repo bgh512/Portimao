@@ -1,4 +1,4 @@
-# Albufeira question flow (V2.8)
+# Portimao question flow (V3.0)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -354,6 +354,6 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 
 The questions and their order are the same. These differ:
 
-- In **2** and **3** the picture of the current file is saved to `Albufeira_preview.png` and opened in your picture viewer.
+- In **2** and **3** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer.
 - Before **2.1** a small menu steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring.
 - Every "Do you accept...?" question has a third answer, **3) Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.

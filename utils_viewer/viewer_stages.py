@@ -56,7 +56,7 @@ from utils_viewer.viewer_window import PictureWindow
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-PREVIEW_FILE = Path(tempfile.gettempdir()) / 'Albufeira_preview.png'
+PREVIEW_FILE = Path(tempfile.gettempdir()) / 'Portimao_preview.png'
 WARNING_COLOUR = '\x1b[1;31m'  # bold red
 STAGE_TITLES = {'browser': 'Experiment browser',
                 'trim': 'Trimming and ignoring',
@@ -1380,4 +1380,4 @@ def viewer_asker(summaries: List[dict],
         session.window.window_closer()
 
     # ---- 4 Return the answers --------------------------------------------------------
-    return state['limits'], state['fit'], state['details'], state['plotted']
+    return state['limits'], state['fit'], state['details'], state['plotted']

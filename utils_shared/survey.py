@@ -2015,4 +2015,4 @@ def trim_asker(summaries: List[dict],
                        ('ignore', 'end'),
                        ):
         _limits_asker(summaries, remembered, kind, edge, collected, reporter)
-    return _limits_filler(summaries, collected)
+    return _limits_filler(summaries, collected)

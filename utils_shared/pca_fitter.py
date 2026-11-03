@@ -505,4 +505,4 @@ def fit_table_builder(result: dict, names: Optional[List[str]] = None) -> dict:
     for i, name in enumerate(names):
         columns[name] = result['wavelengths']
         columns[f'Unnamed: {2 * i + 1}'] = -result['components'][:, i]
-    return {'haem_list': names, 'data': pd.DataFrame(columns)}
+    return {'haem_list': names, 'data': pd.DataFrame(columns)}

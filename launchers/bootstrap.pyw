@@ -1,8 +1,8 @@
 """
 Launcher of the program without a terminal window: checks for updates, sets up the
 private Python environment the first time, makes the desktop icon and starts the
-program. Needs only the Python standard library. Started by the Albufeira icon on
-Windows (with pythonw), by Albufeira.app on a Mac and by the menu entry on Linux.
+program. Needs only the Python standard library. Started by the Portimao icon on
+Windows (with pythonw), by Portimao.app on a Mac and by the menu entry on Linux.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -20,7 +20,7 @@ from typing import Callable, List, Optional
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-APP_NAME = 'Albufeira'
+APP_NAME = 'Portimao'
 ROOT = Path(__file__).resolve().parent.parent
 IS_WINDOWS = sys.platform == 'win32'
 ENVIRONMENT = ROOT / ('.venv' if IS_WINDOWS else '.venv_unix')
@@ -30,9 +30,9 @@ ENVIRONMENT_PYTHON = ENVIRONMENT / ('Scripts/python.exe'
                                     )
 ENVIRONMENT_WINDOWLESS = ENVIRONMENT / 'Scripts/pythonw.exe'
 LOG_FILE = ROOT / 'logs' / 'launch.log'
-SHORTCUT_MARK = ROOT / '.shortcut_made_albufeira'  # the old program used .shortcut_made
-OLD_NAME = 'DePalencify'
-REPOSITORY_NAME = 'Albufeira'  # the name of the GitHub repository after it is renamed
+SHORTCUT_MARK = ROOT / '.shortcut_made_portimao'  # the old program used .shortcut_made
+OLD_NAMES = ('DePalencify', 'Albufeira')  # the names the program had before
+REPOSITORY_NAME = 'Portimao'  # the name of the GitHub repository after it is renamed
 HIDDEN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 REQUIRED_IMPORTS = 'import numpy, pandas, scipy, matplotlib, xlsxwriter, openpyxl, PIL'
 WAIT_SECONDS = 8.0
@@ -137,13 +137,13 @@ def _old_shortcut_remover() -> None:
     """
     ---- Summary ----
     Helper function to delete the shortcuts of the program under its old name, so only
-    the Albufeira ones are left after an update.
+    the Portimao ones are left after an update.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    OLD_NAME, IS_WINDOWS (module constants).
+    OLD_NAMES, IS_WINDOWS (module constants).
 
     ---- Outputs ----
     None
@@ -164,11 +164,14 @@ def _old_shortcut_remover() -> None:
     if IS_WINDOWS:
         appdata = Path(os.environ.get('APPDATA', home / 'AppData/Roaming'))
         places += [appdata / 'Microsoft/Windows/Start Menu/Programs']
-        names = [f'{OLD_NAME}.lnk']
+        names = [f'{old}.lnk' for old in OLD_NAMES]
     else:
         places += [Path(os.environ.get('XDG_DATA_HOME',
                                        home / '.local/share')) / 'applications']
-        names = [f'{OLD_NAME}.desktop', f'{OLD_NAME}.app']
+        names = [f'{old}{ending}'
+                 for old in OLD_NAMES
+                 for ending in ('.desktop', '.app')
+                 ]
     for place in places:
         for name in names:
             target = place / name
@@ -234,7 +237,7 @@ def _remote_renamer() -> None:
     None.
 
     ---- Globals read ----
-    OLD_NAME, REPOSITORY_NAME (module constants).
+    OLD_NAMES, REPOSITORY_NAME (module constants).
 
     ---- Outputs ----
     None
@@ -253,10 +256,11 @@ def _remote_renamer() -> None:
     try:
         shown = _command_runner(['git', 'remote', 'get-url', 'origin'])
         url = shown.stdout.strip()
-        if shown.returncode != 0 or OLD_NAME.lower() not in url.lower():
+        old = next((o for o in OLD_NAMES if o.lower() in url.lower()), None)
+        if shown.returncode != 0 or old is None:
             return
-        start = url.lower().rindex(OLD_NAME.lower())
-        new_url = url[:start] + REPOSITORY_NAME + url[start + len(OLD_NAME):]
+        start = url.lower().rindex(old.lower())
+        new_url = url[:start] + REPOSITORY_NAME + url[start + len(old):]
         if _command_runner(['git', 'ls-remote', new_url, 'HEAD'],
                            timeout=20).returncode == 0:
             _command_runner(['git', 'remote', 'set-url', 'origin', new_url])
@@ -422,7 +426,7 @@ def launcher_runner(show: Callable[[str], None]) -> int:
     try:
         show('Checking for updates ...')
         if update_checker():
-            environment = dict(os.environ, ALBUFEIRA_UPDATED='1')
+            environment = dict(os.environ, PORTIMAO_UPDATED='1')
             subprocess.Popen([sys.executable, str(Path(__file__).resolve())],
                              env=environment)
             return 0
@@ -488,10 +492,6 @@ def main() -> int:
     return result[0] if result else 1
 
 
-if __name__ == '__main__':
-    sys.exit(main())
-
-
 # ---- program_starter -----------------------------------------------------------------
 def program_starter() -> 'subprocess.Popen':
     """
@@ -542,7 +542,7 @@ def shortcut_maker() -> None:
     ---- Summary ----
     Main function to make the clickable icon the first time (and again if the folder
     is moved): Desktop and Start menu shortcuts on Windows, an entry in the applications
-    menu and on the Desktop on Linux. A Mac uses the Albufeira.app in the folder.
+    menu and on the Desktop on Linux. A Mac uses the Portimao.app in the folder.
 
     ---- Inputs ----
     None.
@@ -575,7 +575,7 @@ def shortcut_maker() -> None:
             target = windowless if windowless.exists() else Path(sys.executable)
             _command_runner(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                              '-WindowStyle', 'Hidden', '-File', str(script),
-                             str(ROOT), str(target), str(ROOT / 'Albufeira.pyw')])
+                             str(ROOT), str(target), str(ROOT / 'Portimao.pyw')])
         elif sys.platform.startswith('linux'):
             entry = (f'[Desktop Entry]\nType=Application\nName={APP_NAME}\n'
                      'Comment=Convert chamber .paf files to figures and data\n'
@@ -611,7 +611,7 @@ def update_checker() -> bool:
     None.
 
     ---- Globals read ----
-    ROOT (module constant); os.environ["ALBUFEIRA_UPDATED"].
+    ROOT (module constant); os.environ["PORTIMAO_UPDATED"].
 
     ---- Outputs ----
     bool
@@ -628,7 +628,7 @@ def update_checker() -> bool:
     _remote_renamer
     """
 
-    if not (ROOT / '.git').exists() or os.environ.get('ALBUFEIRA_UPDATED'):
+    if not (ROOT / '.git').exists() or os.environ.get('PORTIMAO_UPDATED'):
         return False
     if shutil.which('git') is None:
         return False
@@ -642,3 +642,7 @@ def update_checker() -> bool:
         return _command_runner(['git', 'pull', '--ff-only', '--quiet']).returncode == 0
     except Exception:
         return False
+
+
+if __name__ == '__main__':
+    sys.exit(main())

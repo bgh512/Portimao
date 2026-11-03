@@ -630,4 +630,4 @@ def skipped_windows_finder(session: ViewerSession,
         skipped = processed['experiment'].get('averages', {}).get('skipped')
         if skipped:
             found[summary['name']] = skipped
-    return found
+    return found

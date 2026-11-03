@@ -1,4 +1,4 @@
-# Albufeira
+# Portimao
 
 Reads Espana Scientific Software `.paf` files, plots every experiment and the combined figures, and exports Excel workbooks that can be checked by hand.
 
@@ -20,8 +20,8 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
 3. Download the project and enter its folder:
 
     ```powershell
-    git clone https://github.com/bgh512/DePalencify.git
-    cd DePalencify
+    git clone https://github.com/bgh512/Portimao.git
+    cd Portimao
     ```
 
 4. Create and activate a Python environment, then install the dependencies:
@@ -46,8 +46,8 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
 3. Download the project and enter its folder:
 
     ```bash
-    git clone https://github.com/bgh512/DePalencify.git
-    cd DePalencify
+    git clone https://github.com/bgh512/Portimao.git
+    cd Portimao
     ```
 
 4. Create and activate a Python environment, then install the dependencies:
@@ -77,8 +77,8 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
 3. Download the project and enter its folder:
 
     ```bash
-    git clone https://github.com/bgh512/DePalencify.git
-    cd DePalencify
+    git clone https://github.com/bgh512/Portimao.git
+    cd Portimao
     ```
 
 4. Create and activate a Python environment, then install the dependencies:
@@ -144,21 +144,21 @@ The program has no command-line options. It asks numbered questions in the termi
 
 ### 2.2 Using the launcher
 
-The launchers open Albufeira without leaving a terminal window open.
+The launchers open Portimao without leaving a terminal window open.
 
-- Windows: double-click `Albufeira.pyw` (or `run.bat`, whose window closes at once). The first time it also puts an Albufeira icon on your Desktop and in the Start menu; use that from then on.
-- macOS: double-click `Albufeira.app`.
-- Linux: run `./run.sh`; the first time it adds Albufeira to the applications menu and the Desktop.
+- Windows: double-click `Portimao.pyw` (or `run.bat`, whose window closes at once). The first time it also puts an Portimao icon on your Desktop and in the Start menu; use that from then on.
+- macOS: double-click `Portimao.app`.
+- Linux: run `./run.sh`; the first time it adds Portimao to the applications menu and the Desktop.
 
-A small "Starting Albufeira" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way.
+A small "Starting Portimao" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way.
 
-Windows and macOS may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. On Windows right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. On macOS right-click `Albufeira.app` and choose Open the first time.
+Windows and macOS may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. On Windows right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. On macOS right-click `Portimao.app` and choose Open the first time.
 
 ### 2.3 Changing the icon
 
 1. Replace `assets/icon.png` with the new icon (a square PNG, ideally 1024 x 1024 pixels).
-2. Run `python launchers/make_icons.py` (inside the program's environment, for example `.venv\Scripts\python launchers\make_icons.py` on Windows or `.venv_unix/bin/python launchers/make_icons.py` on Mac and Linux). It makes `assets/icon.ico` (window, taskbar and Windows shortcut) and the Mac icon inside `Albufeira.app`.
-3. Delete the file `.shortcut_made_albufeira`, then start Albufeira once, so the Desktop and Start menu shortcuts are made again with the new icon.
+2. Run `python launchers/make_icons.py` (inside the program's environment, for example `.venv\Scripts\python launchers\make_icons.py` on Windows or `.venv_unix/bin/python launchers/make_icons.py` on Mac and Linux). It makes `assets/icon.ico` (window, taskbar and Windows shortcut) and the Mac icon inside `Portimao.app`.
+3. Delete the file `.shortcut_made_portimao`, then start Portimao once, so the Desktop and Start menu shortcuts are made again with the new icon.
 
 
 ### 2.4 The questions
@@ -175,7 +175,7 @@ Every figure asks for its own journal. Answering `None` uses Nature with the def
 
 ### 2.5 The experiment browser
 
-The program runs in one window. The left side is a text terminal that asks the questions, with a box at the bottom to type your answers in (press Enter to send; the up and down keys recall earlier answers). If you type nothing, the value in [brackets] is used. The right side shows the plots of your files, with **< Prev** and **Next >** buttons and a drop-down list of the files under the plot. The arrows loop round, and Page Up and Page Down do the same from the keyboard. The window and the taskbar show the Albufeira icon (on macOS the Dock icon needs the optional `pyobjc` package).
+The program runs in one window. The left side is a text terminal that asks the questions, with a box at the bottom to type your answers in (press Enter to send; the up and down keys recall earlier answers). If you type nothing, the value in [brackets] is used. The right side shows the plots of your files, with **< Prev** and **Next >** buttons and a drop-down list of the files under the plot. The arrows loop round, and Page Up and Page Down do the same from the keyboard. The window and the taskbar show the Portimao icon (on macOS the Dock icon needs the optional `pyobjc` package).
 
 The plot stays usable while a question waits. You can flick through every file at any time without answering, and the accept questions wait while you look. All files are drawn in the background with the latest answers, so flicking between them is quick. The plot is for looking: it cannot be clicked to change anything.
 
@@ -189,7 +189,7 @@ The previews use the same processing as the final run, so what is shown is what 
 
 Closing the window while the program is still running stops it (a file that is being written may be left incomplete).
 
-**If the window cannot open.** The window needs Python's tkinter. It is included with the python.org installers for Windows and macOS. On Linux install it with your package manager (for example `sudo apt install python3-tk`), and a display is needed. When the window cannot open, the program says why and runs in the terminal as before: each preview is saved as a picture (`Albufeira_preview.png` in the temporary folder) and opened in the default picture viewer, and the file is chosen by a question instead of the arrows. To use the terminal on purpose, set the environment variable `ALBUFEIRA_NO_GUI` to any value.
+**If the window cannot open.** The window needs Python's tkinter. It is included with the python.org installers for Windows and macOS. On Linux install it with your package manager (for example `sudo apt install python3-tk`), and a display is needed. When the window cannot open, the program says why and runs in the terminal as before: each preview is saved as a picture (`Portimao_preview.png` in the temporary folder) and opened in the default picture viewer, and the file is chosen by a question instead of the arrows. To use the terminal on purpose, set the environment variable `PORTIMAO_NO_GUI` to any value.
 
 The full list of questions, with where each answer leads, is in [QUESTION_FLOW.md](QUESTION_FLOW.md).
 
@@ -231,11 +231,11 @@ What to keep in mind:
 ## 3. Project structure
 
 ```
-Albufeira/
+Portimao/
     make_zip.bat            zips the project for sharing (Windows)
     main.py                 entry point
     config.py               defaults, journal sizes and colours
-    Albufeira.pyw, Albufeira.app, run.bat, run.sh   launchers (no terminal window)
+    Portimao.pyw, Portimao.app, run.bat, run.sh   launchers (no terminal window)
     launchers/              the launcher program, shortcut and icon scripts
     assets/                 icons
     fits/                   haem fit CSVs (your own fit goes here)

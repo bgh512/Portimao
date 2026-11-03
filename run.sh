@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mac and Linux: starts Albufeira without keeping a terminal open (the first run sets things up).
+# Mac and Linux: starts Portimao without keeping a terminal open (the first run sets things up).
 cd "$(dirname "$0")" || exit 1
 PY="$(command -v python3 || command -v python)"
 if [ -z "$PY" ]; then

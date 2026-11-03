@@ -1,7 +1,7 @@
-# Albufeira - Function List
+# Portimao - Function List
 
-- **Project:** Albufeira
-- **Version:** V2.8
+- **Project:** Portimao
+- **Version:** V3.0
 - **Date:** 03/11/2026
 
 ## Contents
@@ -219,8 +219,8 @@
     - [`figure_capture_setter`](#figure_capture_setter)
     - [`figure_saver`](#figure_saver)
     - [`file_name_sanitiser`](#file_name_sanitiser)
-    - [`program_title_builder`](#program_title_builder)
     - [`name_simplifier`](#name_simplifier)
+    - [`program_title_builder`](#program_title_builder)
 - [`utils_shared/individual_experiment_exporter.py`](#utils_sharedindividual_experiment_exporterpy)
     - [`_frame_writer`](#_frame_writer)
     - [`_name_lister`](#_name_lister)
@@ -412,7 +412,7 @@
 
 ## `config.py`
 
-Settings and defaults of Albufeira: figure styles, journal sizes and colours.
+Settings and defaults of Portimao: figure styles, journal sizes and colours.
 
 ### CLASSES
 
@@ -617,7 +617,7 @@ Makes every icon file from one picture: put the new icon at assets/icon.png (squ
 ```text
 ---- Summary ----
 Main function to turn assets/icon.png into the Windows icon (assets/icon.ico) and
-the Mac icon (inside Albufeira.app).
+the Mac icon (inside Portimao.app).
 
 ---- Inputs ----
 None.
@@ -3487,7 +3487,7 @@ figure_finisher
 
 Publication figure (baseline OCR, OCR response, haem response), exemplars.
 
-### _AXES STYLER
+### PUBLICATION PLOTTER HELPERS
 
 #### `_axes_styler`
 
@@ -3522,8 +3522,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _BASELINE BAR PLOTTER
 
 #### `_baseline_bar_plotter`
 
@@ -3565,8 +3563,6 @@ _significance_formatter
 finite_float_converter
 ```
 
-### _BLOCK GAP CALCULATOR
-
 #### `_block_gap_calculator`
 
 ```text
@@ -3602,8 +3598,6 @@ row + 1.0 unit. The gap between the OCR and haem responses = two-line tick label
 gap_space_calculator
 ```
 
-### _COLUMN CHOOSER
-
 #### `_column_chooser`
 
 ```text
@@ -3634,8 +3628,6 @@ None.
 None.
 ```
 
-### _CONDITION INDEXER
-
 #### `_condition_indexer`
 
 ```text
@@ -3664,8 +3656,6 @@ None.
 ---- Helpers ----
 condition_classifier
 ```
-
-### _CROP START FINDER
 
 #### `_crop_start_finder`
 
@@ -3699,8 +3689,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _EXEMPLAR GAP CALCULATOR
 
 #### `_exemplar_gap_calculator`
 
@@ -3739,8 +3727,6 @@ column, 1.5 unit when there are several (the later columns have no y labels).
 gap_space_calculator
 ```
 
-### _EXEMPLAR PLOTTER
-
 #### `_exemplar_plotter`
 
 ```text
@@ -3775,8 +3761,6 @@ None.
 experiment_drawer
 ```
 
-### _EXEMPLAR SELECTOR
-
 #### `_exemplar_selector`
 
 ```text
@@ -3808,8 +3792,6 @@ None.
 _experiment_classifier
 ```
 
-### _EXPERIMENT CLASSIFIER
-
 #### `_experiment_classifier`
 
 ```text
@@ -3838,8 +3820,6 @@ None.
 condition_classifier
 run_name_parser
 ```
-
-### _EXPERIMENT CROPPER
 
 #### `_experiment_cropper`
 
@@ -3870,8 +3850,6 @@ t_new = t - start; rows with t_new < 0 are dropped.
 ---- Helpers ----
 time_getter
 ```
-
-### _FIGURE FINISHER
 
 #### `_figure_finisher`
 
@@ -3907,8 +3885,6 @@ None.
 figure_canvas_fitter
 panel_letter_adder
 ```
-
-### _HAEM BLOCK PLOTTER
 
 #### `_haem_block_plotter`
 
@@ -3972,8 +3948,6 @@ _tick_label_builder
 _window_orderer
 ```
 
-### _HAEM LABEL FINDER
-
 #### `_haem_label_finder`
 
 ```text
@@ -4005,8 +3979,6 @@ None.
 None.
 ```
 
-### _HAEM LABEL PAD CALCULATOR
-
 #### `_haem_label_pad_calculator`
 
 ```text
@@ -4034,8 +4006,6 @@ pad = 1.2 label font + 0.5 unit + 5 x 0.55 tick font + 0.5 unit (points).
 ---- Helpers ----
 None.
 ```
-
-### _HAEM ROW SELECTOR
 
 #### `_haem_row_selector`
 
@@ -4067,8 +4037,6 @@ None.
 name_simplifier
 ```
 
-### _HAEM SOURCE FINDER
-
 #### `_haem_source_finder`
 
 ```text
@@ -4098,8 +4066,6 @@ None.
 None.
 ```
 
-### _LAYOUT VALIDATOR
-
 #### `_layout_validator`
 
 ```text
@@ -4127,8 +4093,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _LEGEND HANDLE BUILDER
 
 #### `_legend_handle_builder`
 
@@ -4159,8 +4123,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _MEAN YLIM SETTER
 
 #### `_mean_ylim_setter`
 
@@ -4201,8 +4163,6 @@ all means are on one side of the baseline, the baseline side gets a 3 % margin.
 _metric_field_selector
 ```
 
-### _MEASUREMENT FINDER
-
 #### `_measurement_finder`
 
 ```text
@@ -4233,8 +4193,6 @@ None.
 name_simplifier
 ```
 
-### _METRIC FIELD SELECTOR
-
 #### `_metric_field_selector`
 
 ```text
@@ -4262,8 +4220,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _OCR BLOCK PLOTTER
 
 #### `_ocr_block_plotter`
 
@@ -4316,8 +4272,6 @@ _tick_label_builder
 _window_orderer
 ```
 
-### _OUTSIDE BAR DRAWER
-
 #### `_outside_bar_drawer`
 
 ```text
@@ -4347,8 +4301,6 @@ None.
 ---- Helpers ----
 _test_bar_drawer
 ```
-
-### _P VALUE ADJUSTER
 
 #### `_p_value_adjuster`
 
@@ -4380,8 +4332,6 @@ i of (n - j) p(j), 1) with j counted from 0.
 None.
 ```
 
-### _REFERENCE LEVEL FINDER
-
 #### `_reference_level_finder`
 
 ```text
@@ -4412,8 +4362,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _REFERENCE SELECTOR
 
 #### `_reference_selector`
 
@@ -4450,8 +4398,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _RESPONSE AXES PREPARER
 
 #### `_response_axes_preparer`
 
@@ -4491,8 +4437,6 @@ None.
 _axes_styler
 ```
 
-### _RESPONSE METRIC CHECKER
-
 #### `_response_metric_checker`
 
 ```text
@@ -4522,8 +4466,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _RESPONSE SERIES DRAWER
 
 #### `_response_series_drawer`
 
@@ -4566,8 +4508,6 @@ None.
 ---- Helpers ----
 _metric_field_selector
 ```
-
-### _RESPONSE WINDOW TESTER
 
 #### `_response_window_tester`
 
@@ -4620,8 +4560,6 @@ _p_value_adjuster
 _test_bar_drawer
 ```
 
-### _ROW YLIM SHARER
-
 #### `_row_ylim_sharer`
 
 ```text
@@ -4648,8 +4586,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _SIGNIFICANCE BAR DRAWER
 
 #### `_significance_bar_drawer`
 
@@ -4691,8 +4627,6 @@ None.
 None.
 ```
 
-### _SIGNIFICANCE FORMATTER
-
 #### `_significance_formatter`
 
 ```text
@@ -4721,8 +4655,6 @@ None.
 ---- Helpers ----
 None.
 ```
-
-### _TEST BAR DRAWER
 
 #### `_test_bar_drawer`
 
@@ -4762,8 +4694,6 @@ None.
 _offset_transformer
 ```
 
-### _TICK LABEL BUILDER
-
 #### `_tick_label_builder`
 
 ```text
@@ -4793,8 +4723,6 @@ None.
 ---- Helpers ----
 finite_float_converter
 ```
-
-### _WINDOW ORDERER
 
 #### `_window_orderer`
 
@@ -4830,7 +4758,7 @@ None.
 None.
 ```
 
-### EXEMPLAR FIGURE PLOTTER
+### MAIN FUNCTIONS
 
 #### `exemplar_figure_plotter`
 
@@ -4873,8 +4801,6 @@ experiment_title_builder
 stack_legend_drawer
 watermark_style_builder
 ```
-
-### PUBLICATION FIGURE PLOTTER
 
 #### `publication_figure_plotter`
 
@@ -4920,8 +4846,6 @@ _panel_labeller
 _reference_selector
 _response_metric_checker
 ```
-
-### PUBLICATION FIGURE SAVER
 
 #### `publication_figure_saver`
 
@@ -6291,7 +6215,7 @@ condition_grouper
 
 Export of the across-run (triplicate) statistics to an Excel workbook.
 
-### TRIPLICATE EXPORTER
+### MAIN FUNCTIONS
 
 #### `triplicate_exporter`
 
@@ -7376,6 +7300,34 @@ None.
 None.
 ```
 
+#### `name_simplifier`
+
+```text
+---- Summary ----
+Main function to simplify a name for matching by lower-casing it and removing
+everything except letters and digits, so "Cyt $c_1$" equals "cyt c1".
+
+---- Inputs ----
+value : Any
+    Name (converted with str).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Lower-case letters and digits only.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `program_title_builder`
 
 ```text
@@ -7395,36 +7347,8 @@ None.
 
 ---- Outputs ----
 str
-    For example "Albufeira dev V2.7"; without a branch (a folder from a zip file)
-    "Albufeira V2.7".
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `name_simplifier`
-
-```text
----- Summary ----
-Main function to simplify a name for matching by lower-casing it and removing
-everything except letters and digits, so "Cyt $c_1$" equals "cyt c1".
-
----- Inputs ----
-value : Any
-    Name (converted with str).
-
----- Globals read ----
-None.
-
----- Outputs ----
-str
-    Lower-case letters and digits only.
+    For example "Portimao dev V2.7"; without a branch (a folder from a zip file)
+    "Portimao V2.7".
 
 ---- Globals mutated ----
 None.
@@ -12543,7 +12467,7 @@ None.
 
 ```text
 ---- Summary ----
-Method to give the window (and so the taskbar or dock) the Albufeira icon. A
+Method to give the window (and so the taskbar or dock) the Portimao icon. A
 missing icon file or an unsupported system is ignored.
 
 ---- Inputs ----
@@ -13266,7 +13190,7 @@ title : str
     Window title.
 
 ---- Globals read ----
-os.environ["ALBUFEIRA_NO_GUI"] (set to anything to keep the terminal).
+os.environ["PORTIMAO_NO_GUI"] (set to anything to keep the terminal).
 
 ---- Outputs ----
 Optional[int]

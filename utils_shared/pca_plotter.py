@@ -102,4 +102,4 @@ def pca_figure_builder(analysis: dict,
     residual.set_xlabel('Number of components')
     residual.set_ylabel('Residual RMS (OD)')
     residual.set_xticks(places)
-    return fig
+    return fig

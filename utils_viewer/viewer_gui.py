@@ -262,7 +262,7 @@ class ViewerGui:
 
         if not self._is_finished:
             from tkinter import messagebox
-            if not messagebox.askokcancel('Close Albufeira',
+            if not messagebox.askokcancel('Close Portimao',
                                           'The program has not finished. Close the '
                                           'window and stop it? A file that is being '
                                           'written may be left incomplete.',
@@ -508,7 +508,7 @@ class ViewerGui:
     def _icon_setter(self) -> None:
         """
         ---- Summary ----
-        Method to give the window (and so the taskbar or dock) the Albufeira icon. A
+        Method to give the window (and so the taskbar or dock) the Portimao icon. A
         missing icon file or an unsupported system is ignored.
 
         ---- Inputs ----
@@ -1601,7 +1601,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
         Window title.
 
     ---- Globals read ----
-    os.environ["ALBUFEIRA_NO_GUI"] (set to anything to keep the terminal).
+    os.environ["PORTIMAO_NO_GUI"] (set to anything to keep the terminal).
 
     ---- Outputs ----
     Optional[int]
@@ -1619,8 +1619,8 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
     """
 
     try:
-        if os.environ.get('ALBUFEIRA_NO_GUI'):
-            raise GuiUnavailable('ALBUFEIRA_NO_GUI is set')
+        if os.environ.get('PORTIMAO_NO_GUI'):
+            raise GuiUnavailable('PORTIMAO_NO_GUI is set')
         try:
             import tkinter as tk
         except ImportError:
@@ -1636,7 +1636,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
                 ctypes.windll.shcore.SetProcessDpiAwareness(1)  # sharp text
                 # own taskbar group, so the taskbar shows our icon, not Python's
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                    'Albufeira.ExperimentBrowser',
+                    'Portimao.ExperimentBrowser',
                 )
             except Exception:
                 pass

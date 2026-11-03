@@ -1,4 +1,4 @@
-# Albufeira - Data Format
+# Portimao - Data Format
 
 ## 1. Structures
 
@@ -341,7 +341,7 @@ Structure: see `last_answers` in section 1.1.
 | Property | Value |
 |---|---|
 | File type | `.png` |
-| Location and name | `Albufeira_preview.png` in the system temporary folder |
+| Location and name | `Portimao_preview.png` in the system temporary folder |
 
 Written, and opened in the default picture viewer, only when the experiment browser window cannot open. Overwritten by each preview.
 

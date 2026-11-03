@@ -235,48 +235,6 @@ def file_name_sanitiser(name: Any, default: str = 'experiment') -> str:
     return cleaned or default
 
 
-# ---- program_title_builder -----------------------------------------------------------
-def program_title_builder(root: Path, version: str) -> str:
-    """
-    ---- Summary ----
-    Main function to build the name shown at the top of the terminal, in the window
-    title and in the log: the program name, the git branch it was installed from (when
-    the folder is a git clone) and the version.
-
-    ---- Inputs ----
-    root : Path
-        Program folder.
-    version : str
-        Version text from the VERSION file.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    str
-        For example "Albufeira dev V2.7"; without a branch (a folder from a zip file)
-        "Albufeira V2.7".
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    branch = ''
-    try:
-        head = (root / '.git' / 'HEAD').read_text(encoding='utf-8').strip()
-        if head.startswith('ref:'):
-            branch = head.rsplit('/', 1)[-1]
-    except OSError:
-        pass
-    return ' '.join(part for part in ('Albufeira', branch, f'V{version}') if part)
-
-
 # ---- name_simplifier -----------------------------------------------------------------
 def name_simplifier(value: Any) -> str:
     """
@@ -306,3 +264,45 @@ def name_simplifier(value: Any) -> str:
     """
 
     return re.sub(r'[^a-z0-9]', '', str(value).lower())
+
+
+# ---- program_title_builder -----------------------------------------------------------
+def program_title_builder(root: Path, version: str) -> str:
+    """
+    ---- Summary ----
+    Main function to build the name shown at the top of the terminal, in the window
+    title and in the log: the program name, the git branch it was installed from (when
+    the folder is a git clone) and the version.
+
+    ---- Inputs ----
+    root : Path
+        Program folder.
+    version : str
+        Version text from the VERSION file.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        For example "Portimao dev V2.7"; without a branch (a folder from a zip file)
+        "Portimao V2.7".
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    branch = ''
+    try:
+        head = (root / '.git' / 'HEAD').read_text(encoding='utf-8').strip()
+        if head.startswith('ref:'):
+            branch = head.rsplit('/', 1)[-1]
+    except OSError:
+        pass
+    return ' '.join(part for part in ('Portimao', branch, f'V{version}') if part)
