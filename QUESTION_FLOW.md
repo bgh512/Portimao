@@ -1,4 +1,4 @@
-# Albufeira question flow (V2.7)
+# Albufeira question flow (V2.8)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -66,12 +66,33 @@ If the `fits/` folder holds no `.csv` file, 3.1 is not asked, a message says so,
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.1.1 | Which fit would you like to use? (a numbered list of the fit files) | **3.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **3.2** |
-| 3.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **3.2** |
+| 3.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last) | **3.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **3.2**; the last choice leads to **3.1.1.1** (after 3.1.2 if that is needed) |
+| 3.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **3.2** (or **3.1.1.1** when the components are being found) |
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
 | 3.2 | Do you accept this decomposition? | **3.3** | **3.1** (choose the fit again) |
+
+#### 3.A.1 Components from the data (principal component analysis)
+
+Asked when the last choice of 3.1.1 is taken. The numbers keep counting up when a question is asked again, and each component name is a question of its own, so the numbers on screen can be higher than these. The files are read for their spectra (trimmed, without the ignored parts; this can take a moment) and a table shows how much each principal component explains and the error left. The plot window gets a *PCA components* picture after the files **(plot)**. It goes when the decomposition is drawn.
+
+| # | Question | Leads to |
+|---|---|---|
+| 3.1.1.1 | Where should the spectral window start (nm)? | **3.1.1.2** |
+| 3.1.1.2 | Where should the spectral window end (nm)? | the table, then **3.1.1.3** (or this question again if the analysis cannot be run, for example the window is too narrow) |
+| 3.1.1.3 | How many components should be used? (a whole number; the suggestion is the default) | **3.1.1.4** |
+| 3.1.1.4 | Do you want to rotate the components so each is as peak-like as possible (varimax)? `(Y/n)` | the components are drawn **(plot)**, then **3.1.1.5** |
+
+| # | Question | 1 → | 2 → | 3 → | 4 → |
+|---|---|---|---|---|---|
+| 3.1.1.5 | Do you accept these components? | **3.1.1.6** | **3.1.1.3** (the number of components) | **3.1.1.1** (the window) | **3.1.1** (choose a fit file instead) |
+
+| # | Question | Leads to |
+|---|---|---|
+| 3.1.1.6 | Do you want to name the components? `(y/N)` | yes: one question for each component (a name that is empty, has a comma or is used twice is asked again), then **3.1.1.7**; no (PC1, PC2, ...): **3.1.1.7** |
+| 3.1.1.7 | Do you want to save these components as a fit file in the fits folder? `(Y/n)` | yes: **3.1.1.8**; no: the decomposition is drawn **(plot)**, then **3.2** |
+| 3.1.1.8 | What should the fit file be called (without .csv)? | if the name exists, it asks whether to replace it (no asks for a name again); then the decomposition is drawn **(plot)**, then **3.2** |
 
 ### 3.B OD values
 

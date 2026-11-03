@@ -41,6 +41,7 @@ class PictureWindow:
     ---- Methods ----
     __init__
     _file_opener
+    extra_publisher
     figure_shower
     file_focuser
     output_capturer
@@ -126,6 +127,38 @@ class PictureWindow:
             pass  # the path is printed, so the picture can still be opened by hand
 
     # ---- MAIN METHODS ----------------------------------------------------------------
+
+    # ---- extra_publisher -------------------------------------------------------------
+    def extra_publisher(self, title: str, png: bytes) -> None:
+        """
+        ---- Summary ----
+        Method to show one more picture (such as the components found by the principal
+        component analysis): it is saved as a picture file and opened.
+
+        ---- Inputs ----
+        title : str
+            Name of the picture.
+        png : bytes
+            The picture.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Writes the picture file (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        pictures_publisher
+        """
+
+        self.pictures_publisher([(title, png)])
 
     # ---- figure_shower ---------------------------------------------------------------
     def figure_shower(self, figure: Figure) -> None:
@@ -308,4 +341,4 @@ class PictureWindow:
 
         ---- Helpers ----
         None.
-        """
+        """

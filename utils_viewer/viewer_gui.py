@@ -102,8 +102,9 @@ class ViewerGui:
     _picture_shower
     _step_taker
     _widgets_builder
-    file_focuser
+    extra_publisher
     figure_shower
+    file_focuser
     input_reader
     output_capturer
     pictures_publisher
@@ -274,6 +275,39 @@ class ViewerGui:
             self._renderer.stopper()
         self._root.destroy()
 
+    # ---- _display_names --------------------------------------------------------------
+    def _display_names(self) -> List[str]:
+        """
+        ---- Summary ----
+        Method to give the names for the drop-down: the experiment files are marked as
+        locked once the figures built from them are shown.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        List[str]
+            One text per entry of the list.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if not self._is_pictures:
+            return list(self._names)
+        return [f'[locked] {name}' if i < self._file_count else name
+                for i, name in enumerate(self._names)
+                ]
+
     # ---- _drain_runner ---------------------------------------------------------------
     def _drain_runner(self) -> None:
         """
@@ -329,39 +363,6 @@ class ViewerGui:
         flush()
         self._root.after(25, self._drain_runner)
 
-    # ---- _display_names --------------------------------------------------------------
-    def _display_names(self) -> List[str]:
-        """
-        ---- Summary ----
-        Method to give the names for the drop-down: the experiment files are marked as
-        locked once the figures built from them are shown.
-
-        ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        List[str]
-            One text per entry of the list.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        if not self._is_pictures:
-            return list(self._names)
-        return [f'[locked] {name}' if i < self._file_count else name
-                for i, name in enumerate(self._names)
-                ]
-
     # ---- _event_handler --------------------------------------------------------------
     def _event_handler(self, event: tuple) -> None:
         """
@@ -371,7 +372,7 @@ class ViewerGui:
         ---- Inputs ----
         event : tuple
             (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-            'image', 'closed' or 'finished'.
+            'extra', 'image', 'closed' or 'finished'.
 
         ---- Globals read ----
         None.
@@ -429,8 +430,24 @@ class ViewerGui:
             self._help.configure(text=FIGURES_HELP)
             self._nav_state(len(self._names) > 1)
             self._navigator(len(files))
+        elif kind == 'extra':
+            # One more picture (not a file) is listed after the files until the next
+            # preview is drawn from the settings.
+            title, png = event[1], event[2]
+            self._names = self._names[:self._file_count] + [title]
+            self._images[title] = png
+            self._failures.pop(title, None)
+            self._notes.pop(title, None)
+            self._has_spec = True
+            self._combo.configure(values=self._display_names())
+            self._nav_state(len(self._names) > 1)
+            self._navigator(len(self._names) - 1)
         elif kind == 'spec':
             spec, name = event[1], event[2]
+            if not self._is_pictures and len(self._names) > self._file_count:
+                self._names = self._names[:self._file_count]
+                self._index = min(self._index, self._file_count - 1)
+                self._combo.configure(values=self._display_names())
             self._version += 1
             self._previous = {**self._previous, **self._images}
             self._images, self._notes, self._failures = {}, {}, {}
@@ -1126,6 +1143,39 @@ class ViewerGui:
                              'starts.')
 
     # ---- MAIN METHODS ----------------------------------------------------------------
+
+    # ---- extra_publisher -------------------------------------------------------------
+    def extra_publisher(self, title: str, png: bytes) -> None:
+        """
+        ---- Summary ----
+        Method to show one more picture, such as the components found by the principal
+        component analysis, in the selector after the files. The files stay as they
+        were, and the picture goes when the next preview is drawn.
+
+        ---- Inputs ----
+        title : str
+            Name shown in the selector.
+        png : bytes
+            The picture.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the picture for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('extra', title, png))
 
     # ---- figure_shower ---------------------------------------------------------------
     def figure_shower(self, figure: Any) -> None:

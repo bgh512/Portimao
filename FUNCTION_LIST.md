@@ -1,7 +1,7 @@
 # Albufeira - Function List
 
 - **Project:** Albufeira
-- **Version:** V2.7
+- **Version:** V2.8
 - **Date:** 03/11/2026
 
 ## Contents
@@ -270,6 +270,18 @@
     - [`token_reader`](#token_reader)
     - [`u32_reader`](#u32_reader)
     - [`warning_printer`](#warning_printer)
+- [`utils_shared/pca_fitter.py`](#utils_sharedpca_fitterpy)
+    - [`_component_orienter`](#_component_orienter)
+    - [`_nuisance_basis_builder`](#_nuisance_basis_builder)
+    - [`_spectra_gridder`](#_spectra_gridder)
+    - [`_varimax_rotator`](#_varimax_rotator)
+    - [`component_builder`](#component_builder)
+    - [`component_count_suggester`](#component_count_suggester)
+    - [`component_finder`](#component_finder)
+    - [`fit_saver`](#fit_saver)
+    - [`fit_table_builder`](#fit_table_builder)
+- [`utils_shared/pca_plotter.py`](#utils_sharedpca_plotterpy)
+    - [`pca_figure_builder`](#pca_figure_builder)
 - [`utils_shared/questions.py`](#utils_sharedquestionspy)
     - [`UserQuit`](#userquit)
     - [`_input_reader`](#_input_reader)
@@ -366,6 +378,8 @@
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
     - [`preview_info_builder`](#preview_info_builder)
+    - [`pca_picture_builder`](#pca_picture_builder)
+    - [`pca_spectra_gatherer`](#pca_spectra_gatherer)
     - [`preview_drawer`](#preview_drawer)
     - [`preview_figure_builder`](#preview_figure_builder)
     - [`skipped_windows_finder`](#skipped_windows_finder)
@@ -373,14 +387,18 @@
     - [`PreviewRenderer`](#previewrenderer)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
     - [`_answers_previewer`](#_answers_previewer)
+    - [`_component_namer`](#_component_namer)
     - [`_empty_limits_builder`](#_empty_limits_builder)
     - [`_file_chooser`](#_file_chooser)
+    - [`_fit_file_saver`](#_fit_file_saver)
     - [`_limits_lister`](#_limits_lister)
     - [`_od_lister`](#_od_lister)
+    - [`_pca_table_lister`](#_pca_table_lister)
     - [`_review_asker`](#_review_asker)
     - [`_skipped_lister`](#_skipped_lister)
     - [`analysis_stage_runner`](#analysis_stage_runner)
     - [`browser_stage_runner`](#browser_stage_runner)
+    - [`pca_stage_runner`](#pca_stage_runner)
     - [`plots_stage_runner`](#plots_stage_runner)
     - [`trim_stage_runner`](#trim_stage_runner)
     - [`viewer_asker`](#viewer_asker)
@@ -9294,6 +9312,364 @@ None.
 None.
 ```
 
+## `utils_shared/pca_fitter.py`
+
+Principal component analysis of the spectra of several experiments, to find the
+
+### PCA FITTER HELPERS
+
+#### `_component_orienter`
+
+```text
+---- Summary ----
+Helper function to give each component the same convention as the fit files: its
+largest peak positive and equal to 1.
+
+---- Inputs ----
+vectors : np.ndarray
+    Components as columns, shape (n_wavelengths, n_components).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The components, each divided by its largest absolute value and with the sign
+    that makes that value positive.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+e = v x sign(v[i]) / |v[i]|, with i the position of the largest |v|.
+
+---- Helpers ----
+None.
+```
+
+#### `_nuisance_basis_builder`
+
+```text
+---- Summary ----
+Helper function to build the offset and scatter terms that the haem decomposition
+fits alongside the haems, as an orthonormal basis, so they can be taken out of the
+spectra before the components are searched for.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths of the spectra (nm).
+degree_of_scatter : int
+    Number of 1/wavelength^k scatter terms.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    Orthonormal columns spanning the constant and the scatter terms, shape
+    (n_wavelengths, degree_of_scatter + 1).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The columns are 1 and (1/wl^k - min) / (max - min) as in s_array_generator,
+orthonormalised by QR.
+
+---- Helpers ----
+None.
+```
+
+#### `_spectra_gridder`
+
+```text
+---- Summary ----
+Helper function to put the spectra of one file on the common wavelength grid.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths of the file (nm), ascending.
+spectra : np.ndarray
+    Spectra of the file, shape (n_spectra, n_wavelengths).
+grid : np.ndarray
+    The wavelengths to give the spectra at (nm).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    Spectra on the grid, shape (n_spectra, len(grid)). Spectra already on the grid
+    are returned as they are.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Linear interpolation of each spectrum at the grid wavelengths.
+
+---- Helpers ----
+None.
+```
+
+#### `_varimax_rotator`
+
+```text
+---- Summary ----
+Helper function to find the rotation that makes the components as simple as
+possible (each concentrated on a few wavelengths), which makes them look more like
+single haem spectra than the plain principal components do.
+
+---- Inputs ----
+loadings : np.ndarray
+    Components as columns, shape (n_wavelengths, n_components).
+max_iterations : int
+    Most iterations to run.
+tolerance : float
+    The iteration stops when the criterion improves by less than this fraction.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    Orthogonal rotation matrix, shape (n_components, n_components).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Varimax: maximise the variance of the squared loadings of every component. Each
+step is R = U V^T from the SVD of L^T (Lr^3 - Lr diag(sum Lr^2) / p), Lr = L R.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `component_builder`
+
+```text
+---- Summary ----
+Main function to take the first components of an analysis, optionally rotate them
+to simpler shapes, and give them the conventions of the fit files.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+count : int
+    Number of components to keep.
+rotate : bool
+    True to apply the varimax rotation (the components then span the same space and
+    leave the same residual, but are more peak-like).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {'wavelengths', 'components' (columns, largest peak = +1), 'explained' (fraction
+    of the variance of each component), 'residual_rms' (OD left unexplained),
+    'peaks' (wavelength of each peak), 'count', 'rotated'}. Components are ordered
+    by the variance they explain. Raises ValueError for an impossible count.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+residual RMS = sqrt((total variance - variance of the kept components) / number of
+values).
+
+---- Helpers ----
+_component_orienter
+_varimax_rotator
+```
+
+#### `component_count_suggester`
+
+```text
+---- Summary ----
+Main function to suggest how many components to use. This is a rule of thumb, not a
+proof: it looks for the biggest drop between neighbouring principal components
+(where the signal ends and the noise starts) and, when there is no clear drop,
+takes enough components to explain nearly all of the variance.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+
+---- Globals read ----
+ENOUGH_VARIANCE, MINIMUM_RATIO (module constants).
+
+---- Outputs ----
+int
+    Suggested number of components, at least 2 when two or more are available.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Singular value s_j = sqrt(eigenvalue j). Suggested k = the k from 2 to K-1 with the
+largest s_k / s_(k+1), if that ratio is at least 2; otherwise the smallest k with
+cumulative variance >= 99%.
+
+---- Helpers ----
+None.
+```
+
+#### `component_finder`
+
+```text
+---- Summary ----
+Main function to run a principal component analysis on the spectra of all the files
+together, inside a spectral window. The offset and scatter terms that the haem
+decomposition fits as well are removed from every spectrum first, and each file's
+average spectrum is removed, so the components describe how the spectra change and
+differences between preparations do not become components.
+
+---- Inputs ----
+spectra_sets : List[dict]
+    One entry per file: {'name', 'wavelengths' (nm), 'spectra' (n_spectra x
+    n_wavelengths, the same attenuation the decomposition uses)}; only the part
+    kept after trimming and ignoring.
+window : Tuple[float, float]
+    (start, end) wavelength of the analysis, in nm.
+max_components : int
+    Most components worked out.
+degree_of_scatter : int
+    Number of scatter terms (the same as the haem decomposition uses).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {'wavelengths', 'eigenvectors' (columns, orthonormal), 'eigenvalues',
+    'gram', 'total_variance', 'n_values', 'n_spectra', 'counts' ({file name: number
+    of spectra used}), 'window', 'degree_of_scatter'}. Raises ValueError when the
+    window or the data cannot be analysed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+X = spectra with the nuisance terms projected out and the file mean removed;
+G = sum over files of X^T X; the components are the eigenvectors of G.
+
+---- Helpers ----
+_nuisance_basis_builder
+_spectra_gridder
+```
+
+#### `fit_saver`
+
+```text
+---- Summary ----
+Main function to save a fit in the layout of the fit files in the fits folder
+(a header naming each haem over its wavelength column, one (wavelength, response)
+pair of columns per haem).
+
+---- Inputs ----
+fit : dict
+    Fit dictionary from fit_table_builder.
+path : Path
+    File to write (.csv).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The file written.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `fit_table_builder`
+
+```text
+---- Summary ----
+Main function to turn the components found into a fit dictionary, exactly as
+fit_importer gives for a fit file, so the haem decomposition can use it.
+
+---- Inputs ----
+result : dict
+    Result of component_builder.
+names : Optional[List[str]]
+    Name of each component; None names them PC1, PC2, ...
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {'haem_list': names, 'data': table of (wavelength, response) column pairs}.
+    The responses are the negated components (a peak of -1), as in the fit files,
+    because the decomposition negates the fit again.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+response = -component.
+
+---- Helpers ----
+None.
+```
+
+## `utils_shared/pca_plotter.py`
+
+Figure of the components found by the principal component analysis.
+
+### MAIN FUNCTIONS
+
+#### `pca_figure_builder`
+
+```text
+---- Summary ----
+Main function to draw the components found: their spectra (top), the share of the
+variance each principal component explains (bottom left) and the residual left
+after each number of components (bottom right), with the chosen number marked.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+result : dict
+    Result of component_builder (the chosen components).
+names : List[str]
+    Name of each component.
+colours : List[str]
+    Colours to give the components, repeated when there are more components.
+fig : Optional[Figure]
+    Figure to draw in; None makes a new one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Figure
+    The figure; matplotlib styling (fonts and sizes) is taken from the caller's
+    rcParams.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Residual RMS after k components = sqrt((total variance - sum of the first k
+eigenvalues) / number of values).
+
+---- Helpers ----
+None.
+```
+
 ## `utils_shared/questions.py`
 
 Helpers for asking numbered questions in the terminal.
@@ -11183,7 +11559,8 @@ yes_no_asker
 ```text
 ---- Summary ----
 Main function to ask whether to decompose the spectra into haems and which fit to
-use.
+use: a fit file, or (when a pca_runner is given) components found from the data
+with a principal component analysis.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -11196,9 +11573,13 @@ forced : bool
     True to skip the yes/no question (a figure that needs the haems was chosen).
 depth : int
     Numbering depth of the questions (1 = 3.1, 2 = 3.1.1).
+pca_runner : Optional[Callable]
+    Function (dataset, depth) that finds the components with a principal component
+    analysis and returns (fit file name, fit), or (None, None) when the user wants
+    a fit file instead. None leaves the option out.
 
 ---- Globals read ----
-None.
+PCA_CHOICE (module constant).
 
 ---- Outputs ----
 tuple
@@ -11943,8 +12324,9 @@ _pane_writer
 _picture_shower
 _step_taker
 _widgets_builder
-file_focuser
+extra_publisher
 figure_shower
+file_focuser
 input_reader
 output_capturer
 pictures_publisher
@@ -12043,6 +12425,33 @@ None.
 None.
 ```
 
+##### `_display_names`
+
+```text
+---- Summary ----
+Method to give the names for the drop-down: the experiment files are marked as
+locked once the figures built from them are shown.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    One text per entry of the list.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_drain_runner`
 
 ```text
@@ -12072,33 +12481,6 @@ _event_handler
 _pane_writer
 ```
 
-##### `_display_names`
-
-```text
----- Summary ----
-Method to give the names for the drop-down: the experiment files are marked as
-locked once the figures built from them are shown.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-List[str]
-    One text per entry of the list.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 ##### `_event_handler`
 
 ```text
@@ -12108,7 +12490,7 @@ Method to carry out one message from the other threads, on the window thread.
 ---- Inputs ----
 event : tuple
     (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-    'image', 'closed' or 'finished'.
+    'extra', 'image', 'closed' or 'finished'.
 
 ---- Globals read ----
 None.
@@ -12485,6 +12867,37 @@ None
 
 ---- Globals mutated ----
 None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `extra_publisher`
+
+```text
+---- Summary ----
+Method to show one more picture, such as the components found by the principal
+component analysis, in the selector after the files. The files stay as they
+were, and the picture goes when the next preview is drawn.
+
+---- Inputs ----
+title : str
+    Name shown in the selector.
+png : bytes
+    The picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the picture for the window (side effect).
 
 ---- Equations ----
 None.
@@ -13124,6 +13537,80 @@ None.
 
 ### MAIN FUNCTIONS
 
+#### `pca_picture_builder`
+
+```text
+---- Summary ----
+Main function to draw the components of the principal component analysis as a
+picture for the plot window, in the default journal style like the other previews.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+result : dict
+    Result of component_builder (the chosen components).
+names : List[str]
+    Name of each component.
+
+---- Globals read ----
+settings.EXTRA_COLOURS; PREVIEW_DPI, BROWSING_ANSWERS (module constants).
+
+---- Outputs ----
+bytes
+    The picture (PNG).
+
+---- Globals mutated ----
+None. Sets the matplotlib rcParams of the figure style (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+pca_figure_builder
+```
+
+#### `pca_spectra_gatherer`
+
+```text
+---- Summary ----
+Main function to collect, from every file, the spectra the principal component
+analysis uses: the part kept after trimming, without the ignored start and end,
+cut to the spectral window.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache).
+dataset : str
+    Spectral dataset holding the haem spectra.
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+window : Tuple[float, float]
+    (start, end) wavelength to keep, in nm. A little outside it is kept as well so
+    the analysis can put every file on one grid.
+progress : Optional[Any]
+    Function called with (number read, number of files); may be None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[List[dict], List[str]]
+    ([{'name', 'wavelengths', 'spectra'}], problems). A file that cannot be read or
+    has no spectra left is left out and named in the problems.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+Spectra kept where ignore_start <= t <= duration - ignore_end after trimming.
+
+---- Helpers ----
+_loaded_experiment_getter
+experiment_attenuation_adder
+experiment_trimmer
+preview_info_builder
+```
+
 #### `preview_drawer`
 
 ```text
@@ -13513,6 +14000,38 @@ None.
 None.
 ```
 
+#### `_component_namer`
+
+```text
+---- Summary ----
+Helper function to ask whether to name the components found (they are called PC1,
+PC2, ... otherwise) and, if so, what each is called.
+
+---- Inputs ----
+result : dict
+    Result of component_builder.
+depth : int
+    Numbering depth of the questions.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    The name of each component, all different.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+text_asker
+yes_no_asker
+```
+
 #### `_empty_limits_builder`
 
 ```text
@@ -13570,6 +14089,47 @@ None.
 choice_asker
 ```
 
+#### `_fit_file_saver`
+
+```text
+---- Summary ----
+Helper function to ask whether to keep the components found as a fit file in the
+fits folder, so they can be chosen like any other fit in later runs, and to save
+them.
+
+---- Inputs ----
+fit : dict
+    Fit dictionary from fit_table_builder.
+fits_folder : Path
+    Folder holding the fit .csv files.
+count : int
+    Number of components (used in the suggested file name).
+window : Tuple[float, float]
+    Spectral window used (nm), also used in the suggested file name.
+depth : int
+    Numbering depth of the questions.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    Name of the file saved, or None when nothing was saved.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and writes the fit file (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+fit_saver
+info_printer
+text_asker
+yes_no_asker
+```
+
 #### `_limits_lister`
 
 ```text
@@ -13622,6 +14182,40 @@ None. Prints to the terminal (side effect).
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+info_printer
+```
+
+#### `_pca_table_lister`
+
+```text
+---- Summary ----
+Helper function to print how much of the changes in the spectra each principal
+component explains, and what is left over if only the first few are used, so the
+number of components can be chosen.
+
+---- Inputs ----
+analysis : dict
+    Result of component_finder.
+suggestion : int
+    Number of components suggested.
+depth : int
+    Numbering depth of the lines.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+Residual RMS = sqrt((total variance - variance of the first k components) / number
+of values).
 
 ---- Helpers ----
 info_printer
@@ -13748,6 +14342,7 @@ averaging_asker
 decomposition_asker
 event_asker
 od_scaling_asker
+pca_stage_runner
 preview_drawer
 saved_values_reader
 ```
@@ -13787,6 +14382,62 @@ _file_chooser
 choice_asker
 info_printer
 preview_drawer
+```
+
+#### `pca_stage_runner`
+
+```text
+---- Summary ----
+Main function to find the components of the haem spectra from the data itself with
+a principal component analysis, instead of using a fit file. The user chooses the
+spectral window and the number of components, sees the components in the plot
+window, and can save them as a fit file in the fits folder.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary; the window is stored in it (pca_start, pca_end,
+    pca_rotate).
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file (trim_asker).
+fits_folder : Path
+    Folder holding the fit .csv files.
+dataset : str
+    Spectral dataset holding the haem spectra.
+depth : int
+    Numbering depth of the questions.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[Optional[str], Optional[dict]]
+    (fit file name, fit dictionary as fit_importer gives). (None, None) when the
+    user prefers to choose a fit file instead. The name is a description when the
+    fit was not saved.
+
+---- Globals mutated ----
+None. Reads the files, reads from and prints to the terminal, draws the plot window
+and may write a fit file (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_component_namer
+_fit_file_saver
+_pca_table_lister
+component_builder
+component_count_suggester
+component_finder
+fit_table_builder
+number_asker
+pca_picture_builder
+pca_spectra_gatherer
+yes_no_asker
 ```
 
 #### `plots_stage_runner`
@@ -14275,6 +14926,7 @@ PREVIEW_DPI (module constant).
 ---- Methods ----
 __init__
 _file_opener
+extra_publisher
 figure_shower
 file_focuser
 output_capturer
@@ -14335,6 +14987,36 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+##### `extra_publisher`
+
+```text
+---- Summary ----
+Method to show one more picture (such as the components found by the principal
+component analysis): it is saved as a picture file and opened.
+
+---- Inputs ----
+title : str
+    Name of the picture.
+png : bytes
+    The picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the picture file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+pictures_publisher
 ```
 
 ##### `figure_shower`

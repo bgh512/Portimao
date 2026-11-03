@@ -158,14 +158,14 @@ Windows and macOS may show a "do you trust this software" warning the first time
 
 1. Replace `assets/icon.png` with the new icon (a square PNG, ideally 1024 x 1024 pixels).
 2. Run `python launchers/make_icons.py` (inside the program's environment, for example `.venv\Scripts\python launchers\make_icons.py` on Windows or `.venv_unix/bin/python launchers/make_icons.py` on Mac and Linux). It makes `assets/icon.ico` (window, taskbar and Windows shortcut) and the Mac icon inside `Albufeira.app`.
-3. Delete the file `.shortcut_made`, then start Albufeira once, so the Desktop and Start menu shortcuts are made again with the new icon.
+3. Delete the file `.shortcut_made_albufeira`, then start Albufeira once, so the Desktop and Start menu shortcuts are made again with the new icon.
 
 
 ### 2.4 The questions
 
 1. **Your files:** the `.paf` folder and the results folder. The plots of the files then appear on the right.
 2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. The four questions (trim start, trim end, ignore start, ignore end) all work the same way: yes/no, how many minutes for ALL the data, then optionally how many minutes for each specific file. Ignore times count from the new 0 after trimming.
-3. **Analysis:** decompose the haems (which fit), enter the OD values (they are only checked here), average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
+3. **Analysis:** decompose the haems (which fit, or components found from your own data, section 2.7), enter the OD values (they are only checked here), average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
 4. **Individual experiment plots:** how the figure saved for each file looks, one choice at a time: oxygen and OCR, the haems and their order, how the haems are shown and whether they are scaled by OD, the event labels, then the journal and size.
 5. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
 6. **Experiment summaries:** time response (waterfall time points to skip, two kinetic traces, three decomposition plots), OCR and haem response (OCR, haem form, haems and order).
@@ -209,6 +209,25 @@ Everything goes into the results folder you chose:
 
 Both summary figures need a haem fit in `fits/`. File names must carry the information the figure needs: `knockdown_kcn_then_bd_run1` (strain, addition order, run) for the OCR and haem response, and `control_7hours` (group, hours) for the time response. Files whose names do not fit are listed and left out of that figure only.
 
+### 2.7 Finding the haem components from the data (PCA)
+
+Instead of a fit file, the haem decomposition can use components found from your own spectra with a principal component analysis (PCA). Choose *Find the components from the data (principal component analysis)* in the list of fits. Then:
+
+1. **Spectral window:** the start and end wavelength (nm) the analysis runs over. Choose where the haems you care about absorb (the default is 500 to 630 nm).
+2. **The data:** every spectrum of every file is analysed together, after trimming and without the ignored start and end. The offset and scatter terms that the decomposition fits anyway are taken out of each spectrum first, and each file's average spectrum is removed, so the components describe how the spectra change and differences between preparations do not become components.
+3. **Number of components:** a table shows how much of the change each principal component explains and how much error (OD) is left with that many; a number is suggested. The suggestion is a rule of thumb (the biggest drop between neighbouring components), not a proof, so check it against the plot. Use as few as describe the data; extra ones only fit noise.
+4. **Rotation:** optionally rotated (varimax) so each component is as peak-like as possible. This does not change how well the data is described, only the shapes.
+5. **The plot:** the plot window gets a *PCA components* picture after the files in the drop-down: the component spectra, how much each explains, and the error left for each number of components. It goes when the next preview is drawn. Accept, or change the number of components, the window, or choose a fit file instead.
+6. **Names and saving:** the components are called PC1, PC2, ... unless you name them. You can save them as a fit file in `fits/`, ready to be chosen like any other fit in later runs; the fit used for this run is the one found whether or not you save it.
+
+What to keep in mind:
+
+- Principal components are abstract shapes that explain the changes in the spectra. Where haem spectra overlap strongly (the c and b type haems do), a component is usually a mixture of haems, and the analysis cannot tell by itself which haem is which. The fit to the data is still good; what the components mean is for you to decide, for example by comparing their peaks with known haem spectra.
+- Each component is scaled so its largest peak is 1, with the sign that makes that peak positive. The "concentrations" from a PCA fit are therefore in arbitrary units, not uM. The delta A values (mOD) are in real absorbance units.
+- The components describe changes, so the absolute values of the decomposition include a constant offset. The delta A values remove it.
+- It needs spectra that change: with files in which a haem never changes, that haem cannot be found.
+- This has been tested on synthetic spectra only, not on real `.paf` data.
+
 ## 3. Project structure
 
 ```
@@ -225,6 +244,8 @@ Albufeira/
         paf_reader.py       direct .paf reader
         experiment_processing.py   the processing steps shared by the run and the previews
         output_capture.py   per-thread capture of printed output
+        pca_fitter.py       principal component analysis of the spectra (components, fit file)
+        pca_plotter.py      the figure of the components found
         ...
     utils_viewer/           the experiment browser (window with the questions and the plots)
         __init__.py

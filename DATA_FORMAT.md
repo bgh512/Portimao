@@ -133,6 +133,46 @@ Added to each experiment of the time response figure by `utils_custom`.
 | `'difference_spectrum'` | dict | | | `'wavelengths'` (n_wavelengths,), `'spectrum'` (n_wavelengths,), `'minuend'`, `'subtrahend'` (window names; the spectrum is minuend minus subtrahend) |
 | `'difference_decomposition'` | dict | | | `'haem_names'` (n_haems), `'coefficients'` (n_haems), `'haem_percentages'` (n_haems, %), `'percent_basis'` (signed or absolute), `'filtered_data'`, `'scatter'`, `'no_scatter'`, `'haem_total'` (each n_wavelengths) and `'haem_individual'` (n_haems arrays of n_wavelengths) |
 
+#### `fit`
+
+A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds the components found by the principal component analysis.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names, in file order |
+| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the negated response as the basis spectrum |
+
+#### `pca_analysis`
+
+Returned by `component_finder` (`utils_shared/pca_fitter.py`): the principal component analysis of the spectra of all files inside a spectral window.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'wavelengths'` | np.ndarray | (n_wavelengths) | nm | The common grid inside the window |
+| `'eigenvectors'` | np.ndarray | (n_wavelengths, n_components) | | Orthonormal principal components as columns, largest first |
+| `'eigenvalues'` | np.ndarray | (n_components) | OD^2 | Variance of each principal component (sum of squares over all spectra) |
+| `'gram'` | np.ndarray | (n_wavelengths, n_wavelengths) | OD^2 | Sum over files of X^T X, where X are the cleaned spectra |
+| `'total_variance'` | float | | OD^2 | Trace of `'gram'` |
+| `'n_values'` | int | | | Number of spectra x number of wavelengths |
+| `'n_spectra'` | int | | | Number of spectra used |
+| `'counts'` | dict | | | `{file name: number of spectra used}` |
+| `'window'` | Tuple[float, float] | | nm | First and last wavelength used |
+| `'degree_of_scatter'` | int | | | Scatter terms taken out of every spectrum first |
+
+#### `pca_result`
+
+Returned by `component_builder`: the chosen number of components, optionally rotated and in the convention of the fit files.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'wavelengths'` | np.ndarray | (n_wavelengths) | nm | As in `pca_analysis` |
+| `'components'` | np.ndarray | (n_wavelengths, count) | | Components as columns, each with its largest peak equal to +1, ordered by the variance they explain |
+| `'explained'` | np.ndarray | (count) | | Fraction of the total variance of each component |
+| `'residual_rms'` | float | | OD | Root mean square of what the components leave unexplained |
+| `'peaks'` | np.ndarray | (count) | nm | Wavelength of each component's largest peak |
+| `'count'` | int | | | Number of components |
+| `'rotated'` | bool | | | True when the varimax rotation was applied |
+
 #### `last_answers`
 
 Saved to `last_answers.json` next to `main.py` and offered as the defaults on the next run.
@@ -223,6 +263,20 @@ Attenuation (or transmission, or intensity) of one spectral dataset.
 | measurement columns | float | see `experiment` | One per trace or haem |
 
 The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End time (min)` and, per measurement, `<name> mean`, `<name> SD` and `<name> change from baseline (%)`.
+
+#### `fit csv`
+
+| Property | Value |
+|---|---|
+| File type | CSV |
+| Delimiter | comma |
+| Encoding | UTF-8 (line ends CRLF when written by the program) |
+| Location and name | `fits/<name>.csv`; the program saves the components found by the principal component analysis here |
+
+| Column | Type | Units | Description |
+|---|---|---|---|
+| `<haem>` | float | nm | Wavelength column of one haem; the header names the haem (every second column, starting with the first) |
+| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of -1 (the decomposition negates the fit) |
 
 #### `spectral csv`
 

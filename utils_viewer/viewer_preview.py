@@ -4,6 +4,7 @@ Processing and drawing of one experiment as a preview figure.
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import copy
+import io
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -12,14 +13,18 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.figure import Figure
 
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.paf_reader import experiment_paf_loader
+from utils_shared.pca_plotter import pca_figure_builder
+from utils_shared.trimming import experiment_trimmer
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -235,6 +240,139 @@ def preview_info_builder(summary: dict, limits: dict, details: dict) -> dict:
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- pca_picture_builder -------------------------------------------------------------
+def pca_picture_builder(analysis: dict, result: dict, names: List[str]) -> bytes:
+    """
+    ---- Summary ----
+    Main function to draw the components of the principal component analysis as a
+    picture for the plot window, in the default journal style like the other previews.
+
+    ---- Inputs ----
+    analysis : dict
+        Result of component_finder.
+    result : dict
+        Result of component_builder (the chosen components).
+    names : List[str]
+        Name of each component.
+
+    ---- Globals read ----
+    settings.EXTRA_COLOURS; PREVIEW_DPI, BROWSING_ANSWERS (module constants).
+
+    ---- Outputs ----
+    bytes
+        The picture (PNG).
+
+    ---- Globals mutated ----
+    None. Sets the matplotlib rcParams of the figure style (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    pca_figure_builder
+    """
+
+    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS, **BROWSING_ANSWERS))
+    plt.rcParams.update(cfg.RC_PARAMS)
+    width = cfg.FIGURE_SIZE[0]
+    fig = Figure(figsize=(width, width * 0.8), dpi=PREVIEW_DPI)
+    pca_figure_builder(analysis, result, names, settings.EXTRA_COLOURS, fig)
+    fig.set_layout_engine('constrained')
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=PREVIEW_DPI)
+    return buffer.getvalue()
+
+
+# ---- pca_spectra_gatherer ------------------------------------------------------------
+def pca_spectra_gatherer(session: ViewerSession,
+                         dataset: str,
+                         limits: dict,
+                         window: Tuple[float, float],
+                         progress: Optional[Any] = None,
+                         ) -> Tuple[List[dict], List[str]]:
+    """
+    ---- Summary ----
+    Main function to collect, from every file, the spectra the principal component
+    analysis uses: the part kept after trimming, without the ignored start and end,
+    cut to the spectral window.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (files, window, cache).
+    dataset : str
+        Spectral dataset holding the haem spectra.
+    limits : dict
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+    window : Tuple[float, float]
+        (start, end) wavelength to keep, in nm. A little outside it is kept as well so
+        the analysis can put every file on one grid.
+    progress : Optional[Any]
+        Function called with (number read, number of files); may be None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[List[dict], List[str]]
+        ([{'name', 'wavelengths', 'spectra'}], problems). A file that cannot be read or
+        has no spectra left is left out and named in the problems.
+
+    ---- Globals mutated ----
+    None. Reads the files (side effect).
+
+    ---- Equations ----
+    Spectra kept where ignore_start <= t <= duration - ignore_end after trimming.
+
+    ---- Helpers ----
+    _loaded_experiment_getter
+    experiment_attenuation_adder
+    experiment_trimmer
+    preview_info_builder
+    """
+
+    sets: List[dict] = []
+    problems: List[str] = []
+    for number, summary in enumerate(session.summaries, start=1):
+        name = summary['name']
+        try:
+            with session.window.output_capturer():
+                info = preview_info_builder(summary, limits, {})
+                experiment = _loaded_experiment_getter(session, summary, dataset)
+                if info['trim_start'] is not None or info['trim_end'] is not None:
+                    experiment_trimmer(experiment,
+                                       start_time=info['trim_start'],
+                                       end_time=info['trim_end'],
+                                       )
+                experiment_attenuation_adder(experiment,
+                                             mode=settings.TRANSMISSION_MODE,
+                                             datasets=(dataset,),
+                                             )
+            data = experiment['raw_spectra'][dataset]
+            times = np.asarray(data['time'], dtype=float)
+            duration = float(experiment['CcO2'].iloc[-1, 0])
+            keep = ((times >= info['ignore_start'])
+                    & (times <= duration - info['ignore_end'])
+                    & np.isfinite(times)
+                    )
+            wavelengths = np.asarray(data['wavelengths'], dtype=float)
+            inside = (wavelengths >= window[0] - 2.0) & (wavelengths <= window[1] + 2.0)
+            spectra = np.asarray(data['attenuation'], dtype=float)[keep][:, inside]
+            if len(spectra) < 2:
+                problems.append(f'{name}: fewer than two spectra are left after '
+                                f'trimming and ignoring.',
+                                )
+            else:
+                sets.append({'name': name,
+                             'wavelengths': wavelengths[inside],
+                             'spectra': spectra,
+                             })
+        except Exception as exc:  # one unreadable file must not stop the others
+            problems.append(f'{name}: {type(exc).__name__}: {exc}')
+        if progress is not None:
+            progress(number, len(session.summaries))
+    return sets, problems
 
 
 # ---- preview_drawer ------------------------------------------------------------------
@@ -492,4 +630,4 @@ def skipped_windows_finder(session: ViewerSession,
         skipped = processed['experiment'].get('averages', {}).get('skipped')
         if skipped:
             found[summary['name']] = skipped
-    return found
+    return found

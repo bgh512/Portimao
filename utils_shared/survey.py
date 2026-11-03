@@ -42,6 +42,7 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'od': 'OCR / OD (µM min⁻¹ OD⁻¹)',
               'percent': 'OCR (% of the range)',
               }
+PCA_CHOICE = '__pca__'
 
 
 # ---- SURVEY HELPERS ------------------------------------------------------------------
@@ -747,11 +748,13 @@ def decomposition_asker(summaries: List[dict],
                         fits_folder: Path,
                         forced: bool = False,
                         depth: int = 1,
+                        pca_runner: Optional[Callable] = None,
                         ) -> tuple:
     """
     ---- Summary ----
     Main function to ask whether to decompose the spectra into haems and which fit to
-    use.
+    use: a fit file, or (when a pca_runner is given) components found from the data
+    with a principal component analysis.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -764,9 +767,13 @@ def decomposition_asker(summaries: List[dict],
         True to skip the yes/no question (a figure that needs the haems was chosen).
     depth : int
         Numbering depth of the questions (1 = 3.1, 2 = 3.1.1).
+    pca_runner : Optional[Callable]
+        Function (dataset, depth) that finds the components with a principal component
+        analysis and returns (fit file name, fit), or (None, None) when the user wants
+        a fit file instead. None leaves the option out.
 
     ---- Globals read ----
-    None.
+    PCA_CHOICE (module constant).
 
     ---- Outputs ----
     tuple
@@ -789,7 +796,7 @@ def decomposition_asker(summaries: List[dict],
     # ---- 1 Find the available fits ---------------------------------------------------
     none_chosen = (False, None, None, defaults['decomposition_dataset'])
     fits = sorted(fits_folder.glob('*.csv'), key=lambda p: p.name.lower())
-    if not fits:
+    if not fits and pca_runner is None:
         info_printer(f'No fit files (.csv) were found in {fits_folder}, so haems '
                      f'cannot be '
                      'decomposed this time. Put a fit .csv in that folder and run '
@@ -804,41 +811,61 @@ def decomposition_asker(summaries: List[dict],
         ):
         return none_chosen
 
-    # ---- 2 Choose and load the fit ---------------------------------------------------
+    def dataset_chooser(extra_depth: int) -> Optional[str]:
+        common = set(summaries[0]['datasets'])
+        for summary in summaries[1:]:
+            common &= set(summary['datasets'])
+        if not common:
+            info_printer('The files have no spectrometer in common, so haems cannot '
+                         'be decomposed.',
+                         )
+            return None
+        chosen = defaults['decomposition_dataset']
+        if chosen not in common:
+            options = sorted(common)
+            chosen = options[0]
+            if len(options) > 1:
+                chosen = choice_asker('Which spectrometer holds the haem spectra?',
+                                      [(o, o) for o in options],
+                                      options[0],
+                                      depth=depth + extra_depth,
+                                      )
+        return chosen
+
+    # ---- 2 Choose the fit, and the spectral dataset ----------------------------------
     names = [p.name for p in fits]
     default_fit = defaults.get('fit_file')
-    fit_file = choice_asker('Which fit would you like to use?',
-                            [(n, n) for n in names],
-                            default_fit if default_fit in names else names[0],
-                            depth=depth + (0 if forced else 1),
-                            )
-    try:
-        fit = fit_importer(fits_folder / fit_file)
-    except Exception as exc:
-        info_printer(f'The fit file could not be read ({exc}); haems will not be '
-                     f'decomposed.',
-                     )
+    choices = [(n, n) for n in names]
+    if pca_runner is not None:
+        choices.append((PCA_CHOICE, 'Find the components from the data (principal '
+                                    'component analysis)',
+                        ))
+    dataset = None
+    while True:
+        fit_file = choice_asker('Which fit would you like to use?',
+                                choices,
+                                default_fit if default_fit in names else choices[0][0],
+                                depth=depth + (0 if forced else 1),
+                                )
+        if fit_file == PCA_CHOICE:
+            dataset = dataset or dataset_chooser(1)
+            if dataset is None:
+                return none_chosen
+            fit_file, fit = pca_runner(dataset, depth + (0 if forced else 1) + 1)
+            if fit is None:
+                continue
+            break
+        try:
+            fit = fit_importer(fits_folder / fit_file)
+        except Exception as exc:
+            info_printer(f'The fit file could not be read ({exc}); haems will not be '
+                         f'decomposed.',
+                         )
+            return none_chosen
+        break
+    dataset = dataset or dataset_chooser(1)
+    if dataset is None:
         return none_chosen
-
-    # ---- 3 Choose the spectral dataset -----------------------------------------------
-    common = set(summaries[0]['datasets'])
-    for summary in summaries[1:]:
-        common &= set(summary['datasets'])
-    if not common:
-        info_printer('The files have no spectrometer in common, so haems cannot be '
-                     'decomposed.',
-                     )
-        return none_chosen
-    dataset = defaults['decomposition_dataset']
-    if dataset not in common:
-        options = sorted(common)
-        dataset = options[0]
-        if len(options) > 1:
-            dataset = choice_asker('Which spectrometer holds the haem spectra?',
-                                   [(o, o) for o in options],
-                                   options[0],
-                                   depth=depth + 1,
-                                   )
     return True, fit_file, fit, dataset
 
 
