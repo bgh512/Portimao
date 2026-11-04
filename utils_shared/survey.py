@@ -870,7 +870,10 @@ def decomposition_asker(summaries: List[dict],
 
 
 # ---- event_asker ---------------------------------------------------------------------
-def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
+def event_asker(summaries: List[dict],
+                saved: dict,
+                again: bool = False,
+                ) -> Dict[str, List[dict]]:
     """
     ---- Summary ----
     Main function to ask whether to change the event labels, concentrations and which
@@ -881,6 +884,9 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
         File summaries (DATA_FORMAT.md).
     saved : dict
         {file name: values read from its workbook} (read_saved_settings).
+    again : bool
+        True when the user asked to change the labels again: the yes/no question is
+        skipped and the runs are listed straight away.
 
     ---- Globals read ----
     None.
@@ -931,12 +937,12 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
         return result
 
     # ---- 2 Show the current events and ask which runs to change ----------------------
-    info_printer('Current runs and event labels are:')
+    info_printer('Current runs with events are:')
     for number, summary in enumerate(with_events, start=1):
         info_printer(f"{number}) {summary['name']}:")
         for event, entry in zip(summary['events'], result[summary['name']]):
             info_printer(_event_line_builder(event, entry), depth=2)
-    if not yes_no_asker('Do you want to change any event labels?', False):
+    if not again and not yes_no_asker('Do you want to change any event labels?', False):
         return result
     chosen = numbers_asker('Which run(s) do you want to change?',
                            len(with_events),

@@ -36,6 +36,7 @@ REPOSITORY_NAME = 'Portimao'  # the name of the GitHub repository after it is re
 HIDDEN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 REQUIRED_IMPORTS = 'import numpy, pandas, scipy, matplotlib, xlsxwriter, openpyxl, PIL'
 WAIT_SECONDS = 8.0
+MINIMUM_TK = 8.6  # Tk 8.5 (the one Apple's own Python uses) draws blank windows
 
 
 # ---- LAUNCHER HELPERS ----------------------------------------------------------------
@@ -117,8 +118,9 @@ def _message_shower(title: str, text: str) -> None:
             ctypes.windll.user32.MessageBoxW(0, text, title, 0x10)
             return
         if sys.platform == 'darwin':
-            script = f'display dialog "{text}" with title "{title}" buttons {{"OK"}}'
-            subprocess.run(['osascript', '-e', script.replace('\n', ' ')], check=False)
+            safe = text.replace('\\', ' ').replace('"', "'").replace('\n', ' ')
+            script = f'display dialog "{safe}" with title "{title}" buttons {{"OK"}}'
+            subprocess.run(['osascript', '-e', script], check=False)
             return
         for tool in (['zenity', '--error', '--title', title, '--text', text],
                      ['kdialog', '--error', text, '--title', title],
@@ -184,18 +186,57 @@ def _old_shortcut_remover() -> None:
                 pass
 
 
+# ---- _tk_version_getter --------------------------------------------------------------
+def _tk_version_getter(python: str) -> Optional[float]:
+    """
+    ---- Summary ----
+    Helper function to find which version of Tk (the toolkit of the program's window) a
+    Python has.
+
+    ---- Inputs ----
+    python : str
+        Path of the Python program to ask.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[float]
+        The Tk version (for example 8.6), or None when that Python has no Tk.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _command_runner
+    """
+
+    try:
+        asked = _command_runner([python,
+                                 '-c',
+                                 'import tkinter; print(tkinter.TkVersion)',
+                                 ])
+        return float(asked.stdout.strip()) if asked.returncode == 0 else None
+    except (ValueError, OSError):
+        return None
+
+
 # ---- _python_finder ------------------------------------------------------------------
 def _python_finder() -> Optional[str]:
     """
     ---- Summary ----
     Helper function to find a Python 3.9 or newer to build the private environment
-    with: the one running this launcher, or one on the path.
+    with: one with a Tk of at least 8.6 when there is one (the window is blank with the
+    Tk 8.5 of Apple's own Python), otherwise any Python 3.9 or newer.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    None.
+    MINIMUM_TK (module constant).
 
     ---- Outputs ----
     Optional[str]
@@ -208,21 +249,33 @@ def _python_finder() -> Optional[str]:
     None.
 
     ---- Helpers ----
-    None.
+    _command_runner
+    _tk_version_getter
     """
 
     candidates = [sys.executable] if sys.version_info >= (3, 9) else []
     candidates += [shutil.which(name) for name in ('python3', 'python')]
-    for candidate in candidates:
-        if not candidate:
-            continue
+    if sys.platform == 'darwin':
+        framework = '/Library/Frameworks/Python.framework/Versions'
+        candidates += [f'{framework}/Current/bin/python3',
+                       '/opt/homebrew/bin/python3',
+                       '/usr/local/bin/python3',
+                       ]
+        candidates += [f'{framework}/3.{minor}/bin/python3'
+                       for minor in range(14, 8, -1)
+                       ]
+    usable = []
+    for candidate in dict.fromkeys(c for c in candidates if c and Path(c).exists()):
         check = _command_runner([candidate,
                                  '-c',
                                  'import sys; sys.exit(sys.version_info < (3, 9))',
                                  ])
         if check.returncode == 0:
+            usable.append(candidate)
+    for candidate in usable:
+        if (_tk_version_getter(candidate) or 0) >= MINIMUM_TK:
             return candidate
-    return None
+    return usable[0] if usable else None
 
 
 # ---- _remote_renamer -----------------------------------------------------------------
@@ -280,7 +333,7 @@ def _status_window_maker() -> Optional[Callable[[str], None]]:
     None.
 
     ---- Globals read ----
-    APP_NAME (module constant).
+    APP_NAME, MINIMUM_TK (module constants).
 
     ---- Outputs ----
     Optional[Callable[[str], None]]
@@ -300,6 +353,8 @@ def _status_window_maker() -> Optional[Callable[[str], None]]:
     try:
         import tkinter as tk
         from tkinter import ttk
+        if tk.TkVersion < MINIMUM_TK:  # it would be a blank window
+            return None
         root = tk.Tk()
     except Exception:
         return None
@@ -345,7 +400,8 @@ def environment_builder(show: Callable[[str], None]) -> None:
         Function that shows a line of progress text.
 
     ---- Globals read ----
-    ROOT, ENVIRONMENT, ENVIRONMENT_PYTHON, REQUIRED_IMPORTS (module constants).
+    ROOT, ENVIRONMENT, ENVIRONMENT_PYTHON, MINIMUM_TK, REQUIRED_IMPORTS (module
+    constants).
 
     ---- Outputs ----
     None
@@ -360,8 +416,16 @@ def environment_builder(show: Callable[[str], None]) -> None:
     ---- Helpers ----
     _command_runner
     _python_finder
+    _tk_version_getter
     """
 
+    if ENVIRONMENT_PYTHON.exists() and (
+        (_tk_version_getter(str(ENVIRONMENT_PYTHON)) or 0) < MINIMUM_TK
+    ):
+        better = _python_finder()
+        if better and (_tk_version_getter(better) or 0) >= MINIMUM_TK:
+            show('Rebuilding the environment with a newer Python ...')
+            shutil.rmtree(ENVIRONMENT, ignore_errors=True)
     if ENVIRONMENT_PYTHON.exists():
         ready = _command_runner([str(ENVIRONMENT_PYTHON), '-c', REQUIRED_IMPORTS])
         if ready.returncode == 0:
@@ -403,7 +467,8 @@ def launcher_runner(show: Callable[[str], None]) -> int:
         Function that shows a line of progress text.
 
     ---- Globals read ----
-    APP_NAME, LOG_FILE, WAIT_SECONDS (module constants).
+    APP_NAME, ENVIRONMENT, ENVIRONMENT_PYTHON, LOG_FILE, MINIMUM_TK, WAIT_SECONDS
+    (module constants).
 
     ---- Outputs ----
     int
@@ -417,6 +482,7 @@ def launcher_runner(show: Callable[[str], None]) -> int:
 
     ---- Helpers ----
     _message_shower
+    _tk_version_getter
     environment_builder
     program_starter
     shortcut_maker
@@ -431,6 +497,20 @@ def launcher_runner(show: Callable[[str], None]) -> int:
                              env=environment)
             return 0
         environment_builder(show)
+        tk_version = _tk_version_getter(str(ENVIRONMENT_PYTHON))
+        if tk_version is None or tk_version < MINIMUM_TK:
+            reason = ('has no Tk (its window toolkit)'
+                      if tk_version is None
+                      else f'uses Tk {tk_version:g}, which draws blank windows'
+                      )
+            _message_shower(f'{APP_NAME} needs a newer Python',
+                            f'The Python found on this computer {reason}. Install '
+                            f'Python 3.12 or newer from '
+                            f'https://www.python.org/downloads/ (it includes a good '
+                            f'Tk), then delete the hidden folder '
+                            f'{ENVIRONMENT.name} inside the {APP_NAME} folder and open '
+                            f'{APP_NAME} again.')
+            return 1
         shortcut_maker()
         show(f'Opening {APP_NAME} ...')
         process = program_starter()
@@ -541,8 +621,9 @@ def shortcut_maker() -> None:
     """
     ---- Summary ----
     Main function to make the clickable icon the first time (and again if the folder
-    is moved): Desktop and Start menu shortcuts on Windows, an entry in the applications
-    menu and on the Desktop on Linux. A Mac uses the Portimao.app in the folder.
+    is moved): Desktop and Start menu shortcuts on Windows, a link to Portimao.app on
+    the Desktop on a Mac, an entry in the applications menu and on the Desktop on
+    Linux.
 
     ---- Inputs ----
     None.
@@ -576,6 +657,11 @@ def shortcut_maker() -> None:
             _command_runner(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                              '-WindowStyle', 'Hidden', '-File', str(script),
                              str(ROOT), str(target), str(ROOT / 'Portimao.pyw')])
+        elif sys.platform == 'darwin':
+            link = Path.home() / 'Desktop' / f'{APP_NAME}.app'
+            if link.is_symlink() or link.exists():
+                link.unlink() if link.is_symlink() else shutil.rmtree(link)
+            link.symlink_to(ROOT / f'{APP_NAME}.app')
         elif sys.platform.startswith('linux'):
             entry = (f'[Desktop Entry]\nType=Application\nName={APP_NAME}\n'
                      'Comment=Convert chamber .paf files to figures and data\n'

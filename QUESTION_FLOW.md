@@ -1,4 +1,4 @@
-# Portimao question flow (V3.0)
+# Portimao question flow (V2.9)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -48,7 +48,14 @@ The limits of every file are then listed and drawn **(plot)** one last time.
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
-| 2.5 | Do you accept these limits? | **3.1** | **2.1** |
+| 2.5 | Do you accept these limits? | **2.6** | **2.1** (the limits you entered are drawn as red dashed lines while you enter the new ones, so you can see how far to move them) |
+
+| # | Question | Yes → | No → |
+|---|---|---|---|
+| 2.6 | Do you want to export all the data now, cut to these limits, so you can plot it yourself? `(y/N)` | **2.6.1** | **3.1** |
+| 2.6.1 | Do you want to include the spectra as csv files (large, and it takes a while)? `(y/N)` | the data is exported to `<results>/all_data/<file>/` (a workbook per file with every sheet, plus the spectra csv files if chosen), then **3.1** | |
+
+The export is not scaled by OD, decomposed or averaged; event labels are the ones in the files, and the ignored parts are included.
 
 ---
 
@@ -134,7 +141,7 @@ If no file has any event, 3.7 and 3.8 are not asked and the next step is **3.9**
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.7 | *(the runs and their event labels are listed, then)* Do you want to change any event labels? `(y/N)` | **3.8** | the labels are drawn **(plot)**, then **3.9** |
+| 3.7 | *("Current runs with events are:" and the runs with their event labels are listed, then)* Do you want to change any event labels? `(y/N)` | **3.8** | the labels are drawn **(plot)**, then **3.9** |
 
 | # | Question | Leads to |
 |---|---|---|
@@ -144,7 +151,7 @@ If no file has any event, 3.7 and 3.8 are not asked and the next step is **3.9**
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
-| 3.9 | Do you accept these event labels? | **4.1** | **3.7** (change the labels again) |
+| 3.9 | Do you accept these event labels? | **4.1** | **3.8** (change the labels again: the runs are listed again and 3.7 is not asked) |
 
 ---
 

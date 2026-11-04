@@ -44,7 +44,8 @@ from utils_shared.survey import (averaging_asker,
                                  size_asker,
                                  trim_asker,
                                  )
-from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
+from utils_viewer.viewer_preview import (all_data_exporter,
+                                         BROWSING_ANSWERS,
                                          pca_picture_builder,
                                          pca_spectra_gatherer,
                                          preview_drawer,
@@ -66,6 +67,68 @@ STAGE_TITLES = {'browser': 'Experiment browser',
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
+
+
+# ---- _all_data_asker -----------------------------------------------------------------
+def _all_data_asker(session: ViewerSession, limits: Dict[str, dict]) -> None:
+    """
+    ---- Summary ----
+    Helper function to ask whether to export the data of every file now, cut to the
+    limits just accepted, so it can be plotted outside the program, and to do it.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal and writes the files (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    all_data_exporter
+    info_printer
+    progress_clearer
+    progress_printer
+    text_colourer
+    yes_no_asker
+    """
+
+    if not yes_no_asker('Do you want to export all the data now, cut to these limits, '
+                        'so you can plot it yourself?',
+                        False,
+                        ):
+        return
+    include_spectra = yes_no_asker('Do you want to include the spectra as csv files '
+                                   '(large, and it takes a while)?',
+                                   False,
+                                   depth=2,
+                                   )
+    folder, problems = all_data_exporter(
+        session,
+        limits,
+        include_spectra,
+        lambda n, total: progress_printer(f'Exporting file {n} of {total} ...'),
+    )
+    progress_clearer()
+    for problem in problems:
+        info_printer(text_colourer(f'Not exported: {problem}', WARNING_COLOUR), depth=2)
+    info_printer(f'Exported the data of {len(session.summaries) - len(problems)} '
+                 f'file(s) to {folder}. It is not scaled by OD, decomposed or '
+                 f'averaged, and the event labels are the ones in the files. The '
+                 f'ignored parts are included.',
+                 depth=2,
+                 )
 
 
 # ---- _answers_previewer --------------------------------------------------------------
@@ -730,8 +793,9 @@ def analysis_stage_runner(session: ViewerSession,
         defaults.update({k: answers[k] for k in ('window_minutes', 'gap_minutes')})
 
     # ---- 4 Event labels --------------------------------------------------------------
+    is_again = False
     while True:
-        for name, events in event_asker(summaries, saved).items():
+        for name, events in event_asker(summaries, saved, is_again).items():
             details[name]['events'] = events
             saved[name] = dict(saved.get(name) or {}, events=events)
         redraw()
@@ -741,6 +805,7 @@ def analysis_stage_runner(session: ViewerSession,
                          redraw,
                          ):
             break
+        is_again = True
     return fit, details
 
 
@@ -1174,6 +1239,8 @@ def trim_stage_runner(session: ViewerSession,
     ---- Summary ----
     Main function to ask the trim and ignore questions, adding the shaded trimmed and
     ignored parts to the plot window after every answer, and ask whether to accept them.
+    When the limits are asked again, the earlier ones stay on the plot as dashed lines.
+    After they are accepted, it offers to export all the data cut to them.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1199,6 +1266,7 @@ def trim_stage_runner(session: ViewerSession,
     None.
 
     ---- Helpers ----
+    _all_data_asker
     _answers_previewer
     _empty_limits_builder
     _limits_lister
@@ -1207,6 +1275,8 @@ def trim_stage_runner(session: ViewerSession,
     trim_asker
     """
 
+    previous: Dict[str, dict] = {}
+
     def draw(limits: Dict[str, dict]) -> bool:
         return preview_drawer(session,
                               _answers_previewer(answers, None, 'raw'),
@@ -1214,6 +1284,7 @@ def trim_stage_runner(session: ViewerSession,
                               None,
                               {},
                               show_trim=True,
+                              previous_limits=previous,
                               )
 
     while True:
@@ -1226,8 +1297,11 @@ def trim_stage_runner(session: ViewerSession,
                          'No, enter the limits again',
                          lambda: draw(limits),
                          ):
+            _all_data_asker(session, limits)
             return limits
         remembered = dict(remembered, **limits)
+        previous.clear()
+        previous.update(limits)
 
 
 # ---- viewer_asker --------------------------------------------------------------------

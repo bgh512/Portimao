@@ -146,9 +146,11 @@ The program has no command-line options. It asks numbered questions in the termi
 
 The launchers open Portimao without leaving a terminal window open.
 
-- Windows: double-click `Portimao.pyw` (or `run.bat`, whose window closes at once). The first time it also puts an Portimao icon on your Desktop and in the Start menu; use that from then on.
-- macOS: double-click `Portimao.app`.
+- Windows: double-click `Portimao.pyw` (or `run.bat`, whose window closes at once). The first time it also puts a Portimao icon on your Desktop and in the Start menu; use that from then on.
+- macOS: double-click `Portimao.app` (the first time it also puts a link to it on your Desktop).
 - Linux: run `./run.sh`; the first time it adds Portimao to the applications menu and the Desktop.
+
+**macOS:** use Python from python.org (it includes a Tk of version 8.6 or newer). The Python that comes with macOS (and some Xcode tools) has the old Tk 8.5, which draws a blank window. The launcher looks for a better Python itself, rebuilds its environment with it, and shows a message when it finds none; then install Python 3.12 or newer from python.org, delete the hidden folder `.venv_unix` inside the Portimao folder and open Portimao again.
 
 A small "Starting Portimao" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way.
 
@@ -164,7 +166,7 @@ Windows and macOS may show a "do you trust this software" warning the first time
 ### 2.4 The questions
 
 1. **Your files:** the `.paf` folder and the results folder. The plots of the files then appear on the right.
-2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. The four questions (trim start, trim end, ignore start, ignore end) all work the same way: yes/no, how many minutes for ALL the data, then optionally how many minutes for each specific file. Ignore times count from the new 0 after trimming.
+2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. The four questions (trim start, trim end, ignore start, ignore end) all work the same way: yes/no, how many minutes for ALL the data, then optionally how many minutes for each specific file. Ignore times count from the new 0 after trimming. Once the limits are accepted you can export all the data now, cut to them (a workbook per file in `<results>/all_data/`, optionally with the spectra), to plot it yourself.
 3. **Analysis:** decompose the haems (which fit, or components found from your own data, section 2.7), enter the OD values (they are only checked here), average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
 4. **Individual experiment plots:** how the figure saved for each file looks, one choice at a time: oxygen and OCR, the haems and their order, how the haems are shown and whether they are scaled by OD, the event labels, then the journal and size.
 5. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
@@ -177,9 +179,9 @@ Every figure asks for its own journal. Answering `None` uses Nature with the def
 
 The program runs in one window. The left side is a text terminal that asks the questions, with a box at the bottom to type your answers in (press Enter to send; the up and down keys recall earlier answers). If you type nothing, the value in [brackets] is used. The right side shows the plots of your files, with **< Prev** and **Next >** buttons and a drop-down list of the files under the plot. The arrows loop round, and Page Up and Page Down do the same from the keyboard. The window and the taskbar show the Portimao icon (on macOS the Dock icon needs the optional `pyobjc` package).
 
-The plot stays usable while a question waits. You can flick through every file at any time without answering, and the accept questions wait while you look. All files are drawn in the background with the latest answers, so flicking between them is quick. The plot is for looking: it cannot be clicked to change anything.
+Under the answer box is a row of **Symbols** (µ, superscript and subscript digits such as ⁻¹ and ₂, ±, °, Δ, Greek letters and more): click one to type it at the cursor, for example for event labels like `8 µg ml⁻¹`. The plot stays usable while a question waits. You can flick through every file at any time without answering, and the accept questions wait while you look. All files are drawn in the background with the latest answers, so flicking between them is quick. The plot is for looking: it cannot be clicked to change anything.
 
-- **Trimming and ignoring:** the plot shows the raw data, and after every answer the TRIMMED part (grey, hatched) or IGNORED part (amber) is added, so the shading builds up as you answer; for a specific file the plot switches to that file. Answer *Yes, accept* or *No, enter the limits again* (your answers are offered as the defaults).
+- **Trimming and ignoring:** the plot shows the raw data, and after every answer the TRIMMED part (grey, hatched) or IGNORED part (amber) is added, so the shading builds up as you answer; for a specific file the plot switches to that file. If you choose *No, enter the limits again*, the limits you entered before stay on the plot as red dashed lines while you enter the new ones. Answer *Yes, accept* or *No, enter the limits again* (your answers are offered as the defaults).
 - **Analysis:** the decomposition, averaging windows and event labels are each drawn for every file and accepted or asked again in the same way. An averaging window that does not fit between two additions (or after the last one) is skipped: it is drawn in red with a warning sign, and the terminal lists the files and windows affected so you can check it is OK. The OD values are listed and checked, but the data is not scaled by OD yet; that is chosen in the individual plots. Questions about one file (OD values, event labels) show that file.
 - **Individual experiment plots:** the figure is built up choice by choice. After each of these the plot is redrawn and you accept it or choose again: oxygen and OCR (and which OCR), the haems and their order, how the haems are shown (and whether they are scaled by OD), the event labels, and the journal and size.
 - **Multi-experiment plots and summaries:** the drop-down lists the individual experiment plots, marked `[locked]` (with a padlock drawn on the plot) because they are final, followed by the figure being built. The time response is built panel by panel: first which time points the waterfalls skip, with the other panels shown as empty boxes ("Kinetic trace 1", "Decomposition 2" ...), then each kinetic trace and decomposition plot as you choose it, each with its own accept question. The haem and OCR response starts with the OCR and the baseline plots, then adds all the haems when you choose how to show them, then redraws as you choose which haems and in what order. The side by side and 2x2 figures are drawn once their questions are answered. Every figure ends with a final accept question. This reads the files again, so it can take a moment. Nothing is written to the results folder until the run starts.
@@ -200,6 +202,7 @@ Everything goes into the results folder you chose:
 | Output | Description |
 |---|---|
 | `<experiment>/<experiment>.xlsx` and figure files | One workbook and one figure per experiment |
+| `all_data/<experiment>/<experiment>.xlsx` | Only if you chose to export all the data after the limits: every sheet of each file cut to the trim limits, not scaled or decomposed (plus the spectra csv files if chosen) |
 | `2x2_comparison.*` | Four experiments in a 2x2 grid |
 | `ocr_and_haem_response.*` | Baseline OCR bars, OCR response and haem response (`.png`, `.svg`) |
 | `ocr_and_haem_response.xlsx` | Run values, averages, SEM and every significance test, written so the maths can be checked by hand |
