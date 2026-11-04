@@ -146,8 +146,8 @@ The program has no command-line options. It asks numbered questions in the termi
 
 The launchers open Portimao without leaving a terminal window open.
 
-- Windows: double-click `Portimao.pyw` (or `run.bat`, whose window closes at once). The first time it also puts an Portimao icon on your Desktop and in the Start menu; use that from then on.
-- macOS: double-click `Portimao.app`.
+- Windows: double-click `Portimao.pyw` (or `run.bat`, whose window closes at once). The first time it also puts a Portimao icon on your Desktop and in the Start menu; use that from then on.
+- macOS: double-click `Portimao.app` (the first time it also puts a link to it on your Desktop).
 - Linux: run `./run.sh`; the first time it adds Portimao to the applications menu and the Desktop.
 
 **macOS:** use Python from python.org (it includes a Tk of version 8.6 or newer). The Python that comes with macOS (and some Xcode tools) has the old Tk 8.5, which draws a blank window. The launcher looks for a better Python itself, rebuilds its environment with it, and shows a message when it finds none; then install Python 3.12 or newer from python.org, delete the hidden folder `.venv_unix` inside the Portimao folder and open Portimao again.

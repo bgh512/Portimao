@@ -621,8 +621,9 @@ def shortcut_maker() -> None:
     """
     ---- Summary ----
     Main function to make the clickable icon the first time (and again if the folder
-    is moved): Desktop and Start menu shortcuts on Windows, an entry in the applications
-    menu and on the Desktop on Linux. A Mac uses the Portimao.app in the folder.
+    is moved): Desktop and Start menu shortcuts on Windows, a link to Portimao.app on
+    the Desktop on a Mac, an entry in the applications menu and on the Desktop on
+    Linux.
 
     ---- Inputs ----
     None.
@@ -656,6 +657,11 @@ def shortcut_maker() -> None:
             _command_runner(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                              '-WindowStyle', 'Hidden', '-File', str(script),
                              str(ROOT), str(target), str(ROOT / 'Portimao.pyw')])
+        elif sys.platform == 'darwin':
+            link = Path.home() / 'Desktop' / f'{APP_NAME}.app'
+            if link.is_symlink() or link.exists():
+                link.unlink() if link.is_symlink() else shutil.rmtree(link)
+            link.symlink_to(ROOT / f'{APP_NAME}.app')
         elif sys.platform.startswith('linux'):
             entry = (f'[Desktop Entry]\nType=Application\nName={APP_NAME}\n'
                      'Comment=Convert chamber .paf files to figures and data\n'
