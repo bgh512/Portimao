@@ -45,6 +45,14 @@ FIGURES_HELP = ('Select a figure using the drop-down, or use the arrows to look 
                 'each one. Experiment plots marked [locked] are final; the figure '
                 'being built is listed after them.')
 ENTRY_BACKGROUND = '#2b2b2b'
+MINIMUM_TK = 8.6  # Tk 8.5 (Apple's own Python) draws blank windows
+SYMBOL_FONTS = ('Segoe UI Symbol', 'Arial Unicode MS', 'Helvetica Neue', 'DejaVu Sans',
+               'Liberation Sans', 'Arial',
+               )
+# Characters that are hard to type, for event labels and other text answers.
+SYMBOLS = ('µ', '⁻¹', '⁻²', '⁻³', '²', '³', '₂', '₃', '₄', '⁺', '±', '°', 'Δ', 'α', 'β',
+           'γ', 'λ', '×', '·',
+           )
 PLOT_BACKGROUND = '#f2f2f2'
 _CLOSED = object()
 _active_gui: Optional['ViewerGui'] = None
@@ -101,6 +109,7 @@ class ViewerGui:
     _pane_writer
     _picture_shower
     _step_taker
+    _symbol_inserter
     _widgets_builder
     extra_publisher
     figure_shower
@@ -994,6 +1003,38 @@ class ViewerGui:
             return
         self._navigator(self._index + step, True)
 
+    # ---- _symbol_inserter ------------------------------------------------------------
+    def _symbol_inserter(self, symbol: str) -> None:
+        """
+        ---- Summary ----
+        Method to type a symbol (µ, a superscript -1, ...) into the answer box at the
+        cursor when a question is waiting for an answer.
+
+        ---- Inputs ----
+        symbol : str
+            The characters to add.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Adds text to the answer box (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self._is_waiting:
+            self._entry.insert('insert', symbol)
+        self._entry.focus_set()
+
     # ---- _widgets_builder ------------------------------------------------------------
     def _widgets_builder(self) -> None:
         """
@@ -1059,6 +1100,28 @@ class ViewerGui:
                               font=(self._family, 9),
                               )
         self._hint.pack(fill='x', padx=10)
+        symbol_family = next((f for f in SYMBOL_FONTS if f in families), self._family)
+        keys = tk.Frame(bottom, bg=TERMINAL_BACKGROUND)
+        tk.Label(keys,
+                 text='Symbols:',
+                 bg=TERMINAL_BACKGROUND,
+                 fg='#808080',
+                 font=(self._family, 9),
+                 ).pack(side='left', padx=(10, 6))
+        for symbol in SYMBOLS:
+            key = tk.Label(keys,
+                           text=symbol,
+                           bg='#333333',
+                           fg=TERMINAL_TEXT,
+                           font=(symbol_family, self._size),
+                           padx=5,
+                           cursor='hand2',
+                           )
+            key.pack(side='left', padx=1)
+            key.bind('<Button-1>', lambda e, text=symbol: self._symbol_inserter(text))
+            key.bind('<Enter>', lambda e, widget=key: widget.configure(bg='#4a4a4a'))
+            key.bind('<Leave>', lambda e, widget=key: widget.configure(bg='#333333'))
+        keys.pack(fill='x', pady=(4, 0))
         row = tk.Frame(bottom, bg=TERMINAL_BACKGROUND)
         tk.Label(row,
                  text='>',
@@ -1601,7 +1664,8 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
         Window title.
 
     ---- Globals read ----
-    os.environ["PORTIMAO_NO_GUI"] (set to anything to keep the terminal).
+    MINIMUM_TK (module constant); os.environ["PORTIMAO_NO_GUI"] (set to anything to
+    keep the terminal).
 
     ---- Outputs ----
     Optional[int]
@@ -1640,6 +1704,9 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
                 )
             except Exception:
                 pass
+        if tk.TkVersion < MINIMUM_TK:
+            raise GuiUnavailable(f'this Python has Tk {tk.TkVersion:g}, which draws '
+                                 f'blank windows; install Python from python.org')
         try:
             root = tk.Tk()
         except tk.TclError as exc:

@@ -21,6 +21,7 @@ from matplotlib.figure import Figure
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.experiment_processing import experiment_data_processor
+from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.paf_reader import experiment_paf_loader
 from utils_shared.pca_plotter import pca_figure_builder
@@ -37,6 +38,7 @@ BROWSING_ANSWERS = {key: settings.DEFAULT_ANSWERS[key]
                     }
 _cache_lock = threading.Lock()
 KEY_PREFIX = 'Key: '
+PREVIOUS_COLOUR = '#d62728'
 TRIM_COLOUR = '0.45'
 IGNORE_COLOUR = '#e8a317'
 
@@ -57,6 +59,7 @@ class PreviewSpec:
     details: dict
     show_trim: bool = False
     show_ignored: bool = True
+    previous_limits: dict = field(default_factory=dict)
 
 
 # ---- ViewerSession -------------------------------------------------------------------
@@ -239,7 +242,131 @@ def preview_info_builder(summary: dict, limits: dict, details: dict) -> dict:
     return info
 
 
+# ---- _previous_limit_drawer ----------------------------------------------------------
+def _previous_limit_drawer(axes: list,
+                           previous: dict,
+                           duration: float,
+                           ) -> bool:
+    """
+    ---- Summary ----
+    Helper function to draw the limits entered before as dashed lines on every panel
+    while new limits are being entered, so the user can see how far to move them.
+
+    ---- Inputs ----
+    axes : list
+        Panels of the preview.
+    previous : dict
+        {trim_start, trim_end, ignore_start, ignore_end} of this file in minutes, as
+        entered before (the trim times are on the original recording).
+    duration : float
+        Length of the whole recording in minutes.
+
+    ---- Globals read ----
+    PREVIOUS_COLOUR (module constant).
+
+    ---- Outputs ----
+    bool
+        True when at least one line was drawn.
+
+    ---- Globals mutated ----
+    None. Adds lines to the panels (side effect).
+
+    ---- Equations ----
+    Trim edges at trim_start and trim_end; ignore edges at trim_start + ignore_start and
+    (trim_end or duration) - ignore_end.
+
+    ---- Helpers ----
+    None.
+    """
+
+    start = previous.get('trim_start') or 0.0
+    end = previous.get('trim_end') or duration
+    edges = []
+    if previous.get('trim_start'):
+        edges.append(previous['trim_start'])
+    if previous.get('trim_end'):
+        edges.append(previous['trim_end'])
+    if previous.get('ignore_start'):
+        edges.append(start + previous['ignore_start'])
+    if previous.get('ignore_end'):
+        edges.append(end - previous['ignore_end'])
+    for edge in edges:
+        for ax in axes:
+            ax.axvline(edge, color=PREVIOUS_COLOUR, linestyle='--', linewidth=1.0,
+                       zorder=5)
+    return bool(edges)
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- all_data_exporter ---------------------------------------------------------------
+def all_data_exporter(session: ViewerSession,
+                      limits: dict,
+                      include_spectra: bool,
+                      progress: Optional[Any] = None,
+                      ) -> Tuple[Path, List[str]]:
+    """
+    ---- Summary ----
+    Main function to export the data of every file, cut to the trim limits, so it can
+    be plotted outside the program: one workbook per file with the oxygen, OCR and
+    event sheets, and optionally the spectra as csv files. No haem decomposition, OD
+    scaling or averaging is applied; the ignored parts are left in.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (files, results folder).
+    limits : dict
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+    include_spectra : bool
+        True to write the spectra as csv files too (large and slow).
+    progress : Optional[Any]
+        Function called with (number done, number of files); may be None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[Path, List[str]]
+        (folder written, problems). A file that could not be exported is named in the
+        problems and left out.
+
+    ---- Globals mutated ----
+    None. Reads the files and writes <results>/all_data/<file>/<file>.xlsx (and the
+    spectra) (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    experiment_data_processor
+    experiment_workbook_exporter
+    preview_info_builder
+    """
+
+    folder = session.export_root / 'all_data'
+    problems: List[str] = []
+    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS,
+                               decompose=False,
+                               normalise_od=False,
+                               averaging=False,
+                               export_spectra=include_spectra,
+                               ))
+    for number, summary in enumerate(session.summaries, start=1):
+        try:
+            with session.window.output_capturer():
+                info = preview_info_builder(summary, limits, {})
+                processed = experiment_data_processor(info, cfg, None)
+                experiment_workbook_exporter(processed['experiment'],
+                                             folder,
+                                             full=True,
+                                             spectra=include_spectra,
+                                             )
+        except Exception as exc:  # one bad file must not stop the others
+            problems.append(f"{summary['name']}: {type(exc).__name__}: {exc}")
+        if progress is not None:
+            progress(number, len(session.summaries))
+    return folder, problems
 
 
 # ---- pca_picture_builder -------------------------------------------------------------
@@ -384,6 +511,7 @@ def preview_drawer(session: ViewerSession,
                    show_trim: bool = False,
                    show_ignored: bool = True,
                    name: Optional[str] = None,
+                   previous_limits: Optional[dict] = None,
                    ) -> bool:
     """
     ---- Summary ----
@@ -410,6 +538,9 @@ def preview_drawer(session: ViewerSession,
         True to shade the ignored start and end in amber.
     name : Optional[str]
         File to show; None keeps the file being looked at.
+    previous_limits : Optional[dict]
+        Limits entered before, drawn as dashed lines while new ones are entered (only
+        with show_trim); None draws none.
 
     ---- Globals read ----
     None.
@@ -436,6 +567,7 @@ def preview_drawer(session: ViewerSession,
                        details=copy.deepcopy(details),
                        show_trim=show_trim,
                        show_ignored=show_ignored,
+                       previous_limits=copy.deepcopy(previous_limits or {}),
                        )
 
     # ---- 2 Hand them to the window or draw one picture -------------------------------
@@ -494,6 +626,7 @@ def preview_figure_builder(session: ViewerSession,
     preview_info_builder
     _loaded_experiment_getter
     _overlay_drawer
+    _previous_limit_drawer
     """
 
     # ---- 1 Set up the file and the settings ------------------------------------------
@@ -569,6 +702,13 @@ def preview_figure_builder(session: ViewerSession,
     elif spec.show_ignored and any(r[2] == 'ignore' and r[1] > r[0] for r in regions):
         note = 'amber = ignored in calculations'
     _overlay_drawer(fig, axes, regions, '')
+    if spec.show_trim and spec.previous_limits.get(name):
+        if _previous_limit_drawer(axes,
+                                  spec.previous_limits[name],
+                                  summary['duration_min'],
+                                  ):
+            note = ((f'{note}; ' if note else '')
+                    + 'red dashed = the limits you entered before')
     if note:  # shown above the file selector, not inside the picture
         notes = '\n'.join(line for line in (notes, f'{KEY_PREFIX}{note}') if line)
     return fig, notes

@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V3.0
-- **Date:** 03/11/2026
+- **Version:** V2.9
+- **Date:** 04/11/2026
 
 ## Contents
 
@@ -378,6 +378,8 @@
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
     - [`preview_info_builder`](#preview_info_builder)
+    - [`_previous_limit_drawer`](#_previous_limit_drawer)
+    - [`all_data_exporter`](#all_data_exporter)
     - [`pca_picture_builder`](#pca_picture_builder)
     - [`pca_spectra_gatherer`](#pca_spectra_gatherer)
     - [`preview_drawer`](#preview_drawer)
@@ -386,6 +388,7 @@
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
     - [`PreviewRenderer`](#previewrenderer)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
+    - [`_all_data_asker`](#_all_data_asker)
     - [`_answers_previewer`](#_answers_previewer)
     - [`_component_namer`](#_component_namer)
     - [`_empty_limits_builder`](#_empty_limits_builder)
@@ -11535,6 +11538,9 @@ summaries : List[dict]
     File summaries (DATA_FORMAT.md).
 saved : dict
     {file name: values read from its workbook} (read_saved_settings).
+again : bool
+    True when the user asked to change the labels again: the yes/no question is
+    skipped and the runs are listed straight away.
 
 ---- Globals read ----
 None.
@@ -12247,6 +12253,7 @@ _navigator
 _pane_writer
 _picture_shower
 _step_taker
+_symbol_inserter
 _widgets_builder
 extra_publisher
 figure_shower
@@ -12773,6 +12780,34 @@ None.
 _navigator
 ```
 
+##### `_symbol_inserter`
+
+```text
+---- Summary ----
+Method to type a symbol (µ, a superscript -1, ...) into the answer box at the
+cursor when a question is waiting for an answer.
+
+---- Inputs ----
+symbol : str
+    The characters to add.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds text to the answer box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_widgets_builder`
 
 ```text
@@ -13190,7 +13225,8 @@ title : str
     Window title.
 
 ---- Globals read ----
-os.environ["PORTIMAO_NO_GUI"] (set to anything to keep the terminal).
+MINIMUM_TK (module constant); os.environ["PORTIMAO_NO_GUI"] (set to anything to
+keep the terminal).
 
 ---- Outputs ----
 Optional[int]
@@ -13459,7 +13495,81 @@ None.
 None.
 ```
 
+#### `_previous_limit_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the limits entered before as dashed lines on every panel
+while new limits are being entered, so the user can see how far to move them.
+
+---- Inputs ----
+axes : list
+    Panels of the preview.
+previous : dict
+    {trim_start, trim_end, ignore_start, ignore_end} of this file in minutes, as
+    entered before (the trim times are on the original recording).
+duration : float
+    Length of the whole recording in minutes.
+
+---- Globals read ----
+PREVIOUS_COLOUR (module constant).
+
+---- Outputs ----
+bool
+    True when at least one line was drawn.
+
+---- Globals mutated ----
+None. Adds lines to the panels (side effect).
+
+---- Equations ----
+Trim edges at trim_start and trim_end; ignore edges at trim_start + ignore_start and
+(trim_end or duration) - ignore_end.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
+
+#### `all_data_exporter`
+
+```text
+---- Summary ----
+Main function to export the data of every file, cut to the trim limits, so it can
+be plotted outside the program: one workbook per file with the oxygen, OCR and
+event sheets, and optionally the spectra as csv files. No haem decomposition, OD
+scaling or averaging is applied; the ignored parts are left in.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, results folder).
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+include_spectra : bool
+    True to write the spectra as csv files too (large and slow).
+progress : Optional[Any]
+    Function called with (number done, number of files); may be None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[Path, List[str]]
+    (folder written, problems). A file that could not be exported is named in the
+    problems and left out.
+
+---- Globals mutated ----
+None. Reads the files and writes <results>/all_data/<file>/<file>.xlsx (and the
+spectra) (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_data_processor
+experiment_workbook_exporter
+preview_info_builder
+```
 
 #### `pca_picture_builder`
 
@@ -13562,6 +13672,9 @@ show_ignored : bool
     True to shade the ignored start and end in amber.
 name : Optional[str]
     File to show; None keeps the file being looked at.
+previous_limits : Optional[dict]
+    Limits entered before, drawn as dashed lines while new ones are entered (only
+    with show_trim); None draws none.
 
 ---- Globals read ----
 None.
@@ -13617,6 +13730,7 @@ None.
 preview_info_builder
 _loaded_experiment_getter
 _overlay_drawer
+_previous_limit_drawer
 ```
 
 #### `skipped_windows_finder`
@@ -13889,6 +14003,41 @@ None.
 The steps of the experiment browser: ask, redraw the plot window, then accept or repeat.
 
 ### STAGE HELPERS
+
+#### `_all_data_asker`
+
+```text
+---- Summary ----
+Helper function to ask whether to export the data of every file now, cut to the
+limits just accepted, so it can be plotted outside the program, and to do it.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and writes the files (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+all_data_exporter
+info_printer
+progress_clearer
+progress_printer
+text_colourer
+yes_no_asker
+```
 
 #### `_answers_previewer`
 
@@ -14418,6 +14567,8 @@ size_asker
 ---- Summary ----
 Main function to ask the trim and ignore questions, adding the shaded trimmed and
 ignored parts to the plot window after every answer, and ask whether to accept them.
+When the limits are asked again, the earlier ones stay on the plot as dashed lines.
+After they are accepted, it offers to export all the data cut to them.
 
 ---- Inputs ----
 session : ViewerSession
@@ -14443,6 +14594,7 @@ effects).
 None.
 
 ---- Helpers ----
+_all_data_asker
 _answers_previewer
 _empty_limits_builder
 _limits_lister
