@@ -11,10 +11,13 @@ from typing import Callable, Dict, List, Optional, Tuple
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.pca_fitter import (component_builder,
+                                     component_classifier,
                                      component_count_suggester,
                                      component_finder,
+                                     decomposition_example_finder,
                                      fit_saver,
                                      fit_table_builder,
+                                     TYPE_NAMES,
                                      )
 from utils_shared.questions import (choice_asker,
                                     heading_printer,
@@ -45,6 +48,7 @@ from utils_shared.survey import (averaging_asker,
                                  )
 from utils_viewer.viewer_preview import (all_data_exporter,
                                          BROWSING_ANSWERS,
+                                         pca_example_picture_builder,
                                          pca_picture_builder,
                                          pca_spectra_gatherer,
                                          preview_drawer,
@@ -58,6 +62,9 @@ from utils_viewer.viewer_window import PictureWindow
 # ---- CONSTANTS -----------------------------------------------------------------------
 PREVIEW_FILE = Path(tempfile.gettempdir()) / 'Portimao_preview.png'
 WARNING_COLOUR = '\x1b[1;31m'  # bold red
+PCA_COMPONENTS_TITLE = 'PCA components'
+PCA_EXAMPLES_TITLE = 'PCA examples (smallest and largest residual)'
+DEFAULT_SMOOTHING_NM = 4.0  # offered width of the smoothing of the PCA components
 STAGE_TITLES = {'browser': 'Experiment browser',
                 'trim': 'Trimming and ignoring',
                 'analysis': 'Analysis',
@@ -188,24 +195,28 @@ def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
 
 
 # ---- _component_namer ----------------------------------------------------------------
-def _component_namer(result: dict, depth: int) -> List[str]:
+def _component_namer(result: dict, types: List[str], depth: int) -> List[str]:
     """
     ---- Summary ----
-    Helper function to ask whether to name the components found (they are called PC1,
-    PC2, ... otherwise) and, if so, what each is called.
+    Helper function to ask whether to name the components and, if so, a name for each.
+    The suggested names follow the haem type each component looks like (a-like,
+    b-like, c-like, with a number when a type comes again).
 
     ---- Inputs ----
     result : dict
         Result of component_builder.
+    types : List[str]
+        Haem type of each component (component_classifier).
     depth : int
         Numbering depth of the questions.
 
     ---- Globals read ----
-    None.
+    TYPE_NAMES (pca_fitter constant).
 
     ---- Outputs ----
     List[str]
-        The name of each component, all different.
+        Name of each component: PC1, PC2, ... when the user does not name them. Names
+        are not empty, have no commas and are all different.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect).
@@ -222,15 +233,23 @@ def _component_namer(result: dict, depth: int) -> List[str]:
     names = [f'PC{i + 1}' for i in range(result['components'].shape[1])]
     if not yes_no_asker('Do you want to name the components?', False, depth=depth):
         return names
+    seen: Dict[str, int] = {}
+    suggestions = []
+    for i, kind in enumerate(types):
+        if kind in ('a', 'b', 'c'):
+            seen[kind] = seen.get(kind, 0) + 1
+            number = f' {seen[kind]}' if seen[kind] > 1 else ''
+            suggestions.append(f'{kind}-like{number}')
+        else:
+            suggestions.append(names[i])
     for i, peak in enumerate(result['peaks']):
-        others = [n for j, n in enumerate(names) if j != i]
         while True:
-            name = (text_asker(f'What is component {i + 1} (largest peak at '
-                               f'{peak:.0f} nm) called?',
-                               names[i],
+            name = (text_asker(f'What is component {i + 1} ({TYPE_NAMES[types[i]]}, '
+                               f'largest peak at {peak:.0f} nm) called?',
+                               suggestions[i],
                                depth=depth,
                                ) or '').strip()
-            if name and ',' not in name and name not in others:
+            if name and ',' not in name and name not in names[:i]:
                 names[i] = name
                 break
             info_printer('Use a name that is not empty, has no commas and is not used '
@@ -477,63 +496,73 @@ def _od_lister(details: Dict[str, dict]) -> None:
                      )
 
 
-# ---- _pca_table_lister ---------------------------------------------------------------
-def _pca_table_lister(analysis: dict, suggestion: int, depth: int) -> None:
+# ---- _pca_pictures_publisher ---------------------------------------------------------
+def _pca_pictures_publisher(session: ViewerSession,
+                            analysis: dict,
+                            result: dict,
+                            examples: Optional[dict],
+                            names: List[str],
+                            types: List[str],
+                            depth: int,
+                            ) -> None:
     """
     ---- Summary ----
-    Helper function to print how much of the changes in the spectra each principal
-    component explains, and what is left over if only the first few are used, so the
-    number of components can be chosen.
+    Helper function to put the two PCA pictures in the plot window: the examples of
+    how the spectra are decomposed (listed only) and the components (shown).
 
     ---- Inputs ----
+    session : ViewerSession
+        The browser session.
     analysis : dict
         Result of component_finder.
-    suggestion : int
-        Number of components suggested.
+    result : dict
+        Result of component_builder.
+    examples : Optional[dict]
+        Result of decomposition_example_finder; None leaves the examples out.
+    names : List[str]
+        Name of each component.
+    types : List[str]
+        Haem type of each component (component_classifier).
     depth : int
-        Numbering depth of the lines.
+        Numbering depth of the messages.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     None
-        Nothing.
+        Nothing. A picture that cannot be drawn is reported, never raised.
 
     ---- Globals mutated ----
-    None. Prints to the terminal (side effect).
+    None. Draws in the plot window (side effect).
 
     ---- Equations ----
-    Residual RMS = sqrt((total variance - variance of the first k components) / number
-    of values).
+    None.
 
     ---- Helpers ----
     info_printer
+    pca_example_picture_builder
+    pca_picture_builder
     """
 
-    values = analysis['eigenvalues']
-    total = analysis['total_variance']
-    info_printer(f"Analysed {analysis['n_spectra']} spectra from "
-                 f"{len(analysis['counts'])} files between "
-                 f"{analysis['window'][0]:g} and {analysis['window'][1]:g} nm.",
-                 depth=depth,
-                 )
-    info_printer('  Number   Explained   Total   Residual (OD)', depth=depth)
-    running = 0.0
-    for k, value in enumerate(values, start=1):
-        running += value
-        rms = max(total - running, 0.0) / analysis['n_values']
-        mark = '  <- suggested' if k == suggestion else ''
-        info_printer(f'  {k:>6}   {value / total * 100:8.3f}%   '
-                     f'{running / total * 100:6.2f}%   {rms ** 0.5:11.5f}{mark}',
-                     depth=depth,
-                     )
-    info_printer('The suggestion is a rule of thumb: the biggest drop between '
-                 'neighbouring components, where the signal ends and the noise '
-                 'starts. Use as few components as describe the data; extra ones only '
-                 'fit noise.',
-                 depth=depth,
-                 )
+    try:
+        if examples is not None:
+            session.window.extra_publisher(PCA_EXAMPLES_TITLE,
+                                           pca_example_picture_builder(examples,
+                                                                       names,
+                                                                       types,
+                                                                       ),
+                                           is_shown=False,
+                                           )
+        session.window.extra_publisher(PCA_COMPONENTS_TITLE,
+                                       pca_picture_builder(analysis,
+                                                           result,
+                                                           names,
+                                                           types,
+                                                           ),
+                                       )
+    except Exception as exc:  # a drawing problem must never stop the questions
+        info_printer(f'The PCA pictures could not be drawn ({exc}).', depth=depth)
 
 
 # ---- _review_asker -------------------------------------------------------------------
@@ -898,15 +927,16 @@ def pca_stage_runner(session: ViewerSession,
     ---- Summary ----
     Main function to find the components of the haem spectra from the data itself with
     a principal component analysis, instead of using a fit file. The user chooses the
-    spectral window and the number of components, sees the components in the plot
-    window, and can save them as a fit file in the fits folder.
+    spectral window and the number of components, sees each component in its own
+    panel and the best and worst described spectrum in the plot window, and can save
+    the components as a fit file in the fits folder.
 
     ---- Inputs ----
     session : ViewerSession
         The browser session.
     answers : dict
-        Answers dictionary; the window is stored in it (pca_start, pca_end,
-        pca_rotate).
+        Answers dictionary; the choices are stored in it (pca_start, pca_end,
+        pca_rotate, pca_count, pca_smoothing_nm).
     defaults : dict
         Default answers offered by the questions.
     limits : Dict[str, dict]
@@ -937,15 +967,16 @@ def pca_stage_runner(session: ViewerSession,
     ---- Helpers ----
     _component_namer
     _fit_file_saver
-    _pca_table_lister
+    _pca_pictures_publisher
     choice_asker
     component_builder
+    component_classifier
     component_count_suggester
     component_finder
+    decomposition_example_finder
     fit_table_builder
     info_printer
     number_asker
-    pca_picture_builder
     pca_spectra_gatherer
     progress_clearer
     progress_printer
@@ -965,6 +996,8 @@ def pca_stage_runner(session: ViewerSession,
     start = float(defaults.get('pca_start') or 500.0)
     end = float(defaults.get('pca_end') or 630.0)
     rotate = bool(defaults.get('pca_rotate', True))
+    count = int(defaults.get('pca_count') or 0)
+    smoothing = float(defaults.get('pca_smoothing_nm', DEFAULT_SMOOTHING_NM))
     while True:
         # ---- 1 Choose the window and read the spectra --------------------------------
         start = number_asker('Where should the spectral window start (nm)?',
@@ -1006,13 +1039,20 @@ def pca_stage_runner(session: ViewerSession,
             continue
         suggestion = component_count_suggester(analysis)
         available = len(analysis['eigenvalues'])
-        _pca_table_lister(analysis, suggestion, depth)
+        info_printer(f"Read {analysis['n_spectra']} spectra from "
+                     f"{len(analysis['counts'])} files between "
+                     f"{analysis['window'][0]:g} and {analysis['window'][1]:g} nm.",
+                     depth=depth,
+                     )
 
-        # ---- 2 Choose the components -------------------------------------------------
-        count = suggestion
+        # ---- 2 Find the components ---------------------------------------------------
+        count = min(count or suggestion, available)
         while True:
+            # ---- 2.1 Ask how many and whether to rotate ------------------------------
             while True:
-                value = number_asker('How many components should be used?',
+                value = number_asker(f'How many components should be found? (The data '
+                                     f'suggest {suggestion}; use as few as describe '
+                                     f'the data, extra ones only fit noise.)',
                                      count,
                                      minimum=1,
                                      maximum=available,
@@ -1027,25 +1067,51 @@ def pca_stage_runner(session: ViewerSession,
                                   rotate,
                                   depth=depth,
                                   )
-            result = component_builder(analysis, count, rotate)
+            smoothing = number_asker('Over how many nm should the components be '
+                                     'smoothed to remove their noise (0 for none)?',
+                                     smoothing,
+                                     minimum=0,
+                                     maximum=(end - start) / 4,
+                                     depth=depth,
+                                     )
+
+            # ---- 2.2 Build, describe and draw them -----------------------------------
+            result = component_builder(analysis, count, rotate, smoothing)
+            types = component_classifier(result['wavelengths'], result['components'])
             names = [f'PC{i + 1}' for i in range(count)]
             try:
-                session.window.extra_publisher('PCA components',
-                                               pca_picture_builder(analysis,
-                                                                   result,
-                                                                   names,
-                                                                   ),
-                                               )
-            except Exception as exc:  # a drawing problem must never stop the questions
-                info_printer(f'The components could not be drawn ({exc}).',
+                examples = decomposition_example_finder(sets,
+                                                        result,
+                                                        settings.DEGREE_OF_SCATTER,
+                                                        )
+            except ValueError as exc:
+                examples = None
+                info_printer(f'No example decomposition could be made ({exc}).',
                              depth=depth,
                              )
-            info_printer('Components (largest peak): ' + ', '.join(
-                f'PC{i + 1} {p:.0f} nm ({e * 100:.1f}%)'
-                for i, (p, e) in enumerate(zip(result['peaks'], result['explained']))
-            ) + f". Residual {result['residual_rms']:.5f} OD.",
-                         depth=depth,
-                         )
+            _pca_pictures_publisher(session,
+                                    analysis,
+                                    result,
+                                    examples,
+                                    names,
+                                    types,
+                                    depth,
+                                    )
+            for i, kind in enumerate(types):
+                info_printer(f"PC{i + 1}: {TYPE_NAMES[kind]}, largest peak "
+                             f"{result['peaks'][i]:.0f} nm, "
+                             f"{result['explained'][i] * 100:.1f}% of the change.",
+                             depth=depth,
+                             )
+            if examples is not None:
+                info_printer(f"Residual RMS: {examples['median_rms']:.2g} OD for a "
+                             f"typical spectrum, from {examples['best']['rms']:.2g} "
+                             f"to {examples['worst']['rms']:.2g} OD. The '"
+                             f"{PCA_EXAMPLES_TITLE}' picture shows the two extremes.",
+                             depth=depth,
+                             )
+
+            # ---- 2.3 Accept or change them -------------------------------------------
             choice = choice_asker('Do you accept these components?',
                                   [('yes', 'Yes, accept'),
                                    ('count', 'No, change the number of components'),
@@ -1063,17 +1129,24 @@ def pca_stage_runner(session: ViewerSession,
             break
 
     # ---- 3 Name and save the components ----------------------------------------------
-    names = _component_namer(result, depth)
+    names = _component_namer(result, types, depth)
     if names != [f'PC{i + 1}' for i in range(count)]:
-        try:
-            session.window.extra_publisher('PCA components',
-                                           pca_picture_builder(analysis, result, names),
-                                           )
-        except Exception:  # the unnamed picture stays
-            pass
+        _pca_pictures_publisher(session,
+                                analysis,
+                                result,
+                                examples,
+                                names,
+                                types,
+                                depth,
+                                )
     fit = fit_table_builder(result, names)
     saved = _fit_file_saver(fit, fits_folder, count, analysis['window'], depth)
-    answers.update({'pca_start': start, 'pca_end': end, 'pca_rotate': rotate})
+    answers.update({'pca_start': start,
+                    'pca_end': end,
+                    'pca_rotate': rotate,
+                    'pca_count': count,
+                    'pca_smoothing_nm': smoothing,
+                    })
     return (saved or f'PCA, {count} components, {start:g}-{end:g} nm (not saved)'), fit
 
 

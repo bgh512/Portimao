@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V3.0
+- **Version:** V3.1
 - **Date:** 04/11/2026
 
 ## Contents
@@ -9,6 +9,7 @@
 - [`config.py`](#configpy)
     - [`Config`](#config)
     - [`haem_colour_mapper`](#haem_colour_mapper)
+    - [`pca_colour_mapper`](#pca_colour_mapper)
 - [`launchers/make_icons.py`](#launchersmake_iconspy)
     - [`main`](#main)
 - [`main.py`](#mainpy)
@@ -273,14 +274,20 @@
 - [`utils_shared/pca_fitter.py`](#utils_sharedpca_fitterpy)
     - [`_component_orienter`](#_component_orienter)
     - [`_nuisance_basis_builder`](#_nuisance_basis_builder)
+    - [`_peak_finder`](#_peak_finder)
     - [`_spectra_gridder`](#_spectra_gridder)
     - [`_varimax_rotator`](#_varimax_rotator)
     - [`component_builder`](#component_builder)
+    - [`component_classifier`](#component_classifier)
     - [`component_count_suggester`](#component_count_suggester)
     - [`component_finder`](#component_finder)
+    - [`decomposition_example_finder`](#decomposition_example_finder)
     - [`fit_saver`](#fit_saver)
     - [`fit_table_builder`](#fit_table_builder)
 - [`utils_shared/pca_plotter.py`](#utils_sharedpca_plotterpy)
+    - [`_example_drawer`](#_example_drawer)
+    - [`_reference_line_drawer`](#_reference_line_drawer)
+    - [`pca_example_figure_builder`](#pca_example_figure_builder)
     - [`pca_figure_builder`](#pca_figure_builder)
 - [`utils_shared/questions.py`](#utils_sharedquestionspy)
     - [`UserQuitError`](#userquiterror)
@@ -380,6 +387,7 @@
     - [`preview_info_builder`](#preview_info_builder)
     - [`_previous_limit_drawer`](#_previous_limit_drawer)
     - [`all_data_exporter`](#all_data_exporter)
+    - [`pca_example_picture_builder`](#pca_example_picture_builder)
     - [`pca_picture_builder`](#pca_picture_builder)
     - [`pca_spectra_gatherer`](#pca_spectra_gatherer)
     - [`preview_drawer`](#preview_drawer)
@@ -396,7 +404,7 @@
     - [`_fit_file_saver`](#_fit_file_saver)
     - [`_limits_lister`](#_limits_lister)
     - [`_od_lister`](#_od_lister)
-    - [`_pca_table_lister`](#_pca_table_lister)
+    - [`_pca_pictures_publisher`](#_pca_pictures_publisher)
     - [`_review_asker`](#_review_asker)
     - [`_skipped_lister`](#_skipped_lister)
     - [`analysis_stage_runner`](#analysis_stage_runner)
@@ -607,6 +615,38 @@ None.
 
 ---- Helpers ----
 name_simplifier
+```
+
+#### `pca_colour_mapper`
+
+```text
+---- Summary ----
+Main function to give each PCA component a plot colour from the haem type its peaks
+look like: green for a-like, blue for b-like, red for c-like, with a darker then a
+lighter shade for each further component of the same type, and a colour no haem
+type has for mixed or unknown components.
+
+---- Inputs ----
+types : List[str]
+    Type of each component: 'a', 'b', 'c', 'mixed' or 'unknown'
+    (pca_fitter.component_classifier).
+
+---- Globals read ----
+PCA_TYPE_COLOURS (module constant).
+
+---- Outputs ----
+List[str]
+    Hex colour of each component, in the same order. Colours repeat only when a
+    type has more components than shades.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `launchers/make_icons.py`
@@ -9311,6 +9351,39 @@ orthonormalised by QR.
 None.
 ```
 
+#### `_peak_finder`
+
+```text
+---- Summary ----
+Helper function to find the clear peaks and troughs of a component, ignoring the
+small bumps that noise makes.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths (nm), ascending and evenly spaced, shape (n_wavelengths).
+values : np.ndarray
+    The component, shape (n_wavelengths).
+
+---- Globals read ----
+PEAK_SHARE, PROMINENCE_SHARE, SMOOTHING_NM (module constants).
+
+---- Outputs ----
+List[float]
+    Wavelength of each peak or trough (nm), in order.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+s = running mean of the component over SMOOTHING_NM; a peak is a local maximum of
+|s| that is at least PEAK_SHARE x max|s| high and rises at least PROMINENCE_SHARE x
+max|s| above the higher of the lowest points between it and the next higher point
+on either side (its prominence).
+
+---- Helpers ----
+None.
+```
+
 #### `_spectra_gridder`
 
 ```text
@@ -9384,7 +9457,8 @@ None.
 ```text
 ---- Summary ----
 Main function to take the first components of an analysis, optionally rotate them
-to simpler shapes, and give them the conventions of the fit files.
+to simpler shapes and smooth away their noise, and give them the conventions of the
+fit files.
 
 ---- Inputs ----
 analysis : dict
@@ -9394,27 +9468,69 @@ count : int
 rotate : bool
     True to apply the varimax rotation (the components then span the same space and
     leave the same residual, but are more peak-like).
+smoothing_nm : float
+    Width (nm) of the Savitzky-Golay smoothing of each component; 0 (or a width
+    under three wavelength steps) leaves them as found.
 
 ---- Globals read ----
-None.
+SMOOTHING_ORDER (module constant).
 
 ---- Outputs ----
 dict
     {'wavelengths', 'components' (columns, largest peak = +1), 'explained' (fraction
     of the variance of each component), 'residual_rms' (OD left unexplained),
-    'peaks' (wavelength of each peak), 'count', 'rotated'}. Components are ordered
-    by the variance they explain. Raises ValueError for an impossible count.
+    'peaks' (wavelength of each peak), 'count', 'rotated', 'smoothing_nm' (the
+    width used, 0 for none)}. Components are ordered by the variance they explain;
+    'explained' and 'residual_rms' are those of the components before smoothing.
+    Raises ValueError for an impossible count or a negative smoothing width.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
 residual RMS = sqrt((total variance - variance of the kept components) / number of
-values).
+values). Smoothing fits a polynomial of order SMOOTHING_ORDER over a window of
+smoothing_nm (an odd number of points) around every wavelength.
 
 ---- Helpers ----
 _component_orienter
 _varimax_rotator
+```
+
+#### `component_classifier`
+
+```text
+---- Summary ----
+Main function to say which haem type each component looks like, from where its
+peaks are: a-like (alpha band near 605 nm, Soret near 445 nm), b-like (near 563 and
+430 nm) or c-like (near 551 and 418 nm). This is a guide for the colours and names,
+not an identification.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths of the components (nm), ascending, shape (n_wavelengths).
+components : np.ndarray
+    Components as columns, shape (n_wavelengths, n_components), each with its
+    largest peak equal to +1 (component_builder).
+
+---- Globals read ----
+HAEM_BANDS, PEAK_SHARE (module constants).
+
+---- Outputs ----
+List[str]
+    Type of each component: 'a', 'b' or 'c' when all its peaks inside known bands
+    belong to that type, 'mixed' when they belong to more than one type, 'unknown'
+    when none falls in a known band.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Peaks as in _peak_finder; troughs count as peaks, so a component that raises one
+haem and lowers another is mixed.
+
+---- Helpers ----
+_peak_finder
 ```
 
 #### `component_count_suggester`
@@ -9493,6 +9609,47 @@ _nuisance_basis_builder
 _spectra_gridder
 ```
 
+#### `decomposition_example_finder`
+
+```text
+---- Summary ----
+Main function to decompose every spectrum with the components found, exactly as the
+haem decomposition will (components plus offset and scatter, least squares), and
+return the spectra that are described best and worst, to show what the components
+leave unexplained.
+
+---- Inputs ----
+spectra_sets : List[dict]
+    As for component_finder, optionally with 'times' (min, one per spectrum).
+result : dict
+    Result of component_builder.
+degree_of_scatter : int
+    Number of scatter terms (the same as the haem decomposition uses).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {'wavelengths', 'best', 'worst', 'median_rms' (OD), 'n_spectra'}. 'best' and
+    'worst' are the spectra with the smallest and largest residual RMS, each
+    {'name', 'time_min' (NaN when unknown), 'spectrum', 'contributions'
+    (n_wavelengths x n_components: coefficient x component), 'background' (offset
+    and scatter), 'fitted', 'residual', 'rms' (OD)}. Raises ValueError when no
+    spectrum can be decomposed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+B = [components, offset and scatter terms]; c = B^+ a (least squares) for each
+spectrum a; fitted = B c; residual = a - fitted; RMS = sqrt(mean(residual^2)).
+
+---- Helpers ----
+_nuisance_basis_builder
+_spectra_gridder
+```
+
 #### `fit_saver`
 
 ```text
@@ -9558,17 +9715,129 @@ None.
 
 ## `utils_shared/pca_plotter.py`
 
-Figure of the components found by the principal component analysis.
+Figures of the principal component analysis: the components and example decompositions.
+
+### PLOTTER HELPERS
+
+#### `_example_drawer`
+
+```text
+---- Summary ----
+Helper function to draw one decomposed spectrum: the measured spectrum, what each
+component and the offset and scatter add, their sum, and below it the residual.
+
+---- Inputs ----
+main : Axes
+    Axes for the spectrum and its parts.
+lower : Axes
+    Axes for the residual.
+wavelengths : np.ndarray
+    Wavelengths (nm), shape (n_wavelengths).
+example : dict
+    One example of decomposition_example_finder ('best' or 'worst').
+heading : str
+    Start of the title, for example 'Smallest residual'.
+names : List[str]
+    Name of each component.
+colours : List[str]
+    Colour of each component.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing; draws on the axes.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_reference_line_drawer`
+
+```text
+---- Summary ----
+Helper function to draw faint vertical lines at the usual peaks of haems a, b and c
+that fall inside the window, so the peaks of a component can be compared with them.
+
+---- Inputs ----
+ax : Axes
+    Axes to draw on.
+window : tuple
+    (start, end) of the wavelengths shown (nm).
+colours : dict
+    {haem type: colour} of the lines.
+is_labelled : bool
+    True to write the haem type above each line.
+
+---- Globals read ----
+REFERENCE_PEAKS (module constant).
+
+---- Outputs ----
+None
+    Nothing; draws on the axes.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
 
 ### MAIN FUNCTIONS
+
+#### `pca_example_figure_builder`
+
+```text
+---- Summary ----
+Main function to show how well the components describe the spectra: the spectrum
+described best and the one described worst, each split into its components, offset
+and scatter, with the residual underneath.
+
+---- Inputs ----
+examples : dict
+    Result of decomposition_example_finder.
+names : List[str]
+    Name of each component.
+colours : List[str]
+    Colour of each component.
+fig : Optional[Figure]
+    Figure to draw in; None makes a new one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Figure
+    The figure; matplotlib styling is taken from the caller's rcParams. The two
+    residual panels share their scale, so their sizes can be compared.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_example_drawer
+```
 
 #### `pca_figure_builder`
 
 ```text
 ---- Summary ----
-Main function to draw the components found: their spectra (top), the share of the
-variance each principal component explains (bottom left) and the residual left
-after each number of components (bottom right), with the chosen number marked.
+Main function to draw the components found, each in a panel of its own, coloured by
+the haem type it looks like, with faint lines at the usual peaks of haems a, b and
+c.
 
 ---- Inputs ----
 analysis : dict
@@ -9577,8 +9846,12 @@ result : dict
     Result of component_builder (the chosen components).
 names : List[str]
     Name of each component.
+types : List[str]
+    Haem type of each component (component_classifier).
 colours : List[str]
-    Colours to give the components, repeated when there are more components.
+    Colour of each component.
+type_colours : dict
+    {'a', 'b', 'c': colour} of the guide lines.
 fig : Optional[Figure]
     Figure to draw in; None makes a new one.
 
@@ -9594,11 +9867,10 @@ Figure
 None.
 
 ---- Equations ----
-Residual RMS after k components = sqrt((total variance - sum of the first k
-eigenvalues) / number of values).
+None.
 
 ---- Helpers ----
-None.
+_reference_line_drawer
 ```
 
 ## `utils_shared/questions.py`
@@ -12459,6 +12731,7 @@ _image_receiver
 _nav_state_setter
 _navigator
 _pane_writer
+_picture_shower
 ```
 
 ##### `_history_stepper`
@@ -12927,14 +13200,17 @@ None.
 ```text
 ---- Summary ----
 Method to show one more picture, such as the components found by the principal
-component analysis, in the selector after the files. The files stay as they
-were, and the picture goes when the next preview is drawn.
+component analysis, in the selector after the files. The files and the other
+extra pictures stay (a picture with the same title is replaced), and the extra
+pictures go when the next preview is drawn.
 
 ---- Inputs ----
 title : str
     Name shown in the selector.
 png : bytes
     The picture.
+is_shown : bool
+    True to switch the window to the picture; False only lists it.
 
 ---- Globals read ----
 None.
@@ -13630,12 +13906,46 @@ experiment_workbook_exporter
 preview_info_builder
 ```
 
+#### `pca_example_picture_builder`
+
+```text
+---- Summary ----
+Main function to draw the best and the worst described spectrum of the principal
+component analysis as a picture for the plot window, in the default journal style
+like the other previews.
+
+---- Inputs ----
+examples : dict
+    Result of decomposition_example_finder.
+names : List[str]
+    Name of each component.
+types : List[str]
+    Haem type of each component (component_classifier).
+
+---- Globals read ----
+settings.pca_colour_mapper; PREVIEW_DPI, BROWSING_ANSWERS (module constants).
+
+---- Outputs ----
+bytes
+    The picture (PNG).
+
+---- Globals mutated ----
+None. Sets the matplotlib rcParams of the figure style (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+pca_example_figure_builder
+```
+
 #### `pca_picture_builder`
 
 ```text
 ---- Summary ----
-Main function to draw the components of the principal component analysis as a
-picture for the plot window, in the default journal style like the other previews.
+Main function to draw the components of the principal component analysis, one
+panel each, as a picture for the plot window, in the default journal style like
+the other previews.
 
 ---- Inputs ----
 analysis : dict
@@ -13644,9 +13954,12 @@ result : dict
     Result of component_builder (the chosen components).
 names : List[str]
     Name of each component.
+types : List[str]
+    Haem type of each component (component_classifier).
 
 ---- Globals read ----
-settings.EXTRA_COLOURS; PREVIEW_DPI, BROWSING_ANSWERS (module constants).
+settings.PCA_TYPE_COLOURS, settings.pca_colour_mapper; PREVIEW_DPI,
+BROWSING_ANSWERS (module constants).
 
 ---- Outputs ----
 bytes
@@ -13688,8 +14001,8 @@ None.
 
 ---- Outputs ----
 Tuple[List[dict], List[str]]
-    ([{'name', 'wavelengths', 'spectra'}], problems). A file that cannot be read or
-    has no spectra left is left out and named in the problems.
+    ([{'name', 'wavelengths', 'spectra', 'times' (min)}], problems). A file that
+    cannot be read or has no spectra left is left out and named in the problems.
 
 ---- Globals mutated ----
 None. Reads the files (side effect).
@@ -14139,21 +14452,25 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to ask whether to name the components found (they are called PC1,
-PC2, ... otherwise) and, if so, what each is called.
+Helper function to ask whether to name the components and, if so, a name for each.
+The suggested names follow the haem type each component looks like (a-like,
+b-like, c-like, with a number when a type comes again).
 
 ---- Inputs ----
 result : dict
     Result of component_builder.
+types : List[str]
+    Haem type of each component (component_classifier).
 depth : int
     Numbering depth of the questions.
 
 ---- Globals read ----
-None.
+TYPE_NAMES (pca_fitter constant).
 
 ---- Outputs ----
 List[str]
-    The name of each component, all different.
+    Name of each component: PC1, PC2, ... when the user does not name them. Names
+    are not empty, have no commas and are all different.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect).
@@ -14322,38 +14639,46 @@ None.
 info_printer
 ```
 
-#### `_pca_table_lister`
+#### `_pca_pictures_publisher`
 
 ```text
 ---- Summary ----
-Helper function to print how much of the changes in the spectra each principal
-component explains, and what is left over if only the first few are used, so the
-number of components can be chosen.
+Helper function to put the two PCA pictures in the plot window: the examples of
+how the spectra are decomposed (listed only) and the components (shown).
 
 ---- Inputs ----
+session : ViewerSession
+    The browser session.
 analysis : dict
     Result of component_finder.
-suggestion : int
-    Number of components suggested.
+result : dict
+    Result of component_builder.
+examples : Optional[dict]
+    Result of decomposition_example_finder; None leaves the examples out.
+names : List[str]
+    Name of each component.
+types : List[str]
+    Haem type of each component (component_classifier).
 depth : int
-    Numbering depth of the lines.
+    Numbering depth of the messages.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 None
-    Nothing.
+    Nothing. A picture that cannot be drawn is reported, never raised.
 
 ---- Globals mutated ----
-None. Prints to the terminal (side effect).
+None. Draws in the plot window (side effect).
 
 ---- Equations ----
-Residual RMS = sqrt((total variance - variance of the first k components) / number
-of values).
+None.
 
 ---- Helpers ----
 info_printer
+pca_example_picture_builder
+pca_picture_builder
 ```
 
 #### `_review_asker`
@@ -14526,15 +14851,16 @@ preview_drawer
 ---- Summary ----
 Main function to find the components of the haem spectra from the data itself with
 a principal component analysis, instead of using a fit file. The user chooses the
-spectral window and the number of components, sees the components in the plot
-window, and can save them as a fit file in the fits folder.
+spectral window and the number of components, sees each component in its own
+panel and the best and worst described spectrum in the plot window, and can save
+the components as a fit file in the fits folder.
 
 ---- Inputs ----
 session : ViewerSession
     The browser session.
 answers : dict
-    Answers dictionary; the window is stored in it (pca_start, pca_end,
-    pca_rotate).
+    Answers dictionary; the choices are stored in it (pca_start, pca_end,
+    pca_rotate, pca_count, pca_smoothing_nm).
 defaults : dict
     Default answers offered by the questions.
 limits : Dict[str, dict]
@@ -14565,15 +14891,16 @@ None.
 ---- Helpers ----
 _component_namer
 _fit_file_saver
-_pca_table_lister
+_pca_pictures_publisher
 choice_asker
 component_builder
+component_classifier
 component_count_suggester
 component_finder
+decomposition_example_finder
 fit_table_builder
 info_printer
 number_asker
-pca_picture_builder
 pca_spectra_gatherer
 progress_clearer
 progress_printer
@@ -15141,13 +15468,16 @@ None.
 ```text
 ---- Summary ----
 Method to show one more picture (such as the components found by the principal
-component analysis): it is saved as a picture file and opened.
+component analysis): it is saved as a picture file named after its title, so
+several extra pictures do not overwrite each other, and opened.
 
 ---- Inputs ----
 title : str
     Name of the picture.
 png : bytes
     The picture.
+is_shown : bool
+    Not used: without a selector to find it in later, every picture is opened.
 
 ---- Globals read ----
 None.
@@ -15157,13 +15487,13 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Writes the picture file (side effect).
+None. Writes the picture file and opens it (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-pictures_publisher
+_file_opener
 ```
 
 ##### `figure_shower`

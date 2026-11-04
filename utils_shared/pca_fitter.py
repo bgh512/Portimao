@@ -9,12 +9,30 @@ from typing import Dict, List, Optional, Tuple
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
 import pandas as pd
+from scipy.signal import savgol_filter
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 ENOUGH_VARIANCE = 0.99
 MAX_COMPONENTS = 10
 MINIMUM_RATIO = 2.0  # smallest drop between neighbouring components counted as a gap
+# Where each haem type has its reduced-minus-oxidised peaks (nm): the alpha band, then
+# the Soret band. A component is called a-, b- or c-like when its peaks fall in the
+# bands of one type only.
+HAEM_BANDS = {'c': ((545.0, 556.5), (410.0, 423.0)),
+              'b': ((556.5, 570.0), (423.0, 437.0)),
+              'a': ((595.0, 612.0), (437.0, 450.0)),
+              }
+PEAK_SHARE = 0.35  # a peak counts when it is at least this share of the largest one
+PROMINENCE_SHARE = 0.25  # ... and stands this share above the dips on either side
+SMOOTHING_NM = 4.0  # width of the running mean that keeps noise from making peaks
+SMOOTHING_ORDER = 2  # polynomial order of the Savitzky-Golay smoothing of components
+TYPE_NAMES = {'a': 'a-like',
+              'b': 'b-like',
+              'c': 'c-like',
+              'mixed': 'mixed',
+              'unknown': 'no known band',
+              }
 
 
 # ---- PCA FITTER HELPERS --------------------------------------------------------------
@@ -99,6 +117,70 @@ def _nuisance_basis_builder(wavelengths: np.ndarray,
         columns.append(shifted / np.amax(shifted))
     q, _ = np.linalg.qr(np.column_stack(columns))
     return q
+
+
+# ---- _peak_finder --------------------------------------------------------------------
+def _peak_finder(wavelengths: np.ndarray, values: np.ndarray) -> List[float]:
+    """
+    ---- Summary ----
+    Helper function to find the clear peaks and troughs of a component, ignoring the
+    small bumps that noise makes.
+
+    ---- Inputs ----
+    wavelengths : np.ndarray
+        Wavelengths (nm), ascending and evenly spaced, shape (n_wavelengths).
+    values : np.ndarray
+        The component, shape (n_wavelengths).
+
+    ---- Globals read ----
+    PEAK_SHARE, PROMINENCE_SHARE, SMOOTHING_NM (module constants).
+
+    ---- Outputs ----
+    List[float]
+        Wavelength of each peak or trough (nm), in order.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    s = running mean of the component over SMOOTHING_NM; a peak is a local maximum of
+    |s| that is at least PEAK_SHARE x max|s| high and rises at least PROMINENCE_SHARE x
+    max|s| above the higher of the lowest points between it and the next higher point
+    on either side (its prominence).
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Smooth the component ------------------------------------------------------
+    if len(values) < 3:
+        return []
+    step = float(np.median(np.diff(wavelengths)))
+    width = max(1, int(round(SMOOTHING_NM / step)) if step > 0 else 1)
+    kernel = np.ones(width) / width
+    padded = np.pad(np.asarray(values, dtype=float), width, mode='edge')
+    size = np.abs(np.convolve(padded, kernel, mode='same')[width:-width])
+    largest = float(np.max(size))
+    if largest <= 0:
+        return []
+
+    # ---- 2 Keep the clear peaks ------------------------------------------------------
+    peaks = []
+    for i in range(1, len(size) - 1):
+        if not (size[i] >= size[i - 1] and size[i] > size[i + 1]):
+            continue
+        if size[i] < PEAK_SHARE * largest:
+            continue
+        lowest = []
+        for direction in (-1, 1):
+            j, low = i, size[i]
+            while 0 <= j + direction < len(size) and size[j + direction] <= size[i]:
+                j += direction
+                low = min(low, size[j])
+            lowest.append(low)
+        if size[i] - max(lowest) >= PROMINENCE_SHARE * largest:
+            peaks.append(float(wavelengths[i]))
+    return peaks
 
 
 # ---- _spectra_gridder ----------------------------------------------------------------
@@ -201,11 +283,13 @@ def _varimax_rotator(loadings: np.ndarray,
 def component_builder(analysis: dict,
                       count: int,
                       rotate: bool = True,
+                      smoothing_nm: float = 0.0,
                       ) -> dict:
     """
     ---- Summary ----
     Main function to take the first components of an analysis, optionally rotate them
-    to simpler shapes, and give them the conventions of the fit files.
+    to simpler shapes and smooth away their noise, and give them the conventions of the
+    fit files.
 
     ---- Inputs ----
     analysis : dict
@@ -215,33 +299,41 @@ def component_builder(analysis: dict,
     rotate : bool
         True to apply the varimax rotation (the components then span the same space and
         leave the same residual, but are more peak-like).
+    smoothing_nm : float
+        Width (nm) of the Savitzky-Golay smoothing of each component; 0 (or a width
+        under three wavelength steps) leaves them as found.
 
     ---- Globals read ----
-    None.
+    SMOOTHING_ORDER (module constant).
 
     ---- Outputs ----
     dict
         {'wavelengths', 'components' (columns, largest peak = +1), 'explained' (fraction
         of the variance of each component), 'residual_rms' (OD left unexplained),
-        'peaks' (wavelength of each peak), 'count', 'rotated'}. Components are ordered
-        by the variance they explain. Raises ValueError for an impossible count.
+        'peaks' (wavelength of each peak), 'count', 'rotated', 'smoothing_nm' (the
+        width used, 0 for none)}. Components are ordered by the variance they explain;
+        'explained' and 'residual_rms' are those of the components before smoothing.
+        Raises ValueError for an impossible count or a negative smoothing width.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
     residual RMS = sqrt((total variance - variance of the kept components) / number of
-    values).
+    values). Smoothing fits a polynomial of order SMOOTHING_ORDER over a window of
+    smoothing_nm (an odd number of points) around every wavelength.
 
     ---- Helpers ----
     _component_orienter
     _varimax_rotator
     """
 
-    # ---- 1 Check the count -----------------------------------------------------------
+    # ---- 1 Check the inputs ----------------------------------------------------------
     available = analysis['eigenvectors'].shape[1]
     if not 1 <= count <= available:
         raise ValueError(f'The number of components must be from 1 to {available}.')
+    if smoothing_nm < 0:
+        raise ValueError('The smoothing width cannot be negative.')
 
     # ---- 2 Rotate and order the components -------------------------------------------
     vectors = analysis['eigenvectors'][:, :count]
@@ -253,7 +345,20 @@ def component_builder(analysis: dict,
     order = np.argsort(-variance)
     vectors, variance = vectors[:, order], variance[order]
 
-    # ---- 3 Describe them -------------------------------------------------------------
+    # ---- 3 Smooth them ---------------------------------------------------------------
+    wavelengths = analysis['wavelengths']
+    step = float(np.median(np.diff(wavelengths)))
+    points = int(round(smoothing_nm / step)) if step > 0 else 0
+    if points % 2 == 0:  # the window needs an odd number of points
+        points += 1
+    largest_odd = len(wavelengths) if len(wavelengths) % 2 else len(wavelengths) - 1
+    points = min(points, largest_odd)
+    used_nm = 0.0
+    if points >= max(3, SMOOTHING_ORDER + 2):
+        vectors = savgol_filter(vectors, points, SMOOTHING_ORDER, axis=0, mode='interp')
+        used_nm = (points - 1) * step
+
+    # ---- 4 Describe them -------------------------------------------------------------
     total = analysis['total_variance']
     left = max(total - float(np.sum(variance)), 0.0)
     components = _component_orienter(vectors)
@@ -265,7 +370,58 @@ def component_builder(analysis: dict,
             'peaks': peaks,
             'count': count,
             'rotated': do_rotate,
+            'smoothing_nm': used_nm,
             }
+
+
+# ---- component_classifier ------------------------------------------------------------
+def component_classifier(wavelengths: np.ndarray, components: np.ndarray) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to say which haem type each component looks like, from where its
+    peaks are: a-like (alpha band near 605 nm, Soret near 445 nm), b-like (near 563 and
+    430 nm) or c-like (near 551 and 418 nm). This is a guide for the colours and names,
+    not an identification.
+
+    ---- Inputs ----
+    wavelengths : np.ndarray
+        Wavelengths of the components (nm), ascending, shape (n_wavelengths).
+    components : np.ndarray
+        Components as columns, shape (n_wavelengths, n_components), each with its
+        largest peak equal to +1 (component_builder).
+
+    ---- Globals read ----
+    HAEM_BANDS, PEAK_SHARE (module constants).
+
+    ---- Outputs ----
+    List[str]
+        Type of each component: 'a', 'b' or 'c' when all its peaks inside known bands
+        belong to that type, 'mixed' when they belong to more than one type, 'unknown'
+        when none falls in a known band.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Peaks as in _peak_finder; troughs count as peaks, so a component that raises one
+    haem and lowers another is mixed.
+
+    ---- Helpers ----
+    _peak_finder
+    """
+
+    types = []
+    for j in range(components.shape[1]):
+        found = set()
+        for peak in _peak_finder(wavelengths, components[:, j]):
+            for kind, bands in HAEM_BANDS.items():
+                if any(low <= peak < high for low, high in bands):
+                    found.add(kind)
+        if len(found) == 1:
+            types.append(found.pop())
+        else:
+            types.append('mixed' if found else 'unknown')
+    return types
 
 
 # ---- component_count_suggester -------------------------------------------------------
@@ -420,6 +576,100 @@ def component_finder(spectra_sets: List[dict],
             'counts': counts,
             'window': (float(grid[0]), float(grid[-1])),
             'degree_of_scatter': degree_of_scatter,
+            }
+
+
+# ---- decomposition_example_finder ----------------------------------------------------
+def decomposition_example_finder(spectra_sets: List[dict],
+                                 result: dict,
+                                 degree_of_scatter: int = 1,
+                                 ) -> dict:
+    """
+    ---- Summary ----
+    Main function to decompose every spectrum with the components found, exactly as the
+    haem decomposition will (components plus offset and scatter, least squares), and
+    return the spectra that are described best and worst, to show what the components
+    leave unexplained.
+
+    ---- Inputs ----
+    spectra_sets : List[dict]
+        As for component_finder, optionally with 'times' (min, one per spectrum).
+    result : dict
+        Result of component_builder.
+    degree_of_scatter : int
+        Number of scatter terms (the same as the haem decomposition uses).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    dict
+        {'wavelengths', 'best', 'worst', 'median_rms' (OD), 'n_spectra'}. 'best' and
+        'worst' are the spectra with the smallest and largest residual RMS, each
+        {'name', 'time_min' (NaN when unknown), 'spectrum', 'contributions'
+        (n_wavelengths x n_components: coefficient x component), 'background' (offset
+        and scatter), 'fitted', 'residual', 'rms' (OD)}. Raises ValueError when no
+        spectrum can be decomposed.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    B = [components, offset and scatter terms]; c = B^+ a (least squares) for each
+    spectrum a; fitted = B c; residual = a - fitted; RMS = sqrt(mean(residual^2)).
+
+    ---- Helpers ----
+    _nuisance_basis_builder
+    _spectra_gridder
+    """
+
+    # ---- 1 Build the basis -----------------------------------------------------------
+    grid = result['wavelengths']
+    components = result['components']
+    count = components.shape[1]
+    nuisance = _nuisance_basis_builder(grid, degree_of_scatter)
+    basis = np.column_stack((components, nuisance))
+    solver = np.linalg.pinv(basis)
+
+    # ---- 2 Find the residual of every spectrum ---------------------------------------
+    rows, labels, rms_parts = [], [], []
+    for entry in spectra_sets:
+        data = _spectra_gridder(np.asarray(entry['wavelengths'], dtype=float),
+                                np.asarray(entry['spectra'], dtype=float),
+                                grid,
+                                )
+        times = np.asarray(entry.get('times', np.full(len(data), np.nan)), dtype=float)
+        finite = np.all(np.isfinite(data), axis=1)
+        data, times = data[finite], times[finite]
+        if not len(data):
+            continue
+        residuals = data - (data @ solver.T) @ basis.T
+        rms_parts.append(np.sqrt(np.mean(residuals ** 2, axis=1)))
+        rows.append(data)
+        labels += [(entry['name'], float(t)) for t in times]
+    if not rows:
+        raise ValueError('No spectrum could be decomposed with the components.')
+    rms = np.concatenate(rms_parts)
+    spectra = np.vstack(rows)
+
+    # ---- example ---------------------------------------------------------------------
+    def example(index: int) -> dict:
+        coefficients = solver @ spectra[index]
+        fitted = basis @ coefficients
+        return {'name': labels[index][0],
+                'time_min': labels[index][1],
+                'spectrum': spectra[index],
+                'contributions': components * coefficients[:count],
+                'background': basis[:, count:] @ coefficients[count:],
+                'fitted': fitted,
+                'residual': spectra[index] - fitted,
+                'rms': float(rms[index]),
+                }
+    return {'wavelengths': grid,
+            'best': example(int(np.argmin(rms))),
+            'worst': example(int(np.argmax(rms))),
+            'median_rms': float(np.median(rms)),
+            'n_spectra': len(rms),
             }
 
 

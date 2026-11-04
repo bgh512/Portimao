@@ -23,7 +23,9 @@ from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.paf_reader import experiment_paf_loader
-from utils_shared.pca_plotter import pca_figure_builder
+from utils_shared.pca_plotter import (pca_example_figure_builder,
+                                      pca_figure_builder,
+                                      )
 from utils_shared.trimming import experiment_trimmer
 
 
@@ -391,12 +393,64 @@ def all_data_exporter(session: ViewerSession,
     return folder, problems
 
 
-# ---- pca_picture_builder -------------------------------------------------------------
-def pca_picture_builder(analysis: dict, result: dict, names: List[str]) -> bytes:
+# ---- pca_example_picture_builder -----------------------------------------------------
+def pca_example_picture_builder(examples: dict,
+                                names: List[str],
+                                types: List[str],
+                                ) -> bytes:
     """
     ---- Summary ----
-    Main function to draw the components of the principal component analysis as a
-    picture for the plot window, in the default journal style like the other previews.
+    Main function to draw the best and the worst described spectrum of the principal
+    component analysis as a picture for the plot window, in the default journal style
+    like the other previews.
+
+    ---- Inputs ----
+    examples : dict
+        Result of decomposition_example_finder.
+    names : List[str]
+        Name of each component.
+    types : List[str]
+        Haem type of each component (component_classifier).
+
+    ---- Globals read ----
+    settings.pca_colour_mapper; PREVIEW_DPI, BROWSING_ANSWERS (module constants).
+
+    ---- Outputs ----
+    bytes
+        The picture (PNG).
+
+    ---- Globals mutated ----
+    None. Sets the matplotlib rcParams of the figure style (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    pca_example_figure_builder
+    """
+
+    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS, **BROWSING_ANSWERS))
+    plt.rcParams.update(cfg.RC_PARAMS)
+    width = cfg.FIGURE_SIZE[0]
+    fig = Figure(figsize=(width, width * 1.1), dpi=PREVIEW_DPI)
+    pca_example_figure_builder(examples, names, settings.pca_colour_mapper(types), fig)
+    fig.set_layout_engine('constrained')
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=PREVIEW_DPI)
+    return buffer.getvalue()
+
+
+# ---- pca_picture_builder -------------------------------------------------------------
+def pca_picture_builder(analysis: dict,
+                        result: dict,
+                        names: List[str],
+                        types: List[str],
+                        ) -> bytes:
+    """
+    ---- Summary ----
+    Main function to draw the components of the principal component analysis, one
+    panel each, as a picture for the plot window, in the default journal style like
+    the other previews.
 
     ---- Inputs ----
     analysis : dict
@@ -405,9 +459,12 @@ def pca_picture_builder(analysis: dict, result: dict, names: List[str]) -> bytes
         Result of component_builder (the chosen components).
     names : List[str]
         Name of each component.
+    types : List[str]
+        Haem type of each component (component_classifier).
 
     ---- Globals read ----
-    settings.EXTRA_COLOURS; PREVIEW_DPI, BROWSING_ANSWERS (module constants).
+    settings.PCA_TYPE_COLOURS, settings.pca_colour_mapper; PREVIEW_DPI,
+    BROWSING_ANSWERS (module constants).
 
     ---- Outputs ----
     bytes
@@ -426,8 +483,17 @@ def pca_picture_builder(analysis: dict, result: dict, names: List[str]) -> bytes
     cfg = settings.Config(dict(settings.DEFAULT_ANSWERS, **BROWSING_ANSWERS))
     plt.rcParams.update(cfg.RC_PARAMS)
     width = cfg.FIGURE_SIZE[0]
-    fig = Figure(figsize=(width, width * 0.8), dpi=PREVIEW_DPI)
-    pca_figure_builder(analysis, result, names, settings.EXTRA_COLOURS, fig)
+    height = max(width * 0.5, 0.35 * width * result['count'] + 0.6)
+    fig = Figure(figsize=(width, height), dpi=PREVIEW_DPI)
+    type_colours = {kind: settings.PCA_TYPE_COLOURS[kind][0] for kind in 'abc'}
+    pca_figure_builder(analysis,
+                       result,
+                       names,
+                       types,
+                       settings.pca_colour_mapper(types),
+                       type_colours,
+                       fig,
+                       )
     fig.set_layout_engine('constrained')
     buffer = io.BytesIO()
     fig.savefig(buffer, format='png', dpi=PREVIEW_DPI)
@@ -465,8 +531,8 @@ def pca_spectra_gatherer(session: ViewerSession,
 
     ---- Outputs ----
     Tuple[List[dict], List[str]]
-        ([{'name', 'wavelengths', 'spectra'}], problems). A file that cannot be read or
-        has no spectra left is left out and named in the problems.
+        ([{'name', 'wavelengths', 'spectra', 'times' (min)}], problems). A file that
+        cannot be read or has no spectra left is left out and named in the problems.
 
     ---- Globals mutated ----
     None. Reads the files (side effect).
@@ -516,6 +582,7 @@ def pca_spectra_gatherer(session: ViewerSession,
                 sets.append({'name': name,
                              'wavelengths': wavelengths[inside],
                              'spectra': spectra,
+                             'times': times[keep],
                              })
         except Exception as exc:  # one unreadable file must not stop the others
             problems.append(f'{name}: {type(exc).__name__}: {exc}')

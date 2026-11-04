@@ -128,17 +128,20 @@ class PictureWindow:
     # ---- MAIN METHODS ----------------------------------------------------------------
 
     # ---- extra_publisher -------------------------------------------------------------
-    def extra_publisher(self, title: str, png: bytes) -> None:
+    def extra_publisher(self, title: str, png: bytes, is_shown: bool = True) -> None:
         """
         ---- Summary ----
         Method to show one more picture (such as the components found by the principal
-        component analysis): it is saved as a picture file and opened.
+        component analysis): it is saved as a picture file named after its title, so
+        several extra pictures do not overwrite each other, and opened.
 
         ---- Inputs ----
         title : str
             Name of the picture.
         png : bytes
             The picture.
+        is_shown : bool
+            Not used: without a selector to find it in later, every picture is opened.
 
         ---- Globals read ----
         None.
@@ -148,16 +151,23 @@ class PictureWindow:
             Nothing.
 
         ---- Globals mutated ----
-        None. Writes the picture file (side effect).
+        None. Writes the picture file and opens it (side effects).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
-        pictures_publisher
+        _file_opener
         """
 
-        self.pictures_publisher([(title, png)])
+        slug = ''.join(c if c.isalnum() else '_' for c in title.lower())
+        path = self.preview_path.with_name(f'{self.preview_path.stem}_{slug}.png')
+        path.write_bytes(png)
+        print(f'  Picture ({title}): {path}')
+        self.preview_path, kept = path, self.preview_path
+        self._has_opened_file = False
+        self._file_opener()
+        self.preview_path = kept
 
     # ---- figure_shower ---------------------------------------------------------------
     def figure_shower(self, figure: Figure) -> None:

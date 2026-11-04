@@ -407,6 +407,7 @@ class ViewerGui:
         _nav_state_setter
         _navigator
         _pane_writer
+        _picture_shower
         """
 
         kind = event[0]
@@ -446,17 +447,21 @@ class ViewerGui:
             self._nav_state_setter(len(self._names) > 1)
             self._navigator(len(files))
         elif kind == 'extra':
-            # One more picture (not a file) is listed after the files until the next
-            # preview is drawn from the settings.
-            title, png = event[1], event[2]
-            self._names = self._names[:self._file_count] + [title]
+            # Extra pictures (not files) are listed after the files until the next
+            # preview is drawn from the settings; the same title replaces its picture.
+            title, png, is_shown = event[1], event[2], event[3]
+            if title not in self._names[self._file_count:]:
+                self._names = self._names + [title]
             self._images[title] = png
             self._failures.pop(title, None)
             self._notes.pop(title, None)
             self._has_spec = True
             self._combo.configure(values=self._display_name_lister())
             self._nav_state_setter(len(self._names) > 1)
-            self._navigator(len(self._names) - 1)
+            if is_shown:
+                self._navigator(self._names.index(title))
+            elif self._names[self._index] == title:
+                self._picture_shower()
         elif kind == 'spec':
             spec, name = event[1], event[2]
             if not self._is_pictures and len(self._names) > self._file_count:
@@ -1306,18 +1311,21 @@ class ViewerGui:
     # ---- MAIN METHODS ----------------------------------------------------------------
 
     # ---- extra_publisher -------------------------------------------------------------
-    def extra_publisher(self, title: str, png: bytes) -> None:
+    def extra_publisher(self, title: str, png: bytes, is_shown: bool = True) -> None:
         """
         ---- Summary ----
         Method to show one more picture, such as the components found by the principal
-        component analysis, in the selector after the files. The files stay as they
-        were, and the picture goes when the next preview is drawn.
+        component analysis, in the selector after the files. The files and the other
+        extra pictures stay (a picture with the same title is replaced), and the extra
+        pictures go when the next preview is drawn.
 
         ---- Inputs ----
         title : str
             Name shown in the selector.
         png : bytes
             The picture.
+        is_shown : bool
+            True to switch the window to the picture; False only lists it.
 
         ---- Globals read ----
         None.
@@ -1336,7 +1344,7 @@ class ViewerGui:
         None.
         """
 
-        self._events.put(('extra', title, png))
+        self._events.put(('extra', title, png, is_shown))
 
     # ---- figure_shower ---------------------------------------------------------------
     def figure_shower(self, figure: Any) -> None:

@@ -82,24 +82,25 @@ If the `fits/` folder holds no `.csv` file, 3.1 is not asked, a message says so,
 
 #### 3.A.1 Components from the data (principal component analysis)
 
-Asked when the last choice of 3.1.1 is taken. The numbers keep counting up when a question is asked again, and each component name is a question of its own, so the numbers on screen can be higher than these. The files are read for their spectra (trimmed, without the ignored parts; this can take a moment) and a table shows how much each principal component explains and the error left. The plot window gets a *PCA components* picture after the files **(plot)**. It goes when the decomposition is drawn.
+Asked when the last choice of 3.1.1 is taken. The numbers keep counting up when a question is asked again, and each component name is a question of its own, so the numbers on screen can be higher than these. The files are read for their spectra (trimmed, without the ignored parts; this can take a moment). Once the components are made, the plot window gets a *PCA components* picture (one panel per component, coloured by the haem type it looks like) and a *PCA examples* picture (the best and worst described spectrum and their residuals) after the files **(plot)**. They go when the decomposition is drawn.
 
 | # | Question | Leads to |
 |---|---|---|
 | 3.1.1.1 | Where should the spectral window start (nm)? | **3.1.1.2** |
-| 3.1.1.2 | Where should the spectral window end (nm)? | the table, then **3.1.1.3** (or this question again if the analysis cannot be run, for example the window is too narrow) |
-| 3.1.1.3 | How many components should be used? (a whole number; the suggestion is the default) | **3.1.1.4** |
-| 3.1.1.4 | Do you want to rotate the components so each is as peak-like as possible (varimax)? `(Y/n)` | the components are drawn **(plot)**, then **3.1.1.5** |
+| 3.1.1.2 | Where should the spectral window end (nm)? | **3.1.1.3** (or this question again if the analysis cannot be run, for example the window is too narrow) |
+| 3.1.1.3 | How many components should be found? (a whole number; the number used last time, or else the suggestion, is the default) | **3.1.1.4** |
+| 3.1.1.4 | Do you want to rotate the components so each is as peak-like as possible (varimax)? `(Y/n)` | **3.1.1.5** |
+| 3.1.1.5 | Over how many nm should the components be smoothed to remove their noise (0 for none)? (default 4, or the width used last time; at most a quarter of the window) | the components and the examples are drawn **(plot)**, with one line per component (type, peak, share of the change) and the residual, then **3.1.1.6** |
 
 | # | Question | 1 → | 2 → | 3 → | 4 → |
 |---|---|---|---|---|---|
-| 3.1.1.5 | Do you accept these components? | **3.1.1.6** | **3.1.1.3** (the number of components) | **3.1.1.1** (the window) | **3.1.1** (choose a fit file instead) |
+| 3.1.1.6 | Do you accept these components? | **3.1.1.7** | **3.1.1.3** (the number of components) | **3.1.1.1** (the window) | **3.1.1** (choose a fit file instead) |
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.1.1.6 | Do you want to name the components? `(y/N)` | yes: one question for each component (a name that is empty, has a comma or is used twice is asked again), then **3.1.1.7**; no (PC1, PC2, ...): **3.1.1.7** |
-| 3.1.1.7 | Do you want to save these components as a fit file in the fits folder? `(Y/n)` | yes: **3.1.1.8**; no: the decomposition is drawn **(plot)**, then **3.2** |
-| 3.1.1.8 | What should the fit file be called (without .csv)? | if the name exists, it asks whether to replace it (no asks for a name again); then the decomposition is drawn **(plot)**, then **3.2** |
+| 3.1.1.7 | Do you want to name the components? `(y/N)` | yes: one question for each component, suggesting a name from its type such as *a-like* (a name that is empty, has a comma or is used twice is asked again), then **3.1.1.8**; no (PC1, PC2, ...): **3.1.1.8** |
+| 3.1.1.8 | Do you want to save these components as a fit file in the fits folder? `(Y/n)` | yes: **3.1.1.9**; no: the decomposition is drawn **(plot)**, then **3.2** |
+| 3.1.1.9 | What should the fit file be called (without .csv)? | if the name exists, it asks whether to replace it (no asks for a name again); then the decomposition is drawn **(plot)**, then **3.2** |
 
 ### 3.B OD values
 

@@ -116,6 +116,21 @@ HAEM_COLOURS = {'cytc1': '#ff3636',
                 'cyta605': '#00b050',
                 'cytb557': '#00b0db',
                 }
+# Colours of the components found by the PCA, by the haem type their peaks look like
+# (pca_fitter.component_classifier): the colours of the usual haems, then darker and
+# lighter shades for a second and third component of the same type. 'other' (peaks of
+# more than one type, or none in a known band) uses colours no haem type has.
+PCA_TYPE_COLOURS = {'a': ['#00b050', '#006b30', '#7fd8a8'],
+                    'b': ['#3131ff', '#0d0d87', '#8f8fff'],
+                    'c': ['#ff3636', '#a00000', '#ff9b9b'],
+                    'other': ['#e69f00',
+                              '#cc79a7',
+                              '#7b3294',
+                              '#8c510a',
+                              '#d55e00',
+                              '#7f7f7f',
+                              ],
+                    }
 EXTRA_COLOURS = ['#e69f00',
                  '#cc79a7',
                  '#56b4e9',
@@ -581,4 +596,46 @@ def haem_colour_mapper(names: List[str]) -> Dict[str, str]:
     colours, spare = {}, iter(EXTRA_COLOURS * 3)
     for name in names:
         colours[name] = HAEM_COLOURS.get(name_simplifier(name)) or next(spare)
+    return colours
+
+
+# ---- pca_colour_mapper ---------------------------------------------------------------
+def pca_colour_mapper(types: List[str]) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to give each PCA component a plot colour from the haem type its peaks
+    look like: green for a-like, blue for b-like, red for c-like, with a darker then a
+    lighter shade for each further component of the same type, and a colour no haem
+    type has for mixed or unknown components.
+
+    ---- Inputs ----
+    types : List[str]
+        Type of each component: 'a', 'b', 'c', 'mixed' or 'unknown'
+        (pca_fitter.component_classifier).
+
+    ---- Globals read ----
+    PCA_TYPE_COLOURS (module constant).
+
+    ---- Outputs ----
+    List[str]
+        Hex colour of each component, in the same order. Colours repeat only when a
+        type has more components than shades.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    used = {key: 0 for key in PCA_TYPE_COLOURS}
+    colours = []
+    for kind in types:
+        key = kind if kind in ('a', 'b', 'c') else 'other'
+        shades = PCA_TYPE_COLOURS[key]
+        colours.append(shades[used[key] % len(shades)])
+        used[key] += 1
     return colours

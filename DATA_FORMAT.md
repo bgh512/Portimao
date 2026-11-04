@@ -172,6 +172,42 @@ Returned by `component_builder`: the chosen number of components, optionally rot
 | `'peaks'` | np.ndarray | (count) | nm | Wavelength of each component's largest peak |
 | `'count'` | int | | | Number of components |
 | `'rotated'` | bool | | | True when the varimax rotation was applied |
+| `'smoothing_nm'` | float | | nm | Width of the Savitzky-Golay smoothing of the components; 0 when not smoothed. `'explained'` and `'residual_rms'` are those of the components before smoothing |
+
+The haem type of each component (`'a'`, `'b'`, `'c'`, `'mixed'` or `'unknown'`) is worked out separately by `component_classifier`, from where its clear peaks and troughs are: the alpha and Soret bands of haem c (545-556.5 and 410-423 nm), b (556.5-570 and 423-437 nm) and a (595-612 and 437-450 nm). `config.pca_colour_mapper` turns the types into colours (`PCA_TYPE_COLOURS`).
+
+#### `pca_spectra_set`
+
+One entry of the list `pca_spectra_gatherer` (`utils_viewer/viewer_preview.py`) returns, and `component_finder` and `decomposition_example_finder` read: the spectra of one file kept after trimming and ignoring.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'name'` | str | | | File name |
+| `'wavelengths'` | np.ndarray | (n_wavelengths) | nm | Wavelengths, ascending (the window plus 2 nm either side) |
+| `'spectra'` | np.ndarray | (n_spectra, n_wavelengths) | OD | Attenuation spectra |
+| `'times'` | np.ndarray | (n_spectra) | min | Time of each spectrum (optional for the analysis) |
+
+#### `pca_examples`
+
+Returned by `decomposition_example_finder`: every spectrum decomposed with the components plus the offset and scatter terms, exactly as the haem decomposition does, and the two extremes.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'wavelengths'` | np.ndarray | (n_wavelengths) | nm | As in `pca_result` |
+| `'best'`, `'worst'` | dict | | | The spectrum with the smallest and the largest residual RMS (keys below) |
+| `'median_rms'` | float | | OD | Residual RMS of a typical spectrum |
+| `'n_spectra'` | int | | | Number of spectra decomposed |
+
+| Key of `'best'` and `'worst'` | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'name'` | str | | | File the spectrum is from |
+| `'time_min'` | float | | min | Time of the spectrum; NaN when unknown |
+| `'spectrum'` | np.ndarray | (n_wavelengths) | OD | The measured spectrum |
+| `'contributions'` | np.ndarray | (n_wavelengths, count) | OD | Coefficient x component, one column per component |
+| `'background'` | np.ndarray | (n_wavelengths) | OD | Offset and scatter part of the fit |
+| `'fitted'` | np.ndarray | (n_wavelengths) | OD | Sum of the fit |
+| `'residual'` | np.ndarray | (n_wavelengths) | OD | `'spectrum'` - `'fitted'` |
+| `'rms'` | float | | OD | Root mean square of `'residual'` |
 
 #### `last_answers`
 
@@ -343,7 +379,7 @@ Structure: see `last_answers` in section 1.1.
 | File type | `.png` |
 | Location and name | `Portimao_preview.png` in the system temporary folder |
 
-Written, and opened in the default picture viewer, only when the experiment browser window cannot open. Overwritten by each preview.
+Written, and opened in the default picture viewer, only when the experiment browser window cannot open. Overwritten by each preview. Extra pictures, such as the PCA components and examples, are written next to it as `Portimao_preview_<title>.png` (the title in lower case, with every other character as `_`).
 
 #### `log file`
 

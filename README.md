@@ -218,10 +218,15 @@ Instead of a fit file, the haem decomposition can use components found from your
 
 1. **Spectral window:** the start and end wavelength (nm) the analysis runs over. Choose where the haems you care about absorb (the default is 500 to 630 nm).
 2. **The data:** every spectrum of every file is analysed together, after trimming and without the ignored start and end. The offset and scatter terms that the decomposition fits anyway are taken out of each spectrum first, and each file's average spectrum is removed, so the components describe how the spectra change and differences between preparations do not become components.
-3. **Number of components:** a table shows how much of the change each principal component explains and how much error (OD) is left with that many; a number is suggested. The suggestion is a rule of thumb (the biggest drop between neighbouring components), not a proof, so check it against the plot. Use as few as describe the data; extra ones only fit noise.
+3. **Number of components:** you say how many components to find, and exactly that many are made. The question suggests a number (the biggest drop between neighbouring principal components), but this is a rule of thumb, not a proof, so check it against the pictures. Use as few as describe the data; extra ones only fit noise.
 4. **Rotation:** optionally rotated (varimax) so each component is as peak-like as possible. This does not change how well the data is described, only the shapes.
-5. **The plot:** the plot window gets a *PCA components* picture after the files in the drop-down: the component spectra, how much each explains, and the error left for each number of components. It goes when the next preview is drawn. Accept, or change the number of components, the window, or choose a fit file instead.
-6. **Names and saving:** the components are called PC1, PC2, ... unless you name them. You can save them as a fit file in `fits/`, ready to be chosen like any other fit in later runs; the fit used for this run is the one found whether or not you save it.
+5. **Smoothing:** the components carry some of the noise of the data, so they are smoothed (Savitzky-Golay, 4 nm unless you choose another width; 0 for none). This takes out the noise wiggles but keeps the peak positions and real shapes such as shoulders and troughs. Use a width well under the width of the narrowest band.
+6. **The pictures:** two pictures are added after the files in the drop-down of the plot window, and go when the next preview is drawn:
+    - *PCA components* (shown): each component in a panel of its own, with how much of the change it explains. Each is coloured by the haem type its peaks look like: green for a-like (peaks near 604 or 444 nm), blue for b-like (563 or 430 nm), red for c-like (551 or 418 nm), a darker or lighter shade when a type comes twice, and a colour of its own when a component has peaks of more than one type (*mixed*) or none in a known band. Faint dashed lines mark the usual a, b and c peaks. The type is a guide from the peak positions, not an identification.
+    - *PCA examples (smallest and largest residual)*: the spectrum the components describe best and the one they describe worst, each with its file and time, split into what each component and the offset and scatter add, the sum of the fit, and the residual underneath (both residuals on the same scale). This is the same least-squares fit the haem decomposition does with the components.
+
+    Accept, or change the number of components, the window, or choose a fit file instead.
+7. **Names and saving:** the components are called PC1, PC2, ... unless you name them; the names suggested follow their type (a-like, b-like, c-like). You can save them as a fit file in `fits/`, ready to be chosen like any other fit in later runs; the fit used for this run is the one found whether or not you save it.
 
 What to keep in mind:
 
@@ -229,6 +234,7 @@ What to keep in mind:
 - Each component is scaled so its largest peak is 1, with the sign that makes that peak positive. The "concentrations" from a PCA fit are therefore in arbitrary units, not uM. The delta A values (mOD) are in real absorbance units.
 - The components describe changes, so the absolute values of the decomposition include a constant offset. The delta A values remove it.
 - It needs spectra that change: with files in which a haem never changes, that haem cannot be found.
+- Components found from data carry some of its noise. The haem decomposition fits whole spectra, so a component's noise is multiplied by all the haem in the sample, including the part that never changes; without smoothing that is usually most of the residual in the examples picture. The smoothing removes most of it.
 - This has been tested on synthetic spectra only, not on real `.paf` data.
 
 ## 3. Project structure
@@ -248,7 +254,7 @@ Portimao/
         experiment_processing.py   the processing steps shared by the run and the previews
         output_capture.py   per-thread capture of printed output
         pca_fitter.py       principal component analysis of the spectra (components, fit file)
-        pca_plotter.py      the figure of the components found
+        pca_plotter.py      the figures of the components and example decompositions
         ...
     utils_viewer/           the experiment browser (window with the questions and the plots)
         __init__.py
