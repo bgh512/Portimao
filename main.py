@@ -30,7 +30,7 @@ from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
-from utils_shared.questions import section_starter, UserQuit, yes_no_asker
+from utils_shared.questions import section_starter, UserQuitError, yes_no_asker
 from utils_shared.helpers import program_title_builder
 from utils_shared.run_logging import logging_starter, logging_stopper
 from utils_shared.survey import (files_asker,
@@ -161,7 +161,7 @@ def everything_asker() -> Tuple[dict,
     Tuple[dict, Path, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
         (answers, results folder, per-experiment info dictionaries, fit, side-by-side
         comparison settings or None, names of the 2x2 grid experiments or None). Raises
-        UserQuit if the user declines to start.
+        UserQuitError if the user declines to start.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal; writes last_answers.json through
@@ -172,6 +172,7 @@ def everything_asker() -> Tuple[dict,
 
     ---- Helpers ----
     active_gui_getter
+    comparison_maker
     files_asker
     haem_name_formatter
     last_answers_loader
@@ -179,6 +180,7 @@ def everything_asker() -> Tuple[dict,
     multi_experiment_asker
     multi_figure_checker_builder
     section_starter
+    special_figures_maker
     summary_figure_asker
     viewer_asker
     yes_no_asker
@@ -361,7 +363,7 @@ def everything_asker() -> Tuple[dict,
 
     # ---- 6 Confirm the start ---------------------------------------------------------
     if not yes_no_asker('Do you want to start?', True):
-        raise UserQuit()
+        raise UserQuitError()
 
     # ---- 7 Remember the answers ------------------------------------------------------
     files = dict(remembered)
@@ -638,7 +640,7 @@ def program_runner() -> int:
          comparison,
          exemplar_names,
          ) = everything_asker()
-    except (UserQuit, KeyboardInterrupt):
+    except (UserQuitError, KeyboardInterrupt):
         print('\nCancelled. Nothing was changed.')
         return 1
 

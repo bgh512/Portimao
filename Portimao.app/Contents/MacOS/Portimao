@@ -1,12 +1,41 @@
 #!/bin/bash
 # Starts Portimao from this folder without opening Terminal.
-DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
-cd "$DIR" || exit 1
-for PY in /Library/Frameworks/Python.framework/Versions/Current/bin/python3 /opt/homebrew/bin/python3 /usr/local/bin/python3 "$(command -v python3)"; do
-    [ -x "$PY" ] && break
-done
-if [ ! -x "$PY" ]; then
-    osascript -e 'display dialog "Python 3.9 or newer was not found. Install it from https://www.python.org/downloads/ and open Portimao again." with title "Portimao" buttons {"OK"}'
+APP="$(cd "$(dirname "$0")/../.." && pwd)"
+DIR="$(dirname "$APP")"
+
+message() {
+    osascript -e "display dialog \"$1\" with title \"Portimao\" buttons {\"OK\"} default button 1" >/dev/null 2>&1
+}
+
+# A downloaded app that still has the download (quarantine) flag is run by macOS from a
+# hidden copy (App Translocation), which has none of the program's files next to it
+if [ ! -f "$DIR/launchers/bootstrap.pyw" ]; then
+    case "$APP" in
+        */AppTranslocation/*)
+            message "macOS opened Portimao from a temporary copy, because the folder was downloaded. Open Terminal and run:  xattr -dr com.apple.quarantine followed by a space, drag the Portimao folder onto the Terminal window, press Enter, then open Portimao again." ;;
+        *)
+            message "Portimao.app must stay inside the Portimao folder, next to the launchers folder. Move it back and open it again." ;;
+    esac
     exit 1
 fi
-exec "$PY" "$DIR/launchers/bootstrap.pyw"
+cd "$DIR" || exit 1
+
+# Finder starts apps with a short PATH, so the usual install places are tried first.
+# Each candidate must really run Python 3.9 or newer (/usr/bin/python3 is only a stub
+# when Apple's command line tools are not installed).
+PY=""
+for CANDIDATE in /Library/Frameworks/Python.framework/Versions/Current/bin/python3 \
+                 /opt/homebrew/bin/python3 \
+                 /usr/local/bin/python3 \
+                 "$(command -v python3)"; do
+    if [ -x "$CANDIDATE" ] && "$CANDIDATE" -c 'import sys; sys.exit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
+        PY="$CANDIDATE"
+        break
+    fi
+done
+if [ -z "$PY" ]; then
+    message "Python 3.9 or newer was not found. Install Python 3.12 or newer from https://www.python.org/downloads/ and open Portimao again."
+    exit 1
+fi
+mkdir -p "$DIR/logs"
+exec "$PY" "$DIR/launchers/bootstrap.pyw" 2>>"$DIR/logs/launcher_errors.log"

@@ -382,6 +382,7 @@ def exemplar_figure_plotter(experiments: dict,
     # measured from that addition, so the
     # additions line up across all four quadrants and the event labels need only be
     # written once per column.
+
     # ---- 2 Crop the runs -------------------------------------------------------------
     mode = config.get('CROP_START')
     if mode is not None:

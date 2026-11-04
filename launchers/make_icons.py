@@ -1,7 +1,5 @@
 """
-Makes every icon file from one picture: put the new icon at assets/icon.png (square,
-at least 512 x 512 pixels, ideally 1024 x 1024) and run this file once with the Python
-of the private environment, or any Python that has Pillow installed.
+Makes every icon file from assets/icon.png (square, 512 x 512 pixels or larger).
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -15,8 +13,14 @@ from PIL import Image
 # ---- CONSTANTS -----------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / 'assets' / 'icon.png'
-WINDOWS_SIZES = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128),
-                 (256, 256)]
+WINDOWS_SIZES = [(16, 16),
+                 (24, 24),
+                 (32, 32),
+                 (48, 48),
+                 (64, 64),
+                 (128, 128),
+                 (256, 256),
+                 ]
 MAC_FILE = ROOT / 'Portimao.app' / 'Contents' / 'Resources' / 'Portimao.icns'
 
 

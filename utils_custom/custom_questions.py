@@ -6,7 +6,6 @@ Numbered terminal questions of the time response and the OCR and haem response.
 from pathlib import Path
 from typing import Callable, List, Optional
 
-
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import group_assigner, hours_parser, run_name_lister
 from utils_shared.questions import (choice_asker,
@@ -173,7 +172,6 @@ def _haem_ocr_asker(names: List[str],
                          ):
             break
         ocr_default = answers['ho_ocr_mode']
-
     # All the haems are drawn as soon as the way to show them is chosen.
     answers['ho_blocks'] = ('baseline', 'ocr_response', 'haem_response')
     mode_default = defaults['ho_haem_mode']
@@ -454,7 +452,6 @@ def _step_wirer(figure_checker: Optional[Callable[[str, dict], bool]],
 
     if figure_checker is None:
         return None
-
     def check(members: object, question: str, change: str) -> bool:
         payload = {'fit': fit,
                    'custom': dict(result, **{key: members}),
@@ -462,7 +459,6 @@ def _step_wirer(figure_checker: Optional[Callable[[str, dict], bool]],
                    'change': change,
                    }
         return figure_checker(key, payload)
-
     return check
 
 
@@ -728,6 +724,7 @@ def summary_figure_asker(names: List[str],
 
     ---- Helpers ----
     _haem_ocr_asker
+    _step_wirer
     _time_response_asker
     _window_ensurer
     decomposition_asker

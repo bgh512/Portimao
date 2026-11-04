@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 
-
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
@@ -184,14 +183,33 @@ def _overlay_drawer(fig: Figure,
             continue
         for ax in axes:
             if kind == 'trim':
-                ax.axvspan(start, end, facecolor=TRIM_COLOUR, alpha=0.25, hatch='///',
-                           edgecolor=TRIM_COLOUR, linewidth=0, zorder=1)
+                ax.axvspan(start,
+                           end,
+                           facecolor=TRIM_COLOUR,
+                           alpha=0.25,
+                           hatch='///',
+                           edgecolor=TRIM_COLOUR,
+                           linewidth=0,
+                           zorder=1,
+                           )
             else:
-                ax.axvspan(start, end, facecolor=IGNORE_COLOUR, alpha=0.22,
-                           linewidth=0, zorder=1)
+                ax.axvspan(start,
+                           end,
+                           facecolor=IGNORE_COLOUR,
+                           alpha=0.22,
+                           linewidth=0,
+                           zorder=1,
+                           )
     if note:
-        mark = fig.text(0.995, 0.005, note, ha='right', va='bottom', fontsize=6,
-                        color='0.35', alpha=0.9)
+        mark = fig.text(0.995,
+                        0.005,
+                        note,
+                        ha='right',
+                        va='bottom',
+                        fontsize=6,
+                        color='0.35',
+                        alpha=0.9,
+                        )
         mark.set_in_layout(False)
 
 
@@ -292,8 +310,12 @@ def _previous_limit_drawer(axes: list,
         edges.append(end - previous['ignore_end'])
     for edge in edges:
         for ax in axes:
-            ax.axvline(edge, color=PREVIOUS_COLOUR, linestyle='--', linewidth=1.0,
-                       zorder=5)
+            ax.axvline(edge,
+                       color=PREVIOUS_COLOUR,
+                       linestyle='--',
+                       linewidth=1.0,
+                       zorder=5,
+                       )
     return bool(edges)
 
 
@@ -623,10 +645,12 @@ def preview_figure_builder(session: ViewerSession,
     None.
 
     ---- Helpers ----
-    preview_info_builder
     _loaded_experiment_getter
     _overlay_drawer
     _previous_limit_drawer
+    experiment_data_processor
+    experiment_plotter
+    preview_info_builder
     """
 
     # ---- 1 Set up the file and the settings ------------------------------------------
@@ -751,6 +775,7 @@ def skipped_windows_finder(session: ViewerSession,
 
     ---- Helpers ----
     _loaded_experiment_getter
+    experiment_data_processor
     preview_info_builder
     """
 

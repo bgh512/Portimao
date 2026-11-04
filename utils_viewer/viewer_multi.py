@@ -177,12 +177,10 @@ def _pictures_builder(kind: str,
 
     # ---- 2 Make the figure, keeping the picture instead of the files -----------------
     pictures: List[Tuple[str, bytes]] = []
-
     def capture(figure: Any, stem: str) -> None:
         buffer = io.BytesIO()
         figure.savefig(buffer, format='png', dpi=PREVIEW_DPI)
         pictures.append((stem.replace('_', ' '), buffer.getvalue()))
-
     cfg = settings.Config(answers)
     plt.rcParams.update(cfg.RC_PARAMS)
     with window.output_capturer() as printed:
@@ -249,6 +247,7 @@ def multi_figure_checker_builder(context: dict,
 
     ---- Helpers ----
     _pictures_builder
+    active_gui_getter
     choice_asker
     info_printer
     """
@@ -281,5 +280,4 @@ def multi_figure_checker_builder(context: dict,
         if question is None:  # the finished figure: the processed files are not needed
             context.pop('_processed', None)
         return choice == 'yes'
-
     return checker

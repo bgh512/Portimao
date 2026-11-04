@@ -1,6 +1,5 @@
 """
-Principal component analysis of the spectra of several experiments, to find the
-components (a fit) from the data itself instead of using a fit file.
+Principal component analysis of the spectra of several experiments, to build a fit.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------

@@ -7,7 +7,6 @@ import re
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_custom.run_namer import run_name_lister
@@ -351,10 +350,12 @@ def _limits_asker(summaries: List[dict],
 
     ---- Helpers ----
     _file_focuser
+    _first_event_finder
+    _last_event_finder
     _limit_converter
     _limit_maximum_getter
     _limits_filler
-    _minutes_remembered
+    _minutes_recaller
     info_printer
     number_asker
     yes_no_asker
@@ -366,7 +367,7 @@ def _limits_asker(summaries: List[dict],
     fallback = (settings.DEFAULT_ANSWERS['ignore_first_minutes']
                 if key == 'ignore_start' else 0.0
                 )
-    old = {s['name']: _minutes_remembered(s, remembered, key) for s in summaries}
+    old = {s['name']: _minutes_recaller(s, remembered, key) for s in summaries}
     known = [value for value in old.values() if value is not None]
     default_yes = any(known) or (fallback > 0 and not known)
     if not yes_no_asker(f'Do you want to {verb} the {place} of any of the data?',
@@ -501,8 +502,8 @@ text_italiser
     return text_italiser(inner.replace('\\', ''))
 
 
-# ---- _minutes_remembered -------------------------------------------------------------
-def _minutes_remembered(summary: dict, remembered: dict, key: str) -> Optional[float]:
+# ---- _minutes_recaller ---------------------------------------------------------------
+def _minutes_recaller(summary: dict, remembered: dict, key: str) -> Optional[float]:
     """
     ---- Summary ----
     Helper function to turn a limit remembered from the last run back into the minutes
@@ -810,7 +811,6 @@ def decomposition_asker(summaries: List[dict],
                          )
         ):
         return none_chosen
-
     def dataset_chooser(extra_depth: int) -> Optional[str]:
         common = set(summaries[0]['datasets'])
         for summary in summaries[1:]:

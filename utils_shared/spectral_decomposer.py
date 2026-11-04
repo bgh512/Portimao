@@ -367,13 +367,13 @@ def experiment_decomposer(experiment: dict,
     haem_abs[haem_names] = coefficients[:, :len(haem_names)] * peak_amplitude * 1000.0
     haem_abs.attrs['peak_amplitude_OD'] = dict(zip(haem_names, peak_amplitude.tolist()))
     experiment['haem_abs'] = haem_abs
-    experiment['haem_delta_abs'] = delta_abs_calculator(haem_abs,
-                                                        delta_exclude_first_minutes,
-                                                        delta_window_seconds,
-                                                        label=f'{name}/haem_abs',
-                                                        exclude_last_minutes=(
-                                                            delta_exclude_last_minutes),
-                                                        )
+    experiment['haem_delta_abs'] = delta_abs_calculator(
+        haem_abs,
+        delta_exclude_first_minutes,
+        delta_window_seconds,
+        label=f'{name}/haem_abs',
+        exclude_last_minutes=delta_exclude_last_minutes,
+        )
     return experiment
 
 

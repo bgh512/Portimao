@@ -1,4 +1,6 @@
-"""Publication figure (baseline OCR, OCR response, haem response), exemplars."""
+"""
+Publication figure (baseline OCR, OCR response, haem response), exemplars.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
@@ -315,7 +317,7 @@ def _block_gap_calculator(config: dict, blocks: list, n_columns: int) -> tuple:
     for upper, lower in zip(blocks, blocks[1:]):
         if upper == 'ocr_response':
             gaps.append(2.4 * xtick + 0.5 * unit + config['RESPONSE_TEST_HEADROOM_PT']
-                        + 0.5 * unit
+                        + 0.5 * unit,
                         )
         else:
             gaps.append(1.2 * xtick + 0.5 * unit + legend_row + 1.0 * unit)
@@ -845,7 +847,7 @@ def _haem_block_plotter(fig: Figure,
     ---- Helpers ----
     _haem_label_finder
     _haem_label_pad_calculator
-    _legend_handle_builder
+    _mean_ylim_setter
     _measurement_finder
     _outside_bar_drawer
     _reference_level_finder
@@ -1437,7 +1439,6 @@ def _ocr_block_plotter(fig: Figure,
 
     ---- Helpers ----
     _column_chooser
-    _legend_handle_builder
     _response_axes_preparer
     _response_series_drawer
     _response_window_tester
@@ -1513,12 +1514,10 @@ def _ocr_block_plotter(fig: Figure,
     # ---- 3 Share the axis limits -----------------------------------------------------
     if config['SHARE_Y_BETWEEN_ORDERS'] and len(axes) > 1:
         _row_ylim_sharer(axes)
-
     # The axis line itself covers only 0 to 100 % (the margins and the headroom for the
     # significance bars sit outside it).
     for ax in axes:
         ax.spines['left'].set_bounds(0, 100)
-
     return axes
 
 
@@ -1972,6 +1971,7 @@ def _response_window_tester(ax: Axes,
 
     if not config['RESPONSE_TESTS'] or len(strains) != 2:
         return
+
     # ---- 1 Select the series ---------------------------------------------------------
     first, second = (series_by_strain.get(strain) for strain in strains)
     if not first or not second:
@@ -2050,6 +2050,7 @@ def _response_window_tester(ax: Axes,
     # points, so work out what fraction of the
     # axis that is from its current height, and extend the y range by it.
     axes_height_pt = ax.get_position().height * ax.figure.get_size_inches()[1] * 72.0
+
     # ---- 4 Draw the significance bars ------------------------------------------------
     # Only as much as the bars need above the highest marked point: a panel whose
     # data end well below the top of the axis already has the room.
@@ -2288,7 +2289,6 @@ def _test_bar_drawer(ax: Axes,
         ---- Helpers ----
         None.
         """
-
         return (ax.transData + ScaledTranslation(0,
                                                  points / 72.0,
                                                  ax.figure.dpi_scale_trans,
@@ -2363,6 +2363,7 @@ def _tick_label_builder(experiment: Optional[dict], window_names: list) -> list:
     None.
 
     ---- Helpers ----
+    concentration_formatter
     finite_float_converter
     """
 
@@ -2504,6 +2505,7 @@ def exemplar_figure_plotter(experiments: dict,
     # measured from that addition, so the
     # additions line up across all four quadrants and the event labels need only be
     # written once per column.
+
     # ---- 2 Crop the runs -------------------------------------------------------------
     mode = config.get('CROP_START')
     if mode is not None:
@@ -2676,6 +2678,7 @@ def publication_figure_plotter(experiments: dict,
     _haem_row_selector
     _haem_source_finder
     _layout_validator
+    _legend_handle_builder
     _ocr_block_plotter
     _panel_labeller
     _reference_selector
@@ -2702,6 +2705,7 @@ def publication_figure_plotter(experiments: dict,
     if 'haem_response' in blocks:
         haem_source = _haem_source_finder(triplicates)
         _response_metric_checker(config['HAEM_RESPONSE_METRIC'], haem_source)
+
     # ---- 2 Create the figure grid ----------------------------------------------------
     fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
     block_gaps, column_wspace = _block_gap_calculator(config, blocks, len(orders))
@@ -2751,7 +2755,6 @@ def publication_figure_plotter(experiments: dict,
         ---- Helpers ----
         None.
         """
-
         letter = next(letters)
         letter_names[letter] = name
         panels.append((letter, main_ax, members))

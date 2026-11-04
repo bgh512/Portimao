@@ -8,7 +8,6 @@ import tempfile
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.pca_fitter import (component_builder,
@@ -628,6 +627,7 @@ def _skipped_lister(session: ViewerSession,
     None.
 
     ---- Helpers ----
+    _answers_previewer
     info_printer
     skipped_windows_finder
     text_colourer
@@ -718,7 +718,6 @@ def analysis_stage_runner(session: ViewerSession,
     for name, values in (details_before or {}).items():
         saved[name] = dict(saved.get(name) or {}, **values)
     answers.update({'decompose': False, 'normalise_od': False, 'averaging': False})
-
     def redraw() -> bool:
         return preview_drawer(session,
                               _answers_previewer(answers, fit, 'analysis'),
@@ -726,7 +725,6 @@ def analysis_stage_runner(session: ViewerSession,
                               fit,
                               details,
                               )
-
     def pca_finder(dataset: str, depth: int) -> Tuple[Optional[str], Optional[dict]]:
         return pca_stage_runner(session,
                                 answers,
@@ -870,7 +868,7 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
                        {},
                        show_ignored=False,
                        )
-        info_printer(f"\nCurrent file: {session.current + 1} of {total}")
+        info_printer(f'\nCurrent file: {session.current + 1} of {total}')
         info_printer(f"Filename: {summary['name']} ({summary['duration_min']:.1f} "
                      f"min, {len(summary['events'])} event(s))",
                      )
@@ -940,13 +938,18 @@ def pca_stage_runner(session: ViewerSession,
     _component_namer
     _fit_file_saver
     _pca_table_lister
+    choice_asker
     component_builder
     component_count_suggester
     component_finder
     fit_table_builder
+    info_printer
     number_asker
     pca_picture_builder
     pca_spectra_gatherer
+    progress_clearer
+    progress_printer
+    text_colourer
     yes_no_asker
     """
 
@@ -963,7 +966,6 @@ def pca_stage_runner(session: ViewerSession,
     end = float(defaults.get('pca_end') or 630.0)
     rotate = bool(defaults.get('pca_rotate', True))
     while True:
-
         # ---- 1 Choose the window and read the spectra --------------------------------
         start = number_asker('Where should the spectral window start (nm)?',
                              start,
@@ -982,7 +984,8 @@ def pca_stage_runner(session: ViewerSession,
             limits,
             (start, end),
             lambda n, total: progress_printer(f'Reading the spectra: file {n} of '
-                                              f'{total} ...'),
+                                              f'{total} ...',
+                                              ),
         )
         progress_clearer()
         for problem in problems:
@@ -1122,6 +1125,7 @@ def plots_stage_runner(session: ViewerSession,
     haem_choice_asker
     haem_form_asker
     haem_scaling_asker
+    info_printer
     label_angle_asker
     preview_drawer
     signal_asker
@@ -1134,7 +1138,6 @@ def plots_stage_runner(session: ViewerSession,
                  'before accepting it.',
                  )
     answers.update({'plot_haems': False, 'haem_per_od': False})
-
     def redraw(kind: str = 'plots') -> bool:
         return preview_drawer(session,
                               _answers_previewer(answers, fit, kind),
@@ -1276,7 +1279,6 @@ def trim_stage_runner(session: ViewerSession,
     """
 
     previous: Dict[str, dict] = {}
-
     def draw(limits: Dict[str, dict]) -> bool:
         return preview_drawer(session,
                               _answers_previewer(answers, None, 'raw'),
@@ -1286,7 +1288,6 @@ def trim_stage_runner(session: ViewerSession,
                               show_trim=True,
                               previous_limits=previous,
                               )
-
     while True:
         draw(_empty_limits_builder(session.summaries))
         limits = trim_asker(session.summaries, remembered, draw)
@@ -1348,11 +1349,13 @@ def viewer_asker(summaries: List[dict],
     None.
 
     ---- Helpers ----
+    active_gui_getter
     analysis_stage_runner
     browser_stage_runner
     choice_asker
     file_focus_setter
     heading_printer
+    info_printer
     numbering_getter
     numbering_setter
     plots_stage_runner
@@ -1364,18 +1367,15 @@ def viewer_asker(summaries: List[dict],
     session = ViewerSession(summaries, export_root, window)
     window.session_attacher(session)
     names = [s['name'] for s in summaries]
-
     def focus(name: str) -> None:
         session.current = names.index(name)
         window.file_focuser(name)
-
     file_focus_setter(focus)
     state: dict = {}
 
     # ---- run_browser -----------------------------------------------------------------
     def run_browser() -> None:
         browser_stage_runner(session, answers)
-
     def run_trim() -> None:
         old = state.get('limits') or remembered
         state['limits'] = trim_stage_runner(session, answers, old)
@@ -1385,7 +1385,6 @@ def viewer_asker(summaries: List[dict],
         answers['ignore_last_minutes'] = max(v['ignore_end']
                                              for v in state['limits'].values()
                                              )
-
     def run_analysis() -> None:
         old_defaults = dict(answers) if state.get('fit_asked') else defaults
         state['fit'], state['details'] = analysis_stage_runner(session,
@@ -1396,7 +1395,6 @@ def viewer_asker(summaries: List[dict],
                                                                state.get('details'),
                                                                )
         state['fit_asked'] = True
-
     def run_plots() -> None:
         old_defaults = dict(answers) if state.get('plots_asked') else defaults
         state['plotted'] = plots_stage_runner(session,
@@ -1407,7 +1405,6 @@ def viewer_asker(summaries: List[dict],
                                               state['details'],
                                               )
         state['plots_asked'] = True
-
     steps = [('browser', run_browser),
              ('trim', run_trim),
              ('analysis', run_analysis),

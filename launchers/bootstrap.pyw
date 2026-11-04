@@ -1,8 +1,5 @@
 """
-Launcher of the program without a terminal window: checks for updates, sets up the
-private Python environment the first time, makes the desktop icon and starts the
-program. Needs only the Python standard library. Started by the Portimao icon on
-Windows (with pythonw), by Portimao.app on a Mac and by the menu entry on Linux.
+Launcher: checks for updates, sets up the environment, makes the icon, starts Portimao.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -14,7 +11,6 @@ import sys
 import threading
 import time
 import traceback
-import venv
 from pathlib import Path
 from typing import Callable, List, Optional
 
@@ -30,7 +26,8 @@ ENVIRONMENT_PYTHON = ENVIRONMENT / ('Scripts/python.exe'
                                     )
 ENVIRONMENT_WINDOWLESS = ENVIRONMENT / 'Scripts/pythonw.exe'
 LOG_FILE = ROOT / 'logs' / 'launch.log'
-SHORTCUT_MARK = ROOT / '.shortcut_made_portimao'  # the old program used .shortcut_made
+SHORTCUT_MARK = ROOT / '.portimao_shortcut'  # git-ignored: each computer makes its own
+OLD_SHORTCUT_MARK = '.shortcut_made_portimao'  # was tracked; reset before updates
 OLD_NAMES = ('DePalencify', 'Albufeira')  # the names the program had before
 REPOSITORY_NAME = 'Portimao'  # the name of the GitHub repository after it is renamed
 HIDDEN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
@@ -168,8 +165,8 @@ def _old_shortcut_remover() -> None:
         places += [appdata / 'Microsoft/Windows/Start Menu/Programs']
         names = [f'{old}.lnk' for old in OLD_NAMES]
     else:
-        places += [Path(os.environ.get('XDG_DATA_HOME',
-                                       home / '.local/share')) / 'applications']
+        data_home = Path(os.environ.get('XDG_DATA_HOME', home / '.local/share'))
+        places += [data_home / 'applications']
         names = [f'{old}{ending}'
                  for old in OLD_NAMES
                  for ending in ('.desktop', '.app')
@@ -314,8 +311,10 @@ def _remote_renamer() -> None:
             return
         start = url.lower().rindex(old.lower())
         new_url = url[:start] + REPOSITORY_NAME + url[start + len(old):]
-        if _command_runner(['git', 'ls-remote', new_url, 'HEAD'],
-                           timeout=20).returncode == 0:
+        answered = _command_runner(['git', 'ls-remote', new_url, 'HEAD'],
+                                   timeout=20,
+                                   )
+        if answered.returncode == 0:
             _command_runner(['git', 'remote', 'set-url', 'origin', new_url])
     except Exception:
         pass
@@ -371,17 +370,20 @@ def _status_window_maker() -> Optional[Callable[[str], None]]:
     bar.pack(padx=24, pady=(0, 18))
     bar.start(12)
     messages: 'queue.Queue' = queue.Queue()
-
     def poll() -> None:
         while not messages.empty():
-            label.configure(text=messages.get())
+            text = messages.get()
+            if text is None:  # close, asked for by the launcher thread
+                root.destroy()
+                return
+            label.configure(text=text)
         root.after(100, poll)
-
     def show(text: str) -> None:
         messages.put(text)
-
+    # Tk is only touched by the main thread (other threads crash it on macOS), so the
+    # launcher thread asks for the window to close through the queue
     show.mainloop = lambda: (poll(), root.mainloop())  # type: ignore[attr-defined]
-    show.close = lambda: root.after(0, root.destroy)  # type: ignore[attr-defined]
+    show.close = lambda: messages.put(None)  # type: ignore[attr-defined]
     return show
 
 
@@ -437,21 +439,31 @@ def environment_builder(show: Callable[[str], None]) -> None:
         if python is None:
             raise RuntimeError('Python 3.9 or newer was not found. Install it from '
                                'https://www.python.org/downloads/ and open '
-                               f'{APP_NAME} again.')
+                               f'{APP_NAME} again.',
+                               )
         made = _command_runner([python, '-m', 'venv', str(ENVIRONMENT)])
         if made.returncode != 0:
             shutil.rmtree(ENVIRONMENT, ignore_errors=True)
             raise RuntimeError('The private Python environment could not be created.\n'
-                               + made.stderr[-600:])
+                               + made.stderr[-600:],
+                               )
     show('Installing the packages ...')
-    command = [str(ENVIRONMENT_PYTHON), '-m', 'pip', 'install', '--quiet',
-               '--disable-pip-version-check', '-r', str(ROOT / 'requirements.txt')]
+    command = [str(ENVIRONMENT_PYTHON),
+               '-m',
+               'pip',
+               'install',
+               '--quiet',
+               '--disable-pip-version-check',
+               '-r',
+               str(ROOT / 'requirements.txt'),
+               ]
     installed = _command_runner(command)
     if installed.returncode != 0:
         if not (ENVIRONMENT / '.complete').exists():
             shutil.rmtree(ENVIRONMENT, ignore_errors=True)
         raise RuntimeError('The packages could not be installed. Check the internet '
-                           'connection and try again.\n' + installed.stderr[-600:])
+                           'connection and try again.\n' + installed.stderr[-600:],
+                           )
     (ENVIRONMENT / '.complete').write_text('ok')
 
 
@@ -494,7 +506,8 @@ def launcher_runner(show: Callable[[str], None]) -> int:
         if update_checker():
             environment = dict(os.environ, PORTIMAO_UPDATED='1')
             subprocess.Popen([sys.executable, str(Path(__file__).resolve())],
-                             env=environment)
+                             env=environment,
+                             )
             return 0
         environment_builder(show)
         tk_version = _tk_version_getter(str(ENVIRONMENT_PYTHON))
@@ -509,7 +522,8 @@ def launcher_runner(show: Callable[[str], None]) -> int:
                             f'https://www.python.org/downloads/ (it includes a good '
                             f'Tk), then delete the hidden folder '
                             f'{ENVIRONMENT.name} inside the {APP_NAME} folder and open '
-                            f'{APP_NAME} again.')
+                            f'{APP_NAME} again.',
+                            )
             return 1
         shortcut_maker()
         show(f'Opening {APP_NAME} ...')
@@ -520,7 +534,8 @@ def launcher_runner(show: Callable[[str], None]) -> int:
         if process.poll() not in (None, 0):
             tail = LOG_FILE.read_text(encoding='utf-8', errors='replace')[-700:]
             _message_shower(f'{APP_NAME} could not start',
-                            f'The program stopped straight away.\n\n{tail}')
+                            f'The program stopped straight away.\n\n{tail}',
+                            )
             return 1
         return 0
     except Exception as exc:
@@ -562,11 +577,9 @@ def main() -> int:
     if show is None:
         return launcher_runner(lambda text: None)
     result: List[int] = []
-
     def work() -> None:
         result.append(launcher_runner(show))
         show.close()  # type: ignore[attr-defined]
-
     threading.Thread(target=work, daemon=True).start()
     show.mainloop()  # type: ignore[attr-defined]
     return result[0] if result else 1
@@ -608,12 +621,22 @@ def program_starter() -> 'subprocess.Popen':
         if not python.exists():
             python = ENVIRONMENT_PYTHON
         flags = HIDDEN | getattr(subprocess, 'DETACHED_PROCESS', 0)
-        return subprocess.Popen([str(python), program], cwd=ROOT, env=environment,
-                                stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                                creationflags=flags)
-    return subprocess.Popen([str(ENVIRONMENT_PYTHON), program], cwd=ROOT,
-                            env=environment, stdin=subprocess.DEVNULL, stdout=log,
-                            stderr=log, start_new_session=True)
+        return subprocess.Popen([str(python), program],
+                                cwd=ROOT,
+                                env=environment,
+                                stdin=subprocess.DEVNULL,
+                                stdout=log,
+                                stderr=log,
+                                creationflags=flags,
+                                )
+    return subprocess.Popen([str(ENVIRONMENT_PYTHON), program],
+                            cwd=ROOT,
+                            env=environment,
+                            stdin=subprocess.DEVNULL,
+                            stdout=log,
+                            stderr=log,
+                            start_new_session=True,
+                            )
 
 
 # ---- shortcut_maker ------------------------------------------------------------------
@@ -654,23 +677,35 @@ def shortcut_maker() -> None:
             script = ROOT / 'launchers' / 'make_shortcut.ps1'
             windowless = Path(sys.executable).with_name('pythonw.exe')
             target = windowless if windowless.exists() else Path(sys.executable)
-            _command_runner(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-                             '-WindowStyle', 'Hidden', '-File', str(script),
-                             str(ROOT), str(target), str(ROOT / 'Portimao.pyw')])
+            _command_runner(['powershell',
+                             '-NoProfile',
+                             '-ExecutionPolicy',
+                             'Bypass',
+                             '-WindowStyle',
+                             'Hidden',
+                             '-File',
+                             str(script),
+                             str(ROOT),
+                             str(target),
+                             str(ROOT / 'Portimao.pyw'),
+                             ])
         elif sys.platform == 'darwin':
             link = Path.home() / 'Desktop' / f'{APP_NAME}.app'
             if link.is_symlink() or link.exists():
                 link.unlink() if link.is_symlink() else shutil.rmtree(link)
             link.symlink_to(ROOT / f'{APP_NAME}.app')
         elif sys.platform.startswith('linux'):
+            python = shutil.which('python3') or 'python3'
+            launcher = ROOT / 'launchers' / 'bootstrap.pyw'
+            icon = ROOT / 'assets' / 'icon.png'
             entry = (f'[Desktop Entry]\nType=Application\nName={APP_NAME}\n'
                      'Comment=Convert chamber .paf files to figures and data\n'
-                     f'Exec={shutil.which("python3") or "python3"} '
-                     f'"{ROOT / "launchers" / "bootstrap.pyw"}"\n'
-                     f'Path={ROOT}\nIcon={ROOT / "assets" / "icon.png"}\n'
-                     'Terminal=false\nCategories=Science;Education;\n')
-            menu = Path(os.environ.get('XDG_DATA_HOME',
-                                       Path.home() / '.local/share')) / 'applications'
+                     f'Exec={python} "{launcher}"\n'
+                     f'Path={ROOT}\nIcon={icon}\n'
+                     'Terminal=false\nCategories=Science;Education;\n'
+                     )
+            data_home = os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share')
+            menu = Path(data_home) / 'applications'
             for folder in (menu, Path.home() / 'Desktop'):
                 if folder.is_dir() or folder == menu:
                     folder.mkdir(parents=True, exist_ok=True)
@@ -678,8 +713,12 @@ def shortcut_maker() -> None:
                     path.write_text(entry, encoding='utf-8')
                     path.chmod(0o755)
                     if shutil.which('gio'):
-                        _command_runner(['gio', 'set', str(path),
-                                         'metadata::trusted', 'true'])
+                        _command_runner(['gio',
+                                         'set',
+                                         str(path),
+                                         'metadata::trusted',
+                                         'true',
+                                         ])
         SHORTCUT_MARK.write_text(str(ROOT))
     except Exception:  # a missing shortcut must never stop the program
         pass
@@ -697,7 +736,7 @@ def update_checker() -> bool:
     None.
 
     ---- Globals read ----
-    ROOT (module constant); os.environ["PORTIMAO_UPDATED"].
+    ROOT, OLD_SHORTCUT_MARK (module constants); os.environ['PORTIMAO_UPDATED'].
 
     ---- Outputs ----
     bool
@@ -725,6 +764,8 @@ def update_checker() -> bool:
         behind = _command_runner(['git', 'rev-list', '--count', 'HEAD..@{u}'])
         if behind.returncode != 0 or int(behind.stdout.strip() or 0) == 0:
             return False
+        # older launchers rewrote this tracked file, which would block the pull
+        _command_runner(['git', 'checkout', '--', OLD_SHORTCUT_MARK])
         return _command_runner(['git', 'pull', '--ff-only', '--quiet']).returncode == 0
     except Exception:
         return False

@@ -36,7 +36,7 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
 
 #### macOS
 
-1. Open Terminal: press Cmd + Space, type `Terminal` and press Enter. If git is missing, run `xcode-select --install` first.
+1. Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/) (the `python3` that comes with macOS has an old Tk that draws a blank window). Then open Terminal: press Cmd + Space, type `Terminal` and press Enter. If git is missing, run `xcode-select --install` first.
 2. Go to the folder where the project should be installed:
 
     ```bash
@@ -58,7 +58,7 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
     python -m pip install -r requirements.txt
     ```
 
-    The launchers `run.command` and `run.sh` do this step themselves, so it can be skipped if only a launcher is used.
+    The launchers `Portimao.app` and `run.sh` set up their own environment (`.venv_unix`), so this step can be skipped if only a launcher is used.
 
 #### Linux
 
@@ -152,15 +152,15 @@ The launchers open Portimao without leaving a terminal window open.
 
 **macOS:** use Python from python.org (it includes a Tk of version 8.6 or newer). The Python that comes with macOS (and some Xcode tools) has the old Tk 8.5, which draws a blank window. The launcher looks for a better Python itself, rebuilds its environment with it, and shows a message when it finds none; then install Python 3.12 or newer from python.org, delete the hidden folder `.venv_unix` inside the Portimao folder and open Portimao again.
 
-A small "Starting Portimao" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way.
+A small "Starting Portimao" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details (on macOS, a launcher that does not start at all writes to `logs/launcher_errors.log`). Everything the program prints goes to that file when it is started this way.
 
-Windows and macOS may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. On Windows right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. On macOS right-click `Portimao.app` and choose Open the first time.
+Windows and macOS may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. On Windows right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. On macOS right-click `Portimao.app` and choose Open the first time; on macOS 15 (Sequoia) or newer, open it once, then go to System Settings > Privacy & Security and click *Open Anyway*.
 
 ### 2.3 Changing the icon
 
 1. Replace `assets/icon.png` with the new icon (a square PNG, ideally 1024 x 1024 pixels).
 2. Run `python launchers/make_icons.py` (inside the program's environment, for example `.venv\Scripts\python launchers\make_icons.py` on Windows or `.venv_unix/bin/python launchers/make_icons.py` on Mac and Linux). It makes `assets/icon.ico` (window, taskbar and Windows shortcut) and the Mac icon inside `Portimao.app`.
-3. Delete the file `.shortcut_made_portimao`, then start Portimao once, so the Desktop and Start menu shortcuts are made again with the new icon.
+3. Delete the file `.portimao_shortcut`, then start Portimao once, so the Desktop and Start menu shortcuts are made again with the new icon.
 
 
 ### 2.4 The questions

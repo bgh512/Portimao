@@ -1716,6 +1716,7 @@ def _response_window_tester(ax: Axes,
 
     if not config['RESPONSE_TESTS'] or len(strains) != 2:
         return
+
     # ---- 1 Select the series ---------------------------------------------------------
     first, second = (series_by_strain.get(strain) for strain in strains)
     if not first or not second:
@@ -1792,6 +1793,7 @@ def _response_window_tester(ax: Axes,
     # points, so work out what fraction of the
     # axis that is from its current height, and extend the y range by it.
     axes_height_pt = ax.get_position().height * ax.figure.get_size_inches()[1] * 72.0
+
     # ---- 4 Draw the significance bars ------------------------------------------------
     # Only as much as the bars need above the highest marked point: a panel whose
     # data end well below the top of the axis already has the room.
@@ -2223,6 +2225,7 @@ def ocr_and_haem_response_figure_plotter(experiments: dict,
     if 'haem_response' in blocks:
         haem_source = _haem_source_finder(triplicates)
         _response_metric_checker(config['HAEM_RESPONSE_METRIC'], haem_source)
+
     # ---- 2 Create the figure grid ----------------------------------------------------
     fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
     block_gaps, column_wspace = _block_gap_calculator(config, blocks, len(orders))

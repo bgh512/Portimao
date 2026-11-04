@@ -748,14 +748,14 @@ def experiment_end_trimmer(experiment: dict, end_time: float) -> dict:
                              f'times are unavailable.',
                              )
         keep = dataset['time'] <= end_time
-        for field in ('spectrum_indices',
-                      'time',
-                      'transmission',
-                      'intensity',
-                      'attenuation',
-                      ):
-            if field in dataset:
-                dataset[field] = dataset[field][keep]
+        for key in ('spectrum_indices',
+                    'time',
+                    'transmission',
+                    'intensity',
+                    'attenuation',
+                    ):
+            if key in dataset:
+                dataset[key] = dataset[key][keep]
 
     # ---- 4 Record the trim -----------------------------------------------------------
     experiment['metadata']['trimmed_after_minutes'] = end_time
@@ -1082,7 +1082,7 @@ def rtf_converter(rtf: bytes) -> str:
 
     # ---- 3 Tidy the text -------------------------------------------------------------
     text = ''.join(out)
-    return '\n'.join(l.rstrip() for l in text.split('\n')).strip('\n') + '\n'
+    return '\n'.join(line.rstrip() for line in text.split('\n')).strip('\n') + '\n'
 
 
 # ---- spectra_parser ------------------------------------------------------------------

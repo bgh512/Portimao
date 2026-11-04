@@ -1,0 +1,9 @@
+# Files and folders the style tools (banner_formatter.py, function_list_generator.py)
+# skip. One pattern per line, like .gitignore: end a folder with /, * is a wildcard.
+# Always skipped: .git, .venv, venv, build, style, __pycache__, logs (and hidden
+# folders for the function list).
+#
+# Examples (remove the # to use them):
+# lib/
+# vendor/
+# generated_*.py

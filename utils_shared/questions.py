@@ -21,8 +21,8 @@ _colour_ready = False
 _tight_next = False  # True: the next question follows its heading line directly
 
 
-# ---- UserQuit ------------------------------------------------------------------------
-class UserQuit(Exception):
+# ---- UserQuitError -------------------------------------------------------------------
+class UserQuitError(Exception):
     """
     ---- Summary ----
     Raised when the input ends (window closed, Ctrl+Z / Ctrl+D) so the program can stop
@@ -63,7 +63,8 @@ def _input_reader(text: str, indent: str = '') -> str:
         The typed answer with surrounding spaces removed.
 
     ---- Globals mutated ----
-    None. Reads from the terminal; raises UserQuit when the input ends (side effect).
+    None. Reads from the terminal; raises UserQuitError when the input ends (side
+    effect).
 
     ---- Equations ----
     None.
@@ -76,7 +77,7 @@ def _input_reader(text: str, indent: str = '') -> str:
     try:
         return input(f'{indent}> ').strip()
     except EOFError:
-        raise UserQuit()
+        raise UserQuitError()
 
 
 # ---- _number_builder -----------------------------------------------------------------
@@ -685,21 +686,22 @@ def numbers_asker(question: str, count: int, depth: int = 1) -> List[int]:
 
 # ---- path_cleaner --------------------------------------------------------------------
 def path_cleaner(text: str) -> str:
-    """
+    r"""
     ---- Summary ----
     Main function to clean a path typed or dragged into the window by removing
-    surrounding quotes and spaces.
+    surrounding quotes and spaces, and, on macOS and Linux, the backslashes that
+    Terminal puts before spaces and other characters when a folder is dragged in.
 
     ---- Inputs ----
     text : str
         Text as received from the terminal.
 
     ---- Globals read ----
-    None.
+    os.name.
 
     ---- Outputs ----
     str
-        Path text without surrounding quotes or spaces.
+        Path text without surrounding quotes or spaces, or shell escapes.
 
     ---- Globals mutated ----
     None.
@@ -711,7 +713,10 @@ def path_cleaner(text: str) -> str:
     None.
     """
 
-    return text.strip().strip('"').strip("'").strip()
+    text = text.strip().strip('"').strip("'").strip()
+    if os.name != 'nt':  # on Windows the backslash separates folders
+        text = re.sub(r'\\(.)', r'\1', text)
+    return text
 
 
 # ---- progress_clearer ----------------------------------------------------------------

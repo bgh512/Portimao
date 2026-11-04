@@ -1,0 +1,58 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(python style/tools_format/banner_formatter.py:*)",
+            "Bash(python style/tools_format/function_list_generator.py:*)",
+            "Bash(python3 style/tools_format/banner_formatter.py:*)",
+            "Bash(python3 style/tools_format/function_list_generator.py:*)",
+            "Bash(ruff check:*)",
+            "Bash(yapf:*)",
+            "Bash(clang-format:*)",
+            "Bash(git status:*)",
+            "Bash(git diff:*)",
+            "Bash(git log:*)",
+            "Bash(git branch:*)"
+        ],
+        "ask": [
+            "Bash(git push:*)",
+            "Bash(git release:*)",
+            "Bash(git hotfix:*)",
+            "Bash(git merge:*)",
+            "Bash(git checkout main:*)"
+        ]
+    },
+    "hooks": {
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/tools_format/run_tool.sh\" claude_hook.py session"
+                    }
+                ]
+            }
+        ],
+        "PreToolUse": [
+            {
+                "matcher": "Edit|MultiEdit|Write|NotebookEdit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/tools_format/run_tool.sh\" claude_hook.py guard"
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "Edit|MultiEdit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/tools_format/run_tool.sh\" claude_hook.py tidy"
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -1,6 +1,5 @@
 """
-Pieces of the text terminal in the experiment browser window: colour codes and the
-output streams that send the program's text to the window.
+Text terminal of the experiment browser window: colour codes and output streams.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -411,7 +410,7 @@ class OutputRouter:
         None.
 
         ---- Helpers ----
-        None.
+        captured_buffer_getter
         """
 
         captured = captured_buffer_getter()

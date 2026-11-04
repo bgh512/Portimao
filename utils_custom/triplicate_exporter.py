@@ -1,4 +1,6 @@
-"""Export of the across-run (triplicate) statistics to an Excel workbook."""
+"""
+Export of the across-run (triplicate) statistics to an Excel workbook.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
@@ -118,7 +120,6 @@ def triplicate_exporter(triplicates: dict, output_path: Path) -> Path:
             ---- Helpers ----
             finite_float_converter
             """
-
             value = finite_float_converter(value)
             if np.isfinite(value):
                 sheet.write_number(row, col, value, cell_format)

@@ -5,6 +5,7 @@
         "eeyore.yapf",
         "ms-vscode.cpptools",
         "streetsidesoftware.code-spell-checker",
-        "streetsidesoftware.code-spell-checker-british-english"
+        "streetsidesoftware.code-spell-checker-british-english",
+        "anthropic.claude-code"
     ]
 }

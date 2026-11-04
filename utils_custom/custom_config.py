@@ -248,7 +248,7 @@ def ocr_and_haem_response_config_builder(cfg: Config,
              'ORDER_COLUMNS': ORDER_COLUMNS,
              'STRAIN_ROWS': STRAIN_ROWS,
              'BLOCK_ORDER': tuple(answers.get('ho_blocks')
-                                  or ('baseline', 'ocr_response', 'haem_response')
+                                  or ('baseline', 'ocr_response', 'haem_response'),
                                   ),
              'HAEM_RESPONSE_ROWS': rows,
              'HAEM_RESPONSE_SHOW': list(answers['ho_haems'] or []),
@@ -367,7 +367,7 @@ def source_selector(answers: dict, od_available: bool) -> tuple:
 
 
 # ---- time_response_config_builder ----------------------------------------------------
-def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) -> dict:
+def time_response_config_builder(cfg: Config, answers: dict, haem_names: list) -> dict:
     """
     ---- Summary ----
     Main function to build the settings of the time response figure.

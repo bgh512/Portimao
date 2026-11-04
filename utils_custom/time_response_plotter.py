@@ -15,7 +15,6 @@ from matplotlib.patches import Rectangle
 from matplotlib.ticker import AutoLocator
 from matplotlib.transforms import ScaledTranslation
 
-
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import hours_parser
 from utils_shared.figure_layout import (figure_canvas_fitter,
@@ -1222,6 +1221,7 @@ def waterfall_plotter(ax: Axes,
                         )
     if x_min is not None or x_max is not None:
         ax.set_xlim(left=x_min, right=x_max)
+
     # ---- 4 Style the axes ------------------------------------------------------------
     ax.set_xlabel('Wavelength (nm)', fontsize=config['AXIS_LABEL_FONT_SIZE'])
     ax.set_ylabel(config['WATERFALL_Y_LABEL'], fontsize=config['AXIS_LABEL_FONT_SIZE'])

@@ -1,6 +1,5 @@
 """
-The fallback preview of the experiment browser: one picture file that is rewritten after
-each answer, for computers where the browser window cannot open.
+Fallback preview: one picture file rewritten after each answer, when no window opens.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------

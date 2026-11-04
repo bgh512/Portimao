@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.9
+- **Version:** V3.0
 - **Date:** 04/11/2026
 
 ## Contents
@@ -283,7 +283,7 @@
 - [`utils_shared/pca_plotter.py`](#utils_sharedpca_plotterpy)
     - [`pca_figure_builder`](#pca_figure_builder)
 - [`utils_shared/questions.py`](#utils_sharedquestionspy)
-    - [`UserQuit`](#userquit)
+    - [`UserQuitError`](#userquiterror)
     - [`_input_reader`](#_input_reader)
     - [`_number_builder`](#_number_builder)
     - [`_question_printer`](#_question_printer)
@@ -336,7 +336,7 @@
     - [`_limits_asker`](#_limits_asker)
     - [`_limits_filler`](#_limits_filler)
     - [`_maths_converter`](#_maths_converter)
-    - [`_minutes_remembered`](#_minutes_remembered)
+    - [`_minutes_recaller`](#_minutes_recaller)
     - [`_natural_sorter`](#_natural_sorter)
     - [`_subscript_stripper`](#_subscript_stripper)
     - [`analysis_asker`](#analysis_asker)
@@ -364,7 +364,7 @@
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
 - [`utils_viewer/viewer_gui.py`](#utils_viewerviewer_guipy)
-    - [`GuiUnavailable`](#guiunavailable)
+    - [`GuiUnavailableError`](#guiunavailableerror)
     - [`ViewerGui`](#viewergui)
     - [`active_gui_getter`](#active_gui_getter)
     - [`gui_runner`](#gui_runner)
@@ -611,7 +611,7 @@ name_simplifier
 
 ## `launchers/make_icons.py`
 
-Makes every icon file from one picture: put the new icon at assets/icon.png (square,
+Makes every icon file from assets/icon.png (square, 512 x 512 pixels or larger).
 
 ### FUNCTIONS
 
@@ -702,7 +702,7 @@ FITS_FOLDER, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
 Tuple[dict, Path, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
     (answers, results folder, per-experiment info dictionaries, fit, side-by-side
     comparison settings or None, names of the 2x2 grid experiments or None). Raises
-    UserQuit if the user declines to start.
+    UserQuitError if the user declines to start.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal; writes last_answers.json through
@@ -713,6 +713,7 @@ None.
 
 ---- Helpers ----
 active_gui_getter
+comparison_maker
 files_asker
 haem_name_formatter
 last_answers_loader
@@ -720,6 +721,7 @@ last_answers_saver
 multi_experiment_asker
 multi_figure_checker_builder
 section_starter
+special_figures_maker
 summary_figure_asker
 viewer_asker
 yes_no_asker
@@ -1534,6 +1536,7 @@ None.
 
 ---- Helpers ----
 _haem_ocr_asker
+_step_wirer
 _time_response_asker
 _window_ensurer
 decomposition_asker
@@ -3939,7 +3942,7 @@ None.
 ---- Helpers ----
 _haem_label_finder
 _haem_label_pad_calculator
-_legend_handle_builder
+_mean_ylim_setter
 _measurement_finder
 _outside_bar_drawer
 _reference_level_finder
@@ -4266,7 +4269,6 @@ None.
 
 ---- Helpers ----
 _column_chooser
-_legend_handle_builder
 _response_axes_preparer
 _response_series_drawer
 _response_window_tester
@@ -4724,6 +4726,7 @@ None.
 None.
 
 ---- Helpers ----
+concentration_formatter
 finite_float_converter
 ```
 
@@ -4844,6 +4847,7 @@ _haem_block_plotter
 _haem_row_selector
 _haem_source_finder
 _layout_validator
+_legend_handle_builder
 _ocr_block_plotter
 _panel_labeller
 _reference_selector
@@ -8389,7 +8393,7 @@ time_getter
 
 ## `utils_shared/output_capture.py`
 
-Per-thread capture of printed output, so one thread can print without the text reaching
+Per-thread capture of printed output, kept out of the terminal and the log file.
 
 ### MAIN FUNCTIONS
 
@@ -9241,7 +9245,7 @@ None.
 
 ## `utils_shared/pca_fitter.py`
 
-Principal component analysis of the spectra of several experiments, to find the
+Principal component analysis of the spectra of several experiments, to build a fit.
 
 ### PCA FITTER HELPERS
 
@@ -9603,7 +9607,7 @@ Helpers for asking numbered questions in the terminal.
 
 ### CLASSES
 
-#### `UserQuit`
+#### `UserQuitError`
 
 ```text
 ---- Summary ----
@@ -9643,7 +9647,8 @@ str
     The typed answer with surrounding spaces removed.
 
 ---- Globals mutated ----
-None. Reads from the terminal; raises UserQuit when the input ends (side effect).
+None. Reads from the terminal; raises UserQuitError when the input ends (side
+effect).
 
 ---- Equations ----
 None.
@@ -10072,18 +10077,19 @@ _question_printer
 ```text
 ---- Summary ----
 Main function to clean a path typed or dragged into the window by removing
-surrounding quotes and spaces.
+surrounding quotes and spaces, and, on macOS and Linux, the backslashes that
+Terminal puts before spaces and other characters when a folder is dragged in.
 
 ---- Inputs ----
 text : str
     Text as received from the terminal.
 
 ---- Globals read ----
-None.
+os.name.
 
 ---- Outputs ----
 str
-    Path text without surrounding quotes or spaces.
+    Path text without surrounding quotes or spaces, or shell escapes.
 
 ---- Globals mutated ----
 None.
@@ -11243,10 +11249,12 @@ None.
 
 ---- Helpers ----
 _file_focuser
+_first_event_finder
+_last_event_finder
 _limit_converter
 _limit_maximum_getter
 _limits_filler
-_minutes_remembered
+_minutes_recaller
 info_printer
 number_asker
 yes_no_asker
@@ -11313,7 +11321,7 @@ text_italiser
     
 ```
 
-#### `_minutes_remembered`
+#### `_minutes_recaller`
 
 ```text
 ---- Summary ----
@@ -12199,11 +12207,11 @@ None.
 
 ## `utils_viewer/viewer_gui.py`
 
-The experiment browser window: a text terminal on the left that asks the questions, and
+The experiment browser window: question terminal on the left, plots on the right.
 
 ### CLASSES
 
-#### `GuiUnavailable`
+#### `GuiUnavailableError`
 
 ```text
 ---- Summary ----
@@ -12243,18 +12251,25 @@ MONO_FONTS and the colour constants (module constants).
 __init__
 _answer_sender
 _closing_handler
+_display_name_lister
 _drain_runner
 _event_handler
 _history_stepper
 _icon_setter
+_image_deliverer
 _image_receiver
+_lock_drawer
 _logic_runner
+_message_shower
+_nav_state_setter
 _navigator
 _pane_writer
 _picture_shower
+_resizer
 _step_taker
 _symbol_inserter
 _widgets_builder
+_window_raiser
 extra_publisher
 figure_shower
 file_focuser
@@ -12298,6 +12313,7 @@ None. Sets the attributes on the instance and builds the widgets.
 None.
 
 ---- Helpers ----
+_icon_setter
 _widgets_builder
 ```
 
@@ -12356,7 +12372,7 @@ None.
 None.
 ```
 
-##### `_display_names`
+##### `_display_name_lister`
 
 ```text
 ---- Summary ----
@@ -12437,10 +12453,12 @@ None. Changes the window (side effects).
 None.
 
 ---- Helpers ----
+_display_name_lister
+_image_deliverer
 _image_receiver
+_nav_state_setter
 _navigator
 _pane_writer
-_picture_shower
 ```
 
 ##### `_history_stepper`
@@ -12489,6 +12507,39 @@ None
 
 ---- Globals mutated ----
 None. Sets the window icon (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_image_deliverer`
+
+```text
+---- Summary ----
+Method to queue a finished preview from the preview thread for the window.
+
+---- Inputs ----
+version : int
+    Number of the request it was drawn for.
+name : str
+    File name.
+png : Optional[bytes]
+    Picture, or None when it could not be drawn.
+notes : str
+    Warnings, or the reason when there is no picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the preview (side effect).
 
 ---- Equations ----
 None.
@@ -12611,7 +12662,7 @@ None.
 None.
 ```
 
-##### `_nav_state`
+##### `_nav_state_setter`
 
 ```text
 ---- Summary ----
@@ -12722,6 +12773,7 @@ None. Redraws the plot area and the status line (side effect).
 scale = min(width / picture width, height / picture height), at most 1.5.
 
 ---- Helpers ----
+_lock_drawer
 _message_shower
 ```
 
@@ -12831,6 +12883,42 @@ None. Creates the widgets (side effect).
 None.
 
 ---- Helpers ----
+_answer_sender
+_closing_handler
+_history_stepper
+_message_shower
+_nav_state_setter
+_navigator
+_resizer
+_step_taker
+_symbol_inserter
+```
+
+##### `_window_raiser`
+
+```text
+---- Summary ----
+Helper method to bring the window to the front with the keyboard in the answer
+box. A window started by the launcher otherwise opens behind other windows on
+macOS, where the answers typed would go nowhere.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Raises and focuses the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
 None.
 ```
 
@@ -12913,39 +13001,6 @@ None
 
 ---- Globals mutated ----
 None. Queues the change for the window (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `_image_deliverer`
-
-```text
----- Summary ----
-Method to queue a finished preview from the preview thread for the window.
-
----- Inputs ----
-version : int
-    Number of the request it was drawn for.
-name : str
-    File name.
-png : Optional[bytes]
-    Picture, or None when it could not be drawn.
-notes : str
-    Warnings, or the reason when there is no picture.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Queues the preview (side effect).
 
 ---- Equations ----
 None.
@@ -13066,6 +13121,9 @@ None.
 ---- Helpers ----
 _drain_runner
 _logic_runner
+_window_raiser
+input_reader
+text_sender
 ```
 
 ##### `session_attacher`
@@ -13364,6 +13422,7 @@ None.
 
 ---- Helpers ----
 _pictures_builder
+active_gui_getter
 choice_asker
 info_printer
 ```
@@ -13727,10 +13786,12 @@ printed; the caller decides where the notes go.
 None.
 
 ---- Helpers ----
-preview_info_builder
 _loaded_experiment_getter
 _overlay_drawer
 _previous_limit_drawer
+experiment_data_processor
+experiment_plotter
+preview_info_builder
 ```
 
 #### `skipped_windows_finder`
@@ -13766,6 +13827,7 @@ None.
 
 ---- Helpers ----
 _loaded_experiment_getter
+experiment_data_processor
 preview_info_builder
 ```
 
@@ -14362,6 +14424,7 @@ None. Reads the files and prints to the terminal (side effects).
 None.
 
 ---- Helpers ----
+_answers_previewer
 info_printer
 skipped_windows_finder
 text_colourer
@@ -14503,13 +14566,18 @@ None.
 _component_namer
 _fit_file_saver
 _pca_table_lister
+choice_asker
 component_builder
 component_count_suggester
 component_finder
 fit_table_builder
+info_printer
 number_asker
 pca_picture_builder
 pca_spectra_gatherer
+progress_clearer
+progress_printer
+text_colourer
 yes_no_asker
 ```
 
@@ -14555,6 +14623,7 @@ _review_asker
 haem_choice_asker
 haem_form_asker
 haem_scaling_asker
+info_printer
 label_angle_asker
 preview_drawer
 signal_asker
@@ -14641,11 +14710,13 @@ draws and closes the plot window (side effects).
 None.
 
 ---- Helpers ----
+active_gui_getter
 analysis_stage_runner
 browser_stage_runner
 choice_asker
 file_focus_setter
 heading_printer
+info_printer
 numbering_getter
 numbering_setter
 plots_stage_runner
@@ -14655,7 +14726,7 @@ trim_stage_runner
 
 ## `utils_viewer/viewer_terminal.py`
 
-Pieces of the text terminal in the experiment browser window: colour codes and the
+Text terminal of the experiment browser window: colour codes and output streams.
 
 ### CLASSES
 
@@ -14881,7 +14952,7 @@ None. Passes text to the window or the real stream (side effect).
 None.
 
 ---- Helpers ----
-None.
+captured_buffer_getter
 ```
 
 ### TERMINAL HELPERS
@@ -14977,7 +15048,7 @@ ansi_colour_getter
 
 ## `utils_viewer/viewer_window.py`
 
-The fallback preview of the experiment browser: one picture file that is rewritten after
+Fallback preview: one picture file rewritten after each answer, when no window opens.
 
 ### CLASSES
 

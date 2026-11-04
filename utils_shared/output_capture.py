@@ -1,6 +1,5 @@
 """
-Per-thread capture of printed output, so one thread can print without the text reaching
-the terminal or the log file.
+Per-thread capture of printed output, kept out of the terminal and the log file.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------

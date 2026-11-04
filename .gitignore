@@ -12,6 +12,9 @@ logs/
 # ---- project ----
 last_answers.json
 .shortcut_made
+.portimao_shortcut
+.shortcut_made_portimao
+/*.zip
 
 # >>> style guide (managed block, do not edit between these lines) >>>
 # Python environments and caches
@@ -36,6 +39,9 @@ build/
 # Run logs and generated packs
 logs/
 claude_pack/
+
+# Personal Claude Code settings (.claude/settings.json is shared and committed)
+.claude/settings.local.json
 
 # Real data: any folder whose name ends in _data is never committed
 *_data/

@@ -1,6 +1,5 @@
 """
-The experiment browser window: a text terminal on the left that asks the questions, and
-the plots on the right with a file selector and arrows to flick through the files.
+The experiment browser window: question terminal on the left, plots on the right.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -18,7 +17,6 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 from PIL import Image
-
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.output_capture import output_capturer
@@ -58,8 +56,8 @@ _CLOSED = object()
 _active_gui: Optional['ViewerGui'] = None
 
 
-# ---- GuiUnavailable ------------------------------------------------------------------
-class GuiUnavailable(Exception):
+# ---- GuiUnavailableError -------------------------------------------------------------
+class GuiUnavailableError(Exception):
     """
     ---- Summary ----
     Raised when the browser window cannot be opened (no Tkinter, no display, or the
@@ -99,18 +97,25 @@ class ViewerGui:
     __init__
     _answer_sender
     _closing_handler
+    _display_name_lister
     _drain_runner
     _event_handler
     _history_stepper
     _icon_setter
+    _image_deliverer
     _image_receiver
+    _lock_drawer
     _logic_runner
+    _message_shower
+    _nav_state_setter
     _navigator
     _pane_writer
     _picture_shower
+    _resizer
     _step_taker
     _symbol_inserter
     _widgets_builder
+    _window_raiser
     extra_publisher
     figure_shower
     file_focuser
@@ -161,6 +166,7 @@ class ViewerGui:
         None.
 
         ---- Helpers ----
+        _icon_setter
         _widgets_builder
         """
 
@@ -284,8 +290,8 @@ class ViewerGui:
             self._renderer.stopper()
         self._root.destroy()
 
-    # ---- _display_names --------------------------------------------------------------
-    def _display_names(self) -> List[str]:
+    # ---- _display_name_lister --------------------------------------------------------
+    def _display_name_lister(self) -> List[str]:
         """
         ---- Summary ----
         Method to give the names for the drop-down: the experiment files are marked as
@@ -350,12 +356,10 @@ class ViewerGui:
             return
         pending: List[str] = []
         pending_kind = 'out'
-
         def flush() -> None:
             if pending:
                 self._pane_writer(''.join(pending), pending_kind)
                 pending.clear()
-
         try:
             for _ in range(400):
                 event = self._events.get_nowait()
@@ -397,10 +401,12 @@ class ViewerGui:
         None.
 
         ---- Helpers ----
+        _display_name_lister
+        _image_deliverer
         _image_receiver
+        _nav_state_setter
         _navigator
         _pane_writer
-        _picture_shower
         """
 
         kind = event[0]
@@ -420,7 +426,7 @@ class ViewerGui:
             self._is_pictures = False
             self._help_base = FILES_HELP
             self._help.configure(text=FILES_HELP)
-            self._nav_state(True)
+            self._nav_state_setter(True)
             self._navigator(self._session.current)
         elif kind == 'pictures':
             # The experiment files stay (locked, as last drawn) and the figures being
@@ -434,10 +440,10 @@ class ViewerGui:
                 self._failures.pop(title, None)
                 self._notes.pop(title, None)
             self._has_spec = True
-            self._combo.configure(values=self._display_names())
+            self._combo.configure(values=self._display_name_lister())
             self._help_base = FIGURES_HELP
             self._help.configure(text=FIGURES_HELP)
-            self._nav_state(len(self._names) > 1)
+            self._nav_state_setter(len(self._names) > 1)
             self._navigator(len(files))
         elif kind == 'extra':
             # One more picture (not a file) is listed after the files until the next
@@ -448,15 +454,15 @@ class ViewerGui:
             self._failures.pop(title, None)
             self._notes.pop(title, None)
             self._has_spec = True
-            self._combo.configure(values=self._display_names())
-            self._nav_state(len(self._names) > 1)
+            self._combo.configure(values=self._display_name_lister())
+            self._nav_state_setter(len(self._names) > 1)
             self._navigator(len(self._names) - 1)
         elif kind == 'spec':
             spec, name = event[1], event[2]
             if not self._is_pictures and len(self._names) > self._file_count:
                 self._names = self._names[:self._file_count]
                 self._index = min(self._index, self._file_count - 1)
-                self._combo.configure(values=self._display_names())
+                self._combo.configure(values=self._display_name_lister())
             self._version += 1
             self._previous = {**self._previous, **self._images}
             self._images, self._notes, self._failures = {}, {}, {}
@@ -471,10 +477,10 @@ class ViewerGui:
         elif kind == 'image':
             self._image_receiver(*event[1:])
         elif kind == 'closed':
-            self._nav_state(False)
+            self._nav_state_setter(False)
         elif kind == 'finished':
             self._is_finished = True
-            self._nav_state(False)
+            self._nav_state_setter(False)
             self._hint.configure(text='Finished - close this window when you are done')
             self._pane_writer('\n[Finished. You can close this window.]\n', 'answer')
 
@@ -560,6 +566,49 @@ class ViewerGui:
                 NSApplication.sharedApplication().setApplicationIconImage_(image)
             except Exception:
                 pass
+
+    # ---- _image_deliverer ------------------------------------------------------------
+    def _image_deliverer(self,
+                         version: int,
+                         name: str,
+                         png: Optional[bytes],
+                         notes: str,
+                         ) -> None:
+        """
+        ---- Summary ----
+        Method to queue a finished preview from the preview thread for the window.
+
+        ---- Inputs ----
+        version : int
+            Number of the request it was drawn for.
+        name : str
+            File name.
+        png : Optional[bytes]
+            Picture, or None when it could not be drawn.
+        notes : str
+            Warnings, or the reason when there is no picture.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the preview (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('image', version, name, png, notes))
+
+
+# ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
     # ---- _image_receiver -------------------------------------------------------------
     def _image_receiver(self,
@@ -726,8 +775,8 @@ class ViewerGui:
                                  font=(self._family, 12),
                                  )
 
-    # ---- _nav_state ------------------------------------------------------------------
-    def _nav_state(self, enabled: bool) -> None:
+    # ---- _nav_state_setter -----------------------------------------------------------
+    def _nav_state_setter(self, enabled: bool) -> None:
         """
         ---- Summary ----
         Method to switch the file selector and arrows on or off.
@@ -893,6 +942,7 @@ class ViewerGui:
         scale = min(width / picture width, height / picture height), at most 1.5.
 
         ---- Helpers ----
+        _lock_drawer
         _message_shower
         """
 
@@ -1058,7 +1108,15 @@ class ViewerGui:
         None.
 
         ---- Helpers ----
-        None.
+        _answer_sender
+        _closing_handler
+        _history_stepper
+        _message_shower
+        _nav_state_setter
+        _navigator
+        _resizer
+        _step_taker
+        _symbol_inserter
         """
 
         tk = self._tk
@@ -1201,9 +1259,49 @@ class ViewerGui:
         root.bind_all('<Prior>', lambda e: self._step_taker(-1))
         root.bind_all('<Next>', lambda e: self._step_taker(1))
         root.protocol('WM_DELETE_WINDOW', self._closing_handler)
-        self._nav_state(False)
+        if sys.platform == 'darwin':  # Cmd+Q and Quit in the menu ask first as well
+            root.createcommand('tk::mac::Quit', self._closing_handler)
+        self._nav_state_setter(False)
         self._message_shower('The plots appear here once the experiment browser '
-                             'starts.')
+                             'starts.',
+                             )
+
+    # ---- _window_raiser --------------------------------------------------------------
+    def _window_raiser(self) -> None:
+        """
+        ---- Summary ----
+        Helper method to bring the window to the front with the keyboard in the answer
+        box. A window started by the launcher otherwise opens behind other windows on
+        macOS, where the answers typed would go nowhere.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Raises and focuses the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        try:
+            self._root.lift()
+            self._root.attributes('-topmost', True)
+            self._root.after(500, lambda: self._root.attributes('-topmost', False))
+            self._root.focus_force()
+            self._entry.focus_set()
+        except Exception:  # a window that stays behind still works
+            pass
 
     # ---- MAIN METHODS ----------------------------------------------------------------
 
@@ -1297,49 +1395,6 @@ class ViewerGui:
         """
 
         self._events.put(('focus', name))
-
-    # ---- _image_deliverer ------------------------------------------------------------
-    def _image_deliverer(self,
-                         version: int,
-                         name: str,
-                         png: Optional[bytes],
-                         notes: str,
-                         ) -> None:
-        """
-        ---- Summary ----
-        Method to queue a finished preview from the preview thread for the window.
-
-        ---- Inputs ----
-        version : int
-            Number of the request it was drawn for.
-        name : str
-            File name.
-        png : Optional[bytes]
-            Picture, or None when it could not be drawn.
-        notes : str
-            Warnings, or the reason when there is no picture.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        None
-            Nothing.
-
-        ---- Globals mutated ----
-        None. Queues the preview (side effect).
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        self._events.put(('image', version, name, png, notes))
-
-
-# ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
     # ---- input_reader ----------------------------------------------------------------
     def input_reader(self, prompt: Any = '') -> str:
@@ -1467,12 +1522,16 @@ class ViewerGui:
         ---- Helpers ----
         _drain_runner
         _logic_runner
+        _window_raiser
+        input_reader
+        text_sender
         """
 
         global _active_gui
         self._real_input = builtins.input
         original = (sys.stdout, sys.stderr)
-        owner = lambda: None if self._is_destroyed else self.logic_thread
+        def owner() -> Optional[threading.Thread]:
+            return None if self._is_destroyed else self.logic_thread
         sys.stdout = OutputRouter(original[0], self.text_sender, 'out', owner)
         sys.stderr = OutputRouter(original[1], self.text_sender, 'err', owner)
         builtins.input = self.input_reader
@@ -1484,6 +1543,7 @@ class ViewerGui:
         try:
             self.logic_thread.start()
             self._root.after(25, self._drain_runner)
+            self._root.after(100, self._window_raiser)
             try:
                 self._root.mainloop()
             except KeyboardInterrupt:
@@ -1620,6 +1680,7 @@ class ViewerGui:
             self._renderer.stopper()
         self._events.put(('closed',))
 
+
 # ---- active_gui_getter ---------------------------------------------------------------
 def active_gui_getter() -> Optional[ViewerGui]:
     """
@@ -1684,16 +1745,16 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
 
     try:
         if os.environ.get('PORTIMAO_NO_GUI'):
-            raise GuiUnavailable('PORTIMAO_NO_GUI is set')
+            raise GuiUnavailableError('PORTIMAO_NO_GUI is set')
         try:
             import tkinter as tk
         except ImportError:
-            raise GuiUnavailable('Tkinter is not installed')
+            raise GuiUnavailableError('Tkinter is not installed')
         has_display = (os.environ.get('DISPLAY')
                        or os.environ.get('WAYLAND_DISPLAY')
                        )
         if sys.platform.startswith('linux') and not has_display:
-            raise GuiUnavailable('there is no display')
+            raise GuiUnavailableError('there is no display')
         if sys.platform == 'win32':
             try:
                 import ctypes
@@ -1705,13 +1766,15 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
             except Exception:
                 pass
         if tk.TkVersion < MINIMUM_TK:
-            raise GuiUnavailable(f'this Python has Tk {tk.TkVersion:g}, which draws '
-                                 f'blank windows; install Python from python.org')
+            raise GuiUnavailableError(f'this Python has Tk {tk.TkVersion:g}, which '
+                                      f'draws blank windows; install Python from '
+                                      f'python.org',
+                                      )
         try:
             root = tk.Tk()
         except tk.TclError as exc:
-            raise GuiUnavailable(str(exc))
-    except GuiUnavailable as exc:
+            raise GuiUnavailableError(str(exc))
+    except GuiUnavailableError as exc:
         print(f'The experiment browser window cannot open ({exc}), so the questions '
               f'run in this terminal and previews are saved as a picture.',
               )

@@ -4,9 +4,9 @@
         {
             "label": "Sync style guide",
             "type": "shell",
-            "command": "sh style/tools/style_sync.sh",
+            "command": "sh style/tools_format/style_sync.sh",
             "windows": {
-                "command": "style/tools/style_sync.bat"
+                "command": "style/tools_format/style_sync.bat"
             },
             "runOptions": {
                 "runOn": "folderOpen"
@@ -16,6 +16,50 @@
                 "close": true
             },
             "problemMatcher": []
+        },
+        {
+            "label": "Release dev to main",
+            "type": "process",
+            "command": "git",
+            "args": [
+                "release",
+                "${input:releaseSummary}"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Hotfix on main",
+            "type": "process",
+            "command": "git",
+            "args": [
+                "hotfix",
+                "${input:hotfixSummary}"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "releaseSummary",
+            "type": "promptString",
+            "description": "Summary of the release, used in the commit message"
+        },
+        {
+            "id": "hotfixSummary",
+            "type": "promptString",
+            "description": "Summary of the fix, used in the commit message"
         }
     ]
 }
