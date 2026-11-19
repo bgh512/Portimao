@@ -18,8 +18,8 @@ def attenuation_converter(transmission: Union[Sequence[float], np.ndarray],
                           ) -> np.ndarray:
     """
     ---- Summary ----
-    Main function to convert transmission spectra to attenuation (log10 of the
-    transmittance).
+    Main function to convert transmission spectra to attenuation (minus log10 of the
+    transmittance), as the instrument exports it.
 
     ---- Inputs ----
     transmission : Union[Sequence[float], np.ndarray]
@@ -40,9 +40,9 @@ def attenuation_converter(transmission: Union[Sequence[float], np.ndarray],
     None.
 
     ---- Equations ----
-    attenuation = log10(T), where T is the transmittance (fraction). This is the
-    NEGATIVE of the conventional -log10(T); the decomposition basis spectra are negated
-    too, so the two signs cancel (change both together or neither).
+    attenuation = -log10(T), where T is the transmittance (fraction): less light than
+    the reference gives a positive attenuation. The fit shapes are stored with this
+    sign, so the decomposition uses them as they are.
 
     ---- Helpers ----
     None.
@@ -65,8 +65,10 @@ def attenuation_converter(transmission: Union[Sequence[float], np.ndarray],
     # spectra that contain them) instead of stopping the whole experiment; the caller
     # reports how many there were.
     bad = ~np.isfinite(transmittance) | (transmittance <= 0)
+    # Taken from 0.0, not negated: a transmittance of exactly 1 then gives 0.0 and not
+    # -0.0, which would be written as "-0.0" in the exported files.
     with np.errstate(divide='ignore', invalid='ignore'):
-        attenuation = np.log10(np.where(bad, np.nan, transmittance))
+        attenuation = 0.0 - np.log10(np.where(bad, np.nan, transmittance))
     return attenuation
 
 

@@ -89,13 +89,13 @@ def _dataset_loader(request: pytest.FixtureRequest) -> Iterator[dict]:
         The dictionary of spectra_dataset_reader (with the intensity), plus 'name',
         'reference_counts' (the stored reference spectrum as whole counts) and
         'stored_error' (the largest difference between our attenuation and the stored
-        logarithm of each spectrum minus that of the reference).
+        logarithm of the reference minus that of each spectrum).
 
     ---- Globals mutated ----
     None. Reads the file (side effect).
 
     ---- Equations ----
-    stored attenuation = log10(counts) - log10(reference), both as stored in the file.
+    stored attenuation = log10(reference) - log10(counts), both as stored in the file.
 
     ---- Helpers ----
     None.
@@ -109,7 +109,7 @@ def _dataset_loader(request: pytest.FixtureRequest) -> Iterator[dict]:
         stored_error = 0.0
         for start in range(0, spectra.nframes, ROWS_AT_ONCE):
             rows = slice(start, start + ROWS_AT_ONCE)
-            stored = spectra.log[2:][rows].astype('f8') - reference[None, :]
+            stored = reference[None, :] - spectra.log[2:][rows].astype('f8')
             ours = attenuation_converter(data['transmission'][rows])
             stored_error = max(stored_error, float(np.abs(ours - stored).max()))
     data.update(name=name,
@@ -509,7 +509,7 @@ def test_spectra_parts_agree(dataset: dict) -> None:
     ---- Equations ----
     T = counts / reference counts. Both are whole numbers, each up to half a count
     off, so T may be off by T x (0.5 / counts + 0.5 / reference). Attenuation =
-    log10(counts) - log10(reference) as stored in the file.
+    log10(reference) - log10(counts) as stored in the file.
 
     ---- Helpers ----
     None.

@@ -171,7 +171,7 @@ A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds th
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
 | `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names, in file order |
-| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the negated response as the basis spectrum |
+| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the response as the basis spectrum; it has the sign of the attenuation, -log10(T) |
 
 #### `pca_analysis`
 
@@ -366,7 +366,7 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 | Column | Type | Units | Description |
 |---|---|---|---|
 | `<haem>` | float | nm | Wavelength column of one haem; the header names the haem (every second column, starting with the first) |
-| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of -1 (the decomposition negates the fit) |
+| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of +1 |
 
 #### `spectral csv`
 

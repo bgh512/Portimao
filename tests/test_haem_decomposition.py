@@ -100,8 +100,7 @@ def _haem_spectrum_builder() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     None. Reads the fit file (side effect).
 
     ---- Equations ----
-    spectrum = -sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x background.
-    The minus sign is the program's: its attenuation is log10(T).
+    spectrum = sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x background.
 
     ---- Helpers ----
     _background_builder
@@ -112,7 +111,7 @@ def _haem_spectrum_builder() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     for column in range(0, table.shape[1], 2):  # every haem is on the same wavelengths
         assert np.array_equal(table.iloc[:, column].to_numpy(dtype=float), wavelengths)
     shapes = table.iloc[:, 1::2].to_numpy(dtype=float)
-    spectrum = (-(shapes @ AMOUNTS) * HAEM_FACTOR
+    spectrum = ((shapes @ AMOUNTS) * HAEM_FACTOR
                 + OFFSET
                 + SLOPE * _background_builder(wavelengths)
                 )
@@ -257,7 +256,7 @@ def test_a_series_gives_its_amounts_back() -> None:
 
     wavelengths, _, shapes = _haem_spectrum_builder()
     scale = np.array([1.0, 4.0, 3.0, 2.0])
-    spectra = (-np.outer(scale, shapes @ AMOUNTS) * HAEM_FACTOR
+    spectra = (np.outer(scale, shapes @ AMOUNTS) * HAEM_FACTOR
                + OFFSET
                + SLOPE * _background_builder(wavelengths)[None, :]
                )
@@ -347,7 +346,7 @@ def test_the_three_routes_give_the_same_amounts() -> None:
                           delta_exclude_first_minutes=0.0,
                           )
     run = experiment['haem_conc'][names].to_numpy()[0]
-    components = -shapes * HAEM_FACTOR
+    components = shapes * HAEM_FACTOR
     example = decomposition_example_finder([{'name': 'made up',
                                              'wavelengths': wavelengths,
                                              'spectra': spectrum[None, :],

@@ -563,14 +563,14 @@ def s_array_generator(experimental_data: np.ndarray,
     ---- Outputs ----
     np.ndarray
         Basis matrix, shape (n_filtered_wavelengths, n_haems + degree_of_scatter + 1):
-        negated haem fits (interpolated, times haemfactor), a constant column, then the
+        haem fits (interpolated, times haemfactor), a constant column, then the
         normalised scatter terms.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    haem column = -interp(fit) x haemfactor; the constant and the scatter terms are
+    haem column = interp(fit) x haemfactor; the constant and the scatter terms are
     those of background_builder.
 
     ---- Helpers ----
@@ -587,7 +587,7 @@ def s_array_generator(experimental_data: np.ndarray,
     for i in range(no_haems):
         fit_x = fit_data.iloc[:, 2 * i]
         fit_y = fit_data.iloc[:, 2 * i + 1]
-        s_array[:, i] = -np.interp(filtered[:, 0], fit_x, fit_y) * haemfactor
+        s_array[:, i] = np.interp(filtered[:, 0], fit_x, fit_y) * haemfactor
 
     # ---- 3 Add the scatter terms -----------------------------------------------------
     s_array[:, no_haems:] = background_builder(filtered[:, 0], degree_of_scatter)

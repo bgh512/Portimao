@@ -734,14 +734,14 @@ def fit_table_builder(result: dict, names: Optional[List[str]] = None) -> dict:
     ---- Outputs ----
     dict
         {'haem_list': names, 'data': table of (wavelength, response) column pairs}.
-        The responses are the negated components (a peak of -1), as in the fit files,
-        because the decomposition negates the fit again.
+        The responses are the components as found (a largest peak of +1): the spectra
+        they come from and the fit files have the same sign.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    response = -component.
+    response = component.
 
     ---- Helpers ----
     None.
@@ -752,5 +752,5 @@ def fit_table_builder(result: dict, names: Optional[List[str]] = None) -> dict:
     columns = {}
     for i, name in enumerate(names):
         columns[name] = result['wavelengths']
-        columns[f'Unnamed: {2 * i + 1}'] = -result['components'][:, i]
+        columns[f'Unnamed: {2 * i + 1}'] = result['components'][:, i]
     return {'haem_list': names, 'data': pd.DataFrame(columns)}

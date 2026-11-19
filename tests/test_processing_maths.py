@@ -123,7 +123,7 @@ def _ramp_experiment_builder() -> dict:
 def test_attenuation_from_known_ratios() -> None:
     """
     ---- Summary ----
-    Main function to check that light cut to a tenth and a hundredth gives -1 and -2,
+    Main function to check that light cut to a tenth and a hundredth gives 1 and 2,
     whether it is given as a fraction, as counts against a reference or as a percentage.
 
     ---- Inputs ----
@@ -139,14 +139,14 @@ def test_attenuation_from_known_ratios() -> None:
     None.
 
     ---- Equations ----
-    attenuation = log10(T): log10(1) = 0, log10(0.1) = -1, log10(0.01) = -2. The
-    program keeps this sign (the opposite of the textbook -log10(T)) on purpose.
+    attenuation = -log10(T): -log10(1) = 0, -log10(0.1) = 1, -log10(0.01) = 2, the
+    sign of the instrument's own export.
 
     ---- Helpers ----
     None.
     """
 
-    expected = np.array([0.0, -1.0, -2.0])
+    expected = np.array([0.0, 1.0, 2.0])
     assert np.allclose(attenuation_converter([1.0, 0.1, 0.01]), expected, atol=1e-12)
     counts, reference = np.array([1000.0, 100.0, 10.0]), 1000.0
     assert np.allclose(attenuation_converter(counts / reference), expected, atol=1e-12)
@@ -154,7 +154,7 @@ def test_attenuation_from_known_ratios() -> None:
                        expected,
                        atol=1e-12,
                        )
-    assert np.allclose(attenuation_converter([0.5]), [-0.30103], atol=1e-6)
+    assert np.allclose(attenuation_converter([0.5]), [0.30103], atol=1e-6)
     already = np.array([0.3, -0.2])
     assert np.array_equal(attenuation_converter(already, mode='absorbance'), already)
 
@@ -187,7 +187,7 @@ def test_attenuation_of_impossible_values() -> None:
 
     result = attenuation_converter([0.0, -0.5, np.nan, np.inf, 0.1])
     assert np.all(np.isnan(result[:4]))
-    assert np.isclose(result[4], -1.0)
+    assert np.isclose(result[4], 1.0)
     with pytest.raises(ValueError):
         attenuation_converter([0.5], mode='counts')
 
@@ -212,7 +212,7 @@ def test_attenuation_added_to_an_experiment() -> None:
     None.
 
     ---- Equations ----
-    attenuation = log10(T).
+    attenuation = -log10(T).
 
     ---- Helpers ----
     None.
@@ -228,7 +228,7 @@ def test_attenuation_added_to_an_experiment() -> None:
                   }
     experiment_attenuation_adder(experiment)
     assert np.allclose(experiment['raw_spectra']['Cyt']['attenuation'],
-                       [[0.0, -1.0, -2.0], [1.0, 2.0, 0.0]],
+                       [[0.0, 1.0, 2.0], [-1.0, -2.0, 0.0]],
                        atol=1e-12,
                        )
 

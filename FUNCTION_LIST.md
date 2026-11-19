@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.9
+- **Version:** V1.10
 - **Date:** 19/11/2026
 
 ## Contents
@@ -1113,8 +1113,7 @@ Tuple[np.ndarray, np.ndarray, np.ndarray]
 None. Reads the fit file (side effect).
 
 ---- Equations ----
-spectrum = -sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x background.
-The minus sign is the program's: its attenuation is log10(T).
+spectrum = sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x background.
 
 ---- Helpers ----
 _background_builder
@@ -1934,13 +1933,13 @@ Iterator[dict]
     The dictionary of spectra_dataset_reader (with the intensity), plus 'name',
     'reference_counts' (the stored reference spectrum as whole counts) and
     'stored_error' (the largest difference between our attenuation and the stored
-    logarithm of each spectrum minus that of the reference).
+    logarithm of the reference minus that of each spectrum).
 
 ---- Globals mutated ----
 None. Reads the file (side effect).
 
 ---- Equations ----
-stored attenuation = log10(counts) - log10(reference), both as stored in the file.
+stored attenuation = log10(reference) - log10(counts), both as stored in the file.
 
 ---- Helpers ----
 None.
@@ -2223,7 +2222,7 @@ None.
 ---- Equations ----
 T = counts / reference counts. Both are whole numbers, each up to half a count
 off, so T may be off by T x (0.5 / counts + 0.5 / reference). Attenuation =
-log10(counts) - log10(reference) as stored in the file.
+log10(reference) - log10(counts) as stored in the file.
 
 ---- Helpers ----
 None.
@@ -2384,7 +2383,7 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check that light cut to a tenth and a hundredth gives -1 and -2,
+Main function to check that light cut to a tenth and a hundredth gives 1 and 2,
 whether it is given as a fraction, as counts against a reference or as a percentage.
 
 ---- Inputs ----
@@ -2400,8 +2399,8 @@ None.
 None.
 
 ---- Equations ----
-attenuation = log10(T): log10(1) = 0, log10(0.1) = -1, log10(0.01) = -2. The
-program keeps this sign (the opposite of the textbook -log10(T)) on purpose.
+attenuation = -log10(T): -log10(1) = 0, -log10(0.1) = 1, -log10(0.01) = 2, the
+sign of the instrument's own export.
 
 ---- Helpers ----
 None.
@@ -2453,7 +2452,7 @@ None.
 None.
 
 ---- Equations ----
-attenuation = log10(T).
+attenuation = -log10(T).
 
 ---- Helpers ----
 None.
@@ -8627,8 +8626,8 @@ Convert transmission spectra to the attenuation spectra used for decomposition.
 
 ```text
 ---- Summary ----
-Main function to convert transmission spectra to attenuation (log10 of the
-transmittance).
+Main function to convert transmission spectra to attenuation (minus log10 of the
+transmittance), as the instrument exports it.
 
 ---- Inputs ----
 transmission : Union[Sequence[float], np.ndarray]
@@ -8649,9 +8648,9 @@ np.ndarray
 None.
 
 ---- Equations ----
-attenuation = log10(T), where T is the transmittance (fraction). This is the
-NEGATIVE of the conventional -log10(T); the decomposition basis spectra are negated
-too, so the two signs cancel (change both together or neither).
+attenuation = -log10(T), where T is the transmittance (fraction): less light than
+the reference gives a positive attenuation. The fit shapes are stored with this
+sign, so the decomposition uses them as they are.
 
 ---- Helpers ----
 None.
@@ -12241,14 +12240,14 @@ None.
 ---- Outputs ----
 dict
     {'haem_list': names, 'data': table of (wavelength, response) column pairs}.
-    The responses are the negated components (a peak of -1), as in the fit files,
-    because the decomposition negates the fit again.
+    The responses are the components as found (a largest peak of +1): the spectra
+    they come from and the fit files have the same sign.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-response = -component.
+response = component.
 
 ---- Helpers ----
 None.
@@ -13827,14 +13826,14 @@ None.
 ---- Outputs ----
 np.ndarray
     Basis matrix, shape (n_filtered_wavelengths, n_haems + degree_of_scatter + 1):
-    negated haem fits (interpolated, times haemfactor), a constant column, then the
+    haem fits (interpolated, times haemfactor), a constant column, then the
     normalised scatter terms.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-haem column = -interp(fit) x haemfactor; the constant and the scatter terms are
+haem column = interp(fit) x haemfactor; the constant and the scatter terms are
 those of background_builder.
 
 ---- Helpers ----
