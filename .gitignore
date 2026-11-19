@@ -1,15 +1,8 @@
-# ---- managed block (style/configs/gitignore_block.txt) ----
-.venv/
+# ---- project ----
 .venv_unix/
-__pycache__/
-*.pyc
-.ruff_cache/
 build/
 logs/
 *_data/
-# ---- end managed block ----
-
-# ---- project ----
 last_answers.json
 .shortcut_made
 .portimao_shortcut

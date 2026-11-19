@@ -47,7 +47,7 @@ from utils_viewer.viewer_stages import viewer_asker
 HERE = Path(__file__).resolve().parent
 FITS_FOLDER = HERE / 'fits'
 LAST_ANSWERS_FILE = HERE / 'last_answers.json'
-VERSION = (HERE / 'VERSION').read_text().strip()
+VERSION = (HERE / '.style' / 'VERSION').read_text().strip()
 PROGRAM_TITLE = program_title_builder(HERE, VERSION)
 
 

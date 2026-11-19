@@ -241,7 +241,6 @@ What to keep in mind:
 
 ```
 Portimao/
-    make_zip.bat            zips the project for sharing (Windows)
     main.py                 entry point
     config.py               defaults, journal sizes and colours
     Portimao.pyw, Portimao.app, run.bat, run.sh   launchers (no terminal window)
@@ -271,19 +270,20 @@ Portimao/
         time_response_plotter.py
         ...
     requirements.txt        Python dependencies
-    VERSION                 current version
     README.md
     FUNCTION_LIST.md
     DATA_FORMAT.md
-    CLAUDE.md               imports the style guide for Claude
-    style/                  shared style guide (git submodule, contains CODING_STYLE.md)
+    QUESTION_FLOW.md        every question the program asks
+    .style/                 this project's style guide settings, the VERSION file and the make_zip scripts
+    .claude/                instructions for Claude (CLAUDE.md imports the style guide)
+    style/                  shared style guide (git submodule, see style/rules/CODING_STYLE.md)
 ```
 
 ## 4. Links to other .md files
 
 - [FUNCTION_LIST.md](FUNCTION_LIST.md): every function and class, with its docstring.
 - [DATA_FORMAT.md](DATA_FORMAT.md): custom data structures, units and formats.
-- [style/CODING_STYLE.md](style/CODING_STYLE.md): the coding and formatting standards used in this project.
+- [style/rules/CODING_STYLE.md](style/rules/CODING_STYLE.md): the coding and formatting standards used in this project.
 
 ## 5. License
 
