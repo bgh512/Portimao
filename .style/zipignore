@@ -1,0 +1,7 @@
+# What make_zip leaves out of <project>_export.zip. By default the zip holds every file
+# git does not ignore, so .gitignore decides; add patterns here only to leave out
+# files the project commits but should not share. This file (.style/zipignore)
+# belongs to the project: edit it freely.
+# One pattern per line: end a folder with /, * is a wildcard, and start with / to match
+# from the project root only (for example /raw_data/ but not example_data/).
+# The zip never contains .git, style/, .venv or earlier export zips.

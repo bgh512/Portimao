@@ -1,25 +1,14 @@
 ---
 name: style-check
-description: Check code against the shared style guide (style/CODING_STYLE.md) and fix what does not match. Use when the user asks to check, review, tidy or clean up code for style, or before a commit of a larger change.
+description: Style pass - format, review and fix code so it follows the shared style guide exactly, then bring the documents up to date. Use only when the user asks for a style pass, or to check, review, tidy or clean up code for style. Add "all" to cover the whole project instead of the changed files.
 ---
 
-# Style check
+# Style pass
 
-Check the files the user names, or, if none are named, the files changed since the last commit (`git status --short` and `git diff --name-only`). Skip anything listed in `.styleignore` and everything inside `style/`.
+The fixing is done by the `style-fixer` agent (Sonnet), so this pass costs little of your own context. Do not read or fix the files yourself.
 
-1. Run the automatic tools first, so only the judgement calls are left:
-   - Python: `ruff check --fix <files>`. Do not run yapf; its layout does not match section 3.1 of the guide.
-   - C and C++: `clang-format -i <files>`.
-   - All: `python style/tools_format/banner_formatter.py <files>`.
-   If a tool is not installed, say so and carry on.
-2. Run `ruff check <files>` again and fix every problem it still reports, including unused imports.
-3. Read each file and compare it with `style/CODING_STYLE.md`, which the tools cannot check fully:
-   - names (functions start with the subject and end in `-er` or `-or`, helpers start with `_`, booleans read as statements, units in names such as `_nm`)
-   - multiline layouts as in section 3.1 (arguments aligned with the first, closing bracket on its own line, trailing commas)
-   - the order of banners and sections (imports, constants, helpers, main functions)
-   - every docstring section present and in order (Summary, Inputs, Globals read, Outputs, Globals mutated, Equations, Helpers), with units stated
-   - the Helpers list matches the functions actually called
-   - numbered major stages and substeps inside long functions
-   - British spelling in comments, docstrings and text shown to users
-4. Fix what does not match. If a fix would change behaviour, ask first.
-5. Finish with a short list of what was changed, file by file, and anything left for the user to decide.
+1. Decide the files: the ones the user named; every code file git tracks (`git ls-files`) if they said "all"; otherwise the changed files from `git status --short`. Leave out `style/` and what `.style/styleignore` lists.
+2. Ask the `style-fixer` agent to fix them. For more than about 15 files, split them by folder and start one `style-fixer` per group in the same message, so they run in parallel.
+3. For each `Left:` line: fix it yourself only if it is clearly right and changes no behaviour; otherwise ask the user.
+4. If the pass renamed anything, or the user said "all", ask the `docs-keeper` agent to bring the documents in line with the code.
+5. Finish with your report (Done, Questions for you, Status), passing on the agents' lines in short. Wait for every agent before writing "Ready".

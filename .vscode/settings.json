@@ -5,22 +5,46 @@
     "editor.rulers": [
         88
     ],
-    "editor.formatOnSave": true,
+    "editor.formatOnSave": false,
     "files.insertFinalNewline": true,
     "files.trimTrailingWhitespace": true,
     "[python]": {
-        "editor.defaultFormatter": "eeyore.yapf",
-        "editor.codeActionsOnSave": {
-            "source.fixAll.ruff": "explicit"
-        }
+        "editor.defaultFormatter": null,
+        "editor.codeActionsOnSave": {},
+        "editor.formatOnSave": false
     },
     "[cpp]": {
         "editor.defaultFormatter": "ms-vscode.cpptools"
     },
     "C_Cpp.formatting": "clangFormat",
-    "C_Cpp.clang_format_style": "file",
+    "C_Cpp.clang_format_style": "file:${workspaceFolder}/.style/.clang-format",
     "C_Cpp.codeAnalysis.clangTidy.enabled": true,
     "C_Cpp.codeAnalysis.runAutomatically": true,
     "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
-    "cSpell.language": "en-GB"
+    "cSpell.language": "en-GB",
+    "ruff.importStrategy": "fromEnvironment",
+    "ruff.configuration": "${workspaceFolder}/.style/ruff.toml",
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": "\\.(py|c|cc|cpp|cxx|h|hh|hpp|hxx|js|mjs|cjs|css|html|htm|jinja|jinja2|j2)$",
+                "notMatch": "[\\\\/](style|\\.venv|node_modules)[\\\\/]",
+                "cmd": "\"${workspaceFolder}\\.venv\\Scripts\\python.exe\" \"${workspaceFolder}\\style\\enforce\\tools\\formatter.py\" \"${file}\""
+            }
+        ]
+    },
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "terminal.integrated.env.windows": {
+        "PATH": "${workspaceFolder}\\.venv\\Scripts;${env:PATH}",
+        "VIRTUAL_ENV": "${workspaceFolder}\\.venv"
+    },
+    "terminal.integrated.env.osx": {
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv"
+    },
+    "terminal.integrated.env.linux": {
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv"
+    }
 }

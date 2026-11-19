@@ -1,25 +1,213 @@
 {
     "permissions": {
         "allow": [
-            "Bash(python style/tools_format/banner_formatter.py:*)",
-            "Bash(python style/tools_format/function_list_generator.py:*)",
-            "Bash(python3 style/tools_format/banner_formatter.py:*)",
-            "Bash(python3 style/tools_format/function_list_generator.py:*)",
-            "Bash(ruff check:*)",
-            "Bash(yapf:*)",
-            "Bash(clang-format:*)",
             "Bash(git status:*)",
             "Bash(git diff:*)",
             "Bash(git log:*)",
-            "Bash(git branch:*)"
+            "Bash(git branch:*)",
+            "Bash(cd *)",
+            "Bash(sh style/setup/run_tool.sh:*)",
+            "Bash(git show:*)",
+            "Bash(sh style/setup/run_tool.sh *)",
+            "Bash(bash style/setup/run_tool.sh *)",
+            "Bash(git status)",
+            "Bash(git diff)",
+            "Bash(git log)",
+            "Bash(git branch)",
+            "Bash(git status *)",
+            "Bash(git diff *)",
+            "Bash(git log *)",
+            "Bash(git show *)",
+            "Bash(git branch *)",
+            "Bash(git ls-files *)",
+            "Bash(git rev-parse *)",
+            "Bash(git blame *)",
+            "Bash(git grep *)",
+            "Bash(git check-ignore *)",
+            "Bash(git describe *)",
+            "Bash(git shortlog *)",
+            "Bash(git show-ref *)",
+            "Bash(git stash list *)",
+            "Bash(git submodule status *)",
+            "Bash(git config --get *)",
+            "Bash(git remote -v *)",
+            "Bash(ls *)",
+            "Bash(cat *)",
+            "Bash(head *)",
+            "Bash(tail *)",
+            "Bash(wc *)",
+            "Bash(grep *)",
+            "Bash(rg *)",
+            "Bash(sort *)",
+            "Bash(uniq *)",
+            "Bash(cut *)",
+            "Bash(tr *)",
+            "Bash(diff *)",
+            "Bash(cmp *)",
+            "Bash(comm *)",
+            "Bash(file *)",
+            "Bash(stat *)",
+            "Bash(du *)",
+            "Bash(tree *)",
+            "Bash(basename *)",
+            "Bash(dirname *)",
+            "Bash(realpath *)",
+            "Bash(which *)",
+            "Bash(type *)",
+            "Bash(command -v *)",
+            "Bash(echo *)",
+            "Bash(printf *)",
+            "Bash(pwd *)",
+            "Bash(date *)",
+            "Bash(jq *)",
+            "Bash(sha256sum *)",
+            "Bash(md5sum *)",
+            "Bash(xxd *)",
+            "Bash(od *)",
+            "Bash(nl *)",
+            "Bash(column *)",
+            "Bash(mkdir *)",
+            "Bash(pwd)",
+            "Bash(date)",
+            "Bash(python -m pytest *)",
+            "Bash(python3 -m pytest *)",
+            "Bash(pytest *)",
+            "Bash(.venv/Scripts/python -m pytest *)",
+            "Bash(.venv/Scripts/python.exe -m pytest *)",
+            "Bash(.venv/bin/python -m pytest *)",
+            "Bash(python -m py_compile *)",
+            "Bash(python3 -m py_compile *)",
+            "Bash(python --version *)",
+            "Bash(python3 --version *)",
+            "Bash(python -m pip list *)",
+            "Bash(python -m pip show *)",
+            "Bash(node --version *)",
+            "Bash(node --check *)",
+            "Bash(npm --version *)",
+            "Bash(cmake --build *)",
+            "Bash(ctest *)",
+            "PowerShell(sh style/setup/run_tool.sh *)",
+            "PowerShell(bash style/setup/run_tool.sh *)",
+            "PowerShell(git status)",
+            "PowerShell(git diff)",
+            "PowerShell(git log)",
+            "PowerShell(git branch)",
+            "PowerShell(git status *)",
+            "PowerShell(git diff *)",
+            "PowerShell(git log *)",
+            "PowerShell(git show *)",
+            "PowerShell(git branch *)",
+            "PowerShell(git ls-files *)",
+            "PowerShell(git rev-parse *)",
+            "PowerShell(git blame *)",
+            "PowerShell(git grep *)",
+            "PowerShell(git check-ignore *)",
+            "PowerShell(git describe *)",
+            "PowerShell(git shortlog *)",
+            "PowerShell(git show-ref *)",
+            "PowerShell(git stash list *)",
+            "PowerShell(git submodule status *)",
+            "PowerShell(git config --get *)",
+            "PowerShell(git remote -v *)",
+            "PowerShell(Get-ChildItem *)",
+            "PowerShell(Get-Content *)",
+            "PowerShell(Get-Item *)",
+            "PowerShell(Get-ItemProperty *)",
+            "PowerShell(Get-Location *)",
+            "PowerShell(Get-Command *)",
+            "PowerShell(Get-FileHash *)",
+            "PowerShell(Get-Date *)",
+            "PowerShell(Test-Path *)",
+            "PowerShell(Resolve-Path *)",
+            "PowerShell(Split-Path *)",
+            "PowerShell(Join-Path *)",
+            "PowerShell(Select-String *)",
+            "PowerShell(Measure-Object *)",
+            "PowerShell(Select-Object *)",
+            "PowerShell(Sort-Object *)",
+            "PowerShell(Format-Table *)",
+            "PowerShell(Format-List *)",
+            "PowerShell(Out-String *)",
+            "PowerShell(Write-Output *)",
+            "PowerShell(Write-Host *)",
+            "PowerShell(Compare-Object *)",
+            "PowerShell(ConvertFrom-Json *)",
+            "PowerShell(Get-Location)",
+            "PowerShell(Set-Location *)",
+            "PowerShell(cd *)",
+            "PowerShell(New-Item -ItemType Directory *)",
+            "PowerShell(python -m pytest *)",
+            "PowerShell(python3 -m pytest *)",
+            "PowerShell(pytest *)",
+            "PowerShell(.venv/Scripts/python -m pytest *)",
+            "PowerShell(.venv/Scripts/python.exe -m pytest *)",
+            "PowerShell(.venv/bin/python -m pytest *)",
+            "PowerShell(python -m py_compile *)",
+            "PowerShell(python3 -m py_compile *)",
+            "PowerShell(python --version *)",
+            "PowerShell(python3 --version *)",
+            "PowerShell(python -m pip list *)",
+            "PowerShell(python -m pip show *)",
+            "PowerShell(node --version *)",
+            "PowerShell(node --check *)",
+            "PowerShell(npm --version *)",
+            "PowerShell(cmake --build *)",
+            "PowerShell(ctest *)",
+            "PowerShell(.venv\\Scripts\\python.exe -m pytest *)"
         ],
         "ask": [
+            "Bash(sh style/setup/run_tool.sh enforce/tools/heavy_runner.py *)",
+            "Bash(bash style/setup/run_tool.sh enforce/tools/heavy_runner.py *)",
+            "PowerShell(sh style/setup/run_tool.sh enforce/tools/heavy_runner.py *)",
+            "PowerShell(bash style/setup/run_tool.sh enforce/tools/heavy_runner.py *)"
+        ],
+        "defaultMode": "plan",
+        "deny": [
+            "Bash(git commit:*)",
             "Bash(git push:*)",
+            "Bash(git merge:*)",
+            "Bash(git rebase:*)",
             "Bash(git release:*)",
             "Bash(git hotfix:*)",
-            "Bash(git merge:*)",
-            "Bash(git checkout main:*)"
-        ]
+            "Bash(git tag:*)",
+            "Bash(git reset --hard:*)",
+            "PowerShell(git commit *)",
+            "PowerShell(git push *)",
+            "PowerShell(git merge *)",
+            "PowerShell(git rebase *)",
+            "PowerShell(git release *)",
+            "PowerShell(git hotfix *)",
+            "PowerShell(git tag *)",
+            "PowerShell(git reset --hard *)",
+            "Bash(git branch -d *)",
+            "PowerShell(git branch -d *)",
+            "Bash(git branch -D *)",
+            "PowerShell(git branch -D *)",
+            "Bash(git branch --delete *)",
+            "PowerShell(git branch --delete *)",
+            "Bash(git clean *)",
+            "PowerShell(git clean *)",
+            "Bash(git checkout -- *)",
+            "PowerShell(git checkout -- *)",
+            "Bash(git restore *)",
+            "PowerShell(git restore *)",
+            "Bash(git stash drop *)",
+            "PowerShell(git stash drop *)",
+            "Bash(git stash clear *)",
+            "PowerShell(git stash clear *)",
+            "Bash(find * -exec *)",
+            "Bash(find * -execdir *)",
+            "Bash(find * -ok *)",
+            "Bash(find * -okdir *)",
+            "Bash(find * -delete*)",
+            "Bash(find * -fprint*)",
+            "Bash(find * -fls *)",
+            "Bash(git guide:*)",
+            "PowerShell(git guide *)"
+        ],
+        "blockReadsOutsideWorkingDirectories": true,
+        "blockWritesOutsideWorkingDirectories": true,
+        "additionalDirectories": []
     },
     "hooks": {
         "SessionStart": [
@@ -27,18 +215,46 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/tools_format/run_tool.sh\" claude_hook.py session"
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/setup/run_tool.sh\" enforce/tools/claude_hook.py session"
+                    }
+                ]
+            }
+        ],
+        "UserPromptSubmit": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/setup/run_tool.sh\" enforce/tools/claude_hook.py notes"
                     }
                 ]
             }
         ],
         "PreToolUse": [
             {
+                "matcher": "Read|Edit|MultiEdit|Write|NotebookEdit|Glob|Grep|LS|Bash|PowerShell",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/setup/run_tool.sh\" enforce/tools/claude_hook.py boundary"
+                    }
+                ]
+            },
+            {
                 "matcher": "Edit|MultiEdit|Write|NotebookEdit",
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/tools_format/run_tool.sh\" claude_hook.py guard"
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/setup/run_tool.sh\" enforce/tools/claude_hook.py guard"
+                    }
+                ]
+            },
+            {
+                "matcher": "Bash|PowerShell",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/setup/run_tool.sh\" enforce/tools/claude_hook.py command"
                     }
                 ]
             }
@@ -49,7 +265,27 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/tools_format/run_tool.sh\" claude_hook.py tidy"
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/setup/run_tool.sh\" enforce/tools/claude_hook.py tidy"
+                    }
+                ]
+            }
+        ],
+        "PermissionRequest": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/setup/run_tool.sh\" enforce/tools/claude_hook.py permission"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "sh \"$CLAUDE_PROJECT_DIR/style/setup/run_tool.sh\" enforce/tools/claude_hook.py stop"
                     }
                 ]
             }

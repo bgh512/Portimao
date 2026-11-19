@@ -17,38 +17,44 @@ last_answers.json
 /*.zip
 
 # >>> style guide (managed block, do not edit between these lines) >>>
-# Python environments and caches
+# Python environment and caches (the style sync creates .venv)
+.venv/
 __pycache__/
 *.py[cod]
-.venv/
-venv/
 .ruff_cache/
+
+# Personal Claude Code settings (.claude/settings.json is shared and committed)
+.claude/settings.local.json
+
+# The review folder: Claude's to-do, memory, feedback on the guide and working files,
+# and the usage and permission logs with their summaries (local only)
+_USER_REVIEW/
+
+# Project zips made by make_zip
+*_export.zip
+
+# Full output of the last test run (enforce/tools/test_runner.py)
+.style/test_log.txt
+.style/test_report.xml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Everything else this project should not commit (data, logs, build output) goes
+# below the managed block, in the project's own lines.
+# <<< style guide <<<
+
+# Moved out of the style guide block when the guide stopped managing them.
+# They are now this project's own lines: keep or remove them.
+venv/
 .pytest_cache/
 .mypy_cache/
 *.egg-info/
-
-# C++ build output
-build/
 *.o
 *.obj
 *.a
 *.so
 *.dylib
 *.pyd
-
-# Run logs and generated packs
-logs/
 claude_pack/
-
-# Personal Claude Code settings (.claude/settings.json is shared and committed)
-.claude/settings.local.json
-
-# Real data: any folder whose name ends in _data is never committed
-*_data/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# .vscode/ is NOT ignored: shared settings and spellings are committed
-# <<< style guide <<<

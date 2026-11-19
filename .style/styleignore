@@ -1,0 +1,10 @@
+# Files and folders the style tools (formatter, checker, function list) skip, on top
+# of everything the project's .gitignore already leaves out. One pattern per line, like
+# .gitignore: end a folder with /, * is a wildcard, start with / to match from the
+# project root (this file is .style/styleignore; patterns start from the root).
+# Use it for code the project did not write, such as third-party libraries.
+#
+# Examples (remove the # to use them):
+# lib/
+# vendor/
+# generated_*.py

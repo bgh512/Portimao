@@ -1,0 +1,4 @@
+# Project ruff settings (.style/ruff.toml). The shared rules come from the style guide;
+# add project rules below the extend line. This file is never overwritten. Paths here
+# start from this .style/ folder, so the guide is one folder up.
+extend = "../style/enforce/configs/ruff.toml"

@@ -1,0 +1,7 @@
+{
+    "version": "0.2",
+    "globRoot": "..",
+    "import": ["../style/enforce/configs/cspell.json"],
+    "ignorePaths": ["style/**", ".venv/**", "build/**", "logs/**"],
+    "words": []
+}

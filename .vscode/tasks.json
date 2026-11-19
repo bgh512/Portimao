@@ -4,9 +4,9 @@
         {
             "label": "Sync style guide",
             "type": "shell",
-            "command": "sh style/tools_format/style_sync.sh",
+            "command": "sh style/setup/style_sync.sh",
             "windows": {
-                "command": "style/tools_format/style_sync.bat"
+                "command": "style\\setup\\style_sync.bat"
             },
             "runOptions": {
                 "runOn": "folderOpen"
@@ -18,11 +18,29 @@
             "problemMatcher": []
         },
         {
-            "label": "Release dev to main",
+            "label": "Minor update to dev",
             "type": "process",
             "command": "git",
             "args": [
                 "release",
+                "--minor",
+                "${input:minorSummary}"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Major release dev to main",
+            "type": "process",
+            "command": "git",
+            "args": [
+                "release",
+                "--major",
                 "${input:releaseSummary}"
             ],
             "presentation": {
@@ -34,16 +52,31 @@
             "problemMatcher": []
         },
         {
-            "label": "Hotfix on main",
+            "label": "Hotfix to main",
             "type": "process",
             "command": "git",
             "args": [
-                "hotfix",
+                "release",
+                "--hotfix",
                 "${input:hotfixSummary}"
             ],
             "presentation": {
                 "reveal": "always",
                 "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Make export zip",
+            "type": "shell",
+            "command": "sh .style/make_zip.sh nopause",
+            "windows": {
+                "command": ".style\\make_zip.bat nopause"
+            },
+            "presentation": {
+                "reveal": "always",
                 "panel": "dedicated",
                 "clear": true
             },
@@ -60,6 +93,11 @@
             "id": "hotfixSummary",
             "type": "promptString",
             "description": "Summary of the fix, used in the commit message"
+        },
+        {
+            "id": "minorSummary",
+            "type": "promptString",
+            "description": "Summary of the update, used in the commit message"
         }
     ]
 }
