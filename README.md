@@ -269,6 +269,7 @@ Portimao/
         ocr_and_haem_response_plotter.py
         time_response_plotter.py
         ...
+    tests/                  the tests (test_question_flow.py checks QUESTION_FLOW.md against the code)
     requirements.txt        Python dependencies
     README.md
     FUNCTION_LIST.md

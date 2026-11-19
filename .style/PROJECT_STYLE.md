@@ -8,6 +8,8 @@ This project's own rules for its own kinds of file. They add to the shared style
 
 **It changes with the program.** A question that is added, removed, reworded or moved, a changed first-run default, a changed branch (which question an answer leads to), or a changed message that says why a step is skipped: the list is changed in the same piece of work. A list that disagrees with the program is a fault, like a wrong docstring.
 
+**A test guards the wording.** `tests/test_question_flow.py` reads the text of every question out of the code and fails when one is missing from the list or worded differently; the parts that vary (*file*, *time*) may be any words. It can only read a question that is written in the call that asks it, or handed on through an input called `question`, and it fails when it meets one it cannot read. Run it with `sh style/setup/run_tool.sh enforce/tools/test_runner.py` after changing a question. The order, the branches, the defaults, the option labels, the messages, and a question the program no longer asks are not tested: they are still checked by reading.
+
 **Layout**
 
 - The title is `# Portimao question flow (V<version>)`. The version is the program version, written by `.style/release_hook.py` at every release and never by hand.

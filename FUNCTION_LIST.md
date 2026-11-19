@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.5
+- **Version:** V1.6
 - **Date:** 19/11/2026
 
 ## Contents
@@ -21,6 +21,16 @@
     - [`main`](#main)
     - [`program_runner`](#program_runner)
     - [`special_figures_maker`](#special_figures_maker)
+- [`tests/test_question_flow.py`](#teststest_question_flowpy)
+    - [`_binding_resolver`](#_binding_resolver)
+    - [`_carrier_finder`](#_carrier_finder)
+    - [`_list_reader`](#_list_reader)
+    - [`_question_collector`](#_question_collector)
+    - [`_question_matcher`](#_question_matcher)
+    - [`_text_resolver`](#_text_resolver)
+    - [`_tree_reader`](#_tree_reader)
+    - [`test_question_texts_can_be_read`](#test_question_texts_can_be_read)
+    - [`test_questions_are_in_the_list`](#test_questions_are_in_the_list)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
     - [`exemplar_config_builder`](#exemplar_config_builder)
     - [`haem_labeller`](#haem_labeller)
@@ -967,6 +977,279 @@ None.
 exemplar_runner
 ocr_and_haem_response_runner
 time_response_runner
+```
+
+## `tests/test_question_flow.py`
+
+Tests that every question the program can ask is in QUESTION_FLOW.md, in the same words.
+
+### HELPERS
+
+#### `_binding_resolver`
+
+```text
+---- Summary ----
+Helper function to find the texts a local variable can hold, from its assignments
+and from the loops that fill it out of a list written in the code.
+
+---- Inputs ----
+name : str
+    Name of the variable.
+function : ast.AST
+    The function (or module) the variable lives in.
+functions : List[ast.AST]
+    The functions around the place the variable is used, nearest first.
+seen : FrozenSet[str]
+    Names already being followed, so a name defined by itself ends.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[List[str]]
+    The texts, or None when any value cannot be read.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_text_resolver
+```
+
+#### `_carrier_finder`
+
+```text
+---- Summary ----
+Helper function to find every function that takes a question: the askers and the
+wrappers that hand a question on to them.
+
+---- Inputs ----
+trees : Dict[str, ast.Module]
+    {file name: parsed code}.
+
+---- Globals read ----
+QUESTION_NAME (module constant).
+
+---- Outputs ----
+Dict[str, int]
+    {function name: position of its question input}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_list_reader`
+
+```text
+---- Summary ----
+Helper function to read the question list as plain text: without the marks for
+italics, bold and code, and with single spaces.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ROOT, LIST_NAME (module constants).
+
+---- Outputs ----
+str
+    The text of the list.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_question_collector`
+
+```text
+---- Summary ----
+Helper function to collect the text of every question in the code, without running
+it: the question given in each call to a function that takes one, and each
+'question' entry of a dictionary.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+QUESTION_NAME (module constant).
+
+---- Outputs ----
+Tuple[List[Tuple[str, str]], List[str]]
+    ([(question text, 'file:line')], ['file:line' of each question that could not
+    be read]). VARYING stands for each part filled in at run time.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_carrier_finder
+_text_resolver
+_tree_reader
+```
+
+#### `_question_matcher`
+
+```text
+---- Summary ----
+Helper function to say whether a question is in the list in the same words. The
+parts filled in at run time match any words.
+
+---- Inputs ----
+question : str
+    Question text from the code, with VARYING for each part filled in at run time.
+list_text : str
+    Text of the list from _list_reader.
+
+---- Globals read ----
+VARYING (module constant).
+
+---- Outputs ----
+bool
+    True when the question is in the list.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_text_resolver`
+
+```text
+---- Summary ----
+Helper function to read the question texts an expression can give.
+
+---- Inputs ----
+node : ast.AST
+    The expression given as the question.
+functions : List[ast.AST]
+    The functions around the expression, nearest first, the module last.
+seen : FrozenSet[str]
+    Names already being followed.
+
+---- Globals read ----
+QUESTION_NAME, VARYING (module constants).
+
+---- Outputs ----
+Optional[List[str]]
+    The texts; an empty list for a question handed on from the function's own
+    question input or read from a 'question' entry (it is collected where it is
+    first written); None when the expression cannot be read.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_binding_resolver
+```
+
+#### `_tree_reader`
+
+```text
+---- Summary ----
+Helper function to parse the program's code files and note, on every part, the
+functions it sits in.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ROOT, CODE_PATTERNS (module constants).
+
+---- Outputs ----
+Dict[str, ast.Module]
+    {file name from the project folder: parsed code}. Every node has a
+    ``functions`` list: the functions around it, nearest first, the module last.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_question_texts_can_be_read`
+
+```text
+---- Summary ----
+Main function to check that the text of every question can be read from the code,
+so that none escapes the check against the list.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MINIMUM_QUESTIONS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_question_collector
+```
+
+#### `test_questions_are_in_the_list`
+
+```text
+---- Summary ----
+Main function to check that every question in the code is in QUESTION_FLOW.md in
+the same words.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VARYING, LIST_NAME (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_list_reader
+_question_collector
+_question_matcher
 ```
 
 ## `utils_custom/custom_config.py`
