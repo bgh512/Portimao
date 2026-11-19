@@ -1,0 +1,30 @@
+# Project style
+
+This project's own rules for its own kinds of file. They add to the shared style guide (`style/rules/CODING_STYLE.md`, section 3.12).
+
+## Question flow
+
+`QUESTION_FLOW.md`, in the project root, lists every question the program asks, in the order it asks them, with where each answer leads. It is written for the lab members who use the program, so they can see what is coming and check an answer before a run. The questions are those asked through `utils_shared/questions.py`, wherever in the code they are asked.
+
+**It changes with the program.** A question that is added, removed, reworded or moved, a changed first-run default, a changed branch (which question an answer leads to), or a changed message that says why a step is skipped: the list is changed in the same piece of work. A list that disagrees with the program is a fault, like a wrong docstring.
+
+**Layout**
+
+- The title is `# Portimao question flow (V<version>)`. The version is the program version, written by `.style/release_hook.py` at every release and never by hand.
+- "How to read it" comes first: what the `(Y/n)` letters and `[brackets]` mean, what **Next** and **(plot)** mean, and how the numbers on screen can differ from the numbers in the list.
+- One `## <number>. <title>` heading for each section the program prints, in the same order and with the same title as on screen, with a `---` line between sections.
+- Within a section, a lettered sub-heading for each group of questions (`### 3.A Haem decomposition`), and one level more for a branch with questions of its own (`#### 3.A.1`).
+- The questions are in tables, one row each, with one of these sets of columns:
+    - `# | Question | Yes → | No →` for yes or no questions;
+    - `# | Question | 1 → | 2 →` for the "Do you accept...?" questions and other numbered choices;
+    - `# | Question | Leads to` (or `Answer leads to`) for everything else.
+- A row holds:
+    - the number, following the sections and the nesting on screen (`3.1`, `3.1.1`);
+    - the question in the words shown on screen, with the part that varies in italics (*file*, *time*);
+    - the first-run default as it is shown, `(y/N)`, `(Y/n)` or `[value]`;
+    - where each answer leads, as the number of the next question in bold (**3.2**);
+    - **(plot)** wherever the plot is redrawn.
+- A question that is asked only sometimes says when, in italics in its row or in a sentence above its table.
+- Plain sentences between the tables give what the program says or does without asking: messages, steps that are skipped and why, and what is written to the results folder.
+- The last section, "If the window cannot open (terminal mode)", lists only what differs from the window.
+- Plain words throughout: no function, file or variable names from the code, apart from the files and folders a user sees.

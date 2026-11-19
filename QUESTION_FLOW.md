@@ -1,4 +1,4 @@
-# Portimao question flow (V2.9)
+# Portimao question flow (V1.6)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -16,7 +16,7 @@ Every question in the order it is asked, with where each answer leads. The quest
 
 | # | Question | Answer leads to |
 |---|---|---|
-| 1.1 | What is the directory with the .paf files? | A folder that does not exist, or has no `.paf` files, is refused and the question is asked again. Otherwise every file is read and listed, then **1.2**. |
+| 1.1 | What is the directory with the .paf files? | Any folders ending in `_data` in the program folder are listed first, as a reminder. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused and the question is asked again. Otherwise every file is read and listed, then **1.2**. |
 | 1.2 | To which directory would you like the results to be saved? | **2.1** |
 
 ---
@@ -35,7 +35,7 @@ TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted
 | 2.2.1 | How many minutes should be TRIMMED from the END of ALL the data? `[0]` Every file is shaded **(plot)**. | **2.2.2** | |
 | 2.2.2 | Do you want to adjust this for any specific file? `(y/N)` | **2.2.3** | **2.3** (every file uses 2.2.1) |
 | 2.2.3 | How many minutes should be TRIMMED from the END of *file*? Asked once for each file; the plot switches to that file and its shading is updated **(plot)**. | the next file, then **2.3** | |
-| 2.3 | Do you want to IGNORE the START of any of the data? `(y/N)` | **2.3.1** | **2.4** (nothing ignored at the start) |
+| 2.3 | Do you want to IGNORE the START of any of the data? `(Y/n)` | **2.3.1** | **2.4** (nothing ignored at the start) |
 | 2.3.1 | How many minutes should be IGNORED from the START of ALL the data? `[5]` Every file is shaded **(plot)**. | **2.3.2** | |
 | 2.3.2 | Do you want to adjust this for any specific file? `(y/N)` | **2.3.3** | **2.4** (every file uses 2.3.1) |
 | 2.3.3 | How many minutes should be IGNORED from the START of *file*? Asked once for each file; the plot switches to that file and its shading is updated **(plot)**. | the next file, then **2.4** | |
@@ -69,7 +69,7 @@ Earlier OD and event values found in the files' workbooks are offered as default
 |---|---|---|---|
 | 3.1 | Do you want to decompose the haems? `(y/N)` | **3.1.1** | **3.3** (no haems anywhere in the run) |
 
-If the `fits/` folder holds no `.csv` file, 3.1 is not asked, a message says so, and the run carries on as for No.
+If the `fits/` folder holds no `.csv` file, 3.1 is still asked, and 3.1.1 then offers only *Find the components from the data*.
 
 | # | Question | Leads to |
 |---|---|---|
@@ -98,7 +98,7 @@ Asked when the last choice of 3.1.1 is taken. The numbers keep counting up when 
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.1.1.7 | Do you want to name the components? `(y/N)` | yes: one question for each component, suggesting a name from its type such as *a-like* (a name that is empty, has a comma or is used twice is asked again), then **3.1.1.8**; no (PC1, PC2, ...): **3.1.1.8** |
+| 3.1.1.7 | Do you want to name the components? `(y/N)` | yes: one question for each component, "What is component *N* (*type*, largest peak at *X* nm) called?", suggesting a name from its type such as *a-like* (a name that is empty, has a comma or is used twice is asked again), then **3.1.1.8**; no (PC1, PC2, ...): **3.1.1.8** |
 | 3.1.1.8 | Do you want to save these components as a fit file in the fits folder? `(Y/n)` | yes: **3.1.1.9**; no: the decomposition is drawn **(plot)**, then **3.2** |
 | 3.1.1.9 | What should the fit file be called (without .csv)? | if the name exists, it asks whether to replace it (no asks for a name again); then the decomposition is drawn **(plot)**, then **3.2** |
 
@@ -215,7 +215,7 @@ If nothing at all is plotted (4.1 No, 4.2 No, 4.4 No or skipped), a message says
 |---|---|---|
 | 4.10 | Which journal format would you like? 1) None (use the default: Nature, 1 column wide, 0.5 of a page tall) 2) Nature 3) Science 4) Cell 5) PNAS | **None**: the default size is used, then **4.11** (or **4.12** if nothing is plotted). **A journal**: **4.10.1** |
 | 4.10.1 | How wide should the figure be? (the widths that journal allows) | **4.10.2** |
-| 4.10.2 | How tall should the figure be, as a fraction of the page height (1 = a full page)? | the figure is drawn at its real size **(plot)**, then **4.11** (or **4.12** if nothing is plotted) |
+| 4.10.2 | How tall should the figure be, as a fraction of the page height (1 = a full page = *X* mm)? | the figure is drawn at its real size **(plot)**, then **4.11** (or **4.12** if nothing is plotted) |
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
@@ -281,7 +281,7 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 
 ## 6. Experiment summaries
 
-Both summary figures need the haem fit. If no fit was chosen in 3.1, the fit questions (**3.1.1**, and **3.1.2** if needed) are asked first. If there is no usable fit file the figure is skipped. Both figures also average around the events, so if you said No in 3.5 (and have not been asked since), the averaging window and gap questions (**3.5.1**, **3.5.2**) are asked first.
+Both summary figures need the haem fit. If no fit was chosen in 3.1, the fit questions (**3.1.1**, and **3.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, so if you said No in 3.5 (and have not been asked since), the averaging window and gap questions (**3.5.1**, **3.5.2**) are asked first.
 
 ### 6.A Time response
 
@@ -363,5 +363,5 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 The questions and their order are the same. These differ:
 
 - In **2** and **3** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer.
-- Before **2.1** a small menu steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring.
+- After **1.2** comes a section of its own, **2. Experiment browser**, with a small menu that steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring. Every later section is therefore numbered one higher on screen than in this list (trimming and ignoring is 3, analysis is 4, and so on), and the going back question (**4.12**) offers the experiment browser as well.
 - Every "Do you accept...?" question has a third answer, **3) Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.

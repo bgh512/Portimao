@@ -274,7 +274,8 @@ Portimao/
     FUNCTION_LIST.md
     DATA_FORMAT.md
     QUESTION_FLOW.md        every question the program asks
-    .style/                 this project's style guide settings, the VERSION file and the make_zip scripts
+    .style/                 this project's style guide settings, its own rules (PROJECT_STYLE.md), the VERSION file,
+                            the release hook (release_hook.py) and the make_zip scripts
     .claude/                instructions for Claude (CLAUDE.md imports the style guide)
     style/                  shared style guide (git submodule, see style/rules/CODING_STYLE.md)
 ```
@@ -283,6 +284,8 @@ Portimao/
 
 - [FUNCTION_LIST.md](FUNCTION_LIST.md): every function and class, with its docstring.
 - [DATA_FORMAT.md](DATA_FORMAT.md): custom data structures, units and formats.
+- [QUESTION_FLOW.md](QUESTION_FLOW.md): every question the program asks, in order, with where each answer leads.
+- [.style/PROJECT_STYLE.md](.style/PROJECT_STYLE.md): this project's own rules, such as how the question list is laid out and kept.
 - [style/rules/CODING_STYLE.md](style/rules/CODING_STYLE.md): the coding and formatting standards used in this project.
 
 ## 5. License

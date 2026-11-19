@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.4
+- **Version:** V1.5
 - **Date:** 19/11/2026
 
 ## Contents
