@@ -139,11 +139,17 @@ def experiment_averages_calculator(experiment: dict,
     # ---- 1 Validate the inputs -------------------------------------------------------
     name = experiment['experiment_name']
     if window_minutes <= 0:
-        raise ValueError('window_minutes must be positive.')
+        raise ValueError('The averaging window must be longer than 0 min. Correct it '
+                         'where the program asks for it.',
+                         )
     if gap_minutes < 0 or final_window_gap_minutes < 0:
-        raise ValueError('Averaging gaps cannot be negative.')
+        raise ValueError('The gap before an averaging window cannot be negative. '
+                         'Correct it where the program asks for it.',
+                         )
     if vo2_source is None and haem_source is None:
-        raise ValueError(f'{name}: nothing to average (no VO2 and no haem source).')
+        raise ValueError(f'{name}: there is nothing to average, neither oxygen '
+                         'consumption nor haems.',
+                         )
 
     # ---- 2 Resolve the data sources --------------------------------------------------
     vo2_key, vo2_df = (source_resolver(experiment, vo2_source, VO2_KEYS, 'VO2')
@@ -160,11 +166,15 @@ def experiment_averages_calculator(experiment: dict,
                     key=lambda event: event['time'],
                     )
     if not events:
-        raise ValueError(f'{name}: no timed events found for averaging.')
+        raise ValueError(f'{name}: none of the additions has a time, so there is '
+                         'nothing to average around.',
+                         )
     reference_df = vo2_df if vo2_df is not None else haem_df
     reference_times = time_getter(reference_df)
     if not np.any(np.isfinite(reference_times)):
-        raise ValueError(f'{name}: no valid times.')
+        raise ValueError(f'{name}: the times of the values could not be read, so '
+                         'they cannot be averaged.',
+                         )
     recording_end = float(np.nanmax(reference_times))
     # Define the averaging windows.
     first_event = float(events[0]['time'])

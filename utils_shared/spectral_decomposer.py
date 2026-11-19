@@ -121,6 +121,114 @@ def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.nd
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
+# ---- background_builder --------------------------------------------------------------
+def background_builder(wavelengths: np.ndarray,
+                       degree_of_scatter: int = 1,
+                       ) -> np.ndarray:
+    """
+    ---- Summary ----
+    Main function to build the background terms that every decomposition fits beside
+    its shapes: a constant and the scatter terms.
+
+    ---- Inputs ----
+    wavelengths : np.ndarray
+        Wavelengths of the spectra (nm), shape (n_wavelengths).
+    degree_of_scatter : int
+        Number of 1/wavelength^k scatter terms (>= 0).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    np.ndarray
+        The terms as columns, shape (n_wavelengths, degree_of_scatter + 1): the
+        constant 1 first, then scatter term k = 1, 2, ... Each scatter term runs from 1
+        at the shortest wavelength to 0 at the longest.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    scatter term k = (1/wl^k - min) / (max - min) of 1/wl^k.
+
+    ---- Helpers ----
+    None.
+    """
+
+    wavelengths = np.asarray(wavelengths, dtype=float)
+    columns = [np.ones_like(wavelengths)]
+    for k in range(1, degree_of_scatter + 1):
+        scatter = 1 / wavelengths ** k
+        shifted = scatter - np.amin(scatter)
+        columns.append(shifted / np.amax(shifted))
+    return np.column_stack(columns)
+
+
+# ---- basis_solver --------------------------------------------------------------------
+def basis_solver(basis: np.ndarray, spectra: np.ndarray) -> np.ndarray:
+    """
+    ---- Summary ----
+    Main function to find how much of each column of a basis (the shapes and the
+    background terms) is in one spectrum, or in each spectrum of a run. It is the one
+    solver of every decomposition in the program.
+
+    ---- Inputs ----
+    basis : np.ndarray
+        The shapes to fit as columns, shape (n_wavelengths, n_components).
+    spectra : np.ndarray
+        One spectrum, shape (n_wavelengths), or a run of them, shape (n_spectra,
+        n_wavelengths), on the wavelengths of the basis.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    np.ndarray
+        The amounts, shape (n_components) for one spectrum or (n_spectra,
+        n_components) for a run. A spectrum holding a blank value gives blank amounts
+        for that spectrum only. Raises ValueError, with a message for the user, when
+        there are fewer wavelengths than components or when the columns cannot be told
+        apart.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Least squares: the c that makes |B c - a| smallest. Each column of B is first
+    divided by its length (root of its summed squares), so shapes on very different
+    scales are solved equally well; B_scaled = U S V^T (singular value decomposition);
+    c = V S^-1 U^T a / column length. S^T S is never inverted, as that squares the
+    rounding errors.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Check the basis -----------------------------------------------------------
+    basis = np.asarray(basis, dtype=float)
+    values = np.asarray(spectra, dtype=float)
+    n_wavelengths, n_components = basis.shape
+    if n_wavelengths < n_components:
+        raise ValueError(
+            f'The spectra and the shapes to fit share only {n_wavelengths}'
+            f' wavelengths, too few to work out {n_components} amounts. '
+            'Choose a fit file that covers the wavelengths of the spectra.',
+            )
+    unusable = ('Two of the shapes to fit cannot be told apart over these wavelengths '
+                '(they are the same, or one of them is empty), so the amounts cannot '
+                'be worked out. Choose another fit file.'
+                )
+    lengths = np.linalg.norm(basis, axis=0)
+    if not np.all(np.isfinite(lengths)) or np.any(lengths == 0):
+        raise ValueError(unusable)
+
+    # ---- 2 Solve ---------------------------------------------------------------------
+    u, s, vt = np.linalg.svd(basis / lengths, full_matrices=False)
+    if s[-1] <= s[0] * max(basis.shape) * np.finfo(float).eps:
+        raise ValueError(unusable)
+    return ((values @ u) / s) @ vt / lengths
+
+
 # ---- data_filterer -------------------------------------------------------------------
 def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.ndarray:
     """
@@ -215,8 +323,9 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
     times = time_getter(haem_abs)
     finite_times = times[np.isfinite(times)]
     if not columns or finite_times.size == 0:
-        raise ValueError(f'{label}: no haem columns or finite times available for the '
-                         f'delta absorbance.',
+        raise ValueError(f'{label}: there are no haems, or no times, to find the zero '
+                         'of delta A from. Check that the fit file holds haems and '
+                         'that the file was read fully.',
                          )
     start = float(finite_times.min()) + exclude_first_minutes
     stop = float(finite_times.max()) - exclude_last_minutes
@@ -229,9 +338,10 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
         values = value_getter(haem_abs, column)
         found = _best_window_finder(times, values, start, stop, window_seconds / 60.0)
         if found is None:
-            raise ValueError(f'{label}: no finite {column!r} values between '
-                             f'{start:.2f} and {stop:.2f} min for the delta '
-                             'absorbance reference. Reduce the ignored start or end.',
+            raise ValueError(f'{label}: no {column} values are left between '
+                             f'{start:.2f} and {stop:.2f} min to find the zero of '
+                             'delta A from. Ignore less of the start or the end of '
+                             'the run.',
                              )
         reference[str(column)], first, last = found
         windows[str(column)] = (first, last)
@@ -294,33 +404,42 @@ def experiment_decomposer(experiment: dict,
     ---- Globals mutated ----
     experiment: adds haem_conc (time, spectrum index, one column per haem), haem_abs
     (mOD, same layout; attrs["peak_amplitude_OD"]) and haem_delta_abs
-    (delta_abs_calculator).
+    (delta_abs_calculator). The three are added together at the end; when anything
+    fails, the experiment holds none of them, not even those of an earlier
+    decomposition.
 
     ---- Equations ----
-    c = (S^T S)^-1 S^T a for every spectrum (projector built once); haem_abs = c x peak
-    amplitude of the haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs -
-    mean of the highest window.
+    c = the least-squares amounts of the basis S in every spectrum (basis_solver);
+    haem_abs = c x peak amplitude of the haem basis spectrum x 1000 (OD to mOD);
+    haem_delta_abs = haem_abs - mean of the highest window.
 
     ---- Helpers ----
     _wavelength_masker
+    basis_solver
     delta_abs_calculator
     s_array_generator
     """
 
     # ---- 1 Validate the fit and dataset ----------------------------------------------
-    name = experiment.get('experiment_name', '<unknown>')
+    for key in ('haem_conc', 'haem_abs', 'haem_delta_abs'):
+        experiment.pop(key, None)  # a failure must not leave an older result behind
+    name = experiment.get('experiment_name', 'This file')
     if fit is None or 'data' not in fit or 'haem_list' not in fit:
-        raise ValueError('A valid fit returned by import_fit() is required.')
+        raise ValueError('No fit file was loaded, so the haems cannot be worked out. '
+                         'Choose a fit file when the program asks for one.',
+                         )
     raw_spectra = experiment.get('raw_spectra', {})
     if dataset_name not in raw_spectra:
-        raise ValueError(f'{name}: unknown spectral dataset {dataset_name!r}. '
-                         f"Available datasets: {', '.join(raw_spectra) or '<none>'}",
-                         )
+        raise ValueError(
+            f'{name}: the file has no {dataset_name} spectra to decompose '
+            f"(it has: {', '.join(raw_spectra) or 'none'}). Choose spectra "
+            'that the file holds.',
+            )
     dataset = raw_spectra[dataset_name]
     if spectrum_type not in dataset:
-        raise ValueError(f'{name}/{dataset_name}: spectral data type {spectrum_type!r}'
-                         f' not found. '
-                         f"Available fields: {', '.join(dataset)}",
+        raise ValueError(f'{name}: the {dataset_name} spectra were not converted to '
+                         f'{spectrum_type}, so they cannot be decomposed. This is a '
+                         'fault in the program; please report it.',
                          )
 
     # ---- 2 Read and check the spectra ------------------------------------------------
@@ -328,19 +447,24 @@ def experiment_decomposer(experiment: dict,
     spectra = np.asarray(dataset[spectrum_type], dtype=float)
     spectrum_indices = np.asarray(dataset['spectrum_indices'])
     times = np.asarray(dataset['time'], dtype=float)
+    damaged = (f'{name}: the {dataset_name} spectra cannot be decomposed, because '
+               'their wavelengths, spectra and times do not have matching lengths. '
+               'The file may be damaged; save it again from the instrument software.'
+               )
     if wavelengths.ndim != 1:
-        raise ValueError(f'{name}/{dataset_name}: wavelengths must be a 1D array.')
+        raise ValueError(damaged)
     if spectra.ndim != 2 or spectra.shape[1] != len(wavelengths):
-        raise ValueError(f'{name}/{dataset_name}: {spectrum_type!r} must be a (spectra'
-                         f' x wavelengths) array.',
-                         )
+        raise ValueError(damaged)
     if len(spectrum_indices) != len(spectra) or len(times) != len(spectra):
-        raise ValueError(f'{name}/{dataset_name}: spectrum index/time count does not '
-                         f'match spectra.',
-                         )
+        raise ValueError(damaged)
     if not np.all(np.isfinite(times)):
-        raise ValueError(f'{name}/{dataset_name}: spectrum times are unavailable '
-                         f'(spectra/CsO2 length mismatch).',
+        raise ValueError(f'{name}: the times of the {dataset_name} spectra are not '
+                         'known (the file holds a different number of spectra and of '
+                         'oxygen points), so the haems cannot be worked out.',
+                         )
+    if len(spectra) == 0:
+        raise ValueError(f'{name}: there are no {dataset_name} spectra left to '
+                         'decompose. Trim less of the run.',
                          )
 
     # ---- 3 Decompose the spectra -----------------------------------------------------
@@ -352,12 +476,10 @@ def experiment_decomposer(experiment: dict,
                                 degree_of_scatter,
                                 haemfactor,
                                 )
-    projector = np.linalg.inv(s_array.T @ s_array) @ s_array.T
-    coefficients = spectra[:, mask] @ projector.T  # (n_spectra, n_components)
+    coefficients = basis_solver(s_array, spectra[:, mask])  # (n_spectra, n_components)
     haem_conc = pd.DataFrame(coefficients[:, :len(haem_names)], columns=haem_names)
     haem_conc.insert(0, SPECTRUM_INDEX_COLUMN, spectrum_indices)
     haem_conc.insert(0, TIME_COLUMN, times)
-    experiment['haem_conc'] = haem_conc
 
     # ---- 4 Calculate the absorbances -------------------------------------------------
     # Peak amplitude (OD per unit coefficient) of each haem's basis spectrum; x1000
@@ -366,14 +488,18 @@ def experiment_decomposer(experiment: dict,
     haem_abs = haem_conc.copy()
     haem_abs[haem_names] = coefficients[:, :len(haem_names)] * peak_amplitude * 1000.0
     haem_abs.attrs['peak_amplitude_OD'] = dict(zip(haem_names, peak_amplitude.tolist()))
-    experiment['haem_abs'] = haem_abs
-    experiment['haem_delta_abs'] = delta_abs_calculator(
+    haem_delta_abs = delta_abs_calculator(
         haem_abs,
         delta_exclude_first_minutes,
         delta_window_seconds,
-        label=f'{name}/haem_abs',
+        label=name,
         exclude_last_minutes=delta_exclude_last_minutes,
         )
+
+    # ---- 5 Store the three tables together -------------------------------------------
+    experiment['haem_conc'] = haem_conc
+    experiment['haem_abs'] = haem_abs
+    experiment['haem_delta_abs'] = haem_delta_abs
     return experiment
 
 
@@ -444,10 +570,11 @@ def s_array_generator(experimental_data: np.ndarray,
     None.
 
     ---- Equations ----
-    haem column = -interp(fit) x haemfactor; scatter term k = (1/wl^k - min) / (max -
-    min) of 1/wl^k.
+    haem column = -interp(fit) x haemfactor; the constant and the scatter terms are
+    those of background_builder.
 
     ---- Helpers ----
+    background_builder
     data_filterer
     """
 
@@ -463,11 +590,7 @@ def s_array_generator(experimental_data: np.ndarray,
         s_array[:, i] = -np.interp(filtered[:, 0], fit_x, fit_y) * haemfactor
 
     # ---- 3 Add the scatter terms -----------------------------------------------------
-    s_array[:, no_haems] = 1.0
-    for i in range(degree_of_scatter):
-        scatter_function = 1 / filtered[:, 0] ** (i + 1)
-        shifted = scatter_function - np.amin(scatter_function)
-        s_array[:, no_haems + i + 1] = shifted / np.amax(shifted)
+    s_array[:, no_haems:] = background_builder(filtered[:, 0], degree_of_scatter)
     return s_array
 
 
@@ -513,10 +636,11 @@ def spectrum_decomposer(experimental_data: np.ndarray,
     None.
 
     ---- Equations ----
-    c = (S^T S)^-1 S^T a, where S is the basis matrix and a the spectrum; residual = a -
-    (haems + scatter).
+    c = the least-squares amounts of the basis S in the spectrum a (basis_solver);
+    residual = a - (haems + scatter).
 
     ---- Helpers ----
+    basis_solver
     data_filterer
     s_array_generator
     """
@@ -533,14 +657,7 @@ def spectrum_decomposer(experimental_data: np.ndarray,
                                 degree_of_scatter,
                                 haemfactor,
                                 )
-    c_array = np.matmul(np.matmul(np.linalg.inv(np.matmul(np.transpose(s_array),
-                                                          s_array,
-                                                          ),
-                                                ),
-                                  np.transpose(s_array),
-                                  ),
-                        absorbances,
-                        )
+    c_array = basis_solver(s_array, absorbances)
 
     # ---- 3 Rebuild the components ----------------------------------------------------
     scatter = np.zeros_like(absorbances)

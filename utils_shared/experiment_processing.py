@@ -15,6 +15,51 @@ from utils_shared.spectral_decomposer import experiment_decomposer
 from utils_shared.trimming import experiment_trimmer
 
 
+# ---- EXPERIMENT PROCESSING HELPERS ---------------------------------------------------
+
+
+# ---- _skip_reporter ------------------------------------------------------------------
+def _skip_reporter(step: str, error: Exception) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the user in plain words that a step was skipped for this
+    file, why, and what to do.
+
+    ---- Inputs ----
+    step : str
+        The step in plain words, to complete "Warning: ... was skipped".
+    error : Exception
+        The error that stopped the step. The ValueError and PafError messages of the
+        processing steps are written for the user and are shown as they are; a
+        KeyError or TypeError is a fault in the program, whose raw text is not shown.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None. Prints the warning (side effect).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if isinstance(error, (KeyError, TypeError)):
+        reason = ('A fault in the program stopped this step; please report it, with '
+                  'this file.'
+                  )
+    else:
+        reason = str(error)
+    print(f'  Warning: {step} was skipped for this file; the rest carries on without '
+          f'it. {reason}',
+          )
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -108,6 +153,7 @@ def experiment_data_processor(info: dict,
     None.
 
     ---- Helpers ----
+    _skip_reporter
     event_settings_merger
     experiment_attenuation_adder
     experiment_averages_calculator
@@ -198,7 +244,7 @@ def experiment_data_processor(info: dict,
                   f"({reference['start_time']:.2f}-{reference['end_time']:.2f} min)",
                   )
         except (KeyError, ValueError, PafError) as exc:
-            print(f'  Decomposition skipped: {exc}')
+            _skip_reporter('the decomposition into haems', exc)
     elif a['export_spectra']:
         experiment_attenuation_adder(experiment, mode=settings.TRANSMISSION_MODE)
 
@@ -212,14 +258,15 @@ def experiment_data_processor(info: dict,
                   )
         except (KeyError, ValueError) as exc:
             od_available = False
-            print(f'  OD scaling skipped: {exc}')
+            _skip_reporter('the scaling by OD', exc)
 
     # ---- 4.4 Convert to percentages --------------------------------------------------
     percent_vo2, percent_haem = cfg.percent_need_checker()
     percent_window_seconds = settings.PERCENT_AVERAGE_WINDOW_SECONDS
-    for needed, source_key, target_key in ((percent_haem, 'haem_conc', 'haem_percent'),
-                                           (percent_vo2, 'VoO2', 'VoO2_percent'),
-                                           ):
+    for needed, source_key, target_key, what in (
+        (percent_haem, 'haem_conc', 'haem_percent', 'the haems'),
+        (percent_vo2, 'VoO2', 'VoO2_percent', 'the oxygen consumption'),
+        ):
         if needed and source_key in experiment:
             try:
                 percent_converter(experiment,
@@ -230,7 +277,7 @@ def experiment_data_processor(info: dict,
                                   window_seconds=percent_window_seconds,
                                   )
             except (KeyError, ValueError, TypeError) as exc:
-                print(f'  {target_key} skipped: {exc}')
+                _skip_reporter(f'the % scale of {what}', exc)
 
     # ---- 5 Choose the sources and average --------------------------------------------
     vo2_source, haem_source = cfg.source_chooser(od_available)
@@ -263,7 +310,7 @@ def experiment_data_processor(info: dict,
                           '(not enough time for the window and gap)',
                           )
             except (KeyError, ValueError, TypeError) as exc:
-                print(f'  Averaging skipped: {exc}')
+                _skip_reporter('the averaging around the additions', exc)
 
     # ---- 6 Return the processed experiment -------------------------------------------
     return {'experiment': experiment,

@@ -97,7 +97,9 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
     denominator = float(dilution_factor) * float(optical_density) * float(volume)
     if not np.isfinite(denominator) or denominator <= 0:
-        raise ValueError('Dilution factor x OD x volume must be positive and finite.')
+        raise ValueError('The OD, the volume and the dilution factor must all be above '
+                         '0. Correct them where the program asks for the OD.',
+                         )
     if isinstance(data, pd.DataFrame):
         return data.apply(lambda column: pd.to_numeric(column, errors='raise'),
                           ) / denominator
@@ -122,8 +124,9 @@ def experiment_normaliser(experiment: dict) -> dict:
 
     ---- Outputs ----
     dict
-        The same experiment dictionary. Raises KeyError if dilution_factor, OD or volume
-        is missing from the metadata, and ValueError if VoO2 has no measurement columns.
+        The same experiment dictionary. Raises ValueError, with a message for the user,
+        if dilution_factor, OD or volume is missing from the metadata, or if VoO2 has no
+        measurement columns.
 
     ---- Globals mutated ----
     experiment: adds VoO2_OD and, for each of haem_conc, haem_abs and haem_delta_abs
@@ -143,9 +146,10 @@ def experiment_normaliser(experiment: dict) -> dict:
     missing = [key for key in ('dilution_factor', 'OD', 'volume') if key not in metadata
                ]
     if missing:
-        raise KeyError(f"{experiment['experiment_name']}: missing OD-normalisation "
-                       f'metadata {missing}',
-                       )
+        raise ValueError(f"{experiment['experiment_name']}: the OD, the volume or the "
+                         'dilution factor is missing, so the values cannot be scaled '
+                         'by OD. Enter them where the program asks for the OD.',
+                         )
 
     # ---- 2 Normalise the data --------------------------------------------------------
     kwargs = {'optical_density': metadata['OD'],
@@ -153,8 +157,8 @@ def experiment_normaliser(experiment: dict) -> dict:
               'dilution_factor': metadata['dilution_factor'],
               }
     if not measurement_column_finder(experiment['VoO2']):
-        raise ValueError(f"{experiment['experiment_name']}: no VoO2 measurement "
-                         f'columns found',
+        raise ValueError(f"{experiment['experiment_name']}: the file has no oxygen "
+                         'consumption (VO2) values to scale by OD.',
                          )
     experiment['VoO2_OD'] = _frame_normaliser(experiment['VoO2'], **kwargs)
     for source_key, target_key in (('haem_conc', 'haem_OD'),
@@ -209,14 +213,13 @@ def percent_converter(experiment: dict,
     # ---- 1 Check the source ----------------------------------------------------------
     source = experiment.get(source_key)
     if not isinstance(source, pd.DataFrame):
-        raise ValueError(f"{experiment['experiment_name']}: {source_key} is "
-                         f'unavailable, cannot scale to percent.',
+        raise ValueError(f"{experiment['experiment_name']}: the values to put on the % "
+                         'scale are missing (an earlier step was skipped).',
                          )
 
     # ---- 2 Convert to percentages ----------------------------------------------------
     experiment[target_key] = percent_scaler(source,
-                                            label=f"{experiment['experiment_name']}/"
-                                            f'{source_key}',
+                                            label=experiment['experiment_name'],
                                             **scaling_kwargs,
                                             )
     return experiment
@@ -270,18 +273,24 @@ def percent_scaler(df: pd.DataFrame,
 
     # ---- 1 Validate the inputs -------------------------------------------------------
     if window_seconds <= 0:
-        raise ValueError('window_seconds must be positive.')
+        raise ValueError('The averaging window of the % scale must be longer than 0 s. '
+                         'Correct it in config.py.',
+                         )
     if exclude_first_minutes < 0 or exclude_last_minutes < 0:
-        raise ValueError('Excluded periods cannot be negative.')
+        raise ValueError('The time ignored at the start or the end of the run cannot '
+                         'be negative. Correct it where the program asks for it.',
+                         )
 
     # ---- 2 Find the allowed windows --------------------------------------------------
     columns = measurement_column_finder(df)
     if not columns:
-        raise ValueError(f'{label}: no measurement columns were found.')
+        raise ValueError(f'{label}: there are no values to put on the % scale.')
     times = time_getter(df)
     finite_times = times[np.isfinite(times)]
     if finite_times.size == 0:
-        raise ValueError(f'{label}: no finite measurement times are available.')
+        raise ValueError(f'{label}: the times of the values could not be read, so '
+                         'the % scale cannot be found.',
+                         )
     window_minutes = window_seconds / 60.0
     first_allowed = finite_times.min() + exclude_first_minutes
     last_allowed = finite_times.max() - exclude_last_minutes
@@ -291,10 +300,10 @@ def percent_scaler(df: pd.DataFrame,
     allowed = np.isfinite(times) & after_start & before_end
     candidate_starts = np.unique(times[allowed])
     if candidate_starts.size == 0:
-        raise ValueError(f'{label}: no complete {window_seconds:g}-second windows '
-                         f'remain after excluding the '
-                         'initial/final periods. Reduce the exclusion or window '
-                         'duration.',
+        raise ValueError(f'{label}: less than {window_seconds:g} s of the run is left '
+                         'after the ignored start and end, too little to find the 0 % '
+                         'and the 100 %. Ignore less of the start or the end of the '
+                         'run.',
                          )
 
     # ---- 3 Scale each column ---------------------------------------------------------
@@ -322,8 +331,9 @@ def percent_scaler(df: pd.DataFrame,
             if highest is None or info['mean'] > highest['mean']:
                 highest = info
         if lowest is None or highest is None:
-            raise ValueError(f'{label}: insufficient data to find valid '
-                             f'{window_seconds:g}-second windows for {column!r}.',
+            raise ValueError(f'{label}: {column} has too few values in any '
+                             f'{window_seconds:g} s of the run to find its 0 % and '
+                             '100 %. Ignore less of the start or the end of the run.',
                              )
         low, span = lowest['mean'], highest['mean'] - lowest['mean']
         # A constant signal has no measurable relative range.

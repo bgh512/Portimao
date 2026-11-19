@@ -11,6 +11,9 @@ import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.spectral_decomposer import background_builder, basis_solver
+
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 ENOUGH_VARIANCE = 0.99
@@ -103,19 +106,14 @@ def _nuisance_basis_builder(wavelengths: np.ndarray,
     None.
 
     ---- Equations ----
-    The columns are 1 and (1/wl^k - min) / (max - min) as in s_array_generator,
+    The columns of background_builder (the same terms as the haem decomposition),
     orthonormalised by QR.
 
     ---- Helpers ----
-    None.
+    background_builder
     """
 
-    columns = [np.ones_like(wavelengths)]
-    for k in range(1, degree_of_scatter + 1):
-        scatter = 1 / wavelengths ** k
-        shifted = scatter - np.amin(scatter)
-        columns.append(shifted / np.amax(shifted))
-    q, _ = np.linalg.qr(np.column_stack(columns))
+    q, _ = np.linalg.qr(background_builder(wavelengths, degree_of_scatter))
     return q
 
 
@@ -615,12 +613,14 @@ def decomposition_example_finder(spectra_sets: List[dict],
     None.
 
     ---- Equations ----
-    B = [components, offset and scatter terms]; c = B^+ a (least squares) for each
-    spectrum a; fitted = B c; residual = a - fitted; RMS = sqrt(mean(residual^2)).
+    B = [components, offset and scatter terms]; c = the least-squares amounts of B in
+    each spectrum a (basis_solver, the solver of the haem decomposition); fitted = B c;
+    residual = a - fitted; RMS = sqrt(mean(residual^2)).
 
     ---- Helpers ----
     _nuisance_basis_builder
     _spectra_gridder
+    basis_solver
     """
 
     # ---- 1 Build the basis -----------------------------------------------------------
@@ -629,7 +629,6 @@ def decomposition_example_finder(spectra_sets: List[dict],
     count = components.shape[1]
     nuisance = _nuisance_basis_builder(grid, degree_of_scatter)
     basis = np.column_stack((components, nuisance))
-    solver = np.linalg.pinv(basis)
 
     # ---- 2 Find the residual of every spectrum ---------------------------------------
     rows, labels, rms_parts = [], [], []
@@ -643,7 +642,7 @@ def decomposition_example_finder(spectra_sets: List[dict],
         data, times = data[finite], times[finite]
         if not len(data):
             continue
-        residuals = data - (data @ solver.T) @ basis.T
+        residuals = data - basis_solver(basis, data) @ basis.T
         rms_parts.append(np.sqrt(np.mean(residuals ** 2, axis=1)))
         rows.append(data)
         labels += [(entry['name'], float(t)) for t in times]
@@ -654,7 +653,7 @@ def decomposition_example_finder(spectra_sets: List[dict],
 
     # ---- example ---------------------------------------------------------------------
     def example(index: int) -> dict:
-        coefficients = solver @ spectra[index]
+        coefficients = basis_solver(basis, spectra[index])
         fitted = basis @ coefficients
         return {'name': labels[index][0],
                 'time_min': labels[index][1],

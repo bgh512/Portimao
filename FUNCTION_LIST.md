@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.8
+- **Version:** V1.9
 - **Date:** 19/11/2026
 
 ## Contents
@@ -27,8 +27,18 @@
     - [`_mixed_spectra_builder`](#_mixed_spectra_builder)
     - [`test_one_spectrum_gives_its_amounts_back`](#test_one_spectrum_gives_its_amounts_back)
     - [`test_a_series_gives_its_amounts_back`](#test_a_series_gives_its_amounts_back)
+    - [`test_the_three_routes_give_the_same_amounts`](#test_the_three_routes_give_the_same_amounts)
+    - [`test_same_shapes_give_a_plain_error`](#test_same_shapes_give_a_plain_error)
+    - [`test_a_failed_decomposition_leaves_nothing`](#test_a_failed_decomposition_leaves_nothing)
     - [`test_two_mixed_shapes_give_two_components`](#test_two_mixed_shapes_give_two_components)
     - [`test_the_two_shapes_are_found_again`](#test_the_two_shapes_are_found_again)
+- [`tests/test_haem_direction.py`](#teststest_haem_directionpy)
+    - [`_instrument_fit_reader`](#_instrument_fit_reader)
+    - [`_haem_trace_loader`](#_haem_trace_loader)
+    - [`test_haem_amounts_move_with_the_instrument`](#test_haem_amounts_move_with_the_instrument)
+    - [`test_haem_amounts_fall_when_reduced`](#test_haem_amounts_fall_when_reduced)
+    - [`test_haem_shapes_are_those_of_the_instrument`](#test_haem_shapes_are_those_of_the_instrument)
+    - [`test_instrument_traces_fall_when_reduced`](#test_instrument_traces_fall_when_reduced)
 - [`tests/test_paf_reader_parts.py`](#teststest_paf_reader_partspy)
     - [`test_additions_copies_are_joined`](#test_additions_copies_are_joined)
     - [`test_additions_under_one_name_are_all_kept`](#test_additions_under_one_name_are_all_kept)
@@ -271,6 +281,7 @@
     - [`_renderer_getter`](#_renderer_getter)
     - [`comparison_figure_plotter`](#comparison_figure_plotter)
 - [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
+    - [`_skip_reporter`](#_skip_reporter)
     - [`event_settings_merger`](#event_settings_merger)
     - [`experiment_data_processor`](#experiment_data_processor)
 - [`utils_shared/figure_layout.py`](#utils_sharedfigure_layoutpy)
@@ -401,6 +412,8 @@
 - [`utils_shared/spectral_decomposer.py`](#utils_sharedspectral_decomposerpy)
     - [`_best_window_finder`](#_best_window_finder)
     - [`_wavelength_masker`](#_wavelength_masker)
+    - [`background_builder`](#background_builder)
+    - [`basis_solver`](#basis_solver)
     - [`data_filterer`](#data_filterer)
     - [`delta_abs_calculator`](#delta_abs_calculator)
     - [`experiment_decomposer`](#experiment_decomposer)
@@ -1200,6 +1213,90 @@ _background_builder
 _haem_spectrum_builder
 ```
 
+#### `test_the_three_routes_give_the_same_amounts`
+
+```text
+---- Summary ----
+Main function to check that the three places that decompose a spectrum (one
+spectrum, a whole run, the component finder's examples) give the same amounts for
+the same spectrum, and that these are the amounts it was built from. It guards the
+one shared solver: never loosen it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, EXACT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See _haem_spectrum_builder. The component finder gives each shape's part of the
+spectrum (amount x shape), so its amount is the best fit of that part to the shape:
+sum(part x shape) / sum(shape^2).
+
+---- Helpers ----
+_haem_spectrum_builder
+```
+
+#### `test_same_shapes_give_a_plain_error`
+
+```text
+---- Summary ----
+Main function to check that a fit file in which two haems have the same shape is
+refused with a message that says so, and not with the raw "Singular matrix".
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haem_spectrum_builder
+```
+
+#### `test_a_failed_decomposition_leaves_nothing`
+
+```text
+---- Summary ----
+Main function to check that a decomposition that fails at its last step (the whole
+run is ignored, so the zero of the change cannot be found) leaves no haem amounts,
+absorbances or changes in the experiment, not even those of an earlier
+decomposition.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The run lasts 1 min and its first 10 min are ignored, so nothing is left.
+
+---- Helpers ----
+_haem_spectrum_builder
+```
+
 #### `test_two_mixed_shapes_give_two_components`
 
 ```text
@@ -1257,6 +1354,207 @@ cleaned shape (root of the summed squares).
 ---- Helpers ----
 _background_builder
 _mixed_spectra_builder
+```
+
+## `tests/test_haem_direction.py`
+
+Tests that our haem amounts move the same way as the instrument's own haem traces of
+
+### HELPERS
+
+#### `_instrument_fit_reader`
+
+```text
+---- Summary ----
+Helper function to read the shapes of the instrument software's own fit file
+(.fit), which is made of the same kind of records as a .paf.
+
+---- Inputs ----
+path : Path
+    The .fit file.
+
+---- Globals read ----
+MARK, POINTS_MARK (module constants).
+
+---- Outputs ----
+dict
+    {'range_nm': (first, last) wavelength the instrument fits over, 'labels': the
+    name of each shape in the instrument's list of traces ('Noname' for a shape
+    that gives no trace), 'names': the name each shape was saved under, 'shapes':
+    one array per shape, shape (n_points, 2): wavelength (nm), then the value, both
+    as the instrument uses them (shifted and scaled), 'shifts_nm' and 'scales':
+    the shift and the scale that were applied to the saved points}; the lists are
+    in the file's order.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+The first record gives the fit name, then 1, the range (two 4 byte numbers), the
+number of shapes and their labels. Each shape is a 'Plot: Scatter' record (its
+name) followed by a record that holds its points: the numbers 30, 15, 10, then 20
+bytes, then the points as (wavelength, value) pairs of 4 byte numbers; the number
+of points is 32 bytes before the 30. The points are stored as they were imported.
+The 'Plot: Scatter' record ends with the shape as the instrument uses it: its
+first and last wavelength and its lowest and highest value (four 4 byte numbers,
+28 bytes before its end). shift = that first wavelength - the first stored one
+(when both spans are equally wide); scale = (highest - lowest) / (the same of the
+stored values in that span), negative when the shape is used upside down.
+
+---- Helpers ----
+None.
+```
+
+#### `_haem_trace_loader`
+
+```text
+---- Summary ----
+Helper function to decompose the example run once, as the program does, and to
+read the instrument's own haem traces of the same run.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PAF_FILE, FIT_FILE, HAEM_TRACES (module constants).
+
+---- Outputs ----
+dict
+    {'ours': {haem name: our amount at each spectrum}, 'theirs': {haem name: the
+    instrument's trace at each spectrum}}; every array has shape (n_spectra).
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_haem_amounts_move_with_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that our amount of a haem rises where the instrument's own
+trace of it rises, and falls where it falls, over the whole run.
+
+---- Inputs ----
+haems : dict
+    Our amounts and the instrument's traces, from _haem_trace_loader.
+name : str
+    Name of the haem in our fit file.
+
+---- Globals read ----
+SAME_WAY (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Correlation of the two traces over the spectra where both have a value: +1 when
+they move together, -1 when one is the other upside down. The size and the zero
+of the two differ (other units, other fit shapes), which the correlation ignores.
+
+---- Helpers ----
+None.
+```
+
+#### `test_haem_amounts_fall_when_reduced`
+
+```text
+---- Summary ----
+Main function to check that our amount of a haem is lower once dithionite has
+reduced it fully than it was with oxygen, before the first addition, as the
+instrument's own trace is.
+
+---- Inputs ----
+haems : dict
+    Our amounts and the instrument's traces, from _haem_trace_loader.
+name : str
+    Name of the haem in our fit file.
+
+---- Globals read ----
+FIRST_ADDITION_SPECTRUM, WINDOW_SPECTRA (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+median of the last 2 min of the run (after the dithionite) - median of the 2 min
+before the first addition < 0.
+
+---- Helpers ----
+None.
+```
+
+#### `test_haem_shapes_are_those_of_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that the shape of a haem in our fit file is the shape the
+instrument's own fit file uses for it (shifted and scaled as the instrument does),
+whatever its size and whichever way up it is stored.
+
+---- Inputs ----
+name : str
+    Name of the haem in our fit file.
+
+---- Globals read ----
+FIT_FILE, INSTRUMENT_FIT_FILE, HAEM_TRACES, SAME_SHAPE (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Correlation of the two shapes at the instrument's wavelengths inside the range it
+fits over, where our file has the haem too: +1 or -1 for the same shape.
+
+---- Helpers ----
+_instrument_fit_reader
+```
+
+#### `test_instrument_traces_fall_when_reduced`
+
+```text
+---- Summary ----
+Main function to check that the instrument's own trace of a haem is lower once
+dithionite has reduced it fully than it was with oxygen, before the first
+addition: down is reduced.
+
+---- Inputs ----
+haems : dict
+    Our amounts and the instrument's traces, from _haem_trace_loader.
+name : str
+    Name of the haem in our fit file.
+
+---- Globals read ----
+FIRST_ADDITION_SPECTRUM, DITHIONITE_SPECTRUM, WINDOW_SPECTRA (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+median of the last 2 min of the run (after the dithionite) - median of the 2 min
+before the first addition < 0.
+
+---- Helpers ----
+None.
 ```
 
 ## `tests/test_paf_reader_parts.py`
@@ -8641,6 +8939,39 @@ watermark_style_builder
 
 Reading and processing of one experiment (everything before the figure and the export).
 
+### EXPERIMENT PROCESSING HELPERS
+
+#### `_skip_reporter`
+
+```text
+---- Summary ----
+Helper function to tell the user in plain words that a step was skipped for this
+file, why, and what to do.
+
+---- Inputs ----
+step : str
+    The step in plain words, to complete "Warning: ... was skipped".
+error : Exception
+    The error that stopped the step. The ValueError and PafError messages of the
+    processing steps are written for the user and are shown as they are; a
+    KeyError or TypeError is a fault in the program, whose raw text is not shown.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None. Prints the warning (side effect).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `event_settings_merger`
@@ -8711,6 +9042,7 @@ None. Processes the experiment dictionary in place (side effect).
 None.
 
 ---- Helpers ----
+_skip_reporter
 event_settings_merger
 experiment_attenuation_adder
 experiment_averages_calculator
@@ -10255,8 +10587,9 @@ None. Calls schema.measurement_columns.
 
 ---- Outputs ----
 dict
-    The same experiment dictionary. Raises KeyError if dilution_factor, OD or volume
-    is missing from the metadata, and ValueError if VoO2 has no measurement columns.
+    The same experiment dictionary. Raises ValueError, with a message for the user,
+    if dilution_factor, OD or volume is missing from the metadata, or if VoO2 has no
+    measurement columns.
 
 ---- Globals mutated ----
 experiment: adds VoO2_OD and, for each of haem_conc, haem_abs and haem_delta_abs
@@ -11550,11 +11883,11 @@ np.ndarray
 None.
 
 ---- Equations ----
-The columns are 1 and (1/wl^k - min) / (max - min) as in s_array_generator,
+The columns of background_builder (the same terms as the haem decomposition),
 orthonormalised by QR.
 
 ---- Helpers ----
-None.
+background_builder
 ```
 
 #### `_peak_finder`
@@ -11848,12 +12181,14 @@ dict
 None.
 
 ---- Equations ----
-B = [components, offset and scatter terms]; c = B^+ a (least squares) for each
-spectrum a; fitted = B c; residual = a - fitted; RMS = sqrt(mean(residual^2)).
+B = [components, offset and scatter terms]; c = the least-squares amounts of B in
+each spectrum a (basis_solver, the solver of the haem decomposition); fitted = B c;
+residual = a - fitted; RMS = sqrt(mean(residual^2)).
 
 ---- Helpers ----
 _nuisance_basis_builder
 _spectra_gridder
+basis_solver
 ```
 
 #### `fit_saver`
@@ -13239,6 +13574,78 @@ None.
 
 ### MAIN FUNCTIONS
 
+#### `background_builder`
+
+```text
+---- Summary ----
+Main function to build the background terms that every decomposition fits beside
+its shapes: a constant and the scatter terms.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths of the spectra (nm), shape (n_wavelengths).
+degree_of_scatter : int
+    Number of 1/wavelength^k scatter terms (>= 0).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The terms as columns, shape (n_wavelengths, degree_of_scatter + 1): the
+    constant 1 first, then scatter term k = 1, 2, ... Each scatter term runs from 1
+    at the shortest wavelength to 0 at the longest.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+scatter term k = (1/wl^k - min) / (max - min) of 1/wl^k.
+
+---- Helpers ----
+None.
+```
+
+#### `basis_solver`
+
+```text
+---- Summary ----
+Main function to find how much of each column of a basis (the shapes and the
+background terms) is in one spectrum, or in each spectrum of a run. It is the one
+solver of every decomposition in the program.
+
+---- Inputs ----
+basis : np.ndarray
+    The shapes to fit as columns, shape (n_wavelengths, n_components).
+spectra : np.ndarray
+    One spectrum, shape (n_wavelengths), or a run of them, shape (n_spectra,
+    n_wavelengths), on the wavelengths of the basis.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The amounts, shape (n_components) for one spectrum or (n_spectra,
+    n_components) for a run. A spectrum holding a blank value gives blank amounts
+    for that spectrum only. Raises ValueError, with a message for the user, when
+    there are fewer wavelengths than components or when the columns cannot be told
+    apart.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Least squares: the c that makes |B c - a| smallest. Each column of B is first
+divided by its length (root of its summed squares), so shapes on very different
+scales are solved equally well; B_scaled = U S V^T (singular value decomposition);
+c = V S^-1 U^T a / column length. S^T S is never inverted, as that squares the
+rounding errors.
+
+---- Helpers ----
+None.
+```
+
 #### `data_filterer`
 
 ```text
@@ -13354,15 +13761,18 @@ dict
 ---- Globals mutated ----
 experiment: adds haem_conc (time, spectrum index, one column per haem), haem_abs
 (mOD, same layout; attrs["peak_amplitude_OD"]) and haem_delta_abs
-(delta_abs_calculator).
+(delta_abs_calculator). The three are added together at the end; when anything
+fails, the experiment holds none of them, not even those of an earlier
+decomposition.
 
 ---- Equations ----
-c = (S^T S)^-1 S^T a for every spectrum (projector built once); haem_abs = c x peak
-amplitude of the haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs -
-mean of the highest window.
+c = the least-squares amounts of the basis S in every spectrum (basis_solver);
+haem_abs = c x peak amplitude of the haem basis spectrum x 1000 (OD to mOD);
+haem_delta_abs = haem_abs - mean of the highest window.
 
 ---- Helpers ----
 _wavelength_masker
+basis_solver
 delta_abs_calculator
 s_array_generator
 ```
@@ -13424,10 +13834,11 @@ np.ndarray
 None.
 
 ---- Equations ----
-haem column = -interp(fit) x haemfactor; scatter term k = (1/wl^k - min) / (max -
-min) of 1/wl^k.
+haem column = -interp(fit) x haemfactor; the constant and the scatter terms are
+those of background_builder.
 
 ---- Helpers ----
+background_builder
 data_filterer
 ```
 
@@ -13462,10 +13873,11 @@ List[np.ndarray], np.ndarray]
 None.
 
 ---- Equations ----
-c = (S^T S)^-1 S^T a, where S is the basis matrix and a the spectrum; residual = a -
-(haems + scatter).
+c = the least-squares amounts of the basis S in the spectrum a (basis_solver);
+residual = a - (haems + scatter).
 
 ---- Helpers ----
+basis_solver
 data_filterer
 s_array_generator
 ```
