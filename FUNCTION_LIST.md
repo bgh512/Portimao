@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.6
+- **Version:** V1.7
 - **Date:** 19/11/2026
 
 ## Contents
@@ -21,6 +21,54 @@
     - [`main`](#main)
     - [`program_runner`](#program_runner)
     - [`special_figures_maker`](#special_figures_maker)
+- [`tests/test_haem_decomposition.py`](#teststest_haem_decompositionpy)
+    - [`_background_builder`](#_background_builder)
+    - [`_haem_spectrum_builder`](#_haem_spectrum_builder)
+    - [`_mixed_spectra_builder`](#_mixed_spectra_builder)
+    - [`test_one_spectrum_gives_its_amounts_back`](#test_one_spectrum_gives_its_amounts_back)
+    - [`test_a_series_gives_its_amounts_back`](#test_a_series_gives_its_amounts_back)
+    - [`test_two_mixed_shapes_give_two_components`](#test_two_mixed_shapes_give_two_components)
+    - [`test_the_two_shapes_are_found_again`](#test_the_two_shapes_are_found_again)
+- [`tests/test_paf_reader_parts.py`](#teststest_paf_reader_partspy)
+    - [`test_additions_copies_are_joined`](#test_additions_copies_are_joined)
+    - [`test_additions_under_one_name_are_all_kept`](#test_additions_under_one_name_are_all_kept)
+    - [`test_addition_without_position_is_left_out`](#test_addition_without_position_is_left_out)
+    - [`test_spectrum_times_with_equal_counts`](#test_spectrum_times_with_equal_counts)
+    - [`test_spectrum_times_with_fewer_spectra`](#test_spectrum_times_with_fewer_spectra)
+    - [`test_spectrum_times_with_more_spectra`](#test_spectrum_times_with_more_spectra)
+    - [`test_transmission_from_the_stored_logarithms`](#test_transmission_from_the_stored_logarithms)
+    - [`test_transmission_is_empty_without_reference_counts`](#test_transmission_is_empty_without_reference_counts)
+    - [`test_trace_titles_follow_the_unit_of_the_file`](#test_trace_titles_follow_the_unit_of_the_file)
+- [`tests/test_paf_reading.py`](#teststest_paf_readingpy)
+    - [`_dataset_loader`](#_dataset_loader)
+    - [`_export_reader`](#_export_reader)
+    - [`_trace_export_reader`](#_trace_export_reader)
+    - [`_trace_loader`](#_trace_loader)
+    - [`test_known_file_counts`](#test_known_file_counts)
+    - [`test_spectra_counts_match_the_instrument`](#test_spectra_counts_match_the_instrument)
+    - [`test_transmission_matches_the_instrument`](#test_transmission_matches_the_instrument)
+    - [`test_intensity_matches_the_instrument`](#test_intensity_matches_the_instrument)
+    - [`test_attenuation_size_matches_the_instrument`](#test_attenuation_size_matches_the_instrument)
+    - [`test_attenuation_sign_matches_the_instrument`](#test_attenuation_sign_matches_the_instrument)
+    - [`test_spectra_parts_agree`](#test_spectra_parts_agree)
+    - [`test_times_and_wavelengths_run_in_order`](#test_times_and_wavelengths_run_in_order)
+    - [`test_traces_match_the_instrument`](#test_traces_match_the_instrument)
+    - [`test_loaded_traces_match_the_instrument`](#test_loaded_traces_match_the_instrument)
+- [`tests/test_processing_maths.py`](#teststest_processing_mathspy)
+    - [`_plateau_experiment_builder`](#_plateau_experiment_builder)
+    - [`_ramp_experiment_builder`](#_ramp_experiment_builder)
+    - [`test_attenuation_from_known_ratios`](#test_attenuation_from_known_ratios)
+    - [`test_attenuation_of_impossible_values`](#test_attenuation_of_impossible_values)
+    - [`test_attenuation_added_to_an_experiment`](#test_attenuation_added_to_an_experiment)
+    - [`test_normalising_by_od_volume_and_dilution`](#test_normalising_by_od_volume_and_dilution)
+    - [`test_percent_of_a_trace_with_plateaus`](#test_percent_of_a_trace_with_plateaus)
+    - [`test_percent_of_a_flat_trace`](#test_percent_of_a_flat_trace)
+    - [`test_window_mean_and_spread`](#test_window_mean_and_spread)
+    - [`test_averages_around_the_additions`](#test_averages_around_the_additions)
+    - [`test_average_that_does_not_fit`](#test_average_that_does_not_fit)
+    - [`test_trimming_keeps_exactly_the_chosen_times`](#test_trimming_keeps_exactly_the_chosen_times)
+    - [`test_trimming_never_cuts_an_addition`](#test_trimming_never_cuts_an_addition)
+    - [`test_trimming_the_end_only`](#test_trimming_the_end_only)
 - [`tests/test_question_flow.py`](#teststest_question_flowpy)
     - [`_binding_resolver`](#_binding_resolver)
     - [`_carrier_finder`](#_carrier_finder)
@@ -31,6 +79,14 @@
     - [`_tree_reader`](#_tree_reader)
     - [`test_question_texts_can_be_read`](#test_question_texts_can_be_read)
     - [`test_questions_are_in_the_list`](#test_questions_are_in_the_list)
+- [`tests/test_summary_maths.py`](#teststest_summary_mathspy)
+    - [`_run_builder`](#_run_builder)
+    - [`_spectra_experiment_builder`](#_spectra_experiment_builder)
+    - [`test_averaged_spectra_around_the_additions`](#test_averaged_spectra_around_the_additions)
+    - [`test_difference_of_two_known_spectra`](#test_difference_of_two_known_spectra)
+    - [`test_difference_needs_its_averages`](#test_difference_needs_its_averages)
+    - [`test_average_over_three_runs`](#test_average_over_three_runs)
+    - [`test_average_needs_two_runs`](#test_average_needs_two_runs)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
     - [`exemplar_config_builder`](#exemplar_config_builder)
     - [`haem_labeller`](#haem_labeller)
@@ -270,8 +326,12 @@
     - [`PafError`](#paferror)
     - [`Spectra`](#spectra)
     - [`PafFile`](#paffile)
+    - [`_event_lister`](#_event_lister)
+    - [`_spectrum_time_finder`](#_spectrum_time_finder)
+    - [`_trace_title_maker`](#_trace_title_maker)
+    - [`_transmission_converter`](#_transmission_converter)
+    - [`_unit_cleaner`](#_unit_cleaner)
     - [`dataset_namer`](#dataset_namer)
-    - [`experiment_end_trimmer`](#experiment_end_trimmer)
     - [`experiment_paf_loader`](#experiment_paf_loader)
     - [`experiment_summary_reader`](#experiment_summary_reader)
     - [`record_scanner`](#record_scanner)
@@ -979,6 +1039,1259 @@ ocr_and_haem_response_runner
 time_response_runner
 ```
 
+## `tests/test_haem_decomposition.py`
+
+Tests that the haem decomposition gives back the amounts a spectrum was built from, and
+
+### HELPERS
+
+#### `_background_builder`
+
+```text
+---- Summary ----
+Helper function to build the scatter background shape: it falls with wavelength
+from 1 at the shortest to 0 at the longest.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths (nm), shape (n_wavelengths).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The shape, shape (n_wavelengths).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+(1/wl - min(1/wl)) / (max(1/wl) - min(1/wl)).
+
+---- Helpers ----
+None.
+```
+
+#### `_haem_spectrum_builder`
+
+```text
+---- Summary ----
+Helper function to build one spectrum from known amounts of the five haems of the
+test fit file, on a flat and a sloping background.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
+
+---- Outputs ----
+Tuple[np.ndarray, np.ndarray, np.ndarray]
+    (wavelengths in nm, the spectrum, the haem shapes as columns); the wavelengths
+    are those of the fit file.
+
+---- Globals mutated ----
+None. Reads the fit file (side effect).
+
+---- Equations ----
+spectrum = -sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x background.
+The minus sign is the program's: its attenuation is log10(T).
+
+---- Helpers ----
+_background_builder
+```
+
+#### `_mixed_spectra_builder`
+
+```text
+---- Summary ----
+Helper function to build two files of 20 spectra each, every spectrum mixed from
+the same two shapes in its own amounts, on its own flat and sloping background,
+with a little noise. The second file also has a fixed extra bump in every spectrum,
+as a different preparation would.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+SEED, PEAKS_NM, WIDTHS_NM (module constants).
+
+---- Outputs ----
+Tuple[np.ndarray, np.ndarray, list]
+    (wavelengths 500 to 650 nm in 1 nm steps, the two shapes as columns, the two
+    files as the component finder takes them).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+shape = exp(-0.5 ((wl - peak) / width)^2); spectrum = a x shape_1 + b x shape_2 +
+offset + slope x background + noise (SD 0.0001), a and b between 0 and 1.
+
+---- Helpers ----
+_background_builder
+```
+
+### MAIN FUNCTIONS
+
+#### `test_one_spectrum_gives_its_amounts_back`
+
+```text
+---- Summary ----
+Main function to check that a spectrum built from known amounts of each haem and a
+known background decomposes into those amounts and that background, with nothing
+left over.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See _haem_spectrum_builder: the amounts found must be AMOUNTS, then OFFSET, then
+SLOPE.
+
+---- Helpers ----
+_haem_spectrum_builder
+```
+
+#### `test_a_series_gives_its_amounts_back`
+
+```text
+---- Summary ----
+Main function to check that a run of four spectra holding 1, 4, 3 and 2 times the
+known amounts decomposes into those amounts, and that the haem absorbances and
+their change from the highest point follow from them.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants); TIME_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+amount of haem i in a spectrum = its multiple x AMOUNTS_i; absorbance (mOD) =
+amount x highest point of |shape_i| x HAEM_FACTOR x 1000; change = absorbance - the
+highest absorbance of that haem (the second spectrum), so it is 0 there and
+negative elsewhere. The highest point is looked for in 30 s windows that must end
+before the run does, so the last spectrum can never be it.
+
+---- Helpers ----
+_background_builder
+_haem_spectrum_builder
+```
+
+#### `test_two_mixed_shapes_give_two_components`
+
+```text
+---- Summary ----
+Main function to check that spectra mixed from two shapes give two components and
+no more: the third is only noise, two is the number suggested, and a fixed bump in
+one file does not become a component.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The noise (SD 0.0001) is about a thousandth of the changes of the shapes, so the
+third component must hold less than a ten-thousandth of the variance of the second.
+
+---- Helpers ----
+_mixed_spectra_builder
+```
+
+#### `test_the_two_shapes_are_found_again`
+
+```text
+---- Summary ----
+Main function to check that the two components found are the two shapes the
+spectra were mixed from: each shape can be rebuilt from the components (once its
+own flat and sloping part is taken off, as the finder does), and the components
+have their peaks where the shapes have theirs.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PEAKS_NM (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+cleaned shape = shape - its best fit of (1, background); left over = cleaned shape
+- its best fit of the two components; the left over must be under 1 % of the
+cleaned shape (root of the summed squares).
+
+---- Helpers ----
+_background_builder
+_mixed_spectra_builder
+```
+
+## `tests/test_paf_reader_parts.py`
+
+Tests of the parts of the .paf reader that deal with unusual files, on made-up values
+
+### MAIN FUNCTIONS
+
+#### `test_additions_copies_are_joined`
+
+```text
+---- Summary ----
+Main function to check that the two stored copies of an addition (the first
+without a position) give one addition, in the order of their positions.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_additions_under_one_name_are_all_kept`
+
+```text
+---- Summary ----
+Main function to check that two additions stored under the same name stay two
+additions, each with its own text, and that the user is told.
+
+---- Inputs ----
+capsys : pytest.CaptureFixture
+    Catches what is printed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_addition_without_position_is_left_out`
+
+```text
+---- Summary ----
+Main function to check that an addition with no stored position is left out and
+that the user is told.
+
+---- Inputs ----
+capsys : pytest.CaptureFixture
+    Catches what is printed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_spectrum_times_with_equal_counts`
+
+```text
+---- Summary ----
+Main function to check that as many spectra as time points take the clock's times,
+in minutes, without a message.
+
+---- Inputs ----
+capsys : pytest.CaptureFixture
+    Catches what is printed.
+
+---- Globals read ----
+CLOCK_S (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+time (min) = time (s) / 60.
+
+---- Helpers ----
+None.
+```
+
+#### `test_spectrum_times_with_fewer_spectra`
+
+```text
+---- Summary ----
+Main function to check that fewer spectra than time points take the first times of
+the clock and that the user is told.
+
+---- Inputs ----
+capsys : pytest.CaptureFixture
+    Catches what is printed.
+
+---- Globals read ----
+CLOCK_S (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Four spectra on a clock of 0, 0.5, ... 2.5 s are at 0, 0.5, 1 and 1.5 s.
+
+---- Helpers ----
+None.
+```
+
+#### `test_spectrum_times_with_more_spectra`
+
+```text
+---- Summary ----
+Main function to check that more spectra than time points stop the file, with the
+file's name in the message.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CLOCK_S (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_transmission_from_the_stored_logarithms`
+
+```text
+---- Summary ----
+Main function to check the transmission worked out from the stored logarithms.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Counts of 50 and 400 over a reference of 100 and 200 give 0.5 and 2.
+
+---- Helpers ----
+None.
+```
+
+#### `test_transmission_is_empty_without_reference_counts`
+
+```text
+---- Summary ----
+Main function to check that the transmission is empty, never infinite, where the
+reference has zero counts, and is untouched at the other wavelengths.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+log10(0) is minus infinity: 50 counts over 0 would be infinite, and 0 over 0 has
+no value. Both are left empty. 50 over 100 is 0.5.
+
+---- Helpers ----
+None.
+```
+
+#### `test_trace_titles_follow_the_unit_of_the_file`
+
+```text
+---- Summary ----
+Main function to check the column titles of the traces: the oxygen titles carry
+the file's unit, written with the micro sign, and the OCR column keeps its name.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MICRO_SIGN, GREEK_MU (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_paf_reading.py`
+
+Tests that what is read from a .paf file equals the instrument software's own export of
+
+### HELPERS
+
+#### `_dataset_loader`
+
+```text
+---- Summary ----
+Helper function to read one spectrometer of the example run once for all the tests
+that use it.
+
+---- Inputs ----
+request : pytest.FixtureRequest
+    Gives the dataset name ('Cyt' or 'NADH').
+
+---- Globals read ----
+PAF_FILE, ROWS_AT_ONCE (module constants).
+
+---- Outputs ----
+Iterator[dict]
+    The dictionary of spectra_dataset_reader (with the intensity), plus 'name',
+    'reference_counts' (the stored reference spectrum as whole counts) and
+    'stored_error' (the largest difference between our attenuation and the stored
+    logarithm of each spectrum minus that of the reference).
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+stored attenuation = log10(counts) - log10(reference), both as stored in the file.
+
+---- Helpers ----
+None.
+```
+
+#### `_export_reader`
+
+```text
+---- Summary ----
+Helper function to open a spectrum file exported by the instrument software
+('Espana Spectrum' format). The test is skipped when the file is not there.
+
+---- Inputs ----
+path : Path
+    The exported file.
+
+---- Globals read ----
+EXPORT_MARK, EXPORT_HEADER_BYTES (module constants).
+
+---- Outputs ----
+Tuple[np.ndarray, np.ndarray, np.ndarray]
+    (spectrum numbers, wavelengths in nm, spectra as (n_spectra, n_wavelengths));
+    the spectra stay on disc and are read as they are used.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+The file is a 64 byte header (the mark as 4 whole numbers, then the version, the
+number of spectra NS, of wavelengths NW and of spectrum numbers NT, then zeros),
+NT whole numbers of 4 bytes, NW wavelengths of 8 bytes and NS x NW values of 8
+bytes: 64 + 4 NT + 8 NW + 8 NS NW bytes in all.
+
+---- Helpers ----
+None.
+```
+
+#### `_trace_export_reader`
+
+```text
+---- Summary ----
+Helper function to read a trace exported by the instrument software as text. The
+test is skipped when the file is not there.
+
+---- Inputs ----
+path : Path
+    The exported text file: a time (min) and a value on each line.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The times and the values, shape (n_points, 2). Lines without two numbers (the
+    export ends with one) are left out.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_trace_loader`
+
+```text
+---- Summary ----
+Helper function to read the traces and the times of the example run once.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PAF_FILE, TRACE_FILES (module constants).
+
+---- Outputs ----
+dict
+    {'time_s': the times in seconds, 'values': {trace name: one value per time,
+    blank where the file has none}, 'experiment': the experiment as the program
+    loads it, without its spectra}.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_known_file_counts`
+
+```text
+---- Summary ----
+Main function to check that the example run gives its known numbers of spectra,
+spectrometers and additions, and the additions at their known places.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PAF_FILE, EXPECTED_SPECTRA, EXPECTED_EVENTS, EXPECTED_STEP_S, TRACE_FILES (module
+constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+6,218 spectra 0.5 s apart last (6218 - 1) x 0.5 s = 3108.5 s = 51.808 min; an
+addition at spectrum n is at (n - 1) x 0.5 s.
+
+---- Helpers ----
+None.
+```
+
+#### `test_spectra_counts_match_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that we read as many spectra and wavelengths as the
+instrument exports, with the same spectrum numbers and the same wavelengths.
+
+---- Inputs ----
+dataset : dict
+    One spectrometer of the example run, from _dataset_loader.
+
+---- Globals read ----
+FOLDER, SPECTRA_FILES, EXPECTED_SPECTRA, EXPECTED_WAVELENGTHS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_export_reader
+```
+
+#### `test_transmission_matches_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that every transmission we read equals the instrument's.
+
+---- Inputs ----
+dataset : dict
+    One spectrometer of the example run, from _dataset_loader.
+
+---- Globals read ----
+FOLDER, SPECTRA_FILES, ROWS_AT_ONCE (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The two may differ by a millionth of a millionth of the value (the last digits a
+computer keeps), no more.
+
+---- Helpers ----
+_export_reader
+```
+
+#### `test_intensity_matches_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that every intensity (whole counts) we read equals the
+instrument's.
+
+---- Inputs ----
+dataset : dict
+    One spectrometer of the example run, from _dataset_loader.
+
+---- Globals read ----
+FOLDER, SPECTRA_FILES, ROWS_AT_ONCE (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_export_reader
+```
+
+#### `test_attenuation_size_matches_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that every attenuation we work out has the size of the
+instrument's own, whatever its sign.
+
+---- Inputs ----
+dataset : dict
+    One spectrometer of the example run, from _dataset_loader.
+
+---- Globals read ----
+FOLDER, SPECTRA_FILES, ROWS_AT_ONCE (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+|log10(T)| of ours against |attenuation| of the export, to 12 decimals.
+
+---- Helpers ----
+_export_reader
+```
+
+#### `test_attenuation_sign_matches_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that our attenuation has the sign of the instrument's own:
+more light than the reference gives a negative attenuation, less a positive one.
+
+---- Inputs ----
+dataset : dict
+    One spectrometer of the example run, from _dataset_loader.
+
+---- Globals read ----
+FOLDER, SPECTRA_FILES (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The instrument exports -log10(T); the first spectrum is enough to see the sign.
+
+---- Helpers ----
+_export_reader
+```
+
+#### `test_spectra_parts_agree`
+
+```text
+---- Summary ----
+Main function to check that the transmission, the intensity and the attenuation
+read from one file fit together.
+
+---- Inputs ----
+dataset : dict
+    One spectrometer of the example run, from _dataset_loader.
+
+---- Globals read ----
+ROWS_AT_ONCE (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+T = counts / reference counts. Both are whole numbers, each up to half a count
+off, so T may be off by T x (0.5 / counts + 0.5 / reference). Attenuation =
+log10(counts) - log10(reference) as stored in the file.
+
+---- Helpers ----
+None.
+```
+
+#### `test_times_and_wavelengths_run_in_order`
+
+```text
+---- Summary ----
+Main function to check that the times and wavelengths of the spectra run in order
+with no gaps, and that the spectra are numbered 1 to N.
+
+---- Inputs ----
+dataset : dict
+    One spectrometer of the example run, from _dataset_loader.
+
+---- Globals read ----
+EXPECTED_SPECTRA, EXPECTED_STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+time of spectrum n = (n - 1) x 0.5 s; a gap in the wavelengths would be a step of
+more than 1.5 x the usual one.
+
+---- Helpers ----
+None.
+```
+
+#### `test_traces_match_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that a trace read from the file has the instrument's value
+at every time, and has values at exactly the times the instrument exports.
+
+---- Inputs ----
+traces : dict
+    The traces of the example run, from _trace_loader.
+name : str
+    Name of the trace in the file.
+
+---- Globals read ----
+FOLDER, TRACE_FILES, ROUNDING (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The export has 3 decimals, so a time (min) or a value may differ by 0.0005.
+
+---- Helpers ----
+_trace_export_reader
+```
+
+#### `test_loaded_traces_match_the_instrument`
+
+```text
+---- Summary ----
+Main function to check that the oxygen tables the program works with (as loaded,
+with their times in minutes) equal the instrument's export row for row.
+
+---- Inputs ----
+traces : dict
+    The traces of the example run, from _trace_loader.
+name : str
+    Name of the table in the experiment.
+
+---- Globals read ----
+FOLDER, TRACE_FILES, LOADED_TRACES, ROUNDING, TIME_COLUMN (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The export has 3 decimals, so a time (min) or a value may differ by 0.0005.
+
+---- Helpers ----
+_trace_export_reader
+```
+
+## `tests/test_processing_maths.py`
+
+Tests that the attenuation, normalising, percent, averaging and trimming give the results
+
+### HELPERS
+
+#### `_plateau_experiment_builder`
+
+```text
+---- Summary ----
+Helper function to build an experiment whose oxygen consumption sits on three
+levels, with an addition at each change of level.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, VO2_COLUMN (module constants).
+
+---- Outputs ----
+dict
+    Experiment with a point every 0.5 min from 0 to 12 min; VoO2 is 10 before
+    4 min, 5 from 4 to 8 min and 2 from 8 min on; additions at 4 and 8 min.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_ramp_experiment_builder`
+
+```text
+---- Summary ----
+Helper function to build an experiment in which every value says which time it
+belongs to, so that a cut can be checked point by point.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, VO2_COLUMN (module constants).
+
+---- Outputs ----
+dict
+    Experiment with a point every minute from 0 to 10 min. VoO2 = 10 x time;
+    spectrum number = time + 1; the three transmissions of a spectrum are
+    time + 0.1, time + 0.2 and time + 0.3; additions at 3 and 6 min.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_attenuation_from_known_ratios`
+
+```text
+---- Summary ----
+Main function to check that light cut to a tenth and a hundredth gives -1 and -2,
+whether it is given as a fraction, as counts against a reference or as a percentage.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+attenuation = log10(T): log10(1) = 0, log10(0.1) = -1, log10(0.01) = -2. The
+program keeps this sign (the opposite of the textbook -log10(T)) on purpose.
+
+---- Helpers ----
+None.
+```
+
+#### `test_attenuation_of_impossible_values`
+
+```text
+---- Summary ----
+Main function to check that a transmission with no logarithm (zero, negative or
+missing) becomes a blank, and that an unknown kind of input is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_attenuation_added_to_an_experiment`
+
+```text
+---- Summary ----
+Main function to check that the attenuation stored in an experiment is the
+attenuation of its transmission, one value for each one.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+attenuation = log10(T).
+
+---- Helpers ----
+None.
+```
+
+#### `test_normalising_by_od_volume_and_dilution`
+
+```text
+---- Summary ----
+Main function to check that normalising divides by dilution factor x OD x volume,
+and leaves the times alone.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, VO2_COLUMN (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+With OD 2, volume 3 and dilution 2 the divisor is 12: 12 -> 1, 24 -> 2, 60 -> 5.
+
+---- Helpers ----
+None.
+```
+
+#### `test_percent_of_a_trace_with_plateaus`
+
+```text
+---- Summary ----
+Main function to check that a trace on three levels gives 0 % on its lowest level,
+100 % on its highest and the right share in between.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, VO2_COLUMN (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A point every 6 s for 12 min: 2 for the first 4 min, then 6, then 4 from 8 min.
+percent = (value - 2) / (6 - 2) x 100, so 2 -> 0, 6 -> 100 and 4 -> 50.
+
+---- Helpers ----
+None.
+```
+
+#### `test_percent_of_a_flat_trace`
+
+```text
+---- Summary ----
+Main function to check that a trace that never changes has no percent scale (every
+value blank), and that a window longer than the trace is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, VO2_COLUMN (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_window_mean_and_spread`
+
+```text
+---- Summary ----
+Main function to check the mean and spread of the values inside a time window,
+with a blank value, with one value and with none.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Values 1 to 6 at 0 to 5 min. From 1 to 3 min: 2, 3, 4 -> mean 3, spread
+sqrt((1 + 0 + 1) / 2) = 1. With a blank in the middle of 4, 5, 6: 4 and 6 -> mean
+5, spread sqrt((1 + 1) / 1) = 1.414.
+
+---- Helpers ----
+None.
+```
+
+#### `test_averages_around_the_additions`
+
+```text
+---- Summary ----
+Main function to check the averages before and after each addition, and their
+change from the first one.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Additions at 4 and 8 min, run ends at 12 min, 2 min windows ending 0.5 min before
+the next addition (or the end): 1.5 to 3.5, 5.5 to 7.5 and 9.5 to 11.5 min, where
+the trace is 10, 5 and 2. Change = 10/10, 5/10, 2/10 x 100 = 100, 50, 20 %;
+difference = 0, -5, -8.
+
+---- Helpers ----
+_plateau_experiment_builder
+```
+
+#### `test_average_that_does_not_fit`
+
+```text
+---- Summary ----
+Main function to check that an averaging window too long to fit between two
+additions is left out, and said to be, in place of reaching back over the addition.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A 4 min window ending at 7.5 min starts at 3.5 min, before the addition at 4 min;
+one ending at 11.5 min starts at 7.5 min, before the addition at 8 min. The first
+window (-0.5 to 3.5 min) holds only the level 10.
+
+---- Helpers ----
+_plateau_experiment_builder
+```
+
+#### `test_trimming_keeps_exactly_the_chosen_times`
+
+```text
+---- Summary ----
+Main function to check that cutting a run at 2 and 7 min keeps the points from 2 to
+7 min and no others, in the traces and in the spectra, and counts time from the cut.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, VO2_COLUMN (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Points at 0 to 10 min; kept: 2, 3, 4, 5, 6, 7 -> new times 0 to 5. Their values
+(10 x old time) are 20 to 70; their spectrum numbers 3 to 8; the additions at 3 and
+6 min move to 1 and 4 min.
+
+---- Helpers ----
+_ramp_experiment_builder
+```
+
+#### `test_trimming_never_cuts_an_addition`
+
+```text
+---- Summary ----
+Main function to check that a cut that would lose an addition, or that ends before
+it starts, is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The additions are at 3 and 6 min, so a start at 4 min or an end at 5 min loses one.
+
+---- Helpers ----
+_ramp_experiment_builder
+```
+
+#### `test_trimming_the_end_only`
+
+```text
+---- Summary ----
+Main function to check that cutting only the end at 7 min keeps the points from 0
+to 7 min with their times unchanged.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, VO2_COLUMN (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Points at 0 to 10 min; kept: 0 to 7 (eight points), values 0 to 70.
+
+---- Helpers ----
+_ramp_experiment_builder
+```
+
 ## `tests/test_question_flow.py`
 
 Tests that every question the program can ask is in QUESTION_FLOW.md, in the same words.
@@ -1250,6 +2563,212 @@ None.
 _list_reader
 _question_collector
 _question_matcher
+```
+
+## `tests/test_summary_maths.py`
+
+Tests that the averaged spectra, their difference and the averages over repeated runs
+
+### HELPERS
+
+#### `_run_builder`
+
+```text
+---- Summary ----
+Helper function to build one run that already has its averages, as the averaging
+step leaves them.
+
+---- Inputs ----
+name : str
+    Name of the run, ending in 'run<number>'.
+means : dict
+    {window name: mean of the oxygen consumption in that window}.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+dict
+    Experiment with 'averages'. In each window the spread is 0.1, the change is
+    10 x the mean and the difference is the mean - 1.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_spectra_experiment_builder`
+
+```text
+---- Summary ----
+Helper function to build an experiment whose spectra change at each of two
+additions.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    Experiment with a spectrum of three wavelengths every 0.5 min from 0 to
+    12 min and additions at 4 and 8 min. Before 4 min a spectrum is (t, 2 t, 0),
+    with t its time; from 4 to 8 min it is (1, 2, 3); from 8 min on (0.5, 1, 4).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_averaged_spectra_around_the_additions`
+
+```text
+---- Summary ----
+Main function to check the average spectrum, and its spread, in the window before
+each addition and in the last window.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+2 min windows ending 0.5 min before the next addition (or the end): 1.5 to 3.5,
+5.5 to 7.5 and 9.5 to 11.5 min, five spectra each. In the first, t = 1.5, 2, 2.5,
+3, 3.5: mean 2.5, spread sqrt((1 + 0.25 + 0 + 0.25 + 1) / 4) = 0.7906, so the
+spectrum (t, 2 t, 0) averages to (2.5, 5, 0) with spread (0.7906, 1.5811, 0).
+
+---- Helpers ----
+_spectra_experiment_builder
+```
+
+#### `test_difference_of_two_known_spectra`
+
+```text
+---- Summary ----
+Main function to check that the difference spectrum is the first averaged spectrum
+minus the second, for the usual pair (before and after the last addition) and for
+a pair chosen by name.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+(1, 2, 3) - (0.5, 1, 4) = (0.5, 1, -1); (2.5, 5, 0) - (1, 2, 3) = (1.5, 3, -3).
+
+---- Helpers ----
+_spectra_experiment_builder
+```
+
+#### `test_difference_needs_its_averages`
+
+```text
+---- Summary ----
+Main function to check that a difference is refused when the averaged spectra have
+not been worked out, when a window does not exist, and when the last window does
+not fit after the last addition.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A 4 min window ending at 11.5 min starts at 7.5 min, before the addition at 8 min.
+
+---- Helpers ----
+_spectra_experiment_builder
+```
+
+#### `test_average_over_three_runs`
+
+```text
+---- Summary ----
+Main function to check the mean, spread, standard error and number of runs over
+three repeats, and that a run without a window is left out of that window only.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+First window: 1, 2, 3 -> mean 2, spread sqrt((1 + 0 + 1) / 2) = 1, standard error
+1 / sqrt(3) = 0.5774, N 3. Second window (run 3 has none): 4, 6 -> mean 5, spread
+sqrt((1 + 1) / 1) = 1.4142, standard error 1.4142 / sqrt(2) = 1, N 2. The changes
+are 10 x the means, the differences the means - 1.
+
+---- Helpers ----
+_run_builder
+```
+
+#### `test_average_needs_two_runs`
+
+```text
+---- Summary ----
+Main function to check that a condition with a single run gives no average, and
+that two runs give a mean and spread but are kept apart from other conditions.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Knockdown: 10, 20 -> mean 15, spread sqrt((25 + 25) / 1) = 7.0711, N 2.
+
+---- Helpers ----
+_run_builder
 ```
 
 ## `utils_custom/custom_config.py`
@@ -7571,7 +9090,7 @@ resize figures, and tight cropping is off unless requested.
 fig : Figure
     Matplotlib figure to save.
 folder : Path
-    Output folder; created if missing.
+    Output folder; created if missing (not in preview mode).
 stem : str
     File name without the extension.
 formats : Sequence[str]
@@ -8841,6 +10360,7 @@ notes_reader
 spectra_dataset_reader
 stream_name_lister
 stream_reader
+stream_unit_reader
 ```
 
 ##### `__init__`
@@ -8944,7 +10464,7 @@ None.
 ---- Outputs ----
 List[dict]
     One dictionary per spectrometer: dataset, spectrometer, frames, wavelengths,
-    wavelength_range_nm, the parameters read from the file, and other_fields.
+    wavelength_range_nm and the parameters read from the file.
 
 ---- Globals mutated ----
 None.
@@ -9061,8 +10581,8 @@ None. Prints warnings (side effect).
 None.
 
 ---- Helpers ----
+_event_lister
 u32_reader
-warning_printer
 ```
 
 ##### `frame_counter`
@@ -9133,23 +10653,26 @@ chunk : int
     Number of spectra converted at a time (limits memory use).
 
 ---- Globals read ----
-LN10 (module constant).
+None.
 
 ---- Outputs ----
 dict
     {'wavelengths' (nm, n_wavelengths), 'spectrum_indices' (n_spectra), 'time'
-    (min, n_spectra; NaN if the time count differs), 'transmission' (n_spectra x
-    n_wavelengths)[, 'intensity']}; float64 copies. Raises PafError for an
-    unknown dataset.
+    (min, n_spectra), 'transmission' (n_spectra x n_wavelengths; NaN where it
+    cannot be worked out)[, 'intensity']}; float64 copies. Raises PafError for
+    an unknown dataset or one with more spectra than time points.
 
 ---- Globals mutated ----
-None. Prints a warning if spectrum times are unavailable (side effect).
+None. Prints a warning when there are fewer spectra than time points or when
+the transmission is empty at some wavelengths (side effect).
 
 ---- Equations ----
-transmission = 10^(log - log_ref) = exp((log - log_ref) ln 10); intensity =
-round(10^log). log is the stored log10 row and log_ref the stored reference row.
+intensity = round(10^log), log being the stored log10 row. The transmission is
+given under _transmission_converter.
 
 ---- Helpers ----
+_spectrum_time_finder
+_transmission_converter
 dataset_name_lister
 dataset_namer
 warning_printer
@@ -9197,7 +10720,198 @@ None.
 ---- Outputs ----
 Optional[np.ndarray]
     float64 array with one value per time point (NaN where the software has no
-    value, e.g. the start of VoO2), or None if the trace does not exist.
+    value, e.g. the start of VoO2, and at the end of a trace that is shorter
+    than the clock), or None if the trace does not exist.
+
+---- Globals mutated ----
+None. Prints a warning when more than SHORT_TRACE_FRACTION of the trace is
+missing (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+warning_printer
+```
+
+##### `stream_unit_reader`
+
+```text
+---- Summary ----
+Main method to give the unit the file stores for one trace.
+
+---- Inputs ----
+name : str
+    Trace name, e.g. 'CcO2'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The unit as written in the file (for example 'µM'), or an empty string when
+    the trace does not exist or has no unit.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### READER HELPERS
+
+#### `_event_lister`
+
+```text
+---- Summary ----
+Helper function to turn the stored copies of the text events (additions) into one
+entry per addition.
+
+---- Inputs ----
+found : Sequence[Tuple[str, str, int]]
+    One (name, text, position) per 'Text Event' record, in file order: the name the
+    software gives the event ('Event 1'), the text the user typed and the 1-based
+    spectrum number (0 in the template copy of an event).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[dict]
+    [{'name', 'text', 'datapoint'}] sorted by datapoint. A name stored at several
+    different positions gives one entry per position, each with the text stored
+    beside it. Names with no stored position are left out with a warning.
+
+---- Globals mutated ----
+None. Prints warnings (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+warning_printer
+```
+
+#### `_spectrum_time_finder`
+
+```text
+---- Summary ----
+Helper function to give the time of every spectrum of one spectrometer.
+
+---- Inputs ----
+time_s : np.ndarray
+    Clock of the recording in seconds, shape (n_timepoints,).
+n_spectra : int
+    Number of spectra of the spectrometer; the file numbers them 1 to n_spectra.
+dataset : str
+    Dataset name, for the messages.
+file_name : str
+    File name, for the messages.
+
+---- Globals read ----
+SEND_FILE_ADVICE (module constant).
+
+---- Outputs ----
+np.ndarray
+    Times in minutes, shape (n_spectra,). Raises PafError when there are more
+    spectra than time points, as the last spectra then have no time.
+
+---- Globals mutated ----
+None. Prints a warning when there are fewer spectra than time points (side
+effect).
+
+---- Equations ----
+time of spectrum i (min) = time_s[i - 1] / 60, for i = 1 to n_spectra.
+
+---- Helpers ----
+warning_printer
+```
+
+#### `_trace_title_maker`
+
+```text
+---- Summary ----
+Helper function to write the column title of one trace, with the unit the file
+stores for it.
+
+---- Inputs ----
+key : str
+    Trace name, a key of TRACE_COLUMNS ('CsO2', 'CcO2' or 'VoO2').
+unit : str
+    Unit as written in the file; may be empty.
+
+---- Globals read ----
+TRACE_COLUMNS, UNIT_IN_TITLE, FALLBACK_UNIT (module constants).
+
+---- Outputs ----
+str
+    For example 'Measured O2 (µM)'; with FALLBACK_UNIT when the file has no unit,
+    and without a unit for the traces not in UNIT_IN_TITLE ('VoO2').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_unit_cleaner
+```
+
+#### `_transmission_converter`
+
+```text
+---- Summary ----
+Helper function to work out the transmission of a block of spectra from the stored
+logarithms.
+
+---- Inputs ----
+log_counts : np.ndarray
+    Stored log10 of the counts, shape (n_spectra, n_wavelengths), float64.
+log_reference : np.ndarray
+    Stored log10 of the reference spectrum, shape (n_wavelengths,), float64.
+
+---- Globals read ----
+LN10 (module constant).
+
+---- Outputs ----
+np.ndarray
+    Transmission, shape (n_spectra, n_wavelengths), float64. NaN where it is not a
+    finite number, as where the reference has zero counts (its logarithm is then
+    not finite).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+transmission = 10^(log - log_ref) = exp((log - log_ref) ln 10).
+
+---- Helpers ----
+None.
+```
+
+#### `_unit_cleaner`
+
+```text
+---- Summary ----
+Helper function to write a unit from the file in one way, so that two spellings of
+the same unit compare equal.
+
+---- Inputs ----
+unit : str
+    Unit as written in the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The unit without spaces around it and with the Greek letter mu (U+03BC)
+    replaced by the micro sign (U+00B5).
 
 ---- Globals mutated ----
 None.
@@ -9240,39 +10954,6 @@ None.
 None.
 ```
 
-#### `experiment_end_trimmer`
-
-```text
----- Summary ----
-Main function to discard everything recorded after a given time.
-
----- Inputs ----
-experiment : dict
-    Experiment dictionary, as defined in DATA_FORMAT.md.
-end_time : float
-    Time in minutes after which data is removed.
-
----- Globals read ----
-schema.TIME_COLUMN.
-
----- Outputs ----
-dict
-    The same experiment dictionary, with the traces and spectra shortened and
-    metadata["trimmed_after_minutes"] set. The input is modified in place. Raises
-    ValueError if an event occurs later, a trace is left empty or spectrum times are
-    unavailable.
-
----- Globals mutated ----
-experiment: replaces CcO2, CsO2 and VoO2 and shortens the fields of every
-raw_spectra dataset; adds metadata["trimmed_after_minutes"].
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `experiment_paf_loader`
 
 ```text
@@ -9289,7 +10970,7 @@ with_intensity : bool
     True to also read the integer counts of each spectrum.
 
 ---- Globals read ----
-TRACE_COLUMNS (module constant), schema.TIME_COLUMN.
+TRACE_COLUMNS, TRACE_UNITS (module constants), schema.TIME_COLUMN.
 
 ---- Outputs ----
 dict
@@ -9298,19 +10979,22 @@ dict
     if the VoO2 trace is missing.
 
 ---- Globals mutated ----
-None. Prints warnings for missing traces and events outside the recording (side
-effect).
+None. Prints warnings for missing traces, units the figures do not expect and
+events outside the recording (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_trace_title_maker
+_unit_cleaner
 acquisition_reader
 dataset_name_lister
 events_reader
 notes_reader
 spectra_dataset_reader
 stream_reader
+stream_unit_reader
 warning_printer
 ```
 
@@ -9409,7 +11093,7 @@ None.
 ```text
 ---- Summary ----
 Main function to parse one 'Spectra: CCD' record: frame count, wavelength axis,
-log10 data block, acquisition parameters and trailer strings.
+log10 data block and acquisition parameters.
 
 ---- Inputs ----
 mm : mmap.mmap
@@ -9425,12 +11109,13 @@ None. Calls the Spectra class, token_reader, u32_reader and warning_printer.
 ---- Outputs ----
 Spectra
     Object with offset, name, nframes, npix, wl_off, wavelengths, data_off,
-    data_end, log (nrows x npix float32 view), rec_end, params, trailer, checks and
-    ref attributes. Raises PafError if the layout is not recognised, implausible or
+    data_end, log (nrows x npix float32 view), rec_end, params and checks
+    attributes. Raises PafError if the layout is not recognised, implausible or
     truncated.
 
 ---- Globals mutated ----
-None. Prints a warning for unexpected trailing bytes (side effect).
+None. Prints a warning for unexpected trailing bytes and for a first stored row
+that is not all zeros (side effect).
 
 ---- Equations ----
 None.

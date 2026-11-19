@@ -151,7 +151,7 @@ def figure_saver(fig: Figure,
     fig : Figure
         Matplotlib figure to save.
     folder : Path
-        Output folder; created if missing.
+        Output folder; created if missing (not in preview mode).
     stem : str
         File name without the extension.
     formats : Sequence[str]
@@ -181,15 +181,15 @@ def figure_saver(fig: Figure,
     None.
     """
 
-    # ---- 1 Prepare the folder and size -----------------------------------------------
-    folder = Path(folder)
-    folder.mkdir(parents=True, exist_ok=True)
+    # ---- 1 Pin the size, and only show the figure in preview mode --------------------
     fig.set_size_inches(*size, forward=False)
     if _figure_capture is not None:  # preview mode: show the figure, write nothing
         _figure_capture(fig, stem)
         return []
 
     # ---- 2 Save every format ---------------------------------------------------------
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
     paths = []
     for extension in formats:
         path = folder / f'{stem}.{extension}'

@@ -12,8 +12,8 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 |---|---|---|---|---|
 | `'experiment_name'` | str | | | File stem of the `.paf` file |
 | `'metadata'` | dict | | | `'OD'`, `'volume'`, `'dilution_factor'`, `'events'`, `'ignored_events'` and acquisition details |
-| `'CcO2'` | pd.DataFrame | (n_points, 2) | uM | Measured O2: `Time (min)` and the measurement column |
-| `'CsO2'` | pd.DataFrame | (n_points, 2) | uM | Set O2 |
+| `'CcO2'` | pd.DataFrame | (n_points, 2) | µM | Measured O2: `Time (min)` and the measurement column, titled with the unit stored in the file (`Measured O2 (µM)`; `uM` when the file stores none) |
+| `'CsO2'` | pd.DataFrame | (n_points, 2) | µM | Set O2, titled in the same way (`Set O2 (µM)`) |
 | `'VoO2'` | pd.DataFrame | (n_points, 2) | uM/min | Oxygen consumption rate (OCR) |
 | `'VoO2_OD'` | pd.DataFrame | (n_points, 2) | | Optional. OCR divided by dilution factor x OD x volume |
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
@@ -22,7 +22,7 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the mean of its highest 30 s window (outside the ignored start and end) is 0 |
 | `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. The matching tables divided by dilution factor x OD x volume |
 | `'haem_percent'` | pd.DataFrame | (n_spectra, 2 + n_haems) | % | Optional. `haem_conc` scaled to 0-100 % |
-| `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; dropped after the special figures are prepared |
+| `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; every spectrum has a time, and the transmission is NaN where it cannot be worked out (zero counts in the reference); dropped after the special figures are prepared |
 | `'averages'` | dict | | | Event-window statistics (see `averages`) |
 
 Example:
@@ -238,9 +238,7 @@ Defined in `utils_shared/paf_reader.py`. Created by `spectra_parser`, used by `r
 | `data_end` | int | | bytes | `0` | End of the spectra block |
 | `log` | Optional[np.ndarray] | (nframes + 2, npix) | | `None` | Raw rows: dark row, reference row, then one row per spectrum |
 | `rec_end` | int | | bytes | `0` | End of the record |
-| `ref` | Optional[np.ndarray] | (npix,) | | `None` | Reference spectrum |
 | `params` | dict | | | `{}` | Acquisition parameters found in the record |
-| `trailer` | list | | | `[]` | Text tokens after the data block |
 | `checks` | dict | | | `{}` | Warnings raised while parsing |
 
 #### `PreviewSpec`

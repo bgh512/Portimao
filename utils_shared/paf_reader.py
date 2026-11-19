@@ -19,8 +19,25 @@ import pandas as pd
 from utils_shared.schema import TIME_COLUMN
 
 
+# Layout of a .paf file, as this reader understands it:
+# * The file is a flat series of records, each starting 06 'Espana' 00 00 00 00 00 + a
+#   16-byte class GUID. A header of length-prefixed UTF-16 strings follows
+#   (02 00 00 00, nchars:u32, chars): type ('DataItem', 'Measurement', 'Spectra: CCD',
+#   'Text Event', 'PaneNote', ...), vendor, name.
+# * 'DataItem' + the 'Measurement' after it = one trace: the sample count n sits twice
+#   (at -28 and -20 from the DataItem's end); the Measurement ends with n float32
+#   values + 8 bytes. The Time trace is in seconds (0.5 s steps).
+# * 'Spectra: CCD' = one spectrometer: nframes, npix, a 1..nframes index table, a
+#   parameter block, npix float32 wavelengths, then (nframes + 2) rows of npix
+#   float32: zeros, log10(reference spectrum), then log10(counts) of every frame.
+#   transmission = 10**(row - reference), intensity = round(10**row).
+# * 'Text Event': the spectrum number (u32) of the event is stored 20 bytes after the
+#   end of its name string (zero in the first, template copy of each event; the second
+#   copy holds the real value).
+
+
 # ---- CONSTANTS -----------------------------------------------------------------------
-MARK = b'\x06Espana\x00\x00\x00\x00\x00'
+MARK =b'\x06Espana\x00\x00\x00\x00\x00'
 
 # harmless, seen in most files, not worth showing
 QUIET_WARNINGS = ('DataItem counts disagree',)
@@ -29,7 +46,21 @@ QUIET_WARNINGS = ('DataItem counts disagree',)
 DATASET_ALIAS = {'Cytochromes': 'Cyt'}
 LN10 = float(np.log(10.0))
 
-TRACE_COLUMNS = {'CsO2': 'Set O2 (uM)', 'CcO2': 'Measured O2 (uM)', 'VoO2': 'VoO2'}
+TRACE_COLUMNS = {'CsO2': 'Set O2', 'CcO2': 'Measured O2', 'VoO2': 'VoO2'}
+# unit the rest of the program assumes for each trace (the figure labels are written
+# for these)
+TRACE_UNITS = {'CsO2': 'µM', 'CcO2': 'µM', 'VoO2': 'µM/min'}
+# traces whose column title carries the unit; the VoO2 column is looked up by its name
+UNIT_IN_TITLE = ('CsO2', 'CcO2')
+# written in a title when the file stores no unit for the trace
+FALLBACK_UNIT = 'uM'
+
+# a trace covers the recording when it has at least this fraction of the clock's length
+MIN_TRACE_FRACTION = 0.9
+# a trace missing more than this fraction of the clock's length is reported
+SHORT_TRACE_FRACTION = 0.01
+
+SEND_FILE_ADVICE = 'Please send the file to the person who looks after this program.'
 
 
 # ---- PafError ------------------------------------------------------------------------
@@ -69,9 +100,7 @@ class Spectra:
     data_end: int = 0
     log: Optional[np.ndarray] = None
     rec_end: int = 0
-    ref: Optional[np.ndarray] = None
     params: dict = field(default_factory=dict)
-    trailer: list = field(default_factory=list)
     checks: dict = field(default_factory=dict)
 
 
@@ -110,6 +139,7 @@ class PafFile:
     spectra_dataset_reader
     stream_name_lister
     stream_reader
+    stream_unit_reader
     """
 
     # ---- __init__ --------------------------------------------------------------------
@@ -163,10 +193,11 @@ class PafFile:
                 raise PafError(f'{self.path.name}: no Time stream found')
             main = max(times, key=lambda s: s['n'])
             self.time_s = np.array(main['values'], dtype=float)
+            # a file can hold its clock twice; no copy of it is a trace to show
             self._main = {}
             for s in self._streams:
-                if (s is not main and
-                    s['n'] >= 0.9 * len(self.time_s) and
+                if (s['name'] != 'Time' and
+                    s['n'] >= MIN_TRACE_FRACTION * len(self.time_s) and
                     s['name'] not in self._main
                     ):
                     self._main[s['name']] = s
@@ -256,7 +287,7 @@ class PafFile:
         ---- Outputs ----
         List[dict]
             One dictionary per spectrometer: dataset, spectrometer, frames, wavelengths,
-            wavelength_range_nm, the parameters read from the file, and other_fields.
+            wavelength_range_nm and the parameters read from the file.
 
         ---- Globals mutated ----
         None.
@@ -276,7 +307,6 @@ class PafFile:
                                          round(float(sp.wavelengths[-1]), 2),
                                          ],
                  **sp.params,
-                 'other_fields': list(sp.trailer),
                  }
                 for sp in self.spectra
                 ]
@@ -401,42 +431,19 @@ class PafFile:
         None.
 
         ---- Helpers ----
+        _event_lister
         u32_reader
-        warning_printer
         """
 
-        # ---- 1 Group the records by event --------------------------------------------
-        groups = {}
+        found = []
         for r in self.records:
             if r['type'] != 'Text Event' or len(r['tokens']) < 4:
                 continue
             name, text = r['tokens'][2], r['tokens'][3]
             vpos = name[2] + 20
             value = u32_reader(self._mm, vpos) if vpos + 4 <= text[1] else 0
-            g = groups.setdefault(name[0],
-                                  {'name': name[0], 'text': text[0], 'values': []},
-                                  )
-            g['values'].append(value)
-
-        # ---- 2 Build the event list --------------------------------------------------
-        events = []
-        for g in groups.values():
-            nonzero = sorted({v for v in g['values'] if v})
-            if not nonzero:
-                warning_printer(f"event {g['name']!r} has no stored position and is "
-                                f'ignored',
-                                )
-                continue
-            if len(nonzero) > 1:
-                warning_printer(f"event {g['name']!r} has several stored positions "
-                                f'{nonzero}; the first is used',
-                                )
-            events.append({'name': g['name'],
-                           'text': g['text'],
-                           'datapoint': int(nonzero[0]),
-                           },
-                          )
-        return sorted(events, key=lambda e: e['datapoint'])
+            found.append((name[0], text[0], value))
+        return _event_lister(found)
 
     # ---- frame_counter ---------------------------------------------------------------
     @property
@@ -522,23 +529,26 @@ class PafFile:
             Number of spectra converted at a time (limits memory use).
 
         ---- Globals read ----
-        LN10 (module constant).
+        None.
 
         ---- Outputs ----
         dict
             {'wavelengths' (nm, n_wavelengths), 'spectrum_indices' (n_spectra), 'time'
-            (min, n_spectra; NaN if the time count differs), 'transmission' (n_spectra x
-            n_wavelengths)[, 'intensity']}; float64 copies. Raises PafError for an
-            unknown dataset.
+            (min, n_spectra), 'transmission' (n_spectra x n_wavelengths; NaN where it
+            cannot be worked out)[, 'intensity']}; float64 copies. Raises PafError for
+            an unknown dataset or one with more spectra than time points.
 
         ---- Globals mutated ----
-        None. Prints a warning if spectrum times are unavailable (side effect).
+        None. Prints a warning when there are fewer spectra than time points or when
+        the transmission is empty at some wavelengths (side effect).
 
         ---- Equations ----
-        transmission = 10^(log - log_ref) = exp((log - log_ref) ln 10); intensity =
-        round(10^log). log is the stored log10 row and log_ref the stored reference row.
+        intensity = round(10^log), log being the stored log10 row. The transmission is
+        given under _transmission_converter.
 
         ---- Helpers ----
+        _spectrum_time_finder
+        _transmission_converter
         dataset_name_lister
         dataset_namer
         warning_printer
@@ -552,29 +562,32 @@ class PafFile:
                            f"{', '.join(self.dataset_name_lister()) or 'none'}",
                            )
 
-        # ---- 2 Read the spectra in chunks --------------------------------------------
+        # ---- 2 Find the time of every spectrum ---------------------------------------
+        # before the spectra are read, so a file that is refused costs no memory
+        times = _spectrum_time_finder(self.time_s, sp.nframes, name, self.path.name)
+
+        # ---- 3 Read the spectra in chunks --------------------------------------------
         transmission = np.empty((sp.nframes, sp.npix))
         intensity = np.empty((sp.nframes, sp.npix)) if with_intensity else None
         ref = sp.log[1].astype('f8')
+        is_empty = np.zeros(sp.npix, dtype=bool)
         for i0 in range(0, sp.nframes, chunk):
             i1 = min(sp.nframes, i0 + chunk)
             lg = sp.log[2 + i0:2 + i1].astype('f8')
-            # matches the software's export to 1 ulp
-            transmission[i0:i1] = np.exp((lg - ref[None, :]) * LN10)
+            transmission[i0:i1] = _transmission_converter(lg, ref)
+            is_empty |= np.isnan(transmission[i0:i1]).any(axis=0)
             if with_intensity:
                 raw = 10.0 ** lg
                 raw[~np.isfinite(raw)] = 0.0
                 # identical to the software's integer counts
                 intensity[i0:i1] = np.round(raw)
-
-        # ---- 3 Check the time axis ---------------------------------------------------
-        times = (self.time_s / 60.0
-                 if len(self.time_s) == sp.nframes
-                 else np.full(sp.nframes, np.nan)
-                 )
-        if not np.all(np.isfinite(times)):
-            warning_printer(f'{name}: {sp.nframes} spectra but {len(self.time_s)} time'
-                            f' points; spectrum times are unavailable',
+        if is_empty.any():
+            empty_nm = np.asarray(sp.wavelengths, dtype=float)[is_empty]
+            warning_printer(f'{self.path.name}, {name}: the transmission cannot be '
+                            f'worked out at {int(is_empty.sum())} wavelengths (between '
+                            f'{empty_nm.min():.0f} and {empty_nm.max():.0f} nm), most '
+                            f'likely because the reference spectrum has no counts '
+                            f'there. It is left empty at these wavelengths.',
                             )
 
         # ---- 4 Assemble the output ---------------------------------------------------
@@ -631,7 +644,55 @@ class PafFile:
         ---- Outputs ----
         Optional[np.ndarray]
             float64 array with one value per time point (NaN where the software has no
-            value, e.g. the start of VoO2), or None if the trace does not exist.
+            value, e.g. the start of VoO2, and at the end of a trace that is shorter
+            than the clock), or None if the trace does not exist.
+
+        ---- Globals mutated ----
+        None. Prints a warning when more than SHORT_TRACE_FRACTION of the trace is
+        missing (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        warning_printer
+        """
+
+        s = self._main.get(name)
+        if s is None:
+            return None
+        # A shorter trace is lined up from the start: the software stores the values
+        # it does not have at the start (VoO2, DgO2, VrO2) as NaN, so only the end is
+        # short. Its own export of these traces has the same values at the same times.
+        out = np.full(len(self.time_s), np.nan)
+        n = min(len(out), s['n'])
+        out[:n] = np.asarray(s['values'][:n], dtype=float)
+        n_missing = len(out) - n
+        if n_missing > SHORT_TRACE_FRACTION * len(out):
+            step_s = float(np.nanmedian(np.diff(self.time_s)))
+            warning_printer(f'{self.path.name}: the {name} trace is {n_missing} points '
+                            f'shorter than the recording, so its last '
+                            f'{n_missing * step_s:.0f} s are left empty.',
+                            )
+        return out
+
+    # ---- stream_unit_reader ----------------------------------------------------------
+    def stream_unit_reader(self, name: str) -> str:
+        """
+        ---- Summary ----
+        Main method to give the unit the file stores for one trace.
+
+        ---- Inputs ----
+        name : str
+            Trace name, e.g. 'CcO2'.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        str
+            The unit as written in the file (for example 'µM'), or an empty string when
+            the trace does not exist or has no unit.
 
         ---- Globals mutated ----
         None.
@@ -643,13 +704,233 @@ class PafFile:
         None.
         """
 
-        s = self._main.get(name)
-        if s is None:
-            return None
-        out = np.full(len(self.time_s), np.nan)
-        n = min(len(out), s['n'])
-        out[:n] = np.asarray(s['values'][:n], dtype=float)
-        return out
+        return str(self._main.get(name, {}).get('unit', '')).strip()
+
+
+# ---- READER HELPERS ------------------------------------------------------------------
+
+
+# ---- _event_lister -------------------------------------------------------------------
+def _event_lister(found: Sequence[Tuple[str, str, int]]) -> List[dict]:
+    """
+    ---- Summary ----
+    Helper function to turn the stored copies of the text events (additions) into one
+    entry per addition.
+
+    ---- Inputs ----
+    found : Sequence[Tuple[str, str, int]]
+        One (name, text, position) per 'Text Event' record, in file order: the name the
+        software gives the event ('Event 1'), the text the user typed and the 1-based
+        spectrum number (0 in the template copy of an event).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[dict]
+        [{'name', 'text', 'datapoint'}] sorted by datapoint. A name stored at several
+        different positions gives one entry per position, each with the text stored
+        beside it. Names with no stored position are left out with a warning.
+
+    ---- Globals mutated ----
+    None. Prints warnings (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    warning_printer
+    """
+
+    # ---- 1 Collect the positions stored under each name ------------------------------
+    groups = {}
+    for name, text, position in found:
+        positions = groups.setdefault(name, {})
+        # the copies of one addition repeat its position; the first text is kept
+        if position and position not in positions:
+            positions[position] = text
+
+    # ---- 2 Build the list ------------------------------------------------------------
+    events = []
+    for name, positions in groups.items():
+        if not positions:
+            warning_printer(f'the addition {name!r} has no stored position in the '
+                            f'file and is left out',
+                            )
+            continue
+        if len(positions) > 1:
+            warning_printer(f'the file stores {len(positions)} additions under the '
+                            f'name {name!r} (at spectra {sorted(positions)}); each is '
+                            f'kept as an addition of its own',
+                            )
+        for position, text in positions.items():
+            events.append({'name': name, 'text': text, 'datapoint': int(position)})
+    return sorted(events, key=lambda e: e['datapoint'])
+
+
+# ---- _spectrum_time_finder -----------------------------------------------------------
+def _spectrum_time_finder(time_s: np.ndarray,
+                          n_spectra: int,
+                          dataset: str,
+                          file_name: str,
+                          ) -> np.ndarray:
+    """
+    ---- Summary ----
+    Helper function to give the time of every spectrum of one spectrometer.
+
+    ---- Inputs ----
+    time_s : np.ndarray
+        Clock of the recording in seconds, shape (n_timepoints,).
+    n_spectra : int
+        Number of spectra of the spectrometer; the file numbers them 1 to n_spectra.
+    dataset : str
+        Dataset name, for the messages.
+    file_name : str
+        File name, for the messages.
+
+    ---- Globals read ----
+    SEND_FILE_ADVICE (module constant).
+
+    ---- Outputs ----
+    np.ndarray
+        Times in minutes, shape (n_spectra,). Raises PafError when there are more
+        spectra than time points, as the last spectra then have no time.
+
+    ---- Globals mutated ----
+    None. Prints a warning when there are fewer spectra than time points (side
+    effect).
+
+    ---- Equations ----
+    time of spectrum i (min) = time_s[i - 1] / 60, for i = 1 to n_spectra.
+
+    ---- Helpers ----
+    warning_printer
+    """
+
+    n_times = len(time_s)
+    if n_spectra > n_times:
+        raise PafError(f'{file_name}: the {dataset} spectrometer has {n_spectra} '
+                       f'spectra but the recording has only {n_times} time points, so '
+                       f'its last spectra have no time. This file cannot be '
+                       f'processed. {SEND_FILE_ADVICE}',
+                       )
+    if n_spectra < n_times:
+        warning_printer(f'{file_name}: the {dataset} spectrometer has {n_spectra} '
+                        f'spectra but the recording has {n_times} time points. '
+                        f'Spectrum 1 is taken to belong to the first time point and so '
+                        f'on, so the last {n_times - n_spectra} time points have no '
+                        f'spectrum.',
+                        )
+    return np.asarray(time_s[:n_spectra], dtype=float) / 60.0
+
+
+# ---- _trace_title_maker --------------------------------------------------------------
+def _trace_title_maker(key: str, unit: str) -> str:
+    """
+    ---- Summary ----
+    Helper function to write the column title of one trace, with the unit the file
+    stores for it.
+
+    ---- Inputs ----
+    key : str
+        Trace name, a key of TRACE_COLUMNS ('CsO2', 'CcO2' or 'VoO2').
+    unit : str
+        Unit as written in the file; may be empty.
+
+    ---- Globals read ----
+    TRACE_COLUMNS, UNIT_IN_TITLE, FALLBACK_UNIT (module constants).
+
+    ---- Outputs ----
+    str
+        For example 'Measured O2 (µM)'; with FALLBACK_UNIT when the file has no unit,
+        and without a unit for the traces not in UNIT_IN_TITLE ('VoO2').
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _unit_cleaner
+    """
+
+    if key not in UNIT_IN_TITLE:
+        return TRACE_COLUMNS[key]
+    return f'{TRACE_COLUMNS[key]} ({_unit_cleaner(unit) or FALLBACK_UNIT})'
+
+
+# ---- _transmission_converter ---------------------------------------------------------
+def _transmission_converter(log_counts: np.ndarray,
+                            log_reference: np.ndarray,
+                            ) -> np.ndarray:
+    """
+    ---- Summary ----
+    Helper function to work out the transmission of a block of spectra from the stored
+    logarithms.
+
+    ---- Inputs ----
+    log_counts : np.ndarray
+        Stored log10 of the counts, shape (n_spectra, n_wavelengths), float64.
+    log_reference : np.ndarray
+        Stored log10 of the reference spectrum, shape (n_wavelengths,), float64.
+
+    ---- Globals read ----
+    LN10 (module constant).
+
+    ---- Outputs ----
+    np.ndarray
+        Transmission, shape (n_spectra, n_wavelengths), float64. NaN where it is not a
+        finite number, as where the reference has zero counts (its logarithm is then
+        not finite).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    transmission = 10^(log - log_ref) = exp((log - log_ref) ln 10).
+
+    ---- Helpers ----
+    None.
+    """
+
+    with np.errstate(over='ignore', invalid='ignore'):
+        # this form matches the software's export to 1 ulp
+        transmission = np.exp((log_counts - log_reference[None, :]) * LN10)
+    transmission[~np.isfinite(transmission)] = np.nan
+    return transmission
+
+
+# ---- _unit_cleaner -------------------------------------------------------------------
+def _unit_cleaner(unit: str) -> str:
+    """
+    ---- Summary ----
+    Helper function to write a unit from the file in one way, so that two spellings of
+    the same unit compare equal.
+
+    ---- Inputs ----
+    unit : str
+        Unit as written in the file.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        The unit without spaces around it and with the Greek letter mu (U+03BC)
+        replaced by the micro sign (U+00B5).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return unit.strip().replace('μ', 'µ')
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -687,98 +968,6 @@ def dataset_namer(spectra_name: str) -> str:
     return DATASET_ALIAS.get(spectra_name, re.sub(r'\W+', '_', spectra_name))
 
 
-# ---- experiment_end_trimmer ----------------------------------------------------------
-def experiment_end_trimmer(experiment: dict, end_time: float) -> dict:
-    """
-    ---- Summary ----
-    Main function to discard everything recorded after a given time.
-
-    ---- Inputs ----
-    experiment : dict
-        Experiment dictionary, as defined in DATA_FORMAT.md.
-    end_time : float
-        Time in minutes after which data is removed.
-
-    ---- Globals read ----
-    schema.TIME_COLUMN.
-
-    ---- Outputs ----
-    dict
-        The same experiment dictionary, with the traces and spectra shortened and
-        metadata["trimmed_after_minutes"] set. The input is modified in place. Raises
-        ValueError if an event occurs later, a trace is left empty or spectrum times are
-        unavailable.
-
-    ---- Globals mutated ----
-    experiment: replaces CcO2, CsO2 and VoO2 and shortens the fields of every
-    raw_spectra dataset; adds metadata["trimmed_after_minutes"].
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    # ---- 1 Check the events ----------------------------------------------------------
-    name = experiment['experiment_name']
-    late = [e for e in experiment['metadata'].get('events', []) if e['time'] > end_time]
-    if late:
-        raise ValueError(f'{name}: cannot trim at {end_time:g} min because {len(late)}'
-                         f' event(s) occur later.',
-                         )
-
-    # ---- 2 Trim the data tables ------------------------------------------------------
-    for key in ('CcO2', 'CsO2', 'VoO2'):
-        frame = experiment.get(key)
-        if frame is None:
-            continue
-        keep_rows = frame[TIME_COLUMN].to_numpy(dtype=float) <= end_time
-        trimmed = frame.loc[keep_rows].reset_index(drop=True)
-        if trimmed.empty:
-            raise ValueError(f'{name}: trimming {key} at {end_time:g} min leaves no '
-                             f'data.',
-                             )
-        experiment[key] = trimmed
-
-    # ---- 3 Trim the raw spectra ------------------------------------------------------
-    for dataset_name_, dataset in experiment['raw_spectra'].items():
-        if not np.all(np.isfinite(dataset['time'])):
-            raise ValueError(f'{name}/{dataset_name_}: cannot trim because spectrum '
-                             f'times are unavailable.',
-                             )
-        keep = dataset['time'] <= end_time
-        for key in ('spectrum_indices',
-                    'time',
-                    'transmission',
-                    'intensity',
-                    'attenuation',
-                    ):
-            if key in dataset:
-                dataset[key] = dataset[key][keep]
-
-    # ---- 4 Record the trim -----------------------------------------------------------
-    experiment['metadata']['trimmed_after_minutes'] = end_time
-    return experiment
-# * The file is a flat series of records, each starting 06 'Espana' 00 00 00 00 00 + a
-# 16-byte class GUID. A header of
-# length-prefixed UTF-16 strings follows (02 00 00 00, nchars:u32, chars): type
-# ('DataItem', 'Measurement', 'Spectra: CCD',
-#   'Text Event', 'PaneNote', ...), vendor, name.
-# * 'DataItem' + the 'Measurement' after it = one trace: the sample count n sits twice
-# (at -28 and -20 from the DataItem's end);
-# the Measurement ends with n float32 values + 8 bytes. The Time trace is in seconds
-# (0.5 s steps).
-# * 'Spectra: CCD' = one spectrometer: nframes, npix, a 1..nframes index table, a
-# parameter block, npix float32 wavelengths, then
-# (nframes + 2) rows of npix float32: zeros, log10(reference spectrum), then
-# log10(counts) of every frame.
-#   transmission = 10**(row - reference), intensity = round(10**row).
-# * 'Text Event': the spectrum number (u32) of the event is stored 20 bytes after the
-# end of its name string (zero in the
-#   first, template copy of each event; the second copy holds the real value).
-
-
 # ---- experiment_paf_loader -----------------------------------------------------------
 def experiment_paf_loader(path: Union[str, Path],
                           spectral_datasets: Optional[Sequence[str]] = ('Cyt',),
@@ -798,7 +987,7 @@ def experiment_paf_loader(path: Union[str, Path],
         True to also read the integer counts of each spectrum.
 
     ---- Globals read ----
-    TRACE_COLUMNS (module constant), schema.TIME_COLUMN.
+    TRACE_COLUMNS, TRACE_UNITS (module constants), schema.TIME_COLUMN.
 
     ---- Outputs ----
     dict
@@ -807,19 +996,22 @@ def experiment_paf_loader(path: Union[str, Path],
         if the VoO2 trace is missing.
 
     ---- Globals mutated ----
-    None. Prints warnings for missing traces and events outside the recording (side
-    effect).
+    None. Prints warnings for missing traces, units the figures do not expect and
+    events outside the recording (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _trace_title_maker
+    _unit_cleaner
     acquisition_reader
     dataset_name_lister
     events_reader
     notes_reader
     spectra_dataset_reader
     stream_reader
+    stream_unit_reader
     warning_printer
     """
 
@@ -829,11 +1021,19 @@ def experiment_paf_loader(path: Union[str, Path],
         # ---- 2 Read the traces -------------------------------------------------------
         time_min = paf.time_s / 60.0
         experiment = {'experiment_name': path.stem, 'raw_spectra': {}}
-        for key, column in TRACE_COLUMNS.items():
+        for key in TRACE_COLUMNS:
             values = paf.stream_reader(key)
             if values is None:
                 warning_printer(f'{path.name}: no {key} trace in the file')
                 continue
+            unit = paf.stream_unit_reader(key)
+            if unit and _unit_cleaner(unit) != TRACE_UNITS[key]:
+                warning_printer(f'{path.name}: the file gives {key} in {unit}, not in '
+                                f'{TRACE_UNITS[key]}. The numbers are kept as they '
+                                f'are, but the labels of the figures still say '
+                                f'{TRACE_UNITS[key]}.',
+                                )
+            column = _trace_title_maker(key, unit)
             frame = pd.DataFrame({TIME_COLUMN: time_min, column: values})
             if key == 'VoO2':
                 # the software's .txt export omits these rows
@@ -1090,7 +1290,7 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
     """
     ---- Summary ----
     Main function to parse one 'Spectra: CCD' record: frame count, wavelength axis,
-    log10 data block, acquisition parameters and trailer strings.
+    log10 data block and acquisition parameters.
 
     ---- Inputs ----
     mm : mmap.mmap
@@ -1106,12 +1306,13 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
     ---- Outputs ----
     Spectra
         Object with offset, name, nframes, npix, wl_off, wavelengths, data_off,
-        data_end, log (nrows x npix float32 view), rec_end, params, trailer, checks and
-        ref attributes. Raises PafError if the layout is not recognised, implausible or
+        data_end, log (nrows x npix float32 view), rec_end, params and checks
+        attributes. Raises PafError if the layout is not recognised, implausible or
         truncated.
 
     ---- Globals mutated ----
-    None. Prints a warning for unexpected trailing bytes (side effect).
+    None. Prints a warning for unexpected trailing bytes and for a first stored row
+    that is not all zeros (side effect).
 
     ---- Equations ----
     None.
@@ -1134,8 +1335,14 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
     # ---- 2 Find the frame index ------------------------------------------------------
     idx_pat = struct.pack('<4I', 1, 2, 3, 4)
     p = mm.find(idx_pat, tok[2][2], limit)
+    # the table is found by its first numbers, so spectra that are not numbered from 1
+    # without gaps (sparse spectra) cannot be read
+    not_numbered = (f"the spectra of '{sp.name}' are not numbered 1, 2, 3 and so on "
+                    f'in this file (some may have been skipped during the recording). '
+                    f'This program cannot read such a file yet. {SEND_FILE_ADVICE}'
+                    )
     if p < 0:
-        raise PafError('spectra record at %d: frame index table not found' % off)
+        raise PafError(not_numbered)
     sp.nframes, sp.npix = u32_reader(mm, p - 12), u32_reader(mm, p - 8)
     if not (0 < sp.nframes < 10**7 and 0 < sp.npix < 10**5):
         raise PafError('spectra record at %d: implausible size %d x %d'
@@ -1143,7 +1350,7 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
                        )
     index = np.frombuffer(mm, dtype='<u4', count=sp.nframes, offset=p)
     if not np.array_equal(index, np.arange(1, sp.nframes + 1, dtype='<u4')):
-        raise PafError('spectra record at %d: frame index table is not 1..N' % off)
+        raise PafError(not_numbered)
 
     # ---- 3 Locate the wavelengths ----------------------------------------------------
     e = p + 4 * sp.nframes
@@ -1184,8 +1391,9 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
                         % (sp.name, sp.rec_end - sp.data_end),
                         )
 
-    # ---- 6 Read the parameters and trailer -------------------------------------------
-    # acquisition parameters (layout verified on one file only)
+    # ---- 6 Read the parameters -------------------------------------------------------
+    # acquisition parameters (layout verified on one file only); the value at byte 40
+    # and the text after the data block are not understood well enough to show
     gap = bytes(mm[e:sp.wl_off])
     sp.params = {}
     if len(gap) == 56:
@@ -1193,13 +1401,15 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
                                                    3,
                                                    ),
                      'slit_um': struct.unpack_from('<f', gap, 32)[0],
-                     'unidentified_value': struct.unpack_from('<f', gap, 40)[0],
                      }
-    sp.trailer = [t[0] for t in token_reader(mm, sp.data_end, sp.rec_end)]
     sp.checks = {}
     if np.any(sp.log[0] != 0):
         sp.checks['row0_not_zero'] = True
-    sp.ref = sp.log[1].astype('f8')
+        warning_printer(f"the first stored row of the '{sp.name}' spectra should be "
+                        f'all zeros and is not, so this file may be laid out in a way '
+                        f'this program does not know. Compare its spectra with the '
+                        f"instrument software's before trusting them.",
+                        )
     return sp
 
 

@@ -1,4 +1,4 @@
-# Portimao question flow (V1.7)
+# Portimao question flow (V1.8)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
