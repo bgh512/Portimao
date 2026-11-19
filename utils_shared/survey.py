@@ -837,9 +837,11 @@ def decomposition_asker(summaries: List[dict],
     default_fit = defaults.get('fit_file')
     choices = [(n, n) for n in names]
     if pca_runner is not None:
-        choices.append((PCA_CHOICE, 'Find the components from the data (principal '
-                                    'component analysis)',
-                        ))
+        choices.append((PCA_CHOICE,
+                        'Find the components from the data (principal '
+                        'component analysis)',
+                        ),
+                       )
     dataset = None
     while True:
         fit_file = choice_asker('Which fit would you like to use?',
@@ -1083,7 +1085,8 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
             summary = experiment_summary_reader(path)
         except PafError as exc:
             progress_clearer()
-            info_printer(f'Skipping {path.name}: {exc}')
+            # the message starts with the file name
+            info_printer(f'Skipping {exc}')
             continue
         summary['path'] = path
         summaries.append(summary)
@@ -1521,7 +1524,7 @@ def multi_experiment_asker(summaries: List[dict],
                     'Do you want the run name written faintly on each plot?',
                     defaults['ex_watermark'],
                     depth=2,
-                )
+                    )
                 size_asker(answers,
                            defaults,
                            {'journal': 'ex_journal',

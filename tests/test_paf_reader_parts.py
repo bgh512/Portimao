@@ -3,16 +3,26 @@ Tests of the parts of the .paf reader that deal with unusual files, on made-up v
 with results worked out by hand.
 """
 
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
+import struct
+from pathlib import Path
+
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
 import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.helpers import concentration_formatter
 from utils_shared.paf_reader import (_event_lister,
+                                     _event_time_adder,
                                      _spectrum_time_finder,
                                      _trace_title_maker,
                                      _transmission_converter,
+                                     experiment_paf_loader,
+                                     experiment_summary_reader,
+                                     MARK,
                                      PafError,
+                                     stream_extractor,
                                      )
 
 
@@ -326,3 +336,179 @@ def test_trace_titles_follow_the_unit_of_the_file() -> None:
     assert _trace_title_maker('CcO2', 'kPa') == 'Measured O2 (kPa)'
     assert _trace_title_maker('CcO2', '') == 'Measured O2 (uM)'
     assert _trace_title_maker('VoO2', f'{MICRO_SIGN}M/min') == 'VoO2'
+
+
+# ---- test_addition_outside_the_recording_is_left_out ---------------------------------
+def test_addition_outside_the_recording_is_left_out(capsys: pytest.CaptureFixture,
+                                                    ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that an addition stored outside the recording is left out
+    with a warning that names it, that the others get their time, and that the quiet
+    reading leaves out the same addition without printing.
+
+    ---- Inputs ----
+    capsys : pytest.CaptureFixture
+        Catches what is printed.
+
+    ---- Globals read ----
+    CLOCK_S (module constant).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Spectrum 3 is row 2 of the clock: 1.0 s = 1/60 min.
+
+    ---- Helpers ----
+    None.
+    """
+
+    events = [{'name': 'Event 1', 'text': 'inside', 'datapoint': 3},
+              {'name': 'Event 2', 'text': 'too late', 'datapoint': 7},
+              {'name': 'Event 3', 'text': 'too early', 'datapoint': 0},
+              ]
+    expected = [{'name': 'Event 1',
+                 'text': 'inside',
+                 'datapoint': 3,
+                 'time': 1.0 / 60.0,
+                 'row_index': 2,
+                 },
+                ]
+    assert _event_time_adder(events, CLOCK_S / 60.0, 'made_up.paf') == expected
+    printed = capsys.readouterr().out
+    assert 'made_up.paf' in printed
+    assert 'too late' in printed and 'too early' in printed
+    assert _event_time_adder(events,
+                             CLOCK_S / 60.0,
+                             'made_up.paf',
+                             is_quiet=True,
+                             ) == expected
+    assert capsys.readouterr().out == ''
+
+
+# ---- test_missing_concentration_is_written_by_the_helper -----------------------------
+def test_missing_concentration_is_written_by_the_helper() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the shared helper writes every concentration, a
+    missing one included.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    MICRO_SIGN (module constant).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    2000 uM = 2 mM; 1 500 000 uM = 1.5 M.
+
+    ---- Helpers ----
+    None.
+    """
+
+    assert concentration_formatter(None) == f'? {MICRO_SIGN}M'
+    assert concentration_formatter(8) == f'8 {MICRO_SIGN}M'
+    assert concentration_formatter(2000) == '2 mM'
+    assert concentration_formatter(1_500_000) == '1.5 M'
+
+
+# ---- test_trace_with_disagreeing_lengths_is_noted ------------------------------------
+def test_trace_with_disagreeing_lengths_is_noted() -> None:
+    """
+    ---- Summary ----
+    Main function to check that a trace whose two stored lengths disagree is not read
+    and is noted under its name with the reason, both numbers included.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The two lengths sit 28 and 20 bytes before the end of the first record.
+
+    ---- Helpers ----
+    None.
+    """
+
+    data = bytearray(64)
+    struct.pack_into('<I', data, 64 - 28, 5)
+    struct.pack_into('<I', data, 64 - 20, 4)
+    records = [{'type': 'DataItem',
+                'off': 0,
+                'end': 64,
+                'tokens': [('DataItem', 0, 0), ('Espana', 0, 0), ('VoO2', 0, 0)],
+                },
+               {'type': 'Measurement', 'off': 64, 'end': 64, 'tokens': []},
+               ]
+    traces, skipped = stream_extractor(bytes(data), records)
+    assert traces == []
+    assert list(skipped) == ['VoO2']
+    assert '5 and 4' in skipped['VoO2']
+
+
+# ---- test_unreadable_files_give_plain_messages ---------------------------------------
+def test_unreadable_files_give_plain_messages(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a file that is missing, too small, not a .paf or
+    without a clock is refused with a message that starts with its name and holds no
+    Python error name, by both the quick look and the full reading.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder made by pytest.
+
+    ---- Globals read ----
+    MARK (constant of the reader).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes three small files in tmp_path (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    contents = {'too_small.paf': b'abc',
+                'not_a_paf.paf': bytes(2048),
+                'no_clock.paf': MARK + bytes(2048),
+                }
+    for name, content in contents.items():
+        (tmp_path / name).write_bytes(content)
+    words = {'absent.paf': 'could not be opened',
+             'too_small.paf': 'too small',
+             'not_a_paf.paf': 'not a recording',
+             'no_clock.paf': 'no clock',
+             }
+    for name, word in words.items():
+        for reader in (experiment_summary_reader, experiment_paf_loader):
+            with pytest.raises(PafError) as caught:
+                reader(tmp_path / name)
+            message = str(caught.value)
+            assert message.startswith(f'{name}: ')
+            assert message.count(name) == 1
+            assert word in message
+            assert 'Error' not in message

@@ -19,28 +19,9 @@ import pandas as pd
 from utils_shared.schema import TIME_COLUMN
 
 
-# Layout of a .paf file, as this reader understands it:
-# * The file is a flat series of records, each starting 06 'Espana' 00 00 00 00 00 + a
-#   16-byte class GUID. A header of length-prefixed UTF-16 strings follows
-#   (02 00 00 00, nchars:u32, chars): type ('DataItem', 'Measurement', 'Spectra: CCD',
-#   'Text Event', 'PaneNote', ...), vendor, name.
-# * 'DataItem' + the 'Measurement' after it = one trace: the sample count n sits twice
-#   (at -28 and -20 from the DataItem's end); the Measurement ends with n float32
-#   values + 8 bytes. The Time trace is in seconds (0.5 s steps).
-# * 'Spectra: CCD' = one spectrometer: nframes, npix, a 1..nframes index table, a
-#   parameter block, npix float32 wavelengths, then (nframes + 2) rows of npix
-#   float32: zeros, log10(reference spectrum), then log10(counts) of every frame.
-#   transmission = 10**(row - reference), intensity = round(10**row).
-# * 'Text Event': the spectrum number (u32) of the event is stored 20 bytes after the
-#   end of its name string (zero in the first, template copy of each event; the second
-#   copy holds the real value).
-
-
 # ---- CONSTANTS -----------------------------------------------------------------------
+# the layout of a .paf file is described in DATA_FORMAT.md, under Files
 MARK =b'\x06Espana\x00\x00\x00\x00\x00'
-
-# harmless, seen in most files, not worth showing
-QUIET_WARNINGS = ('DataItem counts disagree',)
 
 # spectrometer name in the file -> dataset name used by the rest of the program
 DATASET_ALIAS = {'Cytochromes': 'Cyt'}
@@ -60,15 +41,39 @@ MIN_TRACE_FRACTION = 0.9
 # a trace missing more than this fraction of the clock's length is reported
 SHORT_TRACE_FRACTION = 0.01
 
+# how each trace the program uses is called in a message
+TRACE_LABELS = {'CsO2': 'set oxygen (CsO2)',
+                'CcO2': 'measured oxygen (CcO2)',
+                'VoO2': 'OCR (VoO2)',
+                }
+
 SEND_FILE_ADVICE = 'Please send the file to the person who looks after this program.'
+COPY_AGAIN_ADVICE = 'Copy it again from the instrument computer.'
+CANNOT_OPEN = ('the file could not be opened. Close it in any other program (the '
+               'instrument software, for example), check that you are allowed to read '
+               'it, then start this program again to include it.'
+               )
+NOT_A_PAF = ('this is not a recording of the instrument software (it does not start '
+             'the way a .paf file does). Check that the right file is in the folder.'
+             )
+TOO_SMALL = ('the file is too small to be a recording (it may not have finished '
+             f'copying). {COPY_AGAIN_ADVICE}'
+             )
+UNKNOWN_LAYOUT = ('the file is laid out in a way this program does not know, so it '
+                  f'cannot be read. {SEND_FILE_ADVICE}'
+                  )
+# what reading a file with an unknown layout can raise
+LAYOUT_ERRORS = (ArithmeticError, LookupError, struct.error, TypeError, ValueError)
 
 
 # ---- PafError ------------------------------------------------------------------------
 class PafError(Exception):
     """
     ---- Summary ----
-    Raised when the file is not a .paf, is truncated, or has a layout this reader does
-    not know.
+    Raised when the file cannot be opened, is not a .paf, is cut short, has a layout
+    this reader does not know or lacks what the program needs. The message starts with
+    the file name and says in plain words what is wrong and what to do, so it can be
+    shown to the user as it is.
 
     ---- Attributes ----
     None.
@@ -135,7 +140,9 @@ class PafFile:
     duration_finder
     events_reader
     frame_counter
+    missing_trace_describer
     notes_reader
+    ocr_trace_checker
     spectra_dataset_reader
     stream_name_lister
     stream_reader
@@ -159,8 +166,9 @@ class PafFile:
         ---- Outputs ----
         None
             Nothing. Sets path, records, spectra, time_s (seconds) and the private
-            stream tables. Raises PafError for a file that is too small, has no Time
-            stream or cannot be read.
+            stream tables. Raises PafError, starting with the file name and saying in
+            plain words what is wrong and what to do, for a file that cannot be opened,
+            is too small, has no Time stream or has a layout this reader does not know.
 
         ---- Globals mutated ----
         None. Opens the file and the memory map (side effect); closes them again if
@@ -177,39 +185,55 @@ class PafFile:
 
         # ---- 1 Open the file ---------------------------------------------------------
         self.path = Path(path)
-        self._fh = open(self.path, 'rb')
+        name = self.path.name
+        self._fh = None
         self._mm = None
+        self._skipped = {}
         try:
+            self._fh = open(self.path, 'rb')
+
             # ---- 2 Map the file and scan its records ---------------------------------
             if self.path.stat().st_size < 1024:
-                raise PafError(f'{self.path.name}: file is too small to be a .paf')
+                raise PafError(TOO_SMALL)
             self._mm = mmap.mmap(self._fh.fileno(), 0, access=mmap.ACCESS_READ)
-            self.records, self.spectra = record_scanner(self._mm)
-            self._streams = stream_extractor(self._mm, self.records)
+            self.records, self.spectra = record_scanner(self._mm, name)
+            self._streams, skipped = stream_extractor(self._mm, self.records, name)
 
             # ---- 3 Find the time axis and main streams -------------------------------
             times = [s for s in self._streams if s['name'] == 'Time']
             if not times:
-                raise PafError(f'{self.path.name}: no Time stream found')
+                raise PafError('the file has no clock (Time trace), so nothing in it '
+                               f'can be placed in time. {SEND_FILE_ADVICE}',
+                               )
             main = max(times, key=lambda s: s['n'])
             self.time_s = np.array(main['values'], dtype=float)
             # a file can hold its clock twice; no copy of it is a trace to show
             self._main = {}
             for s in self._streams:
-                if (s['name'] != 'Time' and
-                    s['n'] >= MIN_TRACE_FRACTION * len(self.time_s) and
-                    s['name'] not in self._main
-                    ):
+                if s['name'] == 'Time' or s['name'] in self._main:
+                    continue
+                if s['n'] >= MIN_TRACE_FRACTION * len(self.time_s):
                     self._main[s['name']] = s
-        except PafError:
+                else:
+                    skipped.setdefault(s['name'],
+                                       f"it has only {s['n']} of the "
+                                       f'{len(self.time_s)} points of the recording',
+                                       )
+            # a trace stored twice is not missing when one of its copies can be read
+            self._skipped = {key: reason
+                             for key, reason in skipped.items()
+                             if key not in self._main
+                             }
+        except PafError as exc:
             self.closer()
-            raise
-        # unexpected layout: report it as a file problem, not a crash
-        except Exception as exc:
+            raise PafError(f'{name}: {exc}') from None
+        except OSError as exc:
             self.closer()
-            raise PafError(f'{self.path.name}: could not be read ({type(exc).__name__}'
-                           f': {exc})',
-                           )
+            raise PafError(f'{name}: {CANNOT_OPEN}') from exc
+        # an unexpected layout is a problem of the file, said in plain words
+        except LAYOUT_ERRORS as exc:
+            self.closer()
+            raise PafError(f'{name}: {UNKNOWN_LAYOUT}') from exc
 
     # ---- SPECIAL METHODS -------------------------------------------------------------
 
@@ -346,7 +370,7 @@ class PafFile:
         except BufferError:
             pass  # a view is still alive; it is released when it is garbage collected
         self._mm = None
-        if not self._fh.closed:
+        if self._fh is not None and not self._fh.closed:
             self._fh.close()
 
     # ---- dataset_name_lister ---------------------------------------------------------
@@ -443,7 +467,7 @@ class PafFile:
             vpos = name[2] + 20
             value = u32_reader(self._mm, vpos) if vpos + 4 <= text[1] else 0
             found.append((name[0], text[0], value))
-        return _event_lister(found)
+        return _event_lister(found, self.path.name)
 
     # ---- frame_counter ---------------------------------------------------------------
     @property
@@ -473,6 +497,43 @@ class PafFile:
         """
 
         return len(self.time_s)
+
+    # ---- missing_trace_describer -----------------------------------------------------
+    def missing_trace_describer(self, name: str) -> str:
+        """
+        ---- Summary ----
+        Main method to say in plain words why one trace the program uses cannot be
+        given.
+
+        ---- Inputs ----
+        name : str
+            Trace name, a key of TRACE_LABELS ('CsO2', 'CcO2' or 'VoO2').
+
+        ---- Globals read ----
+        TRACE_LABELS (module constant).
+
+        ---- Outputs ----
+        str
+            For example 'run1.paf: the file has no OCR (VoO2) trace', or 'run1.paf: the
+            OCR (VoO2) trace cannot be read, because ...' with the reason noted when
+            the trace was skipped. No full stop at the end.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        reason = self._skipped.get(name)
+        if reason is None:
+            return f'{self.path.name}: the file has no {TRACE_LABELS[name]} trace'
+        return (f'{self.path.name}: the {TRACE_LABELS[name]} trace cannot be read, '
+                f'because {reason}'
+                )
 
     # ---- notes_reader ----------------------------------------------------------------
     def notes_reader(self) -> str:
@@ -508,6 +569,44 @@ class PafFile:
                                                ).rstrip(b'\x00 \r\n'),
                                          )
         return ''
+
+    # ---- ocr_trace_checker -----------------------------------------------------------
+    def ocr_trace_checker(self) -> None:
+        """
+        ---- Summary ----
+        Main method to refuse a file whose OCR trace (VoO2) cannot be given, as nothing
+        can be processed without it.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        SEND_FILE_ADVICE (module constant).
+
+        ---- Outputs ----
+        None
+            Nothing. Raises PafError saying why the trace is missing and what to do.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        missing_trace_describer
+        """
+
+        if 'VoO2' in self._main:
+            return
+        advice = (SEND_FILE_ADVICE
+                  if 'VoO2' in self._skipped
+                  else 'Check in the instrument software that the oxygen consumption '
+                       'rate was recorded.'
+                  )
+        raise PafError(f"{self.missing_trace_describer('VoO2')}, and this program "
+                       f'cannot process a file without it. {advice}',
+                       )
 
     # ---- spectra_dataset_reader ------------------------------------------------------
     def spectra_dataset_reader(self,
@@ -557,9 +656,10 @@ class PafFile:
         # ---- 1 Find the dataset ------------------------------------------------------
         sp = next((s for s in self.spectra if dataset_namer(s.name) == name), None)
         if sp is None:
-            raise PafError(f'{self.path.name}: no spectral dataset {name!r}; '
-                           f'available: '
-                           f"{', '.join(self.dataset_name_lister()) or 'none'}",
+            raise PafError(f'{self.path.name}: the file has no spectra called {name!r} '
+                           f'(it has: '
+                           f"{', '.join(self.dataset_name_lister()) or 'none'}). "
+                           f'Choose spectra the file has.',
                            )
 
         # ---- 2 Find the time of every spectrum ---------------------------------------
@@ -711,7 +811,9 @@ class PafFile:
 
 
 # ---- _event_lister -------------------------------------------------------------------
-def _event_lister(found: Sequence[Tuple[str, str, int]]) -> List[dict]:
+def _event_lister(found: Sequence[Tuple[str, str, int]],
+                  file_name: str = '',
+                  ) -> List[dict]:
     """
     ---- Summary ----
     Helper function to turn the stored copies of the text events (additions) into one
@@ -722,6 +824,8 @@ def _event_lister(found: Sequence[Tuple[str, str, int]]) -> List[dict]:
         One (name, text, position) per 'Text Event' record, in file order: the name the
         software gives the event ('Event 1'), the text the user typed and the 1-based
         spectrum number (0 in the template copy of an event).
+    file_name : str
+        File name, for the warnings.
 
     ---- Globals read ----
     None.
@@ -756,16 +860,76 @@ def _event_lister(found: Sequence[Tuple[str, str, int]]) -> List[dict]:
         if not positions:
             warning_printer(f'the addition {name!r} has no stored position in the '
                             f'file and is left out',
+                            file_name,
                             )
             continue
         if len(positions) > 1:
             warning_printer(f'the file stores {len(positions)} additions under the '
                             f'name {name!r} (at spectra {sorted(positions)}); each is '
                             f'kept as an addition of its own',
+                            file_name,
                             )
         for position, text in positions.items():
             events.append({'name': name, 'text': text, 'datapoint': int(position)})
     return sorted(events, key=lambda e: e['datapoint'])
+
+
+# ---- _event_time_adder ---------------------------------------------------------------
+def _event_time_adder(events: Sequence[dict],
+                      time_min: np.ndarray,
+                      file_name: str,
+                      is_quiet: bool = False,
+                      ) -> List[dict]:
+    """
+    ---- Summary ----
+    Helper function to give every addition its time, and to leave out the additions
+    stored outside the recording. The quick look and the full reading both use it, so
+    they always give the same additions.
+
+    ---- Inputs ----
+    events : Sequence[dict]
+        Additions from events_reader, each with 'datapoint' (1-based spectrum number)
+        and 'text'.
+    time_min : np.ndarray
+        Clock of the recording in minutes, shape (n_timepoints,).
+    file_name : str
+        File name, for the warning.
+    is_quiet : bool
+        True to leave an addition out without the warning, when the user was already
+        told about it by the quick look.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[dict]
+        The additions inside the recording, in the order given, each with 'time' (min)
+        and 'row_index' (0-based row of the clock) added.
+
+    ---- Globals mutated ----
+    None. Prints a warning for each addition left out (side effect).
+
+    ---- Equations ----
+    row_index = datapoint - 1; time = time_min[row_index].
+
+    ---- Helpers ----
+    warning_printer
+    """
+
+    timed = []
+    for event in events:
+        row = event['datapoint'] - 1
+        if not 0 <= row < len(time_min):
+            if not is_quiet:
+                warning_printer(f"the addition {event['text']!r} is stored at "
+                                f"spectrum {event['datapoint']}, but the recording "
+                                f'has only {len(time_min)} time points, so it has no '
+                                f'time and is left out.',
+                                file_name,
+                                )
+            continue
+        timed.append(dict(event, time=float(time_min[row]), row_index=row))
+    return timed
 
 
 # ---- _spectrum_time_finder -----------------------------------------------------------
@@ -996,19 +1160,23 @@ def experiment_paf_loader(path: Union[str, Path],
         if the VoO2 trace is missing.
 
     ---- Globals mutated ----
-    None. Prints warnings for missing traces, units the figures do not expect and
-    events outside the recording (side effect).
+    None. Prints warnings for missing traces and for units the figures do not expect
+    (side effect). An addition outside the recording is left out without a warning, as
+    experiment_summary_reader gives it at the start.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _event_time_adder
     _trace_title_maker
     _unit_cleaner
     acquisition_reader
     dataset_name_lister
     events_reader
+    missing_trace_describer
     notes_reader
+    ocr_trace_checker
     spectra_dataset_reader
     stream_reader
     stream_unit_reader
@@ -1019,12 +1187,15 @@ def experiment_paf_loader(path: Union[str, Path],
     path = Path(path)
     with PafFile(path) as paf:
         # ---- 2 Read the traces -------------------------------------------------------
+        paf.ocr_trace_checker()
         time_min = paf.time_s / 60.0
         experiment = {'experiment_name': path.stem, 'raw_spectra': {}}
         for key in TRACE_COLUMNS:
             values = paf.stream_reader(key)
             if values is None:
-                warning_printer(f'{path.name}: no {key} trace in the file')
+                warning_printer(f'{paf.missing_trace_describer(key)}. The figures and '
+                                f'tables are made without it.',
+                                )
                 continue
             unit = paf.stream_unit_reader(key)
             if unit and _unit_cleaner(unit) != TRACE_UNITS[key]:
@@ -1039,8 +1210,6 @@ def experiment_paf_loader(path: Union[str, Path],
                 # the software's .txt export omits these rows
                 frame = frame.dropna(subset=[column]).reset_index(drop=True)
             experiment[key] = frame
-        if 'VoO2' not in experiment:
-            raise PafError(f'{path.name}: no VoO2 trace in the file')
 
         # ---- 3 Read the spectra ------------------------------------------------------
         wanted = (paf.dataset_name_lister()
@@ -1054,24 +1223,19 @@ def experiment_paf_loader(path: Union[str, Path],
             experiment['raw_spectra'][name] = dataset
 
         # ---- 4 Read the events -------------------------------------------------------
-        events = []
-        for number, event in enumerate(paf.events_reader(), start=1):
-            # the stored number is the 1-based spectrum number (as in the original
-            # importer)
-            row = event['datapoint'] - 1
-            if not 0 <= row < len(time_min):
-                warning_printer(f"{path.name}: {event['name']} points outside the "
-                                f'recording and is ignored',
-                                )
-                continue
-            events.append({'datapoint': event['datapoint'],
-                           'text': event['text'],
-                           'label': event['text'],
-                           'concentration_uM': None,
-                           'time': float(time_min[row]),
-                           'row_index': row,
-                           },
-                          )
+        events = [{'datapoint': event['datapoint'],
+                   'text': event['text'],
+                   'label': event['text'],
+                   'concentration_uM': None,
+                   'time': event['time'],
+                   'row_index': event['row_index'],
+                   }
+                  for event in _event_time_adder(paf.events_reader(),
+                                                 time_min,
+                                                 path.name,
+                                                 is_quiet=True,
+                                                 )
+                  ]
 
         # ---- 5 Store the metadata ----------------------------------------------------
         experiment['metadata'] = {'paf_file': path.name,
@@ -1097,34 +1261,34 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
 
     ---- Outputs ----
     dict
-        {'name' (file stem), 'duration_min', 'frames', 'datasets', 'events' (each with
-        'time' in minutes), 'traces'}.
+        {'name' (file stem), 'duration_min', 'frames', 'datasets', 'events' (the
+        additions inside the recording, each with 'time' in minutes), 'traces'}.
+        Raises PafError if the VoO2 trace is missing, so a file that cannot be
+        processed is refused before any question is asked about it.
 
     ---- Globals mutated ----
-    None.
+    None. Prints a warning for each addition outside the recording (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _event_time_adder
     dataset_name_lister
     duration_finder
     events_reader
     frame_counter
+    ocr_trace_checker
     stream_name_lister
     """
 
     with PafFile(path) as paf:
         # ---- 1 Read the event times --------------------------------------------------
-        times = paf.time_s / 60.0
-        events = []
-        for event in paf.events_reader():
-            row = event['datapoint'] - 1
-            events.append(dict(event,
-                               time=float(times[row],
-                                          ) if 0 <= row < len(times) else np.nan,
-                               ),
-                          )
+        paf.ocr_trace_checker()
+        events = _event_time_adder(paf.events_reader(),
+                                   paf.time_s / 60.0,
+                                   paf.path.name,
+                                   )
 
         # ---- 2 Assemble the summary --------------------------------------------------
         return {'name': Path(path).stem,
@@ -1137,7 +1301,9 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
 
 
 # ---- record_scanner ------------------------------------------------------------------
-def record_scanner(mm: mmap.mmap) -> Tuple[List[dict], List[Spectra]]:
+def record_scanner(mm: mmap.mmap,
+                   file_name: str = '',
+                   ) -> Tuple[List[dict], List[Spectra]]:
     """
     ---- Summary ----
     Main function to split the whole file into records and parse the spectra records.
@@ -1145,9 +1311,11 @@ def record_scanner(mm: mmap.mmap) -> Tuple[List[dict], List[Spectra]]:
     ---- Inputs ----
     mm : mmap.mmap
         Read-only memory map of the .paf file.
+    file_name : str
+        File name, for the warnings.
 
     ---- Globals read ----
-    MARK (module constant).
+    MARK, NOT_A_PAF (module constants).
 
     ---- Outputs ----
     Tuple[List[dict], List[Spectra]]
@@ -1169,9 +1337,7 @@ def record_scanner(mm: mmap.mmap) -> Tuple[List[dict], List[Spectra]]:
     # ---- 1 Find the record markers ---------------------------------------------------
     markers = [m.start() for m in re.finditer(re.escape(MARK), mm)]
     if not markers or markers[0] > 64:
-        raise PafError("this does not look like a .paf file (no 'Espana' record header"
-                       ' near the start)',
-                       )
+        raise PafError(NOT_A_PAF)
 
     # ---- 2 Walk through the records --------------------------------------------------
     recs, spectra, skip_until = [], [], 0
@@ -1182,7 +1348,7 @@ def record_scanner(mm: mmap.mmap) -> Tuple[List[dict], List[Spectra]]:
         tok = token_reader(mm, off + 40, min(off + 1200, len(mm)))
         typ = tok[0][0] if tok else None
         if typ == 'Spectra: CCD':
-            sp = spectra_parser(mm, off, all_markers)
+            sp = spectra_parser(mm, off, all_markers, file_name)
             spectra.append(sp)
             skip_until = sp.data_end
             recs.append(dict(off=off, end=sp.rec_end, type=typ, tokens=tok[:3]))
@@ -1286,7 +1452,11 @@ def rtf_converter(rtf: bytes) -> str:
 
 
 # ---- spectra_parser ------------------------------------------------------------------
-def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
+def spectra_parser(mm: mmap.mmap,
+                   off: int,
+                   markers: List[int],
+                   file_name: str = '',
+                   ) -> Spectra:
     """
     ---- Summary ----
     Main function to parse one 'Spectra: CCD' record: frame count, wavelength axis,
@@ -1299,16 +1469,19 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
         Byte offset of the record marker.
     markers : List[int]
         Byte offsets of every record marker in the file, ascending.
+    file_name : str
+        File name, for the warnings.
 
     ---- Globals read ----
-    None. Calls the Spectra class, token_reader, u32_reader and warning_printer.
+    COPY_AGAIN_ADVICE, SEND_FILE_ADVICE (module constants). Calls the Spectra class,
+    token_reader, u32_reader and warning_printer.
 
     ---- Outputs ----
     Spectra
         Object with offset, name, nframes, npix, wl_off, wavelengths, data_off,
         data_end, log (nrows x npix float32 view), rec_end, params and checks
-        attributes. Raises PafError if the layout is not recognised, implausible or
-        truncated.
+        attributes. Raises PafError, in plain words and without the file name, if the
+        layout is not recognised, implausible or cut short.
 
     ---- Globals mutated ----
     None. Prints a warning for unexpected trailing bytes and for a first stored row
@@ -1328,8 +1501,11 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
     sp.offset = off
     limit = min(len(mm), off + 4096)
     tok = token_reader(mm, off + 40, limit)
+    unknown = ('are stored in a way this program does not know, so the file cannot be '
+               f'read. {SEND_FILE_ADVICE}'
+               )
     if len(tok) < 3:
-        raise PafError('spectra record at %d: header strings not found' % off)
+        raise PafError(f'some spectra in the file have no name and {unknown}')
     sp.name = tok[2][0]
 
     # ---- 2 Find the frame index ------------------------------------------------------
@@ -1345,8 +1521,8 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
         raise PafError(not_numbered)
     sp.nframes, sp.npix = u32_reader(mm, p - 12), u32_reader(mm, p - 8)
     if not (0 < sp.nframes < 10**7 and 0 < sp.npix < 10**5):
-        raise PafError('spectra record at %d: implausible size %d x %d'
-                       % (off, sp.nframes, sp.npix),
+        raise PafError(f"the '{sp.name}' spectra have a size that cannot be right "
+                       f'({sp.nframes} spectra of {sp.npix} wavelengths) and {unknown}',
                        )
     index = np.frombuffer(mm, dtype='<u4', count=sp.nframes, offset=p)
     if not np.array_equal(index, np.arange(1, sp.nframes + 1, dtype='<u4')):
@@ -1366,7 +1542,9 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
             sp.wl_off = o
             break
     if sp.wl_off is None:
-        raise PafError('spectra record at %d: wavelength axis not found' % off)
+        raise PafError(f"the wavelengths of the '{sp.name}' spectra were not found "
+                       f'where this program expects them: the spectra {unknown}',
+                       )
 
     # ---- 4 Map the data block --------------------------------------------------------
     sp.wavelengths = np.frombuffer(mm, dtype='<f4', count=sp.npix, offset=sp.wl_off)
@@ -1374,8 +1552,9 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
     nrows = sp.nframes + 2
     sp.data_end = sp.data_off + 4 * sp.npix * nrows
     if sp.data_end > len(mm):
-        raise PafError('spectra record at %d: file is truncated (needs %d bytes, has '
-                       '%d)' % (off, sp.data_end, len(mm)),
+        raise PafError(f"the file is cut short: it ends before the '{sp.name}' "
+                       f'spectra do (it may not have finished copying). '
+                       f'{COPY_AGAIN_ADVICE}',
                        )
     sp.log = np.frombuffer(mm,
                            dtype='<f4',
@@ -1387,8 +1566,10 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
     k = bisect.bisect_left(markers, sp.data_end)
     sp.rec_end = markers[k] if k < len(markers) else len(mm)
     if sp.rec_end - sp.data_end > 4096:
-        warning_printer("spectra '%s': %d unexpected bytes after the data block"
-                        % (sp.name, sp.rec_end - sp.data_end),
+        warning_printer(f"the '{sp.name}' spectra are followed by data this program "
+                        f'does not know, which is left unread. Compare the spectra '
+                        f"with the instrument software's before trusting them.",
+                        file_name,
                         )
 
     # ---- 6 Read the parameters -------------------------------------------------------
@@ -1409,34 +1590,44 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
                         f'all zeros and is not, so this file may be laid out in a way '
                         f'this program does not know. Compare its spectra with the '
                         f"instrument software's before trusting them.",
+                        file_name,
                         )
     return sp
 
 
 # ---- stream_extractor ----------------------------------------------------------------
-def stream_extractor(mm: mmap.mmap, recs: List[dict]) -> List[dict]:
+def stream_extractor(mm: Union[bytes, mmap.mmap],
+                     recs: List[dict],
+                     file_name: str = '',
+                     ) -> Tuple[List[dict], dict]:
     """
     ---- Summary ----
     Main function to extract every trace (DataItem followed by Measurement record) as a
-    float32 array.
+    float32 array, and to note why each trace it cannot read was skipped.
 
     ---- Inputs ----
-    mm : mmap.mmap
-        Read-only memory map of the .paf file.
+    mm : Union[bytes, mmap.mmap]
+        Read-only memory map of the .paf file (or its bytes).
     recs : List[dict]
         Records from record_scanner, in file order.
+    file_name : str
+        File name, for the warning.
 
     ---- Globals read ----
-    None.
+    TRACE_COLUMNS (module constant).
 
     ---- Outputs ----
-    List[dict]
-        One {name, n, offset, values, quantity, unit} dictionary per trace. Traces with
-        disagreeing counts, no samples or a record that is too short are skipped with a
-        warning.
+    Tuple[List[dict], dict]
+        (traces, skipped). traces has one {name, n, offset, values, quantity, unit}
+        dictionary per trace. skipped is {name: reason} for the traces with disagreeing
+        lengths, no values or a record that is too short; the reason is in plain words
+        and completes "the trace cannot be read, because ...". A file holds many traces
+        the program does not use, so nothing is printed here: the caller reports the
+        skipped traces it needs.
 
     ---- Globals mutated ----
-    None. Prints warnings (side effect).
+    None. Prints a warning when a trace the program uses ends in an unexpected way
+    (side effect).
 
     ---- Equations ----
     None.
@@ -1448,7 +1639,7 @@ def stream_extractor(mm: mmap.mmap, recs: List[dict]) -> List[dict]:
     """
 
     # ---- 1 Prepare the output --------------------------------------------------------
-    streams = []
+    streams, skipped = [], {}
 
     # ---- 2 Extract the streams from the record gaps ----------------------------------
     for a, b in zip(recs, recs[1:]):
@@ -1459,21 +1650,30 @@ def stream_extractor(mm: mmap.mmap, recs: List[dict]) -> List[dict]:
         name = a['tokens'][2][0]
         n1, n2 = u32_reader(mm, a['end'] - 28), u32_reader(mm, a['end'] - 20)
         if n1 != n2:
-            warning_printer('stream %s: DataItem counts disagree (%d vs %d), skipped'
-                            % (name, n1, n2),
-                            )
+            skipped.setdefault(name,
+                               f'its length is stored twice in the file and the two '
+                               f'numbers disagree ({n1} and {n2})',
+                               )
             continue
         if n1 == 0:
+            skipped.setdefault(name, 'it holds no values')
             continue
         arr_off = b['end'] - 8 - 4 * n1
         hdr_tokens = token_reader(mm, b['off'] + 40, arr_off)
         if arr_off < b['off'] + 60 or not hdr_tokens:
-            warning_printer('stream %s: array does not fit in its record, skipped'
-                            % name,
-                            )
+            skipped.setdefault(name,
+                               'its values do not fit in the part of the file that '
+                               'holds them',
+                               )
             continue
-        if bytes(mm[b['end'] - 8:b['end']]) != b'\x02\x00\x00\x00\x00\x00\x00\x00':
-            warning_printer('stream %s: unexpected record trailer' % name)
+        if (bytes(mm[b['end'] - 8:b['end']]) != b'\x02\x00\x00\x00\x00\x00\x00\x00' and
+            (name in TRACE_COLUMNS or name == 'Time')
+            ):
+            warning_printer(f'the {name} trace ends in a way this program does not '
+                            f'expect. Compare it with the export of the instrument '
+                            f'software before trusting it.',
+                            file_name,
+                            )
         vals = np.frombuffer(mm, dtype='<f4', count=n1, offset=arr_off)
         strs = [t[0] for t in hdr_tokens]
         streams.append(dict(name=name,
@@ -1484,7 +1684,7 @@ def stream_extractor(mm: mmap.mmap, recs: List[dict]) -> List[dict]:
                             unit=strs[4] if len(strs) > 4 else '',
                             ),
                        )
-    return streams
+    return streams, skipped
 
 
 # ---- token_reader --------------------------------------------------------------------
@@ -1582,18 +1782,20 @@ def u32_reader(buf: Union[bytes, mmap.mmap], off: int) -> int:
 
 
 # ---- warning_printer -----------------------------------------------------------------
-def warning_printer(msg: str) -> None:
+def warning_printer(msg: str, file_name: str = '') -> None:
     """
     ---- Summary ----
-    Main function to print a reader warning, unless it is one of the harmless messages
-    in QUIET_WARNINGS.
+    Main function to print a reader warning.
 
     ---- Inputs ----
     msg : str
         Warning text, without the "WARNING" prefix.
+    file_name : str
+        File the warning is about, written in front of the text; empty when the text
+        already names it.
 
     ---- Globals read ----
-    QUIET_WARNINGS (module constant).
+    None.
 
     ---- Outputs ----
     None
@@ -1609,6 +1811,4 @@ def warning_printer(msg: str) -> None:
     None.
     """
 
-    if any(text in msg for text in QUIET_WARNINGS):
-        return
-    print('  WARNING: ' + msg)
+    print(f"  WARNING: {file_name + ': ' if file_name else ''}{msg}")

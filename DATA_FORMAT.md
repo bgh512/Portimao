@@ -11,10 +11,10 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
 | `'experiment_name'` | str | | | File stem of the `.paf` file |
-| `'metadata'` | dict | | | `'OD'`, `'volume'`, `'dilution_factor'`, `'events'`, `'ignored_events'` and acquisition details |
-| `'CcO2'` | pd.DataFrame | (n_points, 2) | µM | Measured O2: `Time (min)` and the measurement column, titled with the unit stored in the file (`Measured O2 (µM)`; `uM` when the file stores none) |
-| `'CsO2'` | pd.DataFrame | (n_points, 2) | µM | Set O2, titled in the same way (`Set O2 (µM)`) |
-| `'VoO2'` | pd.DataFrame | (n_points, 2) | uM/min | Oxygen consumption rate (OCR) |
+| `'metadata'` | dict | | | What is known about the file and the run (see `metadata`) |
+| `'CcO2'` | pd.DataFrame | (n_points, 2) | µM | Measured O2: `Time (min)` and the measurement column, titled with the unit stored in the file (`Measured O2 (µM)`; `uM` when the file stores none). Missing when the file has no such trace (a warning is printed) |
+| `'CsO2'` | pd.DataFrame | (n_points, 2) | µM | Set O2, titled in the same way (`Set O2 (µM)`). Missing when the file has no such trace |
+| `'VoO2'` | pd.DataFrame | (n_ocr_points, 2) | µM/min | Oxygen consumption rate (OCR): `Time (min)` and `VoO2`. Always there: a file without it is refused. It has fewer rows than the oxygen tables, as the time points where the instrument has no OCR value (the start of a recording, and the end when the trace is shorter than the clock) are left out |
 | `'VoO2_OD'` | pd.DataFrame | (n_points, 2) | | Optional. OCR divided by dilution factor x OD x volume |
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
 | `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem |
@@ -35,9 +35,40 @@ experiment = {'experiment_name': 'control_7hours',
               }
 ```
 
+#### `metadata`
+
+What is known about one experiment, stored as `experiment['metadata']`. The first four keys are set by `experiment_paf_loader`; the others are added while the experiment is processed and exist only from that step on.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'paf_file'` | str | | | Name of the `.paf` file, with its extension |
+| `'events'` | List[dict] | (n_events,) | | The additions in time order (see `event`); once the answers are merged, without the ignored ones |
+| `'acquisition'` | List[dict] | (n_datasets,) | | One entry per spectrometer: `'dataset'`, `'spectrometer'` (its name in the file), `'frames'`, `'wavelengths'` (their number), `'wavelength_range_nm'` (first and last) and, when the file gives them, `'centre_wavelength_nm'` and `'slit_um'` |
+| `'notes'` | str | | | The notes typed in the instrument software, as plain text; empty when there are none |
+| `'OD'`, `'volume'`, `'dilution_factor'` | float | | | Optional. As entered by the user, used for the OD scaling |
+| `'ignored_events'` | List[dict] | | | The additions the user chose to ignore; they are kept only for the workbook |
+| `'trimmed_before_minutes'`, `'trimmed_after_minutes'` | float | | min | Optional. Where the recording was cut, on the original time |
+| `'ignore_first_minutes'`, `'ignore_last_minutes'` | float | | min | Start and end left out of the averages and references |
+| `'fit_file'` | str or None | | | Fit file of the decomposition; None when the haems were not decomposed |
+| `'processed'` | str | | | Date and time of the run, `YYYY-MM-DD HH:MM` |
+
+#### `event`
+
+One addition (a text event of the instrument software). Created by `experiment_paf_loader`, one per addition stored inside the recording; an addition stored outside it is left out, with a warning when the files are first read.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'datapoint'` | int | | | Spectrum number stored with the addition, counted from 1 |
+| `'text'` | str | | | What was typed in the instrument software, e.g. `1ul 8mm nd-011992`. The file holds no concentration |
+| `'label'` | str | | | Name shown in the figures: the text, until the user renames it |
+| `'concentration_uM'` | float or None | | µM | Final concentration entered by the user; None when none was given |
+| `'time'` | float | | min | Time of the addition; counted from the new 0 after a start trim |
+| `'row_index'` | int | | | Row of the time base, `datapoint` - 1; removed when the experiment is trimmed |
+| `'ignored'` | bool | | | Set when the answers are merged: True for an addition the user chose to ignore |
+
 #### `experiment_summary`
 
-Quick description of one `.paf` file, read before the questions are asked. Created by `experiment_summary_reader`.
+Quick description of one `.paf` file, read before the questions are asked. Created by `experiment_summary_reader`, which refuses a file that could not be processed later (one without an OCR trace, for example), so such a file is skipped before any question is asked.
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
@@ -45,7 +76,7 @@ Quick description of one `.paf` file, read before the questions are asked. Creat
 | `'duration_min'` | float | | min | Length of the recording |
 | `'frames'` | int | | | Number of time points |
 | `'datasets'` | List[str] | | | Spectral datasets in the file |
-| `'events'` | List[dict] | | | Events, each with `'time'` in minutes |
+| `'events'` | List[dict] | | | The additions stored inside the recording, in the order of their spectrum numbers, each with `'name'` (the software's name for it, `Event 1`), `'text'`, `'datapoint'`, `'time'` (min) and `'row_index'` as in `event`. They are the same additions, with the same times, as `experiment_paf_loader` gives |
 | `'traces'` | List[str] | | | Names of the recorded traces |
 
 #### `averages`
@@ -236,7 +267,7 @@ Defined in `utils_shared/paf_reader.py`. Created by `spectra_parser`, used by `r
 | `wavelengths` | Optional[np.ndarray] | (npix,) | nm | `None` | Wavelength of each pixel |
 | `data_off` | int | | bytes | `0` | Position of the spectra block |
 | `data_end` | int | | bytes | `0` | End of the spectra block |
-| `log` | Optional[np.ndarray] | (nframes + 2, npix) | | `None` | Raw rows: dark row, reference row, then one row per spectrum |
+| `log` | Optional[np.ndarray] | (nframes + 2, npix) | | `None` | Raw rows, as log10 of the counts: a row of zeros, the reference row, then one row per spectrum (see `.paf file`) |
 | `rec_end` | int | | bytes | `0` | End of the record |
 | `params` | dict | | | `{}` | Acquisition parameters found in the record |
 | `checks` | dict | | | `{}` | Warnings raised while parsing |
@@ -281,6 +312,31 @@ Attenuation (or transmission, or intensity) of one spectral dataset.
 - **Units of the values:** OD for attenuation, fraction for transmission, counts for intensity
 
 ### 1.4 Files
+
+#### `.paf file`
+
+A recording of the instrument software, read by `utils_shared/paf_reader.py`. The format is not published: this is the layout as the reader understands it, checked against the instrument software's own export of one recording (the wavelengths, counts, transmission and traces agree at every point).
+
+| Property | Value |
+|---|---|
+| File type | Binary, little-endian |
+| Text | UTF-16, each string after the four bytes `02 00 00 00` and its number of characters (unsigned 32-bit) |
+| Location and name | `<data folder>/<experiment>.paf`; the file stem is the experiment name |
+
+The file is one record after another. Each record starts with the byte `06`, the word `Espana`, five zero bytes and a 16-byte identifier, followed by its strings: the kind of record, the vendor and a name. The reader uses these kinds:
+
+| Kind of record | What it holds |
+|---|---|
+| `DataItem`, then `Measurement` | One trace (the clock `Time`, `CcO2`, `CsO2`, `VoO2` and others). The number of values is stored twice near the end of the `DataItem` (28 and 20 bytes before it); the `Measurement` ends with that many 32-bit floats and 8 closing bytes, and its strings give the quantity and the unit |
+| `Spectra: CCD` | One spectrometer: the number of spectra and of wavelengths, a table numbering the spectra 1, 2, 3 and so on, a block of settings, the wavelengths (32-bit floats, nm), then the rows of spectra |
+| `Text Event` | One addition: its name (`Event 1`), the text typed, and its spectrum number (unsigned 32-bit, 20 bytes after the name) |
+| `PaneNote` | The notes of the experiment, as rich text |
+
+- **Clock:** the `Time` trace, in seconds from the start (0.5 s steps in the recordings seen). When a file holds it twice, the longer one is used.
+- **Traces:** a trace is used when it has at least 90 % of the clock's length. A shorter trace is lined up with the clock from the start, so only its end is empty. A trace whose two stored lengths disagree, that holds no values or that does not fit in its record is not read; this is reported, with the reason, only for the traces the program uses.
+- **Spectra rows:** (number of spectra + 2) rows of 32-bit floats, one value per wavelength: a row of zeros, log10 of the reference spectrum, then log10 of the counts of each spectrum. So counts = 10^row, rounded to a whole number, and transmission = 10^(row - reference row). Spectrum 1 belongs to the first time point of the clock, and so on.
+- **Additions:** each addition is stored more than once; the first copy has the spectrum number 0 and the later ones the real number.
+- **Not read:** files whose spectra are not numbered 1, 2, 3 without gaps, or that have more spectra than time points, are refused with a message.
 
 #### `individual experiment workbook`
 
@@ -406,8 +462,9 @@ Project-wide choices, written once. The tables above use these units and symbols
 |---|---|---|
 | Time | min | `(min)` in column names, `_min` in keys |
 | Wavelength | nm | none |
-| Oxygen concentration | uM | none |
-| Oxygen consumption rate | uM/min | none |
+| Oxygen concentration | µM | none |
+| Oxygen consumption rate | µM/min | none |
+| Concentration of an addition | µM | `_uM` in keys; written by `concentration_formatter` as µM, mM or M, and `? µM` when none was given |
 | Haem absorbance | mOD | none |
 | Fractions of a range or baseline | % | none |
 
@@ -427,6 +484,7 @@ float64 for all arrays unless stated otherwise in the tables above. The waveleng
 | Symbol | Meaning |
 |---|---|
 | `n_points` | Number of time points of a trace |
+| `n_ocr_points` | Number of time points with an OCR value (fewer than `n_points`) |
 | `n_spectra` | Number of spectra (frames) |
 | `n_wavelengths` | Number of wavelengths (pixels) |
 | `n_haems` | Number of haems in the fit |

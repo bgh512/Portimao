@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.7
+- **Version:** V1.8
 - **Date:** 19/11/2026
 
 ## Contents
@@ -39,6 +39,10 @@
     - [`test_transmission_from_the_stored_logarithms`](#test_transmission_from_the_stored_logarithms)
     - [`test_transmission_is_empty_without_reference_counts`](#test_transmission_is_empty_without_reference_counts)
     - [`test_trace_titles_follow_the_unit_of_the_file`](#test_trace_titles_follow_the_unit_of_the_file)
+    - [`test_addition_outside_the_recording_is_left_out`](#test_addition_outside_the_recording_is_left_out)
+    - [`test_missing_concentration_is_written_by_the_helper`](#test_missing_concentration_is_written_by_the_helper)
+    - [`test_trace_with_disagreeing_lengths_is_noted`](#test_trace_with_disagreeing_lengths_is_noted)
+    - [`test_unreadable_files_give_plain_messages`](#test_unreadable_files_give_plain_messages)
 - [`tests/test_paf_reading.py`](#teststest_paf_readingpy)
     - [`_dataset_loader`](#_dataset_loader)
     - [`_export_reader`](#_export_reader)
@@ -327,6 +331,7 @@
     - [`Spectra`](#spectra)
     - [`PafFile`](#paffile)
     - [`_event_lister`](#_event_lister)
+    - [`_event_time_adder`](#_event_time_adder)
     - [`_spectrum_time_finder`](#_spectrum_time_finder)
     - [`_trace_title_maker`](#_trace_title_maker)
     - [`_transmission_converter`](#_transmission_converter)
@@ -1490,6 +1495,114 @@ None.
 
 ---- Globals mutated ----
 None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_addition_outside_the_recording_is_left_out`
+
+```text
+---- Summary ----
+Main function to check that an addition stored outside the recording is left out
+with a warning that names it, that the others get their time, and that the quiet
+reading leaves out the same addition without printing.
+
+---- Inputs ----
+capsys : pytest.CaptureFixture
+    Catches what is printed.
+
+---- Globals read ----
+CLOCK_S (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Spectrum 3 is row 2 of the clock: 1.0 s = 1/60 min.
+
+---- Helpers ----
+None.
+```
+
+#### `test_missing_concentration_is_written_by_the_helper`
+
+```text
+---- Summary ----
+Main function to check that the shared helper writes every concentration, a
+missing one included.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MICRO_SIGN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+2000 uM = 2 mM; 1 500 000 uM = 1.5 M.
+
+---- Helpers ----
+None.
+```
+
+#### `test_trace_with_disagreeing_lengths_is_noted`
+
+```text
+---- Summary ----
+Main function to check that a trace whose two stored lengths disagree is not read
+and is noted under its name with the reason, both numbers included.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The two lengths sit 28 and 20 bytes before the end of the first record.
+
+---- Helpers ----
+None.
+```
+
+#### `test_unreadable_files_give_plain_messages`
+
+```text
+---- Summary ----
+Main function to check that a file that is missing, too small, not a .paf or
+without a clock is refused with a message that starts with its name and holds no
+Python error name, by both the quick look and the full reading.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder made by pytest.
+
+---- Globals read ----
+MARK (constant of the reader).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes three small files in tmp_path (side effect).
 
 ---- Equations ----
 None.
@@ -8993,20 +9106,22 @@ Small, generic utilities shared by several modules.
 ```text
 ---- Summary ----
 Main function to write a concentration given in micromolar with the most readable
-unit: M from 1 000 000 uM, mM from 1000 uM and uM below that.
+unit: M from 1 000 000 µM, mM from 1000 µM and µM below that. It is the one place
+where a concentration is turned into text.
 
 ---- Inputs ----
 concentration_um : Any
-    Concentration in micromolar (uM); anything float() accepts.
+    Concentration in micromolar (µM); anything float() accepts, or None when the
+    user gave none.
 
 ---- Globals read ----
-None.
+MISSING_CONCENTRATION (module constant).
 
 ---- Outputs ----
 str
-    For example '2 uM', '2 mM' (from 2000 uM) or '1.5 mM'; the unit is written
-    with the micro sign. Raises ValueError or TypeError if the value is not a
-    number.
+    For example '2 µM', '2 mM' (from 2000 µM) or '1.5 mM'; the unit is written
+    with the micro sign. MISSING_CONCENTRATION ('? µM') for None. Raises ValueError
+    or TypeError if the value is neither None nor a number.
 
 ---- Globals mutated ----
 None.
@@ -10304,8 +10419,10 @@ Direct reader of Espana Scientific Software .paf files.
 
 ```text
 ---- Summary ----
-Raised when the file is not a .paf, is truncated, or has a layout this reader does
-not know.
+Raised when the file cannot be opened, is not a .paf, is cut short, has a layout
+this reader does not know or lacks what the program needs. The message starts with
+the file name and says in plain words what is wrong and what to do, so it can be
+shown to the user as it is.
 
 ---- Attributes ----
 None.
@@ -10356,7 +10473,9 @@ dataset_name_lister
 duration_finder
 events_reader
 frame_counter
+missing_trace_describer
 notes_reader
+ocr_trace_checker
 spectra_dataset_reader
 stream_name_lister
 stream_reader
@@ -10380,8 +10499,9 @@ None.
 ---- Outputs ----
 None
     Nothing. Sets path, records, spectra, time_s (seconds) and the private
-    stream tables. Raises PafError for a file that is too small, has no Time
-    stream or cannot be read.
+    stream tables. Raises PafError, starting with the file name and saying in
+    plain words what is wrong and what to do, for a file that cannot be opened,
+    is too small, has no Time stream or has a layout this reader does not know.
 
 ---- Globals mutated ----
 None. Opens the file and the memory map (side effect); closes them again if
@@ -10611,6 +10731,36 @@ None.
 None.
 ```
 
+##### `missing_trace_describer`
+
+```text
+---- Summary ----
+Main method to say in plain words why one trace the program uses cannot be
+given.
+
+---- Inputs ----
+name : str
+    Trace name, a key of TRACE_LABELS ('CsO2', 'CcO2' or 'VoO2').
+
+---- Globals read ----
+TRACE_LABELS (module constant).
+
+---- Outputs ----
+str
+    For example 'run1.paf: the file has no OCR (VoO2) trace', or 'run1.paf: the
+    OCR (VoO2) trace cannot be read, because ...' with the reason noted when
+    the trace was skipped. No full stop at the end.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `notes_reader`
 
 ```text
@@ -10635,6 +10785,33 @@ None.
 
 ---- Helpers ----
 rtf_converter
+```
+
+##### `ocr_trace_checker`
+
+```text
+---- Summary ----
+Main method to refuse a file whose OCR trace (VoO2) cannot be given, as nothing
+can be processed without it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+SEND_FILE_ADVICE (module constant).
+
+---- Outputs ----
+None
+    Nothing. Raises PafError saying why the trace is missing and what to do.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+missing_trace_describer
 ```
 
 ##### `spectra_dataset_reader`
@@ -10776,6 +10953,8 @@ found : Sequence[Tuple[str, str, int]]
     One (name, text, position) per 'Text Event' record, in file order: the name the
     software gives the event ('Event 1'), the text the user typed and the 1-based
     spectrum number (0 in the template copy of an event).
+file_name : str
+    File name, for the warnings.
 
 ---- Globals read ----
 None.
@@ -10791,6 +10970,44 @@ None. Prints warnings (side effect).
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+warning_printer
+```
+
+#### `_event_time_adder`
+
+```text
+---- Summary ----
+Helper function to give every addition its time, and to leave out the additions
+stored outside the recording. The quick look and the full reading both use it, so
+they always give the same additions.
+
+---- Inputs ----
+events : Sequence[dict]
+    Additions from events_reader, each with 'datapoint' (1-based spectrum number)
+    and 'text'.
+time_min : np.ndarray
+    Clock of the recording in minutes, shape (n_timepoints,).
+file_name : str
+    File name, for the warning.
+is_quiet : bool
+    True to leave an addition out without the warning, when the user was already
+    told about it by the quick look.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[dict]
+    The additions inside the recording, in the order given, each with 'time' (min)
+    and 'row_index' (0-based row of the clock) added.
+
+---- Globals mutated ----
+None. Prints a warning for each addition left out (side effect).
+
+---- Equations ----
+row_index = datapoint - 1; time = time_min[row_index].
 
 ---- Helpers ----
 warning_printer
@@ -10979,19 +11196,23 @@ dict
     if the VoO2 trace is missing.
 
 ---- Globals mutated ----
-None. Prints warnings for missing traces, units the figures do not expect and
-events outside the recording (side effect).
+None. Prints warnings for missing traces and for units the figures do not expect
+(side effect). An addition outside the recording is left out without a warning, as
+experiment_summary_reader gives it at the start.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_event_time_adder
 _trace_title_maker
 _unit_cleaner
 acquisition_reader
 dataset_name_lister
 events_reader
+missing_trace_describer
 notes_reader
+ocr_trace_checker
 spectra_dataset_reader
 stream_reader
 stream_unit_reader
@@ -11013,20 +11234,24 @@ None.
 
 ---- Outputs ----
 dict
-    {'name' (file stem), 'duration_min', 'frames', 'datasets', 'events' (each with
-    'time' in minutes), 'traces'}.
+    {'name' (file stem), 'duration_min', 'frames', 'datasets', 'events' (the
+    additions inside the recording, each with 'time' in minutes), 'traces'}.
+    Raises PafError if the VoO2 trace is missing, so a file that cannot be
+    processed is refused before any question is asked about it.
 
 ---- Globals mutated ----
-None.
+None. Prints a warning for each addition outside the recording (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_event_time_adder
 dataset_name_lister
 duration_finder
 events_reader
 frame_counter
+ocr_trace_checker
 stream_name_lister
 ```
 
@@ -11039,9 +11264,11 @@ Main function to split the whole file into records and parse the spectra records
 ---- Inputs ----
 mm : mmap.mmap
     Read-only memory map of the .paf file.
+file_name : str
+    File name, for the warnings.
 
 ---- Globals read ----
-MARK (module constant).
+MARK, NOT_A_PAF (module constants).
 
 ---- Outputs ----
 Tuple[List[dict], List[Spectra]]
@@ -11102,16 +11329,19 @@ off : int
     Byte offset of the record marker.
 markers : List[int]
     Byte offsets of every record marker in the file, ascending.
+file_name : str
+    File name, for the warnings.
 
 ---- Globals read ----
-None. Calls the Spectra class, token_reader, u32_reader and warning_printer.
+COPY_AGAIN_ADVICE, SEND_FILE_ADVICE (module constants). Calls the Spectra class,
+token_reader, u32_reader and warning_printer.
 
 ---- Outputs ----
 Spectra
     Object with offset, name, nframes, npix, wl_off, wavelengths, data_off,
     data_end, log (nrows x npix float32 view), rec_end, params and checks
-    attributes. Raises PafError if the layout is not recognised, implausible or
-    truncated.
+    attributes. Raises PafError, in plain words and without the file name, if the
+    layout is not recognised, implausible or cut short.
 
 ---- Globals mutated ----
 None. Prints a warning for unexpected trailing bytes and for a first stored row
@@ -11131,25 +11361,31 @@ warning_printer
 ```text
 ---- Summary ----
 Main function to extract every trace (DataItem followed by Measurement record) as a
-float32 array.
+float32 array, and to note why each trace it cannot read was skipped.
 
 ---- Inputs ----
-mm : mmap.mmap
-    Read-only memory map of the .paf file.
+mm : Union[bytes, mmap.mmap]
+    Read-only memory map of the .paf file (or its bytes).
 recs : List[dict]
     Records from record_scanner, in file order.
+file_name : str
+    File name, for the warning.
 
 ---- Globals read ----
-None.
+TRACE_COLUMNS (module constant).
 
 ---- Outputs ----
-List[dict]
-    One {name, n, offset, values, quantity, unit} dictionary per trace. Traces with
-    disagreeing counts, no samples or a record that is too short are skipped with a
-    warning.
+Tuple[List[dict], dict]
+    (traces, skipped). traces has one {name, n, offset, values, quantity, unit}
+    dictionary per trace. skipped is {name: reason} for the traces with disagreeing
+    lengths, no values or a record that is too short; the reason is in plain words
+    and completes "the trace cannot be read, because ...". A file holds many traces
+    the program does not use, so nothing is printed here: the caller reports the
+    skipped traces it needs.
 
 ---- Globals mutated ----
-None. Prints warnings (side effect).
+None. Prints a warning when a trace the program uses ends in an unexpected way
+(side effect).
 
 ---- Equations ----
 None.
@@ -11227,15 +11463,17 @@ None.
 
 ```text
 ---- Summary ----
-Main function to print a reader warning, unless it is one of the harmless messages
-in QUIET_WARNINGS.
+Main function to print a reader warning.
 
 ---- Inputs ----
 msg : str
     Warning text, without the "WARNING" prefix.
+file_name : str
+    File the warning is about, written in front of the text; empty when the text
+    already names it.
 
 ---- Globals read ----
-QUIET_WARNINGS (module constant).
+None.
 
 ---- Outputs ----
 None
