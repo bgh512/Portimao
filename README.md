@@ -2,6 +2,10 @@
 
 Reads Espana Scientific Software `.paf` files, plots every experiment and the combined figures, and exports Excel workbooks that can be checked by hand.
 
+Made by Beatrixette.
+
+**Feedback:** to report a problem or ask for a change, open the [Issues page](https://github.com/bgh512/Portimao/issues) and click **New issue** (a free GitHub account is needed). When Portimao does not start on a Mac, choose **Mac problem** and paste the Mac report into it (section 2.3, entry 8).
+
 ## 1. Installation
 
 ### 1.1 Using GitHub (recommended)
@@ -37,10 +41,10 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
 #### macOS
 
 1. Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/) (the `python3` that comes with macOS has an old Tk that draws a blank window). Then open Terminal: press Cmd + Space, type `Terminal` and press Enter. If git is missing, run `xcode-select --install` first.
-2. Go to the folder where the project should be installed:
+2. Go to your home folder, where the project will be installed. Not Documents, Desktop or Downloads: macOS guards those, and the launcher cannot open them (section 2.3, entry 3).
 
     ```bash
-    cd ~/Documents
+    cd ~
     ```
 
 3. Download the project and enter its folder:
@@ -100,7 +104,7 @@ No git is needed.
 #### Install from the .zip
 
 1. On the project's GitHub page, click **Code**, then **Download ZIP**.
-2. Extract the .zip to the desired location.
+2. Extract the .zip to the desired location. On a Mac, move the extracted folder into your home folder (in Finder: Go > Home), not Documents, Desktop or Downloads (section 2.3, entry 3).
 3. Open a terminal in the extracted folder:
     - Windows: right-click inside the folder and choose **Open in Terminal**.
     - macOS: right-click the folder and choose **New Terminal at Folder**.
@@ -150,25 +154,40 @@ The launchers open Portimao without leaving a terminal window open.
 - macOS: double-click `Portimao.app` (the first time it also puts a link to it on your Desktop).
 - Linux: run `./run.sh`; the first time it adds Portimao to the applications menu and the Desktop.
 
-**macOS:** use Python from python.org (it includes a Tk of version 8.6 or newer). The Python that comes with macOS (and some Xcode tools) has the old Tk 8.5, which draws a blank window. The launcher looks for a better Python itself, rebuilds its environment with it, and shows a message when it finds none; then install Python 3.12 or newer from python.org, delete the hidden folder `.venv_unix` inside the Portimao folder and open Portimao again.
+**macOS:** use Python 3.12 or newer from python.org; the Python that comes with macOS draws a blank window. Keep the Portimao folder in your home folder. If Portimao does not start, see section 2.3.
 
 A small "Starting Portimao" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details (on macOS, a launcher that does not start at all writes to `logs/launcher_errors.log`). Everything the program prints goes to that file when it is started this way.
 
-Windows and macOS may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. On Windows right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. On macOS right-click `Portimao.app` and choose Open the first time; on macOS 15 (Sequoia) or newer, open it once, then go to System Settings > Privacy & Security and click *Open Anyway*.
+Windows and macOS may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. On Windows right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. On macOS see section 2.3, entries 1 and 2.
 
-### 2.3 Changing the icon
+### 2.3 If Portimao does not start on a Mac
+
+Find what you see below and do what its entry says. If nothing here helps, run the Mac report (entry 8) and send it, as under **Feedback** at the top.
+
+Several entries use Terminal: press Cmd + Space, type `Terminal` and press Enter. Instead of typing where a file or folder is, you drag it from Finder onto the Terminal window, and macOS types its place for you, followed by a space.
+
+1. **"Portimao" Not Opened, or "Apple cannot check it for malicious software".** macOS 15 (Sequoia) or newer: click Done, open System Settings > Privacy & Security, scroll down to the message about Portimao, click *Open Anyway* and confirm with your password, then open Portimao again. Older macOS: right-click (or Control-click) `Portimao.app`, choose Open, then Open again. Needed only once.
+2. **"Portimao is damaged and can't be opened", or "macOS opened Portimao from a temporary copy".** The folder still carries macOS's download flag. In Terminal, type `xattr -dr com.apple.quarantine` and a space, drag the Portimao folder onto the Terminal window, press Enter, then open Portimao again.
+3. **The icon jumps in the Dock and vanishes, or a message (or `logs/launcher_errors.log`) says "Operation not permitted".** macOS guards Documents, Desktop and Downloads (and iCloud Drive and external drives), and `Portimao.app` cannot ask to open them. Move the Portimao folder into your home folder (in Finder: Go > Home) and open `Portimao.app` from there; the link on the Desktop is made again. Your data folders are guarded in the same way: if they are in Documents, Desktop or Downloads, move them out too, or start Portimao from Terminal instead. To start it from Terminal, type `sh` and a space, drag the file `run.sh` from the Portimao folder onto the Terminal window and press Enter. When macOS asks whether Terminal may open a folder, click Allow.
+4. **"Python 3.9 or newer was not found".** Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/) (the macOS installer), then open Portimao again.
+5. **A blank window, or "Portimao needs a newer Python".** The Python that comes with macOS has an old Tk, which draws blank windows. Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/), then delete the hidden folder `.venv_unix` inside the Portimao folder (in Finder, Cmd + Shift + . shows hidden files) and open Portimao again.
+6. **A box asks to install the "command line developer tools".** Click Install (a few minutes): Portimao uses them to update itself when it was installed with git. Or click Not Now: Portimao still starts.
+7. **"The packages could not be installed".** The first start downloads what Portimao needs. Check the internet connection, or try another network (some networks block the download), then open Portimao again.
+8. **Nothing happens at all, or nothing above helps: the Mac report.** In Terminal, type `sh` and a space, open the Portimao folder and then its `launchers` folder, drag the file `mac_report.sh` onto the Terminal window and press Enter. If macOS asks whether Terminal may open the folder, click Allow. The report is printed and copied by itself: paste it (Cmd + V) into the **Mac problem** form on the [Issues page](https://github.com/bgh512/Portimao/issues). The report only reads; it changes nothing on the Mac. It shows where the Portimao folder is, which includes your Mac user name; change it before sending if you prefer.
+
+### 2.4 Changing the icon
 
 1. Replace `assets/icon.png` with the new icon (a square PNG, ideally 1024 x 1024 pixels).
 2. Run `python launchers/make_icons.py` (inside the program's environment, for example `.venv\Scripts\python launchers\make_icons.py` on Windows or `.venv_unix/bin/python launchers/make_icons.py` on Mac and Linux). It makes `assets/icon.ico` (window, taskbar and Windows shortcut) and the Mac icon inside `Portimao.app`.
 3. Delete the file `.portimao_shortcut`, then start Portimao once, so the Desktop and Start menu shortcuts are made again with the new icon.
 
 
-### 2.4 The questions
+### 2.5 The questions
 
 1. **Your files:** the `.paf` folder and the results folder. The plots of the files then appear on the right. As the folder is read, the instrument's OCR of each file is checked against our own calculation from its oxygen traces. A file whose numbers do not agree gets a warning naming the part that differs, and its figures still use the instrument's OCR (how the check works is in `DATA_FORMAT.md`, under "Our OCR check").
 2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. The four questions (trim start, trim end, ignore start, ignore end) all work the same way: yes/no, how many minutes for ALL the data, then optionally how many minutes for each specific file. In the window you can click on the plot where a cut should fall instead, and the minutes are filled in for you. Ignore times count from the new 0 after trimming. Once the limits are accepted you can export all the data now, cut to them (a workbook per file in `<results>/all_data/`, optionally with the spectra), to plot it yourself.
 3. **OD values and event labels:** fill in the OD values in a table, one row per file (they are only checked here), then change the event labels. Write `ignore` as an event's label to ignore an event that was not an addition. A label whose units could be written more tidily (`8 ug ml-1` as `8 µg mL⁻¹`) is offered in its tidy form: the labels in the files all at once, then each label as you type or keep it. This ends the import.
-4. **Processing:** accept the haems shown, or find components from your own data instead (section 2.7); another fit, or no haems, is chosen in the strip under the plot (section 2.5); then, now that the haems are seen, change the trim and ignore times if you want; then average around the events: how long a window, and how long before the next addition it ends, in seconds. Drag across one window on the plot to fill both in.
+4. **Processing:** accept the haems shown, or find components from your own data instead (section 2.8); another fit, or no haems, is chosen in the strip under the plot (section 2.6); then, now that the haems are seen, change the trim and ignore times if you want; then average around the events: how long a window, and how long before the next addition it ends, in seconds. Drag across one window on the plot to fill both in.
 5. **Individual experiment plots:** the figure saved for each file is drawn with the standard settings, or with the ones last saved for the dataset, and you change only what you want different: oxygen and OCR, which haems in which order, how the haems are shown and whether they are scaled by OD, the angle of the event labels. The haems on or off, the journal and the size are in the strip.
 6. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
 7. **Experiment summaries:** time response (waterfall time points to skip, two kinetic traces, three decomposition plots), OCR and haem response (OCR, haem form, haems and order).
@@ -176,7 +195,7 @@ Windows and macOS may show a "do you trust this software" warning the first time
 
 The figure of each file takes its journal and size from the strip; every other figure asks for its own. `None` uses Nature with the default size. Without the window (terminal mode) every one of these is asked as a question.
 
-### 2.5 The experiment browser
+### 2.6 The experiment browser
 
 The program runs in one window. The left side is a text terminal that asks the questions, with a box at the bottom to type your answers in (press Enter to send; the up and down keys recall earlier answers). If you type nothing, the value in [brackets] is used. The right side shows the plots of your files, with **< Prev** and **Next >** buttons and a drop-down list of the files under the plot. The arrows loop round, and Page Up and Page Down do the same from the keyboard. The window and the taskbar show the Portimao icon (on macOS the Dock icon needs the optional `pyobjc` package).
 
@@ -199,7 +218,7 @@ Closing the window while the program is still running stops it (a file that is b
 
 The full list of questions, with where each answer leads, is in [QUESTION_FLOW.md](QUESTION_FLOW.md).
 
-### 2.6 Outputs
+### 2.7 Outputs
 
 Everything goes into the results folder you chose:
 
@@ -216,7 +235,7 @@ Everything goes into the results folder you chose:
 
 Both summary figures need a haem fit in `fits/`. File names must carry the information the figure needs: `knockdown_kcn_then_bd_run1` (strain, addition order, run) for the OCR and haem response, and `control_7hours` (group, hours) for the time response. Files whose names do not fit are listed and left out of that figure only.
 
-### 2.7 Finding the haem components from the data (PCA)
+### 2.8 Finding the haem components from the data (PCA)
 
 Instead of a fit file, the haem decomposition can use components found from your own spectra with a principal component analysis (PCA). In the window, answer *No, find the components from the data* to *Do you accept this decomposition?*; in the fit question (asked when no haems are shown, and in terminal mode), choose *Find the components from the data (principal component analysis)*, the last in the list of fits. Then:
 
@@ -248,9 +267,10 @@ Portimao/
     main.py                 entry point
     config.py               defaults, journal sizes and colours
     Portimao.pyw, Portimao.app, run.bat, run.sh   launchers (no terminal window)
-    launchers/              the launcher program, shortcut and icon scripts
+    launchers/              the launcher program, shortcut and icon scripts, and the Mac report (mac_report.sh)
+    .github/ISSUE_TEMPLATE/ the "Mac problem" form of the Issues page
     assets/                 icons
-    fits/                   haem fit CSVs (your own fit goes here)
+    fits/                   haem fit CSVs (your own fit goes here; layout in DATA_FORMAT.md, "fit csv")
     utils_shared/           reading, processing, plotting and export of single experiments
         __init__.py
         paf_reader.py       direct .paf reader

@@ -3,8 +3,11 @@ Spectral fit loading and haem decomposition routines.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import csv
+import io
+import re
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
@@ -28,6 +31,34 @@ from utils_shared.schema import (measurement_column_finder,
 FIT_PEAK_BAND = (1e-7, 1e-3)
 # Some fit files hold the same shapes a million times larger; they are divided by this.
 FIT_LARGE_SCALE = 1_000_000.0
+# The first cell of a fit file in the layout with heading lines, and the newest format
+# of that layout this reader knows (written in the second cell as 'format 1').
+FIT_FILE_MARK = 'Portimao fit file'
+FIT_FILE_FORMAT = 1
+# The units a fit file may give its shapes in, each with what its values are divided by
+# to reach the standard scale (OD/mM/cm divided by a million, the instrument's own).
+# 'relative' is for components found from data, scaled to a largest point of 1.
+FIT_UNITS = {'OD/mM/cm': 1_000_000.0,
+             'OD/µM/cm': 1_000.0,
+             'OD/nM/cm': 1.0,
+             'relative': 1_000_000.0,
+             }
+# Which way up the shapes of a fit file are, with the sign that turns them the way the
+# decomposition uses them (oxidised minus reduced) and the words a file says it with.
+FIT_WAY_UP = {'oxidised minus reduced': 1.0, 'reduced minus oxidised': -1.0}
+FIT_WAY_UP_TEXTS = {'oxidised minus reduced': "oxidised minus reduced: each haem's α "
+                                              'peak is a dip, so the amount found '
+                                              'rises as the haem is oxidised and falls '
+                                              'as it is reduced',
+                    'reduced minus oxidised': "reduced minus oxidised: each haem's α "
+                                              'peak points up, so Portimao turns the '
+                                              'shapes over when it reads them',
+                    }
+FIT_NAMES_TEXT = ('In the figures the haem letters are in italics and a capital letter '
+                  'or number after them is written below the line (Cyt bH, Cyt a605)')
+# A word of a haem name put in figure form: one to three haem letters, in italics, then
+# a capital letter or a number written below the line (bH, a605, cc, aa3).
+HAEM_NAME_WORD = re.compile(r'([abcdo]{1,3})([A-Z]|[0-9]+)?')
 # The backgrounds a decomposition can fit under the haems, by name, with the words the
 # messages use; HAEM_BACKGROUND in config.py names the standard one. The Valencia one is
 # the shape of the instrument's own fit file, which follows 1/wavelength^2 exactly.
@@ -42,9 +73,83 @@ BACKGROUND_LABELS = {'scatter_1': 'flat + 1/wavelength',
 # ---- SPECTRAL DECOMPOSER HELPERS -----------------------------------------------------
 
 
+# ---- _fit_heading_reader -------------------------------------------------------------
+def _fit_heading_reader(lines: List[str], label: str) -> Tuple[Dict[str, str], int]:
+    """
+    ---- Summary ----
+    Helper function to read the lines at the top of a fit file in the layout with
+    heading lines: its format, then one 'name,text' line each, up to the first empty
+    line.
+
+    ---- Inputs ----
+    lines : List[str]
+        The lines of the file; the first holds FIT_FILE_MARK.
+    label : str
+        Name of the fit file, used in the messages.
+
+    ---- Globals read ----
+    FIT_FILE_MARK, FIT_FILE_FORMAT (module constants).
+
+    ---- Outputs ----
+    Tuple[Dict[str, str], int]
+        ({name of each heading line, in lower case: its text, the cells after the name
+        joined by ', '}, index in lines of the haem names: the first line that is not
+        empty after the heading lines). A name used twice keeps its first text. Raises
+        ValueError, with a message for the user, when the first line gives no format,
+        the format is newer than FIT_FILE_FORMAT, or no table follows.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None. A line is empty when all its cells are, as a spreadsheet saves an empty line
+    (',,,,').
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Check the format ----------------------------------------------------------
+    first = next(csv.reader(lines[:1]), [])
+    version = re.search(r'[0-9]+', ' '.join(first[1:]))
+    if version is None:
+        raise ValueError(f'{label}: its first line must say "{FIT_FILE_MARK},format '
+                         f'{FIT_FILE_FORMAT}". Correct it, or choose another fit file.',
+                         )
+    if int(version.group()) > FIT_FILE_FORMAT:
+        raise ValueError(
+            f'{label} is a fit file of format {version.group()}, newer than '
+            f'this Portimao can read (format {FIT_FILE_FORMAT}). Download '
+            'Portimao again, or choose another fit file.',
+            )
+
+    # ---- 2 Read the heading lines up to the first empty line -------------------------
+    no_table = (f'{label}: no table of shapes was found. Leave one empty line under the '
+                'lines that describe the fit, then write the haem names, the row saying '
+                'what each column holds, and the numbers.'
+                )
+    headings: Dict[str, str] = {}
+    for index in range(1, len(lines)):
+        cells = [cell.strip() for cell in next(csv.reader([lines[index]]), [])]
+        if not any(cells):
+            break
+        name = ' '.join(cells[0].lower().split())
+        if name and name not in headings:
+            headings[name] = ', '.join(cell for cell in cells[1:] if cell)
+    else:
+        raise ValueError(no_table)
+
+    # ---- 3 Find the haem names below the empty lines ---------------------------------
+    for names_at in range(index + 1, len(lines)):
+        if any(cell.strip() for cell in next(csv.reader([lines[names_at]]), [])):
+            return headings, names_at
+    raise ValueError(no_table)
+
+
 # ---- _fit_table_cleaner --------------------------------------------------------------
 def _fit_table_cleaner(data: pd.DataFrame,
                        label: str,
+                       first_row: int = 2,
                        ) -> Tuple[pd.DataFrame, List[str]]:
     """
     ---- Summary ----
@@ -53,11 +158,14 @@ def _fit_table_cleaner(data: pd.DataFrame,
 
     ---- Inputs ----
     data : pd.DataFrame
-        The fit file as read: (wavelength, response) column pairs, one pair per haem;
-        the header of each wavelength column names the haem. Row i of the table is row
-        i + 2 of the file.
+        The fit table as read: (wavelength, response) column pairs, one pair per haem;
+        the header of each wavelength column names the haem.
     label : str
         Name of the fit file, used in the messages.
+    first_row : int
+        Row of the file that holds row 0 of the table (counted from 1), so that the
+        messages name the row as the file has it: 2 for a file whose only heading is
+        the haem names.
 
     ---- Globals read ----
     None.
@@ -105,11 +213,21 @@ def _fit_table_cleaner(data: pd.DataFrame,
                              'above its wavelength column, or delete the columns if '
                              'they are empty.',
                              )
-        x = _number_column_reader(data.iloc[:, 2 * i], haem, 'wavelength', label)
-        y = _number_column_reader(data.iloc[:, 2 * i + 1], haem, 'response', label)
+        x = _number_column_reader(data.iloc[:, 2 * i],
+                                  haem,
+                                  'wavelength',
+                                  label,
+                                  first_row,
+                                  )
+        y = _number_column_reader(data.iloc[:, 2 * i + 1],
+                                  haem,
+                                  'response',
+                                  label,
+                                  first_row,
+                                  )
         half = np.isnan(x) != np.isnan(y)
         if half.any():
-            row = int(np.nonzero(half)[0][0]) + 2
+            row = int(np.nonzero(half)[0][0]) + first_row
             raise ValueError(f'{label}: row {row} of {haem} has a wavelength without '
                              'a response, or a response without a wavelength. Fill in '
                              'or empty both cells, or choose another fit file.',
@@ -142,6 +260,41 @@ def _fit_table_cleaner(data: pd.DataFrame,
         values[:len(x), 2 * i] = x
         values[:len(y), 2 * i + 1] = y
     return pd.DataFrame(values, columns=data.columns), notes
+
+
+# ---- _fit_unit_finder ----------------------------------------------------------------
+def _fit_unit_finder(text: str) -> Optional[str]:
+    """
+    ---- Summary ----
+    Helper function to find which of the fit units the Unit line of a fit file names,
+    however it is spaced, capitalised or written with a micro sign.
+
+    ---- Inputs ----
+    text : str
+        Text of the Unit line, for example 'OD/mM/cm' or 'od / uM / cm'.
+
+    ---- Globals read ----
+    FIT_UNITS (module constant).
+
+    ---- Outputs ----
+    Optional[str]
+        The unit as FIT_UNITS writes it, or None when the text names none of them.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None. The Greek mu (μ) and a u in place of µ count as the micro sign.
+
+    ---- Helpers ----
+    None.
+    """
+
+    key = re.sub(r'\s+', '', text).lower().replace('μ', 'µ').replace('/um/', '/µm/')
+    for unit in FIT_UNITS:
+        if key == unit.lower():
+            return unit
+    return None
 
 
 # ---- _haem_shape_getter --------------------------------------------------------------
@@ -183,11 +336,121 @@ def _haem_shape_getter(fit_data: pd.DataFrame,
     return x[filled], y[filled]
 
 
+# ---- _headed_fit_reader --------------------------------------------------------------
+def _headed_fit_reader(lines: List[str],
+                       label: str,
+                       ) -> Tuple[pd.DataFrame, float, List[str]]:
+    """
+    ---- Summary ----
+    Helper function to read a fit file in the layout with heading lines (DATA_FORMAT.md,
+    "fit csv") and bring it to the standard scale, the way up the decomposition uses
+    and the haem names in figure form.
+
+    ---- Inputs ----
+    lines : List[str]
+        The lines of the file; the first holds FIT_FILE_MARK.
+    label : str
+        Name of the fit file, used in the messages.
+
+    ---- Globals read ----
+    FIT_UNITS, FIT_WAY_UP, FIT_PEAK_BAND (module constants).
+
+    ---- Outputs ----
+    Tuple[pd.DataFrame, float, List[str]]
+        (the cleaned table, as _fit_table_cleaner gives it, on the standard scale with
+        each haem's name in figure form; what the values of the file were divided by;
+        the notes for the user). Raises ValueError, with a message for the user, when
+        the Unit line is missing or names no fit unit, the Way up line is not one of
+        the two ways, the row under the haem names does not say what the columns
+        hold, or the table cannot be read.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    response = value of the file x way-up sign (+1, or -1 for 'reduced minus
+    oxidised') / divisor of the unit (FIT_UNITS). A file with no Way up line is used
+    as it is written.
+
+    ---- Helpers ----
+    _fit_heading_reader
+    _fit_table_cleaner
+    _fit_unit_finder
+    haem_name_typesetter
+    """
+
+    # ---- 1 Read the heading lines, the unit and the way up ---------------------------
+    headings, names_at = _fit_heading_reader(lines, label)
+    units = ', '.join(FIT_UNITS)
+    if 'unit' not in headings:
+        raise ValueError(f'{label} has no Unit line, so the size of its shapes is not '
+                         f'known. Add a line "Unit,OD/mM/cm" (or another of: {units}) '
+                         'above the empty line, or choose another fit file.',
+                         )
+    unit = _fit_unit_finder(headings['unit'])
+    if unit is None:
+        raise ValueError(f'{label}: its Unit line says "{headings["unit"]}", but the '
+                         f'unit must be one of: {units}. Correct the line, or choose '
+                         'another fit file.',
+                         )
+    sign = 1.0
+    if 'way up' in headings:
+        way_up = ' '.join(headings['way up'].split(':')[0].lower().split())
+        if way_up not in FIT_WAY_UP:
+            raise ValueError(f'{label}: its Way up line says "{headings["way up"]}", '
+                             "but it must start with 'oxidised minus reduced' or "
+                             "'reduced minus oxidised'. Correct the line, or choose "
+                             'another fit file.',
+                             )
+        sign = FIT_WAY_UP[way_up]
+
+    # ---- 2 Check the row that says what each column holds ----------------------------
+    rows = list(csv.reader(lines[names_at:names_at + 2]))
+    if len(rows) < 2 or not all(i < len(rows[1])
+                                and rows[1][i].strip().lower().startswith('wavelength')
+                                for i in range(0, len(rows[0]), 2)
+                                if rows[0][i].strip()
+                                ):
+        raise ValueError(f'{label}: the row under the haem names (row {names_at + 2}) '
+                         'must say what each column holds: "Wavelength (nm)", then the '
+                         'unit. Add that row, or choose another fit file.',
+                         )
+
+    # ---- 3 Read and clean the table --------------------------------------------------
+    try:
+        raw = pd.read_csv(io.StringIO('\n'.join(lines[names_at:])), skiprows=[1])
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
+        raise ValueError(
+            f'{label}: the table of shapes under its first lines could not '
+            'be read. Open it to check it, or choose another fit file.',
+            ) from None
+    cleaned, notes = _fit_table_cleaner(raw, label, first_row=names_at + 3)
+
+    # ---- 4 Bring it to the standard scale, way up and names --------------------------
+    divisor = FIT_UNITS[unit]
+    data = cleaned.copy()
+    data.iloc[:, 1::2] = sign * cleaned.iloc[:, 1::2].to_numpy(dtype=float) / divisor
+    data.columns = [haem_name_typesetter(column) if i % 2 == 0 else column
+                    for i, column in enumerate(cleaned.columns)
+                    ]
+    peak = float(np.nanmax(np.abs(data.iloc[:, 1::2].to_numpy(dtype=float))))
+    low, high = FIT_PEAK_BAND
+    if not low <= peak <= high:
+        notes.append(
+            f'Warning: {label}: the highest point of its shapes is '
+            f'{peak * divisor:.3g} {unit}, far from the usual size in that unit '
+            f'({low * divisor:g} to {high * divisor:g}). Check its Unit line. '
+            'mOD and % are not affected; the raw haem amounts are.',
+            )
+    return data, divisor, notes
+
+
 # ---- _number_column_reader -----------------------------------------------------------
 def _number_column_reader(column: pd.Series,
                           haem: str,
                           kind: str,
                           label: str,
+                          first_row: int,
                           ) -> np.ndarray:
     """
     ---- Summary ----
@@ -195,13 +458,15 @@ def _number_column_reader(column: pd.Series,
 
     ---- Inputs ----
     column : pd.Series
-        The column as read from the file; row i is row i + 2 of the file.
+        The column as read from the file; row i is row i + first_row of the file.
     haem : str
         Name of the haem the column belongs to, used in the message.
     kind : str
         'wavelength' or 'response', used in the message.
     label : str
         Name of the fit file, used in the message.
+    first_row : int
+        Row of the file that holds row 0 of the column (counted from 1).
 
     ---- Globals read ----
     None.
@@ -227,10 +492,11 @@ def _number_column_reader(column: pd.Series,
     unreadable = ~blank & ~np.isfinite(numbers)
     if unreadable.any():
         row = int(np.nonzero(unreadable)[0][0])
-        raise ValueError(f'{label}: the {kind} of {haem} in row {row + 2} is not a '
-                         f'number ("{column.iloc[row]}"). Correct the cell, or choose '
-                         'another fit file.',
-                         )
+        raise ValueError(
+            f'{label}: the {kind} of {haem} in row {row + first_row} is not a '
+            f'number ("{column.iloc[row]}"). Correct the cell, or choose '
+            'another fit file.',
+            )
     return numbers
 
 
@@ -727,6 +993,99 @@ def experiment_decomposer(experiment: dict,
     return experiment
 
 
+# ---- fit_file_writer -----------------------------------------------------------------
+def fit_file_writer(fit: Dict[str, Any],
+                    path: Path,
+                    unit: str,
+                    holds: str,
+                    way_up: Optional[str] = None,
+                    notes: Sequence[Tuple[str, str]] = (),
+                    ) -> Path:
+    """
+    ---- Summary ----
+    Main function to save a fit as a fit file in the layout with heading lines
+    (DATA_FORMAT.md, "fit csv"), which fit_importer reads back as the same fit.
+
+    ---- Inputs ----
+    fit : Dict[str, Any]
+        Fit dictionary, as fit_importer or fit_table_builder give it: names in figure
+        form or plain, the table on the standard scale.
+    path : Path
+        File to write (.csv).
+    unit : str
+        Unit of the values written, one of FIT_UNITS.
+    holds : str
+        What the file holds, in words, for its Holds line.
+    way_up : Optional[str]
+        One of FIT_WAY_UP for a file of haem shapes, which then has a Way up line;
+        None for no Way up line (the shapes are written as the decomposition uses them).
+    notes : Sequence[Tuple[str, str]]
+        Further heading lines for people, as (name, text), for example ('Made from',
+        'the instrument's fit ...'), written in this order under the Names line.
+
+    ---- Globals read ----
+    FIT_FILE_MARK, FIT_FILE_FORMAT, FIT_UNITS, FIT_WAY_UP, FIT_WAY_UP_TEXTS,
+    FIT_NAMES_TEXT (module constants).
+
+    ---- Outputs ----
+    Path
+        The file written. Raises ValueError when the unit or the way up is not one
+        this module knows, or two haems have the same plain name or one has none.
+
+    ---- Globals mutated ----
+    None. Writes the file (side effect).
+
+    ---- Equations ----
+    value written = response x divisor of the unit (FIT_UNITS) x way-up sign
+    (FIT_WAY_UP), to 15 significant digits: a value typed with fewer digits is written
+    as typed, and any other moves by less than 1e-14 of itself. Rows blank in every
+    haem are left out, so no leftover rows are written.
+
+    ---- Helpers ----
+    haem_name_plainer
+    """
+
+    # ---- 1 Check the unit, the way up and the names ----------------------------------
+    if unit not in FIT_UNITS:
+        raise ValueError(f'"{unit}" is not a fit unit; use one of: '
+                         f"{', '.join(FIT_UNITS)}.",
+                         )
+    if way_up is not None and way_up not in FIT_WAY_UP:
+        raise ValueError(f'"{way_up}" is not a way up; use one of: '
+                         f"{', '.join(FIT_WAY_UP)}.",
+                         )
+    names = [haem_name_plainer(name).strip() for name in fit['haem_list']]
+    if not all(names) or len(set(names)) != len(names):
+        raise ValueError('Every haem of a fit file needs its own name (the names: '
+                         f"{'; '.join(names)}). Name the haems again.",
+                         )
+
+    # ---- 2 Build the heading lines ---------------------------------------------------
+    rows = [[FIT_FILE_MARK, f'format {FIT_FILE_FORMAT}'],
+            ['Holds', holds],
+            ['Unit', unit],
+            ]
+    if way_up is not None:
+        rows.append(['Way up', FIT_WAY_UP_TEXTS[way_up]])
+    rows.append(['Names', FIT_NAMES_TEXT])
+    rows += [[name, text] for name, text in notes]
+    rows.append([])
+
+    # ---- 3 Build the table -----------------------------------------------------------
+    rows.append([cell for name in names for cell in (name, '')])
+    rows.append([cell for _ in names for cell in ('Wavelength (nm)', unit)])
+    values = fit['data'].to_numpy(dtype=float).copy()
+    values[:, 1::2] *= FIT_UNITS[unit] * FIT_WAY_UP.get(way_up, 1.0)
+    for row in values:
+        if not np.isnan(row).all():
+            rows.append(['' if np.isnan(value) else f'{value:.15g}' for value in row])
+
+    # ---- 4 Write the file ------------------------------------------------------------
+    with open(path, 'w', encoding='utf-8-sig', newline='') as handle:
+        csv.writer(handle, lineterminator='\r\n').writerows(rows)
+    return path
+
+
 # ---- fit_haem_selector ---------------------------------------------------------------
 def fit_haem_selector(fit: Dict[str, Any], haems: List[str]) -> Dict[str, Any]:
     """
@@ -785,19 +1144,24 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
 
     ---- Inputs ----
     filename : Path
-        CSV with (wavelength, response) column pairs, one pair per haem; the header of
-        each wavelength column names the haem. The haems may have different lengths.
+        CSV with (wavelength, response) column pairs, one pair per haem, the haem's
+        name over its wavelength column; the haems may have different lengths. Either
+        in the layout with heading lines (first cell FIT_FILE_MARK, then a Unit line;
+        see DATA_FORMAT.md, "fit csv"), or the older layout whose first row is the haem
+        names.
 
     ---- Globals read ----
-    None.
+    FIT_FILE_MARK (module constant).
 
     ---- Outputs ----
     Dict[str, Any]
         {'haem_list': haem names in file order, 'data': the cleaned table
-        (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the responses
-        of the file were divided by (1 or 1 000 000), 'notes': sentences for the user
-        about rows left out and the scale}. Raises ValueError, with a message for the
-        user, when the file cannot be read as a fit.
+        (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the values
+        of the file were divided by (1, 1 000 or 1 000 000), 'notes': sentences for
+        the user about rows left out and the scale}. A file with heading lines gives
+        its names in figure form (haem_name_typesetter); an older file gives them as
+        written. Raises ValueError, with a message for the user, when the file cannot
+        be read as a fit.
 
     ---- Globals mutated ----
     None. Reads the file (side effect).
@@ -807,27 +1171,37 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
 
     ---- Helpers ----
     _fit_table_cleaner
+    _headed_fit_reader
     fit_scale_standardiser
     """
 
+    # ---- 1 Read the text -------------------------------------------------------------
     label = Path(filename).name
+    unreadable = (f'{label} could not be read as a table with commas between its '
+                  'columns. Open it to check it, or choose another fit file.'
+                  )
     try:
-        raw = pd.read_csv(filename, delimiter=',')
-    except (OSError,
-            UnicodeDecodeError,
-            pd.errors.EmptyDataError,
-            pd.errors.ParserError,
-            ):
-        raise ValueError(f'{label} could not be read as a table with commas between '
-                         'its columns. Open it to check it, or choose another fit '
-                         'file.',
-                         ) from None
-    cleaned, notes = _fit_table_cleaner(raw, label)
-    data, divisor, scale_notes = fit_scale_standardiser(cleaned, label)
+        text = Path(filename).read_text(encoding='utf-8-sig')
+        lines = text.splitlines()
+        first = next(csv.reader(lines[:1]), [])
+    except (OSError, UnicodeDecodeError, csv.Error):
+        raise ValueError(unreadable) from None
+
+    # ---- 2 Read the layout with heading lines, or the older one ----------------------
+    if first and first[0].strip().lower() == FIT_FILE_MARK.lower():
+        data, divisor, notes = _headed_fit_reader(lines, label)
+    else:
+        try:
+            raw = pd.read_csv(io.StringIO(text), delimiter=',')
+        except (pd.errors.EmptyDataError, pd.errors.ParserError):
+            raise ValueError(unreadable) from None
+        cleaned, notes = _fit_table_cleaner(raw, label)
+        data, divisor, scale_notes = fit_scale_standardiser(cleaned, label)
+        notes = notes + scale_notes
     return {'haem_list': [str(name) for name in data.columns[::2]],
             'data': data,
             'scale_divisor': divisor,
-            'notes': notes + scale_notes,
+            'notes': notes,
             }
 
 
@@ -926,6 +1300,89 @@ def fit_scale_standardiser(data: pd.DataFrame,
         f'the standard scale ({low:g} to {high:g}), so the raw haem amounts will be '
         'on another scale than with the other fits. mOD and % are not affected.',
         ]
+
+
+# ---- haem_name_plainer ---------------------------------------------------------------
+def haem_name_plainer(name: str) -> str:
+    """
+    ---- Summary ----
+    Main function to write a haem name in plain words, without the plotting codes of
+    its figure form: 'Cyt $b_{557}$' becomes 'Cyt b557'. The reverse of
+    haem_name_typesetter for the names it makes.
+
+    ---- Inputs ----
+    name : str
+        Haem name, in figure form or plain.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        The name with each $...$ part written without its $, _, { and } signs; a
+        name without such a part is returned as it is.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return re.sub(r'\$([^$]*)\$',
+                  lambda found: re.sub(r'[_{}\\]', '', found.group(1)),
+                  str(name),
+                  )
+
+
+# ---- haem_name_typesetter ------------------------------------------------------------
+def haem_name_typesetter(name: str) -> str:
+    """
+    ---- Summary ----
+    Main function to put a plain haem name in the form the figures draw: the haem
+    letters in italics and a capital letter or number after them below the line, so
+    'Cyt bH' becomes 'Cyt $b_H$', 'Cyt a605' 'Cyt $a_{605}$' and 'Cyt cc' 'Cyt $cc$'.
+
+    ---- Inputs ----
+    name : str
+        Plain haem name, words separated by spaces.
+
+    ---- Globals read ----
+    HAEM_NAME_WORD (module constant).
+
+    ---- Outputs ----
+    str
+        The name with each haem word (HAEM_NAME_WORD: one to three of the letters a,
+        b, c, d, o, then a capital letter or a number) in figure form; other words,
+        such as 'Cyt', 'PC1' or 'a-like', as written.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    words = []
+    for word in str(name).split(' '):
+        found = HAEM_NAME_WORD.fullmatch(word)
+        if found is None:
+            words.append(word)
+            continue
+        letters, below = found.groups()
+        if not below:
+            words.append(f'${letters}$')
+        elif len(below) == 1:
+            words.append(f'${letters}_{below}$')
+        else:
+            words.append(f'${letters}_{{{below}}}$')
+    return ' '.join(words)
 
 
 # ---- s_array_generator ---------------------------------------------------------------

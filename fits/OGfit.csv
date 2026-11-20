@@ -1,4 +1,11 @@
+﻿Portimao fit file,format 1
+Holds,"The shape of each haem: how much 1 mM of the haem in a 1 cm light path changes the attenuation, -log10(T), at each wavelength between its oxidised and reduced states"
+Unit,OD/mM/cm
+Way up,"oxidised minus reduced: each haem's α peak is a dip, so the amount found rises as the haem is oxidised and falls as it is reduced"
+Names,"In the figures the haem letters are in italics and a capital letter or number after them is written below the line (Cyt bH, Cyt a605)"
+
 Cyt c1,,Cyt c2,,Cyt bH,,Cyt bL,,Cyt a,
+Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm
 491.79,7.02,488.79,7.02,491.39,5.89,491.39,2.53,345.14,-111.08
 491.9,6.93,488.9,6.93,491.5,5.9,491.5,2.55,345.51,-107.14
 492.02,6.98,489.02,6.98,491.62,5.87,491.62,2.49,345.87,-103.74

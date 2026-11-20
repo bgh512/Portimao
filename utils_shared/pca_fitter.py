@@ -13,6 +13,7 @@ from scipy.signal import savgol_filter
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.spectral_decomposer import (basis_solver,
+                                              fit_file_writer,
                                               fit_scale_standardiser,
                                               scatter_background_builder,
                                               )
@@ -679,9 +680,9 @@ def decomposition_example_finder(spectra_sets: List[dict],
 def fit_saver(fit: dict, path: Path) -> Path:
     """
     ---- Summary ----
-    Main function to save a fit in the layout of the fit files in the fits folder
-    (a header naming each haem over its wavelength column, one (wavelength, response)
-    pair of columns per haem).
+    Main function to save the components found as a fit file in the fits folder, in
+    the layout with heading lines (DATA_FORMAT.md, "fit csv"), with the unit
+    'relative': each component scaled so that its largest point is 1.
 
     ---- Inputs ----
     fit : dict
@@ -700,22 +701,19 @@ def fit_saver(fit: dict, path: Path) -> Path:
     None. Writes the file (side effect).
 
     ---- Equations ----
-    None.
+    value written = response x 1 000 000: the component as found (fit_file_writer).
 
     ---- Helpers ----
-    None.
+    fit_file_writer
     """
 
-    header = []
-    for name in fit['haem_list']:
-        header += [name, f'{name} response']
-    fit['data'].to_csv(path,
-                       index=False,
-                       header=header,
-                       lineterminator='\r\n',
-                       float_format='%.6g',
-                       )
-    return path
+    data = fit['data']
+    first, last = float(data.iloc[:, 0].min()), float(data.iloc[:, 0].max())
+    holds = ('Components found by Portimao from the spectra between '
+             f'{first:.0f} and {last:.0f} nm, each scaled so that its largest point is '
+             '1, so the amounts found with them are in arbitrary units'
+             )
+    return fit_file_writer(fit, path, 'relative', holds)
 
 
 # ---- fit_table_builder ---------------------------------------------------------------

@@ -17,7 +17,7 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'VoO2'` | pd.DataFrame | (n_ocr_points, 2) | µM/min | Oxygen consumption rate (OCR): `Time (min)` and `VoO2`. Always there: a file without it is refused. It has fewer rows than the oxygen tables, as the time points where the instrument has no OCR value (the start of a recording, and the end when the trace is shorter than the clock) are left out |
 | `'VoO2_OD'` | pd.DataFrame | (n_points, 2) | | Optional. OCR divided by dilution factor x OD x volume |
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
-| `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem. Fitted beside the chosen background (`HAEM_BACKGROUND` in `config.py`; the choices are `BACKGROUND_LABELS` in `spectral_decomposer.py`). When the change from the first spectrum is fitted, these are the changes from the first spectrum (the first kept, in a trimmed run) |
+| `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mM for a 1 cm light path | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem. The fit shapes times `HAEM_FACTOR` are in OD/mM/cm, so the amounts are mM x cm; with components found from data they are in arbitrary units. Fitted beside the chosen background (`HAEM_BACKGROUND` in `config.py`; the choices are `BACKGROUND_LABELS` in `spectral_decomposer.py`). When the change from the first spectrum is fitted, these are the changes from the first spectrum (the first kept, in a trimmed run) |
 | `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum; a change from the first spectrum when `haem_conc` is |
 | `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the median of its highest 50 spectra in a row (outside the ignored start and end; `REFERENCE_WINDOW_POINTS` in `config.py`) is 0 |
 | `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. The matching tables divided by dilution factor x OD x volume |
@@ -219,10 +219,10 @@ A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds th
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names, in file order |
-| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the response as the basis spectrum; it has the sign of the attenuation, -log10(T). Each haem's rows are at the top, with wavelengths going upwards and blanks (NaN) below a shorter haem. The responses are on the standard scale: the highest point of the shapes lies between 1e-7 and 1e-3 |
-| `'scale_divisor'` | float | | | What the responses were divided by to reach the standard scale: 1, or 1 000 000 |
-| `'notes'` | List[str] | | | Sentences for the user: leftover rows left out of a haem, a fit divided by a million, a fit on neither scale |
+| `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names, in file order. From a fit file with heading lines they are in figure form (`haem_name_typesetter`: `Cyt bH` becomes `Cyt $b_H$`); from an older file, as written |
+| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD/mM/cm ÷ 1 000 000 | (wavelength, response) column pairs, one pair per haem. The decomposition uses the response as the basis spectrum; it has the sign of the attenuation, -log10(T), oxidised minus reduced (each haem's α peak is a dip). Each haem's rows are at the top, with wavelengths going upwards and blanks (NaN) below a shorter haem. The responses are on the standard scale, OD/mM/cm divided by a million (the instrument's own scale, which `HAEM_FACTOR` multiplies back): the highest point of the shapes lies between 1e-7 and 1e-3 |
+| `'scale_divisor'` | float | | | What the values of the file were divided by to reach the standard scale: set by the Unit line of a file with heading lines (1 000 000 for OD/mM/cm and relative, 1 000 for OD/µM/cm, 1 for OD/nM/cm); for an older file, 1, or 1 000 000 when it is a million above the standard |
+| `'notes'` | List[str] | | | Sentences for the user: leftover rows left out of a haem, an older fit divided by a million, a fit far from the usual size of its unit or on neither scale |
 
 #### `pca_analysis`
 
@@ -498,15 +498,47 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 |---|---|
 | File type | CSV |
 | Delimiter | comma |
-| Encoding | UTF-8 (line ends CRLF when written by the program) |
+| Encoding | UTF-8 with the byte-order mark, so that Excel shows µ and α (line ends CRLF when written by the program); read with or without the mark |
 | Location and name | `fits/<name>.csv`; the program saves the components found by the principal component analysis here |
 
-| Column | Type | Units | Description |
-|---|---|---|---|
-| `<haem>` | float | nm | Wavelength column of one haem; the header names the haem (every second column, starting with the first) |
-| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of 1e-6 (the component divided by a million) |
+The file holds one haem or several, written by `fit_file_writer` and read by `fit_importer`. It starts with heading lines, one `name,text` line each, down to the first empty line:
 
-Rules, checked by `fit_importer`: the columns come in pairs and every wavelength column has a haem name; every cell is a number or empty; a row holds both a wavelength and a response, or neither; each haem has at least two rows. The haems may have different lengths, and empty rows are skipped wherever they are. Within a haem the wavelengths go upwards (a haem written wholly downwards is turned round); where they jump backwards, the rows from the jump on are left out and the user is told. Scale: the highest point of the shapes (largest |response| in the file) is between 1e-7 and 1e-3; a file a million above that (0.1 to 1000) is divided by a million when read, and a file on neither scale is used as it is with a warning.
+| Line | Read by the program | Description |
+|---|---|---|
+| `Portimao fit file,format 1` | Yes | Always first. A newer format than the program knows is refused |
+| `Holds,<text>` | No | What the file holds, in words |
+| `Unit,<unit>` | Yes, required | `OD/mM/cm`, `OD/µM/cm`, `OD/nM/cm`, or `relative` for components found from data (each scaled so its largest point is 1). Spaces, capitals, the Greek μ and `uM` are accepted |
+| `Way up,<text>` | Yes, if there | Starts with `oxidised minus reduced` (as the decomposition uses the shapes: each haem's α peak is a dip) or `reduced minus oxidised` (turned over when read). Without this line the shapes are used as written |
+| `Names,<text>` | No | How the names show in the figures |
+| any other `<name>,<text>` | No | For people, for example `Made from` |
+
+Then the table:
+
+| Row or column | Type | Units | Description |
+|---|---|---|---|
+| First row | str | | The haem names, each over its wavelength column, the cell over its value column empty. Plain words: in the figures the haem letters (one to three of a, b, c, d, o) are in italics and a capital letter or number after them is written below the line (`haem_name_typesetter`); other words show as typed |
+| Second row | str | | What each column holds: `Wavelength (nm)`, then the unit |
+| Wavelength columns (every second, from the first) | float | nm | Wavelengths of one haem, going upwards |
+| Value columns | float | the unit | The haem's shape at those wavelengths. Shorter haems end in empty cells |
+
+Example (the top of `fits/bswitch_no2_mycobl_b557.csv`, the standard fit):
+
+```text
+Portimao fit file,format 1
+Holds,"The shape of each haem: how much 1 mM of the haem in a 1 cm light path changes the attenuation, -log10(T), at each wavelength between its oxidised and reduced states"
+Unit,OD/mM/cm
+Way up,"oxidised minus reduced: each haem's α peak is a dip, so the amount found rises as the haem is oxidised and falls as it is reduced"
+Names,"In the figures the haem letters are in italics and a capital letter or number after them is written below the line (Cyt bH, Cyt a605)"
+Made from,The shapes of the instrument's fit 20240913_Myco_b557_nolamda.fit
+
+Cyt cc,,Cyt bH,,Cyt bL,,Cyt a605,,Cyt b557,
+Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm
+508.1799927,1.89,494.9100037,5.89,519.9821167,4.75,508.6799927,-1.93,486.9100037,5.89
+```
+
+Rules, checked by `fit_importer`: the columns come in pairs and every wavelength column has a haem name; every cell is a number or empty; a row holds both a wavelength and a response, or neither; each haem has at least two rows. The haems may have different lengths, and empty rows are skipped wherever they are. Within a haem the wavelengths go upwards (a haem written wholly downwards is turned round); where they jump backwards, the rows from the jump on are left out and the user is told. The values are divided by the unit's number (1 000 000 for OD/mM/cm and relative, 1 000 for OD/µM/cm, 1 for OD/nM/cm) to reach the standard scale; a file whose shapes then fall outside 1e-7 to 1e-3 is used with a warning to check its Unit line. Each message names the row as the file has it.
+
+**Older layout** (still read, for fit files made elsewhere): no heading lines, the first row is the haem names (the header over each value column is not used), the names are used as written (plotting codes such as `Cyt $b_H$` included), and the values have no stated unit. The same rules apply, and the scale is guessed: a file whose highest point is between 1e-7 and 1e-3 is used as it is, a file a million above that (0.1 to 1000) is divided by a million, and a file on neither scale is used as it is with a warning.
 
 #### `spectral csv`
 
