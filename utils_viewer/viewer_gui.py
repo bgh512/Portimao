@@ -20,7 +20,12 @@ from PIL import Image
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.output_capture import output_capturer
-from utils_viewer.viewer_preview import KEY_PREFIX, PreviewSpec, ViewerSession
+from utils_shared.questions import time_request_setter
+from utils_viewer.viewer_preview import (KEY_PREFIX,
+                                         PreviewSpec,
+                                         TimeAxis,
+                                         ViewerSession,
+                                         )
 from utils_viewer.viewer_renderer import PreviewRenderer
 from utils_viewer.viewer_terminal import (ansi_splitter,
                                           ansi_style_updater,
@@ -37,6 +42,12 @@ ERROR_COLOUR = '#ff7b86'
 ICON_PATH = Path(__file__).resolve().parent.parent / 'assets' / 'icon.png'
 ANSWER_HINT = ('Type your answer and press Enter. If you type nothing, the value in '
                '[brackets] is used.')
+TIME_HINT = ('Click on the plot to pick a time, or type it, then press Enter. If you '
+             'type nothing, the value in [brackets] is used.')
+SIGN_BACKGROUND = '#ffd76a'
+SIGN_EDGE = '#e8a317'
+SIGN_TEXT = '#5a3d00'
+POINTER_COLOUR = '#0b62c4'
 FILES_HELP = ('Select a file using the drop-down, or use the arrows to browse the '
               'data.')
 FIGURES_HELP = ('Select a figure using the drop-down, or use the arrows to look at '
@@ -44,12 +55,33 @@ FIGURES_HELP = ('Select a figure using the drop-down, or use the arrows to look 
                 'being built is listed after them.')
 ENTRY_BACKGROUND = '#2b2b2b'
 MINIMUM_TK = 8.6  # Tk 8.5 (Apple's own Python) draws blank windows
-SYMBOL_FONTS = ('Segoe UI Symbol', 'Arial Unicode MS', 'Helvetica Neue', 'DejaVu Sans',
-               'Liberation Sans', 'Arial',
-               )
+SYMBOL_FONTS = ('Segoe UI Symbol',
+                'Arial Unicode MS',
+                'Helvetica Neue',
+                'DejaVu Sans',
+                'Liberation Sans',
+                'Arial',
+                )
 # Characters that are hard to type, for event labels and other text answers.
-SYMBOLS = ('µ', '⁻¹', '⁻²', '⁻³', '²', '³', '₂', '₃', '₄', '⁺', '±', '°', 'Δ', 'α', 'β',
-           'γ', 'λ', '×', '·',
+SYMBOLS = ('µ',
+           '⁻¹',
+           '⁻²',
+           '⁻³',
+           '²',
+           '³',
+           '₂',
+           '₃',
+           '₄',
+           '⁺',
+           '±',
+           '°',
+           'Δ',
+           'α',
+           'β',
+           'γ',
+           'λ',
+           '×',
+           '·',
            )
 PLOT_BACKGROUND = '#f2f2f2'
 _CLOSED = object()
@@ -99,6 +131,7 @@ class ViewerGui:
     _closing_handler
     _display_name_lister
     _drain_runner
+    _drawing_sign_drawer
     _event_handler
     _history_stepper
     _icon_setter
@@ -111,9 +144,12 @@ class ViewerGui:
     _navigator
     _pane_writer
     _picture_shower
+    _pointer_mover
     _resizer
     _step_taker
     _symbol_inserter
+    _time_clicker
+    _time_line_drawer
     _widgets_builder
     _window_raiser
     extra_publisher
@@ -126,6 +162,7 @@ class ViewerGui:
     session_attacher
     spec_publisher
     text_sender
+    time_wanted_setter
     window_closer
     """
 
@@ -187,6 +224,12 @@ class ViewerGui:
         self._previous: Dict[str, bytes] = {}
         self._notes: Dict[str, str] = {}
         self._failures: Dict[str, str] = {}
+        self._axes: Dict[str, Optional[TimeAxis]] = {}
+        self._previous_axes: Dict[str, Optional[TimeAxis]] = {}
+        self._shown_axis: Optional[TimeAxis] = None
+        self._picture_box: Optional[Tuple[float, float, int, int]] = None
+        self._pointer: Optional[Tuple[int, int]] = None
+        self._is_time_wanted = False
         self._photo: Any = None
         self._decoded: Any = None
         self._resize_job: Any = None
@@ -376,6 +419,50 @@ class ViewerGui:
         flush()
         self._root.after(25, self._drain_runner)
 
+    # ---- _drawing_sign_drawer --------------------------------------------------------
+    def _drawing_sign_drawer(self) -> None:
+        """
+        ---- Summary ----
+        Method to draw the "Drawing ..." sign in the top left corner of the plot area,
+        to show that the picture for the latest settings is still being made.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT (module constants).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        text = self._canvas.create_text(22,
+                                        17,
+                                        text='Drawing ...',
+                                        anchor='nw',
+                                        fill=SIGN_TEXT,
+                                        font=(self._family, 11, 'bold'),
+                                        )
+        left, top, right, bottom = self._canvas.bbox(text)
+        back = self._canvas.create_rectangle(left - 9,
+                                             top - 6,
+                                             right + 9,
+                                             bottom + 6,
+                                             fill=SIGN_BACKGROUND,
+                                             outline=SIGN_EDGE,
+                                             )
+        self._canvas.tag_raise(text, back)
+
     # ---- _event_handler --------------------------------------------------------------
     def _event_handler(self, event: tuple) -> None:
         """
@@ -385,7 +472,7 @@ class ViewerGui:
         ---- Inputs ----
         event : tuple
             (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-            'extra', 'image', 'closed' or 'finished'.
+            'extra', 'image', 'time', 'closed' or 'finished'.
 
         ---- Globals read ----
         None.
@@ -416,7 +503,14 @@ class ViewerGui:
             self._is_waiting = True
             self._entry.configure(state='normal')
             self._entry.focus_set()
-            self._hint.configure(text=ANSWER_HINT)
+            self._hint.configure(
+                text=TIME_HINT if self._is_time_wanted else ANSWER_HINT,
+                )
+        elif kind == 'time':
+            self._is_time_wanted = event[1]
+            self._canvas.configure(cursor='crosshair' if event[1] else '')
+            if self._is_waiting:
+                self._hint.configure(text=TIME_HINT if event[1] else ANSWER_HINT)
         elif kind == 'session':
             self._session = event[1]
             self._names = [s['name'] for s in self._session.summaries]
@@ -437,6 +531,7 @@ class ViewerGui:
             self._names = files + [title for title, _ in event[1]]
             kept = {name: png for name, png in self._images.items() if name in files}
             self._images = {**kept, **{title: png for title, png in event[1]}}
+            self._axes = {name: self._axes.get(name) for name in kept}
             for title, _ in event[1]:
                 self._failures.pop(title, None)
                 self._notes.pop(title, None)
@@ -453,6 +548,7 @@ class ViewerGui:
             if title not in self._names[self._file_count:]:
                 self._names = self._names + [title]
             self._images[title] = png
+            self._axes.pop(title, None)
             self._failures.pop(title, None)
             self._notes.pop(title, None)
             self._has_spec = True
@@ -470,7 +566,13 @@ class ViewerGui:
                 self._combo.configure(values=self._display_name_lister())
             self._version += 1
             self._previous = {**self._previous, **self._images}
+            self._previous_axes = {**self._previous_axes,
+                                   **{shown: self._axes.get(shown)
+                                      for shown in self._images
+                                      },
+                                   }
             self._images, self._notes, self._failures = {}, {}, {}
+            self._axes = {}
             self._has_spec = True
             if name in self._names:
                 self._index = self._names.index(name)
@@ -558,9 +660,11 @@ class ViewerGui:
             for size in (256, 64, 32):
                 buffer = io.BytesIO()
                 base.resize((size, size), resampling.LANCZOS).save(buffer, 'PNG')
-                self._icons.append(self._tk.PhotoImage(
-                    data=base64.b64encode(buffer.getvalue()).decode('ascii'),
-                ))
+                self._icons.append(
+                    self._tk.PhotoImage(
+                        data=base64.b64encode(buffer.getvalue()).decode('ascii'),
+                        ),
+                    )
             self._root.iconphoto(True, *self._icons)
         except Exception:  # no icon is better than no window
             return
@@ -578,6 +682,7 @@ class ViewerGui:
                          name: str,
                          png: Optional[bytes],
                          notes: str,
+                         time_axis: Optional[TimeAxis],
                          ) -> None:
         """
         ---- Summary ----
@@ -592,6 +697,8 @@ class ViewerGui:
             Picture, or None when it could not be drawn.
         notes : str
             Warnings, or the reason when there is no picture.
+        time_axis : Optional[TimeAxis]
+            Where the time axis sits in the picture, or None when it has none.
 
         ---- Globals read ----
         None.
@@ -610,7 +717,7 @@ class ViewerGui:
         None.
         """
 
-        self._events.put(('image', version, name, png, notes))
+        self._events.put(('image', version, name, png, notes, time_axis))
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -621,6 +728,7 @@ class ViewerGui:
                         name: str,
                         png: Optional[bytes],
                         notes: str,
+                        time_axis: Optional[TimeAxis],
                         ) -> None:
         """
         ---- Summary ----
@@ -636,6 +744,8 @@ class ViewerGui:
             Picture, or None when it could not be drawn.
         notes : str
             Warnings, or the reason when there is no picture.
+        time_axis : Optional[TimeAxis]
+            Where the time axis sits in the picture, or None when it has none.
 
         ---- Globals read ----
         None.
@@ -661,6 +771,7 @@ class ViewerGui:
         else:
             self._images[name] = png
             self._notes[name] = notes
+            self._axes[name] = time_axis
         if self._names and name == self._names[self._index]:
             self._picture_shower()
 
@@ -694,13 +805,27 @@ class ViewerGui:
         right = self._canvas.winfo_width() - 14
         top = 10
         colour = '#555555'
-        self._canvas.create_arc(right - 44, top, right - 28, top + 16, start=0,
-                                extent=180, style='arc', outline=colour, width=2,
+        self._canvas.create_arc(right - 44,
+                                top,
+                                right - 28,
+                                top + 16,
+                                start=0,
+                                extent=180,
+                                style='arc',
+                                outline=colour,
+                                width=2,
                                 )
-        self._canvas.create_rectangle(right - 48, top + 8, right - 24, top + 24,
-                                      fill=colour, outline=colour,
+        self._canvas.create_rectangle(right - 48,
+                                      top + 8,
+                                      right - 24,
+                                      top + 24,
+                                      fill=colour,
+                                      outline=colour,
                                       )
-        self._canvas.create_text(right - 54, top + 16, text='Locked', anchor='e',
+        self._canvas.create_text(right - 54,
+                                 top + 16,
+                                 text='Locked',
+                                 anchor='e',
                                  fill=colour,
                                  )
 
@@ -901,8 +1026,9 @@ class ViewerGui:
                 self._is_carriage = False
             value = ''.join(c if ord(c) <= 0xFFFF else '?' for c in value)
             colour = {'err': ERROR_COLOUR, 'answer': ANSWER_COLOUR}.get(
-                kind, self._style['fg'],
-            )
+                kind,
+                self._style['fg'],
+                )
             bold = self._style['bold'] or kind == 'answer'
             tag = f"{colour}|{bold}|{self._style['italic']}"
             if tag not in self._fonts:
@@ -928,7 +1054,9 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to show the picture of the current file, scaled to fit the plot area, or
-        say why there is none yet.
+        say why there is none yet. While the picture for the latest settings is still
+        being made, the "Drawing ..." sign is on the plot (over the previous picture
+        when there is one).
 
         ---- Inputs ----
         None.
@@ -947,8 +1075,10 @@ class ViewerGui:
         scale = min(width / picture width, height / picture height), at most 1.5.
 
         ---- Helpers ----
+        _drawing_sign_drawer
         _lock_drawer
         _message_shower
+        _time_line_drawer
         """
 
         self._resize_job = None
@@ -963,7 +1093,11 @@ class ViewerGui:
             is_stale = png is not None
         if png is None:
             self._status.configure(text='')
+            self._picture_box = None
+            self._shown_axis = None
             self._message_shower(failure or f'Drawing {name} ...')
+            if failure is None:
+                self._drawing_sign_drawer()
             return
         key = (name, id(png))
         if self._decoded is None or self._decoded[0] != key:
@@ -979,21 +1113,59 @@ class ViewerGui:
         shown.save(buffer, format='PNG')
         self._photo = self._tk.PhotoImage(
             data=base64.b64encode(buffer.getvalue()).decode('ascii'),
-        )
+            )
         self._canvas.delete('all')
         self._canvas.create_image(self._canvas.winfo_width() // 2,
                                   self._canvas.winfo_height() // 2,
                                   image=self._photo,
                                   )
+        self._picture_box = (self._canvas.winfo_width() // 2 - size[0] / 2,
+                             self._canvas.winfo_height() // 2 - size[1] / 2,
+                             size[0],
+                             size[1],
+                             )
+        self._shown_axis = (self._previous_axes if is_stale else self._axes).get(name)
         if self._is_pictures and self._index < self._file_count:
             self._lock_drawer()
+        if is_stale:
+            self._drawing_sign_drawer()
         lines = self._notes.get(name, '').splitlines()
         key = [line[len(KEY_PREFIX):] for line in lines if line.startswith(KEY_PREFIX)]
         note = '\n'.join(line for line in lines if not line.startswith(KEY_PREFIX))
-        if is_stale:
-            note = 'Redrawing ... (this is the previous picture)'
         self._status.configure(text=note)
         self._help.configure(text='\n'.join([self._help_base] + key))
+        self._time_line_drawer()
+
+    # ---- _pointer_mover --------------------------------------------------------------
+    def _pointer_mover(self, event: Any = None) -> None:
+        """
+        ---- Summary ----
+        Method to note where the mouse is over the plot area and move the time line
+        there; the line goes when the mouse leaves.
+
+        ---- Inputs ----
+        event : Any
+            The Tk motion event, or None when the mouse has left the plot area.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Redraws the time line (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _time_line_drawer
+        """
+
+        self._pointer = None if event is None else (event.x, event.y)
+        self._time_line_drawer()
 
     # ---- _resizer --------------------------------------------------------------------
     def _resizer(self, event: Any) -> None:
@@ -1090,6 +1262,122 @@ class ViewerGui:
             self._entry.insert('insert', symbol)
         self._entry.focus_set()
 
+    # ---- _time_clicker ---------------------------------------------------------------
+    def _time_clicker(self, event: Any) -> None:
+        """
+        ---- Summary ----
+        Method to write the time the mouse points at into the answer box when the plot
+        is clicked while a question waits for a time. The time replaces what was in the
+        box, can still be edited, and is accepted with Enter.
+
+        ---- Inputs ----
+        event : Any
+            The Tk click event.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the text of the answer box (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        pointed_time_finder
+        """
+
+        if not (self._is_time_wanted and self._is_waiting):
+            return
+        if self._picture_box is None or self._shown_axis is None:
+            return
+        time_min = pointed_time_finder(event.x,
+                                       event.y,
+                                       self._picture_box,
+                                       self._shown_axis,
+                                       )
+        if time_min is None:
+            return
+        self._entry.delete(0, 'end')
+        self._entry.insert(0, f'{time_min:.2f}')
+        self._entry.focus_set()
+
+    # ---- _time_line_drawer -----------------------------------------------------------
+    def _time_line_drawer(self) -> None:
+        """
+        ---- Summary ----
+        Method to draw a vertical line over the panels where the mouse is, with the
+        time it points at beside it. Nothing is drawn when the mouse is off the time
+        axis or the picture has none.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        POINTER_COLOUR (module constant).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        The line runs from the top of the first panel to the bottom of the last:
+        y = picture top + (1 - fraction from the bottom) * picture height.
+
+        ---- Helpers ----
+        pointed_time_finder
+        """
+
+        self._canvas.delete('pointer')
+        if (self._pointer is None
+            or self._picture_box is None
+            or self._shown_axis is None
+            ):
+            return
+        x, y = self._pointer
+        axis = self._shown_axis
+        time_min = pointed_time_finder(x, y, self._picture_box, axis)
+        if time_min is None:
+            return
+        _, top, _, height = self._picture_box
+        line_top = top + (1.0 - axis.top) * height
+        line_bottom = top + (1.0 - axis.bottom) * height
+        self._canvas.create_line(x,
+                                 line_top,
+                                 x,
+                                 line_bottom,
+                                 fill=POINTER_COLOUR,
+                                 width=1,
+                                 tags='pointer',
+                                 )
+        # the label sits right of the line, or left of it near the right edge
+        is_near_edge = x + 90 > self._canvas.winfo_width()
+        text = self._canvas.create_text(x - 6 if is_near_edge else x + 6,
+                                        line_top + 4,
+                                        text=f'{time_min:.2f} min',
+                                        anchor='ne' if is_near_edge else 'nw',
+                                        fill=POINTER_COLOUR,
+                                        font=(self._family, 10, 'bold'),
+                                        tags='pointer',
+                                        )
+        left, upper, right, lower = self._canvas.bbox(text)
+        back = self._canvas.create_rectangle(left - 3,
+                                             upper - 1,
+                                             right + 3,
+                                             lower + 1,
+                                             fill='white',
+                                             outline=POINTER_COLOUR,
+                                             tags='pointer',
+                                             )
+        self._canvas.tag_raise(text, back)
+
     # ---- _widgets_builder ------------------------------------------------------------
     def _widgets_builder(self) -> None:
         """
@@ -1119,9 +1407,11 @@ class ViewerGui:
         _message_shower
         _nav_state_setter
         _navigator
+        _pointer_mover
         _resizer
         _step_taker
         _symbol_inserter
+        _time_clicker
         """
 
         tk = self._tk
@@ -1261,6 +1551,9 @@ class ViewerGui:
                          lambda e: self._navigator(self._combo.current(), True),
                          )
         self._canvas.bind('<Configure>', self._resizer)
+        self._canvas.bind('<Motion>', self._pointer_mover)
+        self._canvas.bind('<Leave>', lambda e: self._pointer_mover(None))
+        self._canvas.bind('<Button-1>', self._time_clicker)
         root.bind_all('<Prior>', lambda e: self._step_taker(-1))
         root.bind_all('<Next>', lambda e: self._step_taker(1))
         root.protocol('WM_DELETE_WINDOW', self._closing_handler)
@@ -1522,7 +1815,8 @@ class ViewerGui:
 
         ---- Globals mutated ----
         None. Replaces sys.stdout, sys.stderr and the built-in input while the window
-        runs, and restores them afterwards (side effects).
+        runs, registers the window with the questions that want a time, and restores
+        them all afterwards (side effects).
 
         ---- Equations ----
         None.
@@ -1543,6 +1837,7 @@ class ViewerGui:
         sys.stdout = OutputRouter(original[0], self.text_sender, 'out', owner)
         sys.stderr = OutputRouter(original[1], self.text_sender, 'err', owner)
         builtins.input = self.input_reader
+        time_request_setter(self.time_wanted_setter)
         _active_gui = self
         self.logic_thread = threading.Thread(target=self._logic_runner,
                                              name='program',
@@ -1561,6 +1856,7 @@ class ViewerGui:
         finally:
             sys.stdout, sys.stderr = original
             builtins.input = self._real_input
+            time_request_setter(None)
             _active_gui = None
         return self.exit_code
 
@@ -1655,6 +1951,37 @@ class ViewerGui:
         """
 
         self._events.put(('text', text, kind))
+
+    # ---- time_wanted_setter ----------------------------------------------------------
+    def time_wanted_setter(self, is_wanted: bool) -> None:
+        """
+        ---- Summary ----
+        Method to say that the question being asked wants a time, so a click on the
+        plot writes the pointed time into the answer box, or that it no longer does.
+        It is called from the question thread.
+
+        ---- Inputs ----
+        is_wanted : bool
+            True while the question waits for a time.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('time', is_wanted))
 
     # ---- window_closer ---------------------------------------------------------------
     def window_closer(self) -> None:
@@ -1770,7 +2097,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
                 # own taskbar group, so the taskbar shows our icon, not Python's
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
                     'Portimao.ExperimentBrowser',
-                )
+                    )
             except Exception:
                 pass
         if tk.TkVersion < MINIMUM_TK:
@@ -1788,3 +2115,55 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
               )
         return None
     return ViewerGui(tk, root, program, title).run()
+
+
+# ---- pointed_time_finder -------------------------------------------------------------
+def pointed_time_finder(x: float,
+                        y: float,
+                        picture_box: Tuple[float, float, float, float],
+                        time_axis: TimeAxis,
+                        ) -> Optional[float]:
+    """
+    ---- Summary ----
+    Main function to turn a point of the plot area into the time it points at on the
+    time axis of the picture shown there.
+
+    ---- Inputs ----
+    x : float
+        Distance of the point from the left edge of the plot area, in pixels.
+    y : float
+        Distance of the point from the top edge of the plot area, in pixels.
+    picture_box : Tuple[float, float, float, float]
+        (left, top, width, height) of the picture in the plot area, in pixels.
+    time_axis : TimeAxis
+        Where the time axis sits in the picture, and the times at its ends.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[float]
+        The time in minutes, or None when the point is not over the panels.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    across = (x - left) / width; up = 1 - (y - top) / height;
+    time = start + (across - axis left) / (axis right - axis left) * (end - start).
+
+    ---- Helpers ----
+    None.
+    """
+
+    left, top, width, height = picture_box
+    if width <= 0 or height <= 0 or time_axis.right <= time_axis.left:
+        return None
+    across = (x - left) / width
+    up = 1.0 - (y - top) / height
+    if not (time_axis.left <= across <= time_axis.right
+            and time_axis.bottom <= up <= time_axis.top
+            ):
+        return None
+    share = (across - time_axis.left) / (time_axis.right - time_axis.left)
+    return time_axis.start_min + share * (time_axis.end_min - time_axis.start_min)

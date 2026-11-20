@@ -19,6 +19,9 @@ MAX_DEPTH = 6
 _counters = [0] * MAX_DEPTH  # [section, question, sub question, ...]
 _colour_ready = False
 _tight_next = False  # True: the next question follows its heading line directly
+# What is told when a question wants a time (the window, which then takes clicks on the
+# plot); None in the terminal.
+_time_requester: Optional[Callable[[bool], None]] = None
 
 
 # ---- UserQuitError -------------------------------------------------------------------
@@ -154,6 +157,38 @@ def _question_printer(question: str, depth: int, hint: str = '') -> str:
     print(f"{'' if _tight_next else chr(10)}{indent}{text_colourer(line)}")
     _tight_next = False
     return indent
+
+
+# ---- _time_announcer -----------------------------------------------------------------
+def _time_announcer(is_wanted: bool) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the window, when there is one, that the question being
+    asked wants a time (so a click on the plot can give it), or no longer does.
+
+    ---- Inputs ----
+    is_wanted : bool
+        True while the question waits for a time.
+
+    ---- Globals read ----
+    _time_requester (module state).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Calls the registered function (side effect); nothing happens without one.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if _time_requester is not None:
+        _time_requester(is_wanted)
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -456,11 +491,14 @@ def number_asker(question: str,
                  allow_blank: bool = False,
                  depth: int = 1,
                  blank_label: str = 'none',
+                 wants_time: bool = False,
                  ) -> Optional[float]:
     """
     ---- Summary ----
     Main function to ask a question answered with a number, asking again until the value
-    is valid.
+    is valid. A question that wants a time says so to the window, where a click on the
+    plot then writes the pointed time into the answer box; in the terminal nothing
+    changes.
 
     ---- Inputs ----
     question : str
@@ -479,6 +517,8 @@ def number_asker(question: str,
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
     blank_label : str
         Word shown in [brackets] for an empty answer.
+    wants_time : bool
+        True when the number is a time on the plot (min), which the mouse can give.
 
     ---- Globals read ----
     None.
@@ -497,6 +537,7 @@ def number_asker(question: str,
     ---- Helpers ----
     _input_reader
     _question_printer
+    _time_announcer
     """
 
     # ---- 1 Format the default --------------------------------------------------------
@@ -509,31 +550,37 @@ def number_asker(question: str,
     indent = _question_printer(question, depth, hint)
 
     # ---- 3 Read and check the answer -------------------------------------------------
-    while True:
-        answer = _input_reader(question, indent).replace(',', '.')
-        if not answer:
-            if default is not None:
-                return default
-            if allow_blank:
-                return None
-            print(f'{indent}A number is needed here.')
-            continue
-        try:
-            value = float(answer)
-        except ValueError:
-            print(f'{indent}That is not a number.')
-            continue
-        if (minimum is not None and
-            (value <= minimum if exclusive_minimum else value < minimum)
-            ):
-            print(f'{indent}The value must be '
-                  f"{'above' if exclusive_minimum else 'at least'} {minimum:g}.",
-                  )
-            continue
-        if maximum is not None and value > maximum:
-            print(f'{indent}The value must be at most {maximum:g}.')
-            continue
-        return value
+    if wants_time:
+        _time_announcer(True)
+    try:
+        while True:
+            answer = _input_reader(question, indent).replace(',', '.')
+            if not answer:
+                if default is not None:
+                    return default
+                if allow_blank:
+                    return None
+                print(f'{indent}A number is needed here.')
+                continue
+            try:
+                value = float(answer)
+            except ValueError:
+                print(f'{indent}That is not a number.')
+                continue
+            if (minimum is not None and
+                (value <= minimum if exclusive_minimum else value < minimum)
+                ):
+                print(f'{indent}The value must be '
+                      f"{'above' if exclusive_minimum else 'at least'} {minimum:g}.",
+                      )
+                continue
+            if maximum is not None and value > maximum:
+                print(f'{indent}The value must be at most {maximum:g}.')
+                continue
+            return value
+    finally:
+        if wants_time:
+            _time_announcer(False)
 
 
 # ---- numbering_getter ----------------------------------------------------------------
@@ -915,6 +962,39 @@ def text_italiser(text: str) -> str:
     """
 
     return f'{ITALIC}{text}{RESET}' if colour_checker() else text
+
+
+# ---- time_request_setter -------------------------------------------------------------
+def time_request_setter(requester: Optional[Callable[[bool], None]]) -> None:
+    """
+    ---- Summary ----
+    Main function to register what is told when a question wants a time: the window
+    registers itself while it is open, so a click on its plot can give the time.
+
+    ---- Inputs ----
+    requester : Optional[Callable[[bool], None]]
+        Function called with True when a question starts waiting for a time and False
+        when it has its answer; None to register nothing (the terminal).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    _time_requester (module state).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    global _time_requester
+    _time_requester = requester
 
 
 # ---- yes_no_asker --------------------------------------------------------------------

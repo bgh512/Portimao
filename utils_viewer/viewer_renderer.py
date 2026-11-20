@@ -11,6 +11,8 @@ from typing import Callable, List, Optional, Tuple
 from utils_viewer.viewer_preview import (PREVIEW_DPI,
                                          PreviewSpec,
                                          preview_figure_builder,
+                                         time_axis_finder,
+                                         TimeAxis,
                                          ViewerSession,
                                          )
 
@@ -42,7 +44,8 @@ class PreviewRenderer(threading.Thread):
     # ---- __init__ --------------------------------------------------------------------
     def __init__(self,
                  session: ViewerSession,
-                 deliver: Callable[[int, str, Optional[bytes], str], None],
+                 deliver: Callable[[int, str, Optional[bytes], str, Optional[TimeAxis]],
+                                   None],
                  ) -> None:
         """
         ---- Summary ----
@@ -51,9 +54,10 @@ class PreviewRenderer(threading.Thread):
         ---- Inputs ----
         session : ViewerSession
             The browser session (files, cache).
-        deliver : Callable[[int, str, Optional[bytes], str], None]
-            Function called with (version, file name, PNG bytes or None, notes) for each
-            finished preview. It is called from this thread.
+        deliver : Callable[[int, str, Optional[bytes], str, Optional[TimeAxis]], None]
+            Function called with (version, file name, PNG bytes or None, notes, time
+            axis of the picture or None) for each finished preview. It is called from
+            this thread.
 
         ---- Globals read ----
         None.
@@ -130,7 +134,7 @@ class PreviewRenderer(threading.Thread):
     def _picture_maker(self,
                        spec: PreviewSpec,
                        name: str,
-                       ) -> Tuple[Optional[bytes], str]:
+                       ) -> Tuple[Optional[bytes], str, Optional[TimeAxis]]:
         """
         ---- Summary ----
         Method to draw one file and turn the figure into a PNG picture.
@@ -145,9 +149,10 @@ class PreviewRenderer(threading.Thread):
         PREVIEW_DPI (imported constant).
 
         ---- Outputs ----
-        Tuple[Optional[bytes], str]
-            (PNG bytes, notes); the bytes are None when the preview could not be drawn
-            and the notes then say why.
+        Tuple[Optional[bytes], str, Optional[TimeAxis]]
+            (PNG bytes, notes, time axis); the bytes are None when the preview could
+            not be drawn and the notes then say why. The time axis says where the
+            shared time axis sits in the picture, and is None when there is none.
 
         ---- Globals mutated ----
         None.
@@ -157,17 +162,21 @@ class PreviewRenderer(threading.Thread):
 
         ---- Helpers ----
         preview_figure_builder
+        time_axis_finder
         """
 
         try:
             figure, notes = preview_figure_builder(self._session, spec, name)
             if figure is None:
-                return None, notes
+                return None, notes, None
             buffer = io.BytesIO()
             figure.savefig(buffer, format='png', dpi=PREVIEW_DPI)
-            return buffer.getvalue(), notes
+            return buffer.getvalue(), notes, time_axis_finder(figure)
         except Exception as exc:  # a preview problem must never stop the questions
-            return None, f'Preview not drawn for {name}: {type(exc).__name__}: {exc}'
+            return (None,
+                    f'Preview not drawn for {name}: {type(exc).__name__}: {exc}',
+                    None,
+                    )
 
     # ---- MAIN METHODS ----------------------------------------------------------------
 
@@ -247,11 +256,11 @@ class PreviewRenderer(threading.Thread):
                 if self._is_stopped:
                     return
                 spec, version = self._spec, self._version
-            picture, notes = self._picture_maker(spec, name)
+            picture, notes, time_axis = self._picture_maker(spec, name)
             with self._condition:
                 if version == self._version:
                     self._done.add(name)
-            self._deliver(version, name, picture, notes)
+            self._deliver(version, name, picture, notes, time_axis)
 
     # ---- stopper ---------------------------------------------------------------------
     def stopper(self) -> None:
