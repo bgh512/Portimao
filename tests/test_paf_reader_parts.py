@@ -15,6 +15,7 @@ import pytest
 from utils_shared.helpers import concentration_formatter
 from utils_shared.paf_reader import (_event_lister,
                                      _event_time_adder,
+                                     _short_trace_describer,
                                      _spectrum_time_finder,
                                      _trace_title_maker,
                                      _transmission_converter,
@@ -420,6 +421,41 @@ def test_missing_concentration_is_written_by_the_helper() -> None:
     assert concentration_formatter(8) == f'8 {MICRO_SIGN}M'
     assert concentration_formatter(2000) == '2 mM'
     assert concentration_formatter(1_500_000) == '1.5 M'
+
+
+# ---- test_rate_trace_short_by_its_usual_gap_is_not_reported --------------------------
+def test_rate_trace_short_by_its_usual_gap_is_not_reported() -> None:
+    """
+    ---- Summary ----
+    Main function to check that a trace short by the points the instrument always
+    leaves empty is not reported, even in a short recording, while one short by more
+    is, with its length in seconds.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    In a recording of 1343 points, 20 points are 1.5 %, more than the 1 % that is
+    always let pass; 10 points are 0.7 %. 40 points of 0.5 s are 20 s.
+
+    ---- Helpers ----
+    None.
+    """
+
+    assert _short_trace_describer('VoO2', 20, 1343, 0.5, 20) == ''
+    assert _short_trace_describer('CcO2', 10, 1343, 0.5, 0) == ''
+    assert '20 points' in _short_trace_describer('CcO2', 20, 1343, 0.5, 0)
+    message = _short_trace_describer('VoO2', 40, 1343, 0.5, 20)
+    assert '40 points' in message and '20 s' in message
 
 
 # ---- test_trace_with_disagreeing_lengths_is_noted ------------------------------------

@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.22
+- **Version:** V1.23
 - **Date:** 20/11/2026
 
 ## Contents
@@ -72,6 +72,18 @@
     - [`test_number_and_unit_get_a_space`](#test_number_and_unit_get_a_space)
     - [`test_symbols_can_be_drawn_in_the_figures`](#test_symbols_can_be_drawn_in_the_figures)
     - [`test_tidy_label_stays_as_it_is`](#test_tidy_label_stays_as_it_is)
+- [`tests/test_ocr_checking.py`](#teststest_ocr_checkingpy)
+    - [`_instrument_maker`](#_instrument_maker)
+    - [`test_steady_fall_is_its_slope`](#test_steady_fall_is_its_slope)
+    - [`test_curved_fall_needs_29_points`](#test_curved_fall_needs_29_points)
+    - [`test_leak_is_permeability_times_gap`](#test_leak_is_permeability_times_gap)
+    - [`test_leak_window_is_40_points`](#test_leak_window_is_40_points)
+    - [`test_agreeing_traces_pass`](#test_agreeing_traces_pass)
+    - [`test_wrong_sum_is_caught`](#test_wrong_sum_is_caught)
+    - [`test_wrong_leak_is_caught`](#test_wrong_leak_is_caught)
+    - [`test_addition_stretch_is_left_out`](#test_addition_stretch_is_left_out)
+    - [`test_missing_trace_is_not_checked`](#test_missing_trace_is_not_checked)
+    - [`test_short_recording_is_not_checked`](#test_short_recording_is_not_checked)
 - [`tests/test_paf_reader_parts.py`](#teststest_paf_reader_partspy)
     - [`test_additions_copies_are_joined`](#test_additions_copies_are_joined)
     - [`test_additions_under_one_name_are_all_kept`](#test_additions_under_one_name_are_all_kept)
@@ -84,6 +96,7 @@
     - [`test_trace_titles_follow_the_unit_of_the_file`](#test_trace_titles_follow_the_unit_of_the_file)
     - [`test_addition_outside_the_recording_is_left_out`](#test_addition_outside_the_recording_is_left_out)
     - [`test_missing_concentration_is_written_by_the_helper`](#test_missing_concentration_is_written_by_the_helper)
+    - [`test_rate_trace_short_by_its_usual_gap_is_not_reported`](#test_rate_trace_short_by_its_usual_gap_is_not_reported)
     - [`test_trace_with_disagreeing_lengths_is_noted`](#test_trace_with_disagreeing_lengths_is_noted)
     - [`test_unreadable_files_give_plain_messages`](#test_unreadable_files_give_plain_messages)
 - [`tests/test_paf_reading.py`](#teststest_paf_readingpy)
@@ -101,6 +114,9 @@
     - [`test_times_and_wavelengths_run_in_order`](#test_times_and_wavelengths_run_in_order)
     - [`test_traces_match_the_instrument`](#test_traces_match_the_instrument)
     - [`test_loaded_traces_match_the_instrument`](#test_loaded_traces_match_the_instrument)
+    - [`test_ocr_settings_fit_the_rate_traces`](#test_ocr_settings_fit_the_rate_traces)
+    - [`test_example_ocr_agrees`](#test_example_ocr_agrees)
+    - [`test_our_ocr_stays_fixed`](#test_our_ocr_stays_fixed)
 - [`tests/test_processing_maths.py`](#teststest_processing_mathspy)
     - [`_plateau_experiment_builder`](#_plateau_experiment_builder)
     - [`_ramp_experiment_builder`](#_ramp_experiment_builder)
@@ -150,6 +166,7 @@
 - [`tests/test_window_parts.py`](#teststest_window_partspy)
     - [`test_cell_of_the_od_table`](#test_cell_of_the_od_table)
     - [`test_height_typed_in_the_strip`](#test_height_typed_in_the_strip)
+    - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
     - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
     - [`test_widths_of_each_journal`](#test_widths_of_each_journal)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
@@ -391,6 +408,14 @@
     - [`experiment_normaliser`](#experiment_normaliser)
     - [`percent_converter`](#percent_converter)
     - [`percent_scaler`](#percent_scaler)
+- [`utils_shared/ocr_checking.py`](#utils_sharedocr_checkingpy)
+    - [`_agreement_finder`](#_agreement_finder)
+    - [`_leak_finder`](#_leak_finder)
+    - [`_oxygen_fall_finder`](#_oxygen_fall_finder)
+    - [`_pressure_factor_finder`](#_pressure_factor_finder)
+    - [`ocr_calculator`](#ocr_calculator)
+    - [`ocr_check_describer`](#ocr_check_describer)
+    - [`ocr_checker`](#ocr_checker)
 - [`utils_shared/output_capture.py`](#utils_sharedoutput_capturepy)
     - [`captured_buffer_getter`](#captured_buffer_getter)
     - [`output_capturer`](#output_capturer)
@@ -400,6 +425,7 @@
     - [`PafFile`](#paffile)
     - [`_event_lister`](#_event_lister)
     - [`_event_time_adder`](#_event_time_adder)
+    - [`_short_trace_describer`](#_short_trace_describer)
     - [`_spectrum_time_finder`](#_spectrum_time_finder)
     - [`_trace_title_maker`](#_trace_title_maker)
     - [`_transmission_converter`](#_transmission_converter)
@@ -572,10 +598,12 @@
     - [`_averaging_reviewer`](#_averaging_reviewer)
     - [`_choice_reviewer`](#_choice_reviewer)
     - [`_component_namer`](#_component_namer)
+    - [`_decomposition_storer`](#_decomposition_storer)
     - [`_empty_limits_builder`](#_empty_limits_builder)
     - [`_figure_starter`](#_figure_starter)
     - [`_file_chooser`](#_file_chooser)
     - [`_fit_file_saver`](#_fit_file_saver)
+    - [`_fit_names_lister`](#_fit_names_lister)
     - [`_limits_lister`](#_limits_lister)
     - [`_od_lister`](#_od_lister)
     - [`_od_table_filler`](#_od_table_filler)
@@ -583,6 +611,8 @@
     - [`_review_asker`](#_review_asker)
     - [`_skipped_lister`](#_skipped_lister)
     - [`_standard_fit_loader`](#_standard_fit_loader)
+    - [`_strip_change_applier`](#_strip_change_applier)
+    - [`_strip_shower`](#_strip_shower)
     - [`browser_stage_runner`](#browser_stage_runner)
     - [`details_stage_runner`](#details_stage_runner)
     - [`pca_stage_runner`](#pca_stage_runner)
@@ -595,6 +625,8 @@
     - [`_number_reader`](#_number_reader)
     - [`_page_journal_finder`](#_page_journal_finder)
     - [`height_checker`](#height_checker)
+    - [`size_answers_builder`](#size_answers_builder)
+    - [`strip_values_builder`](#strip_values_builder)
     - [`strip_values_checker`](#strip_values_checker)
     - [`width_choices_lister`](#width_choices_lister)
 - [`utils_viewer/viewer_terminal.py`](#utils_viewerviewer_terminalpy)
@@ -2544,6 +2576,314 @@ None.
 None.
 ```
 
+## `tests/test_ocr_checking.py`
+
+Tests that our OCR maths gives the values worked out by hand, and that the OCR check finds what it should.
+
+### HELPERS
+
+#### `_instrument_maker`
+
+```text
+---- Summary ----
+Helper function to make the traces of a recording whose rates were worked out
+exactly as our maths does.
+
+---- Inputs ----
+n_points : int
+    Points of the clock (0.5 s apart).
+
+---- Globals read ----
+FALL_EDGE_POINTS, FALL_PER_MIN, GAP_MMHG, LEAK_PER_MIN, LEAK_START_POINTS,
+PRESSURE_FACTOR (module constants).
+
+---- Outputs ----
+Dict[str, np.ndarray]
+    CcO2, PcO2, PtO2, VrO2, DgO2 and VoO2, one value per point, NaN where the
+    instrument leaves its rates empty.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+CcO2 = 600 - 0.5 j µM (1 µM/s, so a fall of 60 µM/min); PcO2 = 0.75 x CcO2;
+PtO2 = PcO2 + 100 mmHg; VrO2 = 60, DgO2 = 0.1 x 100 = 10 and VoO2 = 70 µM/min.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_steady_fall_is_its_slope`
+
+```text
+---- Summary ----
+Main function to check that oxygen falling by 1 µM/s gives a fall of 60 µM/min,
+with no value for the 14 points at each end (29 points centred on each point).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+0.5 µM every 0.5 s = 1 µM/s = 60 µM/min.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_curved_fall_needs_29_points`
+
+```text
+---- Summary ----
+Main function to check that oxygen curved as c x t^3 gives the slope of a straight
+line through exactly 29 points 0.5 s apart, so any other window length fails.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+For x = c t^3 around t0, the least-squares slope through the points t0 + k dt,
+k = -14 ... 14, is c (3 t0^2 + dt^2 sum(k^4) / sum(k^2)); sum(k^2) = 2030 and
+sum(k^4) = 255374, so the ratio is 125.8 and dt^2 x 125.8 = 31.45 s^2. With
+c = -0.001 µM/s^3 and t0 = 50 s (row 100): slope = -0.001 x (7500 + 31.45) =
+-7.53145 µM/s, so the fall is 60 x 7.53145 = 451.887 µM/min.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_leak_is_permeability_times_gap`
+
+```text
+---- Summary ----
+Main function to check that a steady pressure gap of 100 mmHg through a wall of
+permeability 0.1 µM/min/mmHg gives a leak of 10 µM/min, with no value for the
+first 39 points, and that our OCR is the fall plus the leak.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+leak = 0.1 x 100 = 10 µM/min; OCR = 60 + 10 = 70 µM/min.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_leak_window_is_40_points`
+
+```text
+---- Summary ----
+Main function to check that a step in the pressure gap reaches its full size in
+the leak after exactly 40 points, the mean ending at each point.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Gap 0 before row 100 and 100 mmHg from it: leak[99] = 0; leak[100] = 0.1 x 100 x
+1/40 = 0.25; leak[138] = 0.1 x 100 x 39/40 = 9.75; leak[139] = 10 µM/min.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_agreeing_traces_pass`
+
+```text
+---- Summary ----
+Main function to check that a recording worked out as we expect is checked, agrees
+in every part, finds the pressure factor and gives no message.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, PRESSURE_FACTOR, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_wrong_sum_is_caught`
+
+```text
+---- Summary ----
+Main function to check that an OCR 5 µM/min above the fall plus the leak is caught,
+and that the message names that part only.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_wrong_leak_is_caught`
+
+```text
+---- Summary ----
+Main function to check that a leak twice ours (as from a permeability twice the
+one stored) is caught in its typical difference and in its size, and named.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The instrument's leak is 20 µM/min against our 10: typical difference 10 µM/min,
+size 100 % off. Its OCR is still its fall plus its leak.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_addition_stretch_is_left_out`
+
+```text
+---- Summary ----
+Main function to check that a large spike in the instrument's fall next to an
+addition is left out of the comparison, and is caught when no addition is there.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The spike adds 5000 µM/min to rows 490 to 510. Without the addition at row 500,
+the 960 compared points give a factor of 1 + 21 x 5000 / (60 x 960) = 2.82, so
+the size is 182 % off.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_missing_trace_is_not_checked`
+
+```text
+---- Summary ----
+Main function to check that a file without the outside oxygen pressure, or without
+the wall's permeability, is not checked, and that the message says why.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_instrument_maker
+```
+
+#### `test_short_recording_is_not_checked`
+
+```text
+---- Summary ----
+Main function to check that a recording too short to compare is not checked.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PERMEABILITY, STEP_S (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+150 points: the instrument's OCR has values at rows 60 to 129 only, 70 points,
+fewer than the 100 needed.
+
+---- Helpers ----
+_instrument_maker
+```
+
 ## `tests/test_paf_reader_parts.py`
 
 Tests of the parts of the .paf reader that deal with unusual files, on made-up values
@@ -2837,6 +3177,34 @@ None.
 
 ---- Equations ----
 2000 uM = 2 mM; 1 500 000 uM = 1.5 M.
+
+---- Helpers ----
+None.
+```
+
+#### `test_rate_trace_short_by_its_usual_gap_is_not_reported`
+
+```text
+---- Summary ----
+Main function to check that a trace short by the points the instrument always
+leaves empty is not reported, even in a short recording, while one short by more
+is, with its length in seconds.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+In a recording of 1343 points, 20 points are 1.5 %, more than the 1 % that is
+always let pass; 10 points are 0.7 %. 40 points of 0.5 s are 20 s.
 
 ---- Helpers ----
 None.
@@ -3300,6 +3668,89 @@ The export has 3 decimals, so a time (min) or a value may differ by 0.0005.
 
 ---- Helpers ----
 _trace_export_reader
+```
+
+#### `test_ocr_settings_fit_the_rate_traces`
+
+```text
+---- Summary ----
+Main function to check the oxygen-rate settings read from the example run: its
+permeability, and the 20 and 60 empty points at the start of VrO2 and of DgO2.
+
+---- Inputs ----
+traces : dict
+    The traces of the example run, from _trace_loader.
+
+---- Globals read ----
+PAF_FILE, EXPECTED_PERMEABILITY, EXPECTED_FALL_EDGE_POINTS,
+EXPECTED_LEAK_START_POINTS, FIXED_DECIMALS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_example_ocr_agrees`
+
+```text
+---- Summary ----
+Main function to check that the instrument's OCR of the example run agrees with
+ours, and that the differences stay at their fixed values.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PAF_FILE, FIXED_DIFFERENCES, FIXED_PRESSURE_FACTOR, FIXED_DECIMALS (module
+constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_our_ocr_stays_fixed`
+
+```text
+---- Summary ----
+Main function to check that our fall, leak and OCR of the example run keep their
+fixed values, so a change to our maths is never made by accident.
+
+---- Inputs ----
+traces : dict
+    The traces of the example run, from _trace_loader.
+
+---- Globals read ----
+PAF_FILE, FIXED_ROWS, FIXED_FALL, FIXED_LEAK, FIXED_OCR, FIXED_DECIMALS (module
+constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `tests/test_processing_maths.py`
@@ -4594,6 +5045,35 @@ None.
 ---- Equations ----
 A Nature page is 170 mm: 0.5 of it is 85 mm and the whole is 170 mm. A Science
 page is 230 mm: 0.25 of it is 57.5 mm. "None" uses the Nature page.
+
+---- Helpers ----
+None.
+```
+
+#### `test_answers_shown_in_the_strip`
+
+```text
+---- Summary ----
+Main function to check that the answers of a run are shown in the strip as they
+are meant (the standard size as the journal "None", a chosen journal by its name,
+the box ticked only when the haems are worked out), that the strip can show them,
+and that its journal, width and height give the same answers back.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
@@ -12337,6 +12817,259 @@ time_getter
 window_seconds_calculator
 ```
 
+## `utils_shared/ocr_checking.py`
+
+Checks the instrument's oxygen consumption rate (OCR) against our own calculation from its oxygen traces.
+
+### HELPERS
+
+#### `_agreement_finder`
+
+```text
+---- Summary ----
+Helper function to measure how closely the instrument's rate follows ours away
+from the additions: the typical difference and the difference in overall size.
+
+---- Inputs ----
+instrument : np.ndarray
+    The instrument's rate, one value per point of the clock (µM/min), NaN where it
+    has none.
+ours : np.ndarray
+    Our rate on the same points (µM/min), NaN where we have none.
+addition_rows : Sequence[int]
+    Row of the clock of each addition (0 = first point).
+
+---- Globals read ----
+ADDITION_POINTS, MIN_COMPARED_POINTS (module constants).
+
+---- Outputs ----
+Optional[Tuple[float, float]]
+    (typical difference in µM/min, difference in size in %), or None when fewer
+    than MIN_COMPARED_POINTS can be compared or our rate is zero throughout.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Compared points: both rates have a value and the point is more than
+ADDITION_POINTS away from every addition. Over them:
+    typical difference = median of |instrument - ours|
+    factor = sum(instrument x ours) / sum(ours^2) (least squares through zero)
+    difference in size = |factor - 1| x 100 %.
+
+---- Helpers ----
+None.
+```
+
+#### `_leak_finder`
+
+```text
+---- Summary ----
+Helper function to work out the oxygen leaking into the chamber through its wall.
+
+---- Inputs ----
+outside_mmHg : np.ndarray
+    Oxygen pressure outside the chamber wall (PtO2, mmHg), one value per point.
+chamber_mmHg : np.ndarray
+    Oxygen pressure in the chamber (PcO2, mmHg), on the same points.
+permeability : float
+    Oxygen permeability of the chamber wall (µM/min/mmHg), as stored in the file.
+
+---- Globals read ----
+LEAK_POINTS (module constant).
+
+---- Outputs ----
+np.ndarray
+    Leak (µM/min), one value per point; NaN for the first LEAK_POINTS - 1 points.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+leak[j] = permeability x mean of (PtO2 - PcO2)[j - 39 ... j] (40 points, 20 s at
+0.5 s, ending at the point itself).
+
+---- Helpers ----
+None.
+```
+
+#### `_oxygen_fall_finder`
+
+```text
+---- Summary ----
+Helper function to work out how fast the measured oxygen falls at each point.
+
+---- Inputs ----
+oxygen_uM : np.ndarray
+    Measured oxygen (CcO2, µM), one value per point of the clock.
+step_s : float
+    Time between two points (s).
+
+---- Globals read ----
+FALL_POINTS, SECONDS_PER_MINUTE (module constants).
+
+---- Outputs ----
+np.ndarray
+    Fall (µM/min, positive when the oxygen goes down), one value per point; NaN for
+    the first and last FALL_POINTS // 2 points.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The slope of the least-squares straight line through the 29 points centred on
+point j:
+    fall[j] = -60 x sum(k x CcO2[j + k]) / (step_s x sum(k^2)), k = -14 ... 14,
+    sum(k^2) = 2030.
+
+---- Helpers ----
+None.
+```
+
+#### `_pressure_factor_finder`
+
+```text
+---- Summary ----
+Helper function to find the fixed factor between the measured oxygen and the
+chamber oxygen pressure, and how far the pressure strays from it.
+
+---- Inputs ----
+oxygen_uM : np.ndarray
+    Measured oxygen (CcO2, µM), one value per point.
+chamber_mmHg : np.ndarray
+    Oxygen pressure in the chamber (PcO2, mmHg), on the same points.
+
+---- Globals read ----
+MIN_COMPARED_POINTS (module constant).
+
+---- Outputs ----
+Tuple[Optional[float], Optional[float]]
+    (factor in mmHg/µM, largest |PcO2 - factor x CcO2| in mmHg), or (None, None)
+    when fewer than MIN_COMPARED_POINTS points have both values or the oxygen is
+    zero throughout.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+factor = sum(CcO2 x PcO2) / sum(CcO2^2) (least squares through zero).
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `ocr_calculator`
+
+```text
+---- Summary ----
+Main function to work out our own OCR from the instrument's oxygen traces.
+
+---- Inputs ----
+traces : Mapping[str, np.ndarray]
+    At least 'CcO2' (µM), 'PcO2' and 'PtO2' (mmHg), one value per point of the
+    clock, NaN where the file has none.
+permeability : float
+    Oxygen permeability of the chamber wall (µM/min/mmHg), as stored in the file.
+step_s : float
+    Time between two points (s).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, np.ndarray]
+    {'fall': fall of the measured oxygen, 'leak': oxygen leaking in, 'ocr': their
+    sum}, each in µM/min with one value per point, NaN where it cannot be worked
+    out.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+our OCR = fall + leak (see _oxygen_fall_finder and _leak_finder; written out in
+DATA_FORMAT.md, "Our OCR check").
+
+---- Helpers ----
+_leak_finder
+_oxygen_fall_finder
+```
+
+#### `ocr_check_describer`
+
+```text
+---- Summary ----
+Main function to say in plain words what the OCR check of one file found.
+
+---- Inputs ----
+check : dict
+    Result of ocr_checker (ocr_check in DATA_FORMAT.md).
+file_name : str
+    Name of the file, written first.
+
+---- Globals read ----
+PART_LABELS (module constant).
+
+---- Outputs ----
+str
+    An empty string when the instrument's OCR agrees with ours; otherwise one
+    sentence saying which parts disagree, or why the file could not be checked.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `ocr_checker`
+
+```text
+---- Summary ----
+Main function to check that the instrument worked out its OCR as we expect, from
+its own oxygen traces.
+
+---- Inputs ----
+traces : Mapping[str, Optional[np.ndarray]]
+    The traces of OCR_TRACES, one value per point of the clock (NaN where the file
+    has none); a trace the file lacks is None or left out.
+permeability : Optional[float]
+    Oxygen permeability of the chamber wall (µM/min/mmHg) from the file, or None
+    when the file does not store it.
+addition_rows : Sequence[int]
+    Row of the clock of each addition (0 = first point).
+step_s : float
+    Time between two points (s).
+
+---- Globals read ----
+MARGINS, OCR_TRACES (module constants).
+
+---- Outputs ----
+dict
+    ocr_check (DATA_FORMAT.md): 'is_checked', 'is_agreeing', 'reason' (why it was
+    not checked, else empty), 'permeability', 'pressure_factor' and 'parts' (for
+    each key of MARGINS: 'difference', 'margin', 'unit' and 'is_agreeing').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+sum: largest |VoO2 - (VrO2 + DgO2)|.
+pressure: largest |PcO2 - factor x CcO2|.
+fall and leak: the typical difference, and the difference in size (%), of the
+instrument's VrO2 and DgO2 from ours, away from the additions (_agreement_finder).
+Each part agrees when its difference is at most its margin.
+
+---- Helpers ----
+_agreement_finder
+_pressure_factor_finder
+ocr_calculator
+```
+
 ## `utils_shared/output_capture.py`
 
 Per-thread capture of printed output, kept out of the terminal and the log file.
@@ -12464,6 +13197,7 @@ events_reader
 frame_counter
 missing_trace_describer
 notes_reader
+ocr_settings_reader
 ocr_trace_checker
 spectra_dataset_reader
 stream_name_lister
@@ -12776,6 +13510,38 @@ None.
 rtf_converter
 ```
 
+##### `ocr_settings_reader`
+
+```text
+---- Summary ----
+Main method to read how the instrument works out its oxygen rates (the
+VoO2Math record).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FALL_EDGE_OFFSET, LEAK_START_OFFSET, OCR_SETTINGS_BYTES, OCR_SETTINGS_RECORD,
+OCR_SETTINGS_START, PERMEABILITY_OFFSET, PERMEABILITY_RANGE, POINTS_RANGE,
+LAYOUT_ERRORS (module constants).
+
+---- Outputs ----
+Optional[dict]
+    ocr_settings (DATA_FORMAT.md): 'permeability' (µM/min/mmHg),
+    'fall_edge_points' and 'leak_start_points'; None when the file has no such
+    record or it is not laid out as expected.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+token_reader
+u32_reader
+```
+
 ##### `ocr_trace_checker`
 
 ```text
@@ -12879,9 +13645,12 @@ Main method to read one trace on the common time base.
 ---- Inputs ----
 name : str
     Trace name, e.g. 'VoO2'.
+is_quiet : bool
+    True to read the trace without the warning about a short trace, when it is
+    given elsewhere.
 
 ---- Globals read ----
-None.
+RATE_TRACES (module constant).
 
 ---- Outputs ----
 Optional[np.ndarray]
@@ -12890,13 +13659,15 @@ Optional[np.ndarray]
     than the clock), or None if the trace does not exist.
 
 ---- Globals mutated ----
-None. Prints a warning when more than SHORT_TRACE_FRACTION of the trace is
-missing (side effect).
+None. Prints a warning when the trace is short (see _short_trace_describer)
+(side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_short_trace_describer
+ocr_settings_reader
 warning_printer
 ```
 
@@ -13000,6 +13771,44 @@ row_index = datapoint - 1; time = time_min[row_index].
 
 ---- Helpers ----
 warning_printer
+```
+
+#### `_short_trace_describer`
+
+```text
+---- Summary ----
+Helper function to say whether a trace shorter than the clock is worth a warning,
+and in what words.
+
+---- Inputs ----
+name : str
+    Trace name, e.g. 'VoO2'.
+n_missing : int
+    Points of the clock the trace has no value for at the end.
+n_clock : int
+    Points of the clock.
+step_s : float
+    Time between two points (s).
+n_expected : int
+    Points the instrument always leaves empty at the end of this trace (the fall
+    edge of VoO2Math for the oxygen rates, else 0).
+
+---- Globals read ----
+SHORT_TRACE_FRACTION (module constant).
+
+---- Outputs ----
+str
+    The warning, without the file name; empty when the trace is short by no more
+    than n_expected points or by no more than SHORT_TRACE_FRACTION of the clock.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `_spectrum_time_finder`
@@ -13224,12 +14033,14 @@ None.
 ---- Outputs ----
 dict
     {'name' (file stem), 'duration_min', 'frames', 'datasets', 'events' (the
-    additions inside the recording, each with 'time' in minutes), 'traces'}.
-    Raises PafError if the VoO2 trace is missing, so a file that cannot be
-    processed is refused before any question is asked about it.
+    additions inside the recording, each with 'time' in minutes), 'traces',
+    'ocr_check' (ocr_check in DATA_FORMAT.md)}. Raises PafError if the VoO2 trace
+    is missing, so a file that cannot be processed is refused before any question
+    is asked about it.
 
 ---- Globals mutated ----
-None. Prints a warning for each addition outside the recording (side effect).
+None. Prints a warning for each addition outside the recording, and one when the
+instrument's OCR does not agree with ours or cannot be checked (side effect).
 
 ---- Equations ----
 None.
@@ -13240,8 +14051,13 @@ dataset_name_lister
 duration_finder
 events_reader
 frame_counter
+ocr_check_describer
+ocr_checker
+ocr_settings_reader
 ocr_trace_checker
 stream_name_lister
+stream_reader
+warning_printer
 ```
 
 #### `record_scanner`
@@ -16724,6 +17540,10 @@ defaults : dict
     Default answers.
 fit : Optional[dict]
     Fit dictionary (haem_list) used to list the haems, or None.
+is_shown_asked : bool
+    False when whether the haems are plotted is already answered (the Haems box
+    of the window's settings strip, in answers['plot_haems']): only which ones and
+    in which order are asked, and only when they are plotted.
 
 ---- Globals read ----
 None.
@@ -17455,12 +18275,14 @@ _picture_shower
 _pointer_mover
 _resizer
 _step_taker
+_strip_change_runner
 _strip_change_teller
 _symbol_inserter
 _time_clicker
 _time_line_drawer
 _widgets_builder
 _window_raiser
+drawing_sign_shower
 extra_publisher
 figure_shower
 file_focuser
@@ -17477,6 +18299,7 @@ strip_fits_setter
 strip_listener_setter
 strip_reader
 strip_setter
+strip_state_setter
 text_sender
 time_reader_setter
 window_closer
@@ -17808,8 +18631,9 @@ Method to carry out one message from the other threads, on the window thread.
 ---- Inputs ----
 event : tuple
     (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-    'extra', 'image', 'time', 'strip', 'strip_fits', 'od_show', 'od_hide',
-    'closed' or 'finished'.
+    'extra', 'image', 'time', 'strip', 'strip_fits', 'strip_state', 'busy',
+    'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..." sign of
+    'busy' stays until the next question, preview or picture shown.
 
 ---- Globals read ----
 None.
@@ -18132,8 +18956,9 @@ ansi_style_updater
 ---- Summary ----
 Method to show the picture of the current file, scaled to fit the plot area, or
 say why there is none yet. While the picture for the latest settings is still
-being made, the "Drawing ..." sign is on the plot (over the previous picture
-when there is one).
+being made, or the program is making pictures of its own (drawing_sign_shower),
+the "Drawing ..." sign is on the plot (over the previous picture when there is
+one).
 
 ---- Inputs ----
 None.
@@ -18241,18 +19066,19 @@ None.
 _navigator
 ```
 
-##### `_strip_change_teller`
+##### `_strip_change_runner`
 
 ```text
 ---- Summary ----
-Method to pass a change the user made in the settings strip to the function
-the program registered, if any.
+Method to hand a change made in the settings strip to the function the program
+registered, on the program thread while a question waits. What it prints goes
+on lines of its own, and the answer prompt is shown again under it.
 
 ---- Inputs ----
-name : str
-    Name of the strip value that changed.
-value : Any
-    Its new value.
+changes : Dict[str, Any]
+    {name: new value} of the strip values that changed.
+prompt : Any
+    The prompt of the question that waits, shown again after a message.
 
 ---- Globals read ----
 None.
@@ -18262,7 +19088,37 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Calls the registered function (side effect).
+None. Calls the registered function, prints and queues the prompt (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+output_capturer
+```
+
+##### `_strip_change_teller`
+
+```text
+---- Summary ----
+Method to pass a change the user made in the settings strip to the program
+thread: it joins the typed answers, so a question that waits takes it at once
+(input_reader).
+
+---- Inputs ----
+changes : Dict[str, Any]
+    {name: new value} of the strip values that changed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the change (side effect).
 
 ---- Equations ----
 None.
@@ -18430,6 +19286,35 @@ None.
 None.
 ```
 
+##### `drawing_sign_shower`
+
+```text
+---- Summary ----
+Method to put the "Drawing ..." sign on the plot while the program makes
+pictures of its own (the combined figures, the components found from the
+data). The sign goes when the next picture or preview is shown, or the next
+question is asked.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the sign for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `extra_publisher`
 
 ```text
@@ -18525,8 +19410,9 @@ None.
 ```text
 ---- Summary ----
 Method that replaces the built-in input while the window is open: it shows the
-prompt in the terminal and waits for the answer typed in the answer box. Other
-threads still use the real input.
+prompt in the terminal and waits for the answer typed in the answer box. A
+change made in the settings strip meanwhile is handed to the program's listener
+and the question goes on waiting. Other threads still use the real input.
 
 ---- Inputs ----
 prompt : Any
@@ -18540,13 +19426,13 @@ str
     The typed answer. Raises EOFError when the window is closed.
 
 ---- Globals mutated ----
-None. Waits for the user (side effect).
+None. Waits for the user and runs the strip listener (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-None.
+_strip_change_runner
 ```
 
 ##### `od_table_hider`
@@ -18816,9 +19702,11 @@ Method to register the function that is told what the user changes in the
 settings strip, or None to stop listening.
 
 ---- Inputs ----
-listener : Optional[Callable[[str, Any], None]]
-    Called with (name, value) at each change, on the window thread: it must
-    return at once (for example by queueing the change).
+listener : Optional[Callable[[Dict[str, Any]], None]]
+    Called with {name: new value} of the values changed at once, on the
+    program thread while a question waits (a change made while the program is
+    busy is taken when the next question is asked). What it prints shows under
+    the question, which then goes on waiting.
 
 ---- Globals read ----
 None.
@@ -18889,6 +19777,34 @@ None.
 
 ---- Helpers ----
 strip_values_checker
+```
+
+##### `strip_state_setter`
+
+```text
+---- Summary ----
+Method to let the user change the settings strip, or grey it out while what it
+shows is not being used. It starts greyed out.
+
+---- Inputs ----
+is_enabled : bool
+    True to let the user change it, False to grey it out.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `text_sender`
@@ -19199,8 +20115,8 @@ figure_capture_setter
 ```text
 ---- Summary ----
 Main function to build the figure checker the multi-experiment questions call after
-each figure: it draws the figure from the data, shows it in the browser window and
-asks whether to accept it.
+each figure: it draws the figure from the data (the "Drawing ..." sign is on the
+plot meanwhile), shows it in the browser window and asks whether to accept it.
 
 ---- Inputs ----
 context : dict
@@ -19598,8 +20514,8 @@ Detailed structure can be found in DATA_FORMAT.md.
 
 ```text
 ---- Summary ----
-Everything the experiment browser keeps between steps: the files, the window and the
-recently read experiments.
+Everything the experiment browser keeps between steps: the files, the window, the
+recently read experiments, the fit in use and how to redraw the step being asked.
 Detailed structure can be found in DATA_FORMAT.md.
 ```
 
@@ -20513,6 +21429,39 @@ text_asker
 yes_no_asker
 ```
 
+#### `_decomposition_storer`
+
+```text
+---- Summary ----
+Helper function to keep what the fit questions decided as the fit in use, and show
+it in the settings strip. A run without haems keeps the name of the last fit, so
+the strip still offers it.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its fit is set.
+answers : dict
+    Answers dictionary (decompose, fit_file, decomposition_dataset are set).
+chosen : tuple
+    (decompose, fit_file, fit, dataset) as decomposition_asker returns it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes ``answers`` and the session, and shows the strip (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_strip_shower
+```
+
 #### `_empty_limits_builder`
 
 ```text
@@ -20550,7 +21499,8 @@ Helper function to set the figure of each file from the standard settings or the
 ones last saved for the dataset, keeping only what this run allows: the OCR per OD
 and the haems scaled by OD only when OD values were entered, and the haems only
 when they are decomposed, limited to those of the fit in use (all of them when none
-of the saved ones is in it).
+of the saved ones is in it). The journal and size are left as the answers hold
+them, which the settings strip may have changed.
 
 ---- Inputs ----
 answers : dict
@@ -20558,10 +21508,13 @@ answers : dict
     and decompose.
 defaults : dict
     The standard or saved answers (plot_o2, plot_ocr, ocr_mode, plot_haems, haems,
-    haem_mode, haem_per_od, event_label_angle, journal, columns, height,
-    size_mode).
+    haem_mode, haem_per_od, event_label_angle).
 fit : Optional[dict]
     Fit dictionary (haem_list), or None when the haems are not decomposed.
+is_strip : bool
+    True in the window, where the Haems box of the settings strip says whether the
+    haems are worked out and shown: the figure then has them whenever they are
+    decomposed.
 
 ---- Globals read ----
 None.
@@ -20647,6 +21600,35 @@ fit_saver
 info_printer
 text_asker
 yes_no_asker
+```
+
+#### `_fit_names_lister`
+
+```text
+---- Summary ----
+Helper function to list the fit files the settings strip offers, in the order the
+fit question lists them.
+
+---- Inputs ----
+fits_folder : Path
+    Folder holding the fit .csv files.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    File names of the .csv files, sorted without regard to case; empty when the
+    folder holds none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `_limits_lister`
@@ -20745,7 +21727,8 @@ text_asker
 ```text
 ---- Summary ----
 Helper function to put the two PCA pictures in the plot window: the examples of
-how the spectra are decomposed (listed only) and the components (shown).
+how the spectra are decomposed (listed only) and the components (shown). The
+"Drawing ..." sign is on the plot while they are made.
 
 ---- Inputs ----
 session : ViewerSession
@@ -20860,8 +21843,9 @@ text_colourer
 ---- Summary ----
 Helper function to load the fit the standard plot shows the haems with, before any
 question about the haems is asked: the fit last saved for the dataset, or the
-standard fit for a dataset never saved. When the haems cannot be shown, one line
-says why and the plot keeps to the oxygen and the OCR.
+standard fit for a dataset never saved. It also loads a fit picked in the settings
+strip. When the haems cannot be shown, one line says why and the plot keeps to the
+oxygen and the OCR.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -20870,6 +21854,9 @@ defaults : dict
     Default answers (decompose, fit_file, decomposition_dataset).
 fits_folder : Path
     Folder holding the fit .csv files.
+is_from_strip : bool
+    True when the fit was picked in the settings strip: the message then says the
+    strip is set back, instead of pointing to the processing.
 
 ---- Globals read ----
 None.
@@ -20891,6 +21878,79 @@ fit_importer
 info_printer
 ```
 
+#### `_strip_change_applier`
+
+```text
+---- Summary ----
+Helper function to make a change in the settings strip what the run uses, and
+redraw the plot of the step being asked. Unticking the haems leaves them out of the
+run; ticking them, or picking a fit, works them out with the fit in the strip. A
+fit that cannot be used is reported and the strip is set back. A new journal, width
+or height redraws only the figure of each file, the one plot drawn at its size.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its fit is changed and its redraw called.
+answers : dict
+    Answers dictionary the values are stored in.
+fits_folder : Path
+    Folder holding the fit .csv files.
+changes : Dict[str, object]
+    {name: new value} of the strip values that changed (DATA_FORMAT.md,
+    strip_values).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes ``answers`` and the session, prints to the terminal, shows the strip
+and redraws the plot (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_standard_fit_loader
+_strip_shower
+info_printer
+size_answers_builder
+```
+
+#### `_strip_shower`
+
+```text
+---- Summary ----
+Helper function to show in the settings strip what the run uses now: the haems
+ticked when they are worked out, the fit, the journal and the size. Without a
+window it does nothing.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (its window and fit).
+answers : dict
+    Answers so far.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Shows the values in the strip (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+strip_values_builder
+```
+
 ### MAIN FUNCTIONS
 
 #### `browser_stage_runner`
@@ -20898,18 +21958,16 @@ info_printer
 ```text
 ---- Summary ----
 Main function to show the standard plot of the files in the plot window (the set
-and measured O2, the OCR and, when a fit is given, the haems, with the events as
-written in the file) before any question is asked about them. In the browser window
-the user can look through them while answering, so the questions carry straight on;
-with the picture fallback a small menu steps through the files.
+and measured O2, the OCR and, when the session has a fit, the haems, with the
+events as written in the file) before any question is asked about them. In the
+browser window the user can look through them while answering, so the questions
+carry straight on; with the picture fallback a small menu steps through the files.
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session; its current file is changed.
+    The browser session; its current file is changed and its redraw set.
 answers : dict
     Answers so far, used for the figure style of the preview.
-fit : Optional[dict]
-    Fit the haems are shown with, or None for the oxygen and the OCR only.
 
 ---- Globals read ----
 None.
@@ -20941,19 +21999,17 @@ Main function to ask the last questions of the import, on the standard plot cut 
 the limits: the OD values (in the table of the window, or with questions per file
 and an accept question), then the event labels. The OD values are only checked:
 the data is scaled by OD in the individual plots. The plot is redrawn with the
-labels once they are entered.
+labels once they are entered. The haems are those of the session's fit.
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session.
+    The browser session; its redraw is set.
 answers : dict
     Answers dictionary the values are stored in.
 defaults : dict
     Default answers offered by the questions.
 limits : Dict[str, dict]
     Trim and ignore limits of every file (trim_asker).
-fit : Optional[dict]
-    Fit the haems are shown with, or None for the oxygen and the OCR only.
 details_before : Optional[Dict[str, dict]]
     OD values and events from an earlier pass, offered as defaults when the step is
     asked again.
@@ -21055,19 +22111,19 @@ from the standard settings or the ones last saved for the dataset, and ask wheth
 it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
 how the haems are shown, the angle of the event labels, the journal and size): only
 that part's questions are asked, with the current choices as the defaults, and the
-figure is drawn and asked about again.
+figure is drawn and asked about again. In the window the settings strip turns the
+haems on or off and sets the journal and size, so 'which haems' asks only which
+ones in which order, and the journal and size are not asked.
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session.
+    The browser session; its fit is the one in use, and its redraw is set.
 answers : dict
     Answers dictionary the values are stored in.
 defaults : dict
     Default answers offered by the questions.
 limits : Dict[str, dict]
     Trim and ignore limits of every file.
-fit : Optional[dict]
-    Fit dictionary, or None.
 details : Dict[str, dict]
     OD values and events of every file.
 
@@ -21079,7 +22135,8 @@ bool
     True when at least one panel is plotted.
 
 ---- Globals mutated ----
-None. Stores the answers in ``answers`` (side effect).
+None. Stores the answers in ``answers``, and the redraw in the session (side
+effects).
 
 ---- Equations ----
 None.
@@ -21088,6 +22145,7 @@ None.
 _answers_previewer
 _choice_reviewer
 _figure_starter
+_strip_shower
 haem_choice_asker
 haem_form_asker
 haem_scaling_asker
@@ -21105,16 +22163,21 @@ size_asker
 Main function to talk the user through the processing, with the plot redrawn after
 each answer: first the haem fit (the fit already shown is accepted, another is
 tried, or the haems are left out), then, now that the haems are seen, an offer to
-change the trim and ignore times, and last the averaging around the events.
+change the trim and ignore times, and last the averaging around the events. In the
+window the settings strip picks the fit and leaves the haems out, so the
+decomposition question only offers to find the components from the data instead.
+While those questions are asked the strip is greyed out.
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session.
+    The browser session; its fit is the fit shown so far (None when the plot shows
+    no haems), and is set to the fit chosen. Its redraw is set.
 answers : dict
     Answers dictionary the values are stored in; fit_file and
     decomposition_dataset name the fit shown.
 defaults : dict
-    Default answers offered by the questions.
+    Default answers offered by the questions; whether to decompose and which fit
+    follow the answers so far (the strip may have changed them).
 limits : Dict[str, dict]
     Trim and ignore limits of every file (trim_asker).
 fits_folder : Path
@@ -21122,22 +22185,20 @@ fits_folder : Path
 details : Dict[str, dict]
     OD values and events of every file (details_stage_runner); the averaging
     windows are drawn around the events not ignored there.
-shown : Optional[dict]
-    Fit the plot shows the haems with so far, or None when it shows none.
-trim_runner : Callable[[Optional[dict]], Dict[str, dict]]
+trim_runner : Callable[[], Dict[str, dict]]
     Function that asks the trim and ignore questions again with the haems of the
-    given fit on the plot, and returns the new limits.
+    session's fit on the plot, and returns the new limits.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-Optional[dict]
-    The fit, or None when the haems are not decomposed.
+None
+    Nothing. The fit is in session.fit (None when the haems are not decomposed).
 
 ---- Globals mutated ----
-None. Stores the answers in ``answers``, reads from and prints to the terminal and
-redraws the window (side effects).
+None. Stores the answers in ``answers`` and the fit in the session, reads from and
+prints to the terminal and redraws the window (side effects).
 
 ---- Equations ----
 None.
@@ -21146,6 +22207,9 @@ None.
 _answers_previewer
 _averaging_reviewer
 _choice_reviewer
+_decomposition_storer
+_fit_names_lister
+_strip_shower
 decomposition_asker
 info_printer
 pca_stage_runner
@@ -21161,18 +22225,16 @@ Main function to ask the trim and ignore questions on the standard plot, adding 
 shaded trimmed and ignored parts to the plot window after every answer, and ask
 whether to accept them. When the limits are asked again, the earlier ones stay on
 the plot as dashed lines. After they are accepted, it offers to export all the data
-cut to them.
+cut to them. The haems are those of the session's fit (none when it has none).
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session.
+    The browser session; its redraw is set.
 answers : dict
     Answers so far, used for the figure style of the preview.
 remembered : Dict[str, dict]
     {file name: {trim_start, trim_end, ignore_start, ignore_end}} offered as the
     defaults (from the last run, or from the previous attempt).
-fit : Optional[dict]
-    Fit the haems are shown with, or None for the oxygen and the OCR only.
 
 ---- Globals read ----
 None.
@@ -21208,7 +22270,8 @@ the processing (the haem fit, the trim and ignore times again if wanted, the
 averaging) and the individual figures. The standard plot of every file (oxygen, OCR
 and the haems of the dataset's fit) is shown first, with no question asked. The
 plot window is redrawn after each answer, and at the end any step can be gone back
-to.
+to. In the window the settings strip can be changed while these questions wait
+(except those of the components found from the data); it is greyed out afterwards.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -21225,7 +22288,7 @@ export_root : Path
     Results folder.
 
 ---- Globals read ----
-PREVIEW_FILE, STAGE_TITLES (module constants).
+PREVIEW_FILE, STAGE_TITLES (module constants); settings.STANDARD_FIT.
 
 ---- Outputs ----
 Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
@@ -21234,13 +22297,16 @@ Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers``, reads from and prints to the terminal,
-draws and closes the plot window (side effects).
+draws and closes the plot window and sets up the settings strip (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_fit_names_lister
 _standard_fit_loader
+_strip_change_applier
+_strip_shower
 active_gui_getter
 browser_stage_runner
 choice_asker
@@ -21270,7 +22336,8 @@ The strip under the plot that always shows the current choices: a tick box for t
 haems, a drop-down of the fits, a drop-down of the journal, a drop-down of the
 widths that journal allows and a typing box for the height. It tells the window
 what the user changed and can be set by the program; it changes nothing by itself.
-Every method runs on the window thread, except values_reader.
+It starts greyed out, until the program says it is listening. Every method runs on
+the window thread, except values_reader.
 
 ---- Attributes ----
 frame : Any
@@ -21290,6 +22357,7 @@ _journal_handler
 _size_refresher
 _width_handler
 fits_setter
+state_setter
 values_reader
 values_setter
 ```
@@ -21309,9 +22377,10 @@ parent : Any
     The widget the strip is built in.
 background : str
     Background colour of the strip.
-on_change : Callable[[str, Any], None]
-    Called with (name, value) each time the user changes a value; the names
-    are those of VALUE_NAMES.
+on_change : Callable[[Dict[str, Any]], None]
+    Called once for each change the user makes, with {name: value} of every
+    value that changed (a new journal can change the width and the height
+    too); the names are those of VALUE_NAMES.
 
 ---- Globals read ----
 settings.DEFAULT_ANSWERS, JOURNAL_NAMES, NO_JOURNAL, NO_JOURNAL_TEXT,
@@ -21340,7 +22409,8 @@ _width_handler
 
 ```text
 ---- Summary ----
-Method to tell the window each value that differs from what it was.
+Method to tell the window, in one call, every value that differs from what it
+was; nothing is told when nothing changed.
 
 ---- Inputs ----
 before : Dict[str, Any]
@@ -21483,7 +22553,8 @@ width_choices_lister
 ```text
 ---- Summary ----
 Method to show the kept values in every part of the strip: the widths offered
-follow the journal, and the width and the height are greyed for "None".
+follow the journal, the width and the height are greyed for "None", and the
+whole strip is greyed while the program is not listening.
 
 ---- Inputs ----
 None.
@@ -21558,6 +22629,34 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+##### `state_setter`
+
+```text
+---- Summary ----
+Method to let the user change the strip, or grey it out while what it shows
+is not being used. The values stay on show either way.
+
+---- Inputs ----
+is_enabled : bool
+    True to let the user change the values, False to grey the strip out.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_refresher
 ```
 
 ##### `values_reader`
@@ -21706,6 +22805,69 @@ height in mm = height * page height of the journal in mm.
 ---- Helpers ----
 _number_reader
 _page_journal_finder
+```
+
+#### `size_answers_builder`
+
+```text
+---- Summary ----
+Main function to turn the journal, width and height of the strip into the answers
+of the figure of each file. The haems and the fit are left out: they need the fit
+file read, which the questions do.
+
+---- Inputs ----
+values : Dict[str, Any]
+    Some or all of the strip values (DATA_FORMAT.md), as checked by
+    strip_values_checker.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS, NO_JOURNAL.
+
+---- Outputs ----
+Dict[str, Any]
+    The answers to update: journal and size_mode for a journal ("None" is the
+    standard journal with size_mode 'default'), columns and height as given.
+    Empty when the values hold none of them.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `strip_values_builder`
+
+```text
+---- Summary ----
+Main function to give the strip values that show the answers of the run.
+
+---- Inputs ----
+answers : dict
+    The answers (fit_file, journal, columns, height, size_mode); a fit_file of
+    None shows an empty fit.
+has_haems : bool
+    True when the haems are worked out and shown, which ticks the box.
+
+---- Globals read ----
+NO_JOURNAL.
+
+---- Outputs ----
+Dict[str, Any]
+    All the strip values (DATA_FORMAT.md). A figure of the standard size
+    (size_mode other than 'custom') shows the journal as "None".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `strip_values_checker`
@@ -22116,12 +23278,17 @@ PREVIEW_DPI (module constant).
 ---- Methods ----
 __init__
 _file_opener
+drawing_sign_shower
 extra_publisher
 figure_shower
 file_focuser
 output_capturer
 pictures_publisher
 session_attacher
+strip_fits_setter
+strip_listener_setter
+strip_setter
+strip_state_setter
 window_closer
 ```
 
@@ -22171,6 +23338,33 @@ None
 ---- Globals mutated ----
 None. Starts the picture viewer; a failure to start it is ignored (side
 effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `drawing_sign_shower`
+
+```text
+---- Summary ----
+Method that does nothing: a picture file has no "Drawing ..." sign, and the
+terminal says what is being drawn.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
 
 ---- Equations ----
 None.
@@ -22331,6 +23525,118 @@ Method that does nothing: the picture needs no list of files.
 ---- Inputs ----
 session : Any
     The browser session.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_fits_setter`
+
+```text
+---- Summary ----
+Method that does nothing: without a window there is no settings strip, and the
+fit is asked as a question.
+
+---- Inputs ----
+names : List[str]
+    File names of the fits (ignored).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_listener_setter`
+
+```text
+---- Summary ----
+Method that does nothing: without a window there is no settings strip to
+listen to.
+
+---- Inputs ----
+listener : Optional[Callable[[Dict[str, Any]], None]]
+    The function that would be told the changes (ignored).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_setter`
+
+```text
+---- Summary ----
+Method that does nothing: without a window there is no settings strip to show
+the values in.
+
+---- Inputs ----
+values : Dict[str, Any]
+    Strip values (ignored).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_state_setter`
+
+```text
+---- Summary ----
+Method that does nothing: without a window there is no settings strip to grey
+out.
+
+---- Inputs ----
+is_enabled : bool
+    Whether the strip could be changed (ignored).
 
 ---- Globals read ----
 None.

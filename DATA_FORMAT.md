@@ -78,6 +78,55 @@ Quick description of one `.paf` file, read before the questions are asked. Creat
 | `'datasets'` | List[str] | | | Spectral datasets in the file |
 | `'events'` | List[dict] | | | The additions stored inside the recording, in the order of their spectrum numbers, each with `'name'` (the software's name for it, `Event 1`), `'text'`, `'datapoint'`, `'time'` (min) and `'row_index'` as in `event`. They are the same additions, with the same times, as `experiment_paf_loader` gives |
 | `'traces'` | List[str] | | | Names of the recorded traces |
+| `'ocr_check'` | dict | | | The check of the instrument's OCR against ours (`ocr_check`); a warning is printed when it disagrees or cannot be done |
+
+#### `ocr_check`
+
+Result of checking the instrument's OCR against our own calculation from its traces. Created by `ocr_checker` (`utils_shared/ocr_checking.py`) once per file, in `experiment_summary_reader`, and turned into the warning by `ocr_check_describer`. How it is worked out is under "Our OCR check" below.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'is_checked'` | bool | | | True when the six traces and the permeability are there and the recording is long enough to compare (100 points) |
+| `'is_agreeing'` | bool | | | True when every part agrees; False when the file was not checked |
+| `'reason'` | str | | | Why the file was not checked, in plain words (`the file has no PtO2 trace`); empty when it was |
+| `'permeability'` | float or None | | µM/min/mmHg | Oxygen permeability of the chamber wall, from `ocr_settings`; None when the file does not store it |
+| `'pressure_factor'` | float or None | | mmHg/µM | `PcO2` / `CcO2` fitted over the run (the oxygen solubility the instrument used); None when not checked |
+| `'parts'` | dict | | | For `'sum'`, `'pressure'`, `'fall'`, `'fall_size'`, `'leak'` and `'leak_size'`: `'difference'`, `'margin'`, `'unit'` (µM/min, mmHg or %) and `'is_agreeing'` (difference at most the margin). Empty when not checked |
+
+##### Our OCR check
+
+The program uses the instrument's OCR (`VoO2`) as it is. The instrument does not say exactly how it smooths its rates, so each file is checked once, when its folder is read, against our own calculation from the same traces. A file that disagrees gets one warning that names the part. Below, Δt is the clock's step (s), Kp the permeability from `VoO2Math` and j a point of the clock.
+
+Our recipe (`ocr_calculator`):
+- fall[j] = -60 × Σ k × CcO2[j + k] / (Δt × Σ k²), for k = -14 … 14 (Σ k² = 2030): the slope of the least-squares straight line through the 29 points centred on j, in µM/min, positive when the oxygen falls; empty for the first and last 14 points
+- leak[j] = Kp × mean of (PtO2 - PcO2)[j - 39 … j]: the 40 points (20 s at 0.5 s) ending at j; empty for the first 39 points
+- our OCR = fall + leak
+
+What is compared (`ocr_checker`), part by part:
+
+| Part | Compared | Margin |
+|---|---|---|
+| `sum` | Largest difference between `VoO2` and `VrO2` + `DgO2` | 0.001 µM/min |
+| `pressure` | Largest difference between `PcO2` and α × `CcO2`, α = Σ CcO2 × PcO2 / Σ CcO2² | 0.001 mmHg |
+| `fall` | Median difference between `VrO2` and our fall | 3 µM/min |
+| `fall_size` | (f - 1) × 100, without its sign, f = Σ VrO2 × fall / Σ fall² | 35 % |
+| `leak` | Median difference between `DgO2` and our leak | 2 µM/min |
+| `leak_size` | (f - 1) × 100, without its sign, f = Σ DgO2 × leak / Σ leak² | 5 % |
+
+- The fall and leak parts use only the points where both have a value and that are more than 30 points (15 s) from every addition.
+- The two smoothings differ most where the oxygen changes fast: after an addition (up to 240 µM/min), or when the outside oxygen jumps with a new oxygen setting (up to 46 µM/min for tens of seconds). So these parts look at the typical difference and at the overall size, not at every point. They catch a wrong permeability, a wrong unit or sign, and maths broken over most of a run.
+- The margins are about three times the worst seen in the 33 sample files on 2026-11-20: 0.0001 for the sum and the pressure; 0.87 µM/min and 11 % for the fall; 0.55 µM/min and 1.6 % for the leak.
+- To change the recipe, for example once the instrument's developer gives the exact smoothing: change `FALL_POINTS`, `LEAK_POINTS` or the helpers in `utils_shared/ocr_checking.py`, then this section. Then rewrite the fixed values in `tests/test_paf_reading.py` (`FIXED_*`), which hold our results on the example run so the maths never changes by accident. `tests/test_ocr_checking.py` holds the cases worked out by hand.
+
+#### `ocr_settings`
+
+How the instrument works out its oxygen rates, read from the `VoO2Math` record by `PafFile.ocr_settings_reader`. None when the file has no such record or it is not laid out as expected.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'permeability'` | float | | µM/min/mmHg | Oxygen permeability of the chamber wall (0.050 to 0.264 in the files seen) |
+| `'fall_edge_points'` | int | | | Points without a `VrO2` value at each end of the recording (20); the three rates all lack this many at the end |
+| `'leak_start_points'` | int | | | Points without a `DgO2` or `VoO2` value at the start (60) |
 
 #### `averages`
 
@@ -262,12 +311,12 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 
 #### `strip_values`
 
-What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/viewer_strip.py`). Given by `ViewerGui.strip_reader`, taken in part or whole by `ViewerGui.strip_setter` (checked by `strip_values_checker`), and told one value at a time, as `(name, value)`, to the function registered with `ViewerGui.strip_listener_setter`. The names are those of the answers in `config.DEFAULT_ANSWERS`.
+What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/viewer_strip.py`). Built from the answers by `strip_values_builder`, given by `ViewerGui.strip_reader`, and taken in part or whole by `ViewerGui.strip_setter` (checked by `strip_values_checker`). Each change the user makes is told once, as a dict of the values it changed (a new journal can change the width and the height too), to the function registered with `ViewerGui.strip_listener_setter`. That function runs on the program thread while a question waits. `size_answers_builder` turns the journal, width and height back into answers. The names are those of the answers in `config.DEFAULT_ANSWERS`.
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'plot_haems'` | bool | | | Whether the haems are shown |
-| `'fit_file'` | str | | | File name of the fit, one of the list given with `ViewerGui.strip_fits_setter` |
+| `'plot_haems'` | bool | | | Whether the haems are worked out and shown (the answers `decompose` and `plot_haems` together) |
+| `'fit_file'` | str | | | File name of the fit, normally one of the list given with `ViewerGui.strip_fits_setter`; the description of components found from the data and not saved; `''` when none is named |
 | `'journal'` | str | | | `'none'` (the standard size, on the page of the standard journal) or a key of `config.JOURNAL_SPECS` |
 | `'columns'` | float | | columns | Width, one of the widths the journal allows (`'widths_mm'`) |
 | `'height'` | float | | fraction of a page | Height, above 0 and up to 1 |
@@ -332,7 +381,7 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `time_axis_finder` from 
 
 #### `ViewerSession`
 
-Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by the stage runners, `preview_drawer` and the preview thread.
+Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by the stage runners, `preview_drawer`, the preview thread and the settings strip (`_strip_change_applier`).
 
 | Field | Type | Shape | Units | Default | Description |
 |---|---|---|---|---|---|
@@ -341,6 +390,9 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by 
 | `window` | ViewerGui or PictureWindow | | | | The browser window, or the preview picture file when no window can open |
 | `current` | int | | | `0` | Index of the file being looked at |
 | `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the last 3 files read; each preview works on a deep copy |
+| `fit` | Optional[dict] | | | `None` | The `fit` the haems are worked out with: the standard or saved fit at first, then the one chosen in the processing or the strip; `None` when the haems are left out |
+| `redraw` | Optional[Callable[[], bool]] | | | `None` | Draws the plot of the step being asked again (set by each stage runner), for a change in the strip |
+| `is_figure` | bool | | | `False` | True while the plot is the figure of each file at its saved size (section 5), so a new journal or size in the strip redraws it |
 
 ### 1.3 Arrays
 
@@ -389,7 +441,7 @@ The file is one record after another. Each record starts with the byte `06`, the
 - **Spectra rows:** (number of spectra + 2) rows of 32-bit floats, one value per wavelength: a row of zeros, log10 of the reference spectrum, then log10 of the counts of each spectrum. So counts = 10^row, rounded to a whole number, and transmission = 10^(row - reference row). Spectrum 1 belongs to the first time point of the clock, and so on.
 - **Additions:** each addition is stored more than once; the first copy has the spectrum number 0 and the later ones the real number.
 - **Not read:** files whose spectra are not numbered 1, 2, 3 without gaps, or that have more spectra than time points, are refused with a message.
-- **Rate traces:** `VrO2` has no value for the first 20 and the last 20 points of the clock, `DgO2` and `VoO2` none for the first 60 and the last 20 (the 20 and 60 stored in `VoO2Math`), so these three are stored 20 values shorter than the clock.
+- **Rate traces:** `VrO2` has no value for the first 20 and the last 20 points of the clock, `DgO2` and `VoO2` none for the first 60 and the last 20 (the 20 and 60 stored in `VoO2Math`), so these three are stored 20 values shorter than the clock. A rate trace short by just these 20 values is not reported as short.
 
 What the file holds, each item marked **recorded** (taken as true), **calculated by the instrument** (can be checked) or **not known**. Checked on four recordings: the example run, against the software's own export, and one from each sample folder.
 
@@ -406,15 +458,15 @@ What the file holds, each item marked **recorded** (taken as true), **calculated
 | Transmission and attenuation | fraction, OD | calculated (by this program; the software's export gives the same) | Agree with the export at every point | |
 | Lifetimes of the two oxygen sensors (`Tau-cO2`, `Tau-tO2`) | µs | recorded | The sensors' own readings; `CcO2` and `PtO2` follow them | Yes |
 | Measured oxygen (`CcO2`) | µM | calculated by the instrument from `Tau-cO2` | Follows 1 / `Tau-cO2` closely but not exactly: the sensor calibration is not stored in a form we can read, so it cannot be checked | Yes |
-| Oxygen pressure in the chamber (`PcO2`) | mmHg | calculated by the instrument: `CcO2` × 0.744 to 0.748 (an oxygen solubility set per run) | Exact to the last stored digit | Yes |
+| Oxygen pressure in the chamber (`PcO2`) | mmHg | calculated by the instrument: `CcO2` × 0.744 to 0.748 (an oxygen solubility set per run) | Exact to the last stored digit; checked on every file read (`ocr_check`) | Yes |
 | Oxygen pressure outside the chamber wall (`PtO2`) | mmHg | calculated by the instrument from `Tau-tO2` | Follows 1 / `Tau-tO2` loosely; cannot be checked, as for `CcO2` | Yes |
 | `FtO2` | % | not known | An oxygen percentage that follows `PtO2` closely (about `PtO2` / 7.7) | Yes |
 | Set oxygen (`CsO2`) | µM | recorded (set by the user) | A few steps | Yes |
-| Oxygen permeability of the chamber wall (`KpO2`) | µM/min/mmHg | recorded (a setting of the run: 0.050 to 0.222 in the files seen) | Stored in `VoO2Math`; the `KpO2` trace itself holds no values | Yes |
+| Oxygen permeability of the chamber wall (`KpO2`) | µM/min/mmHg | recorded (a setting of the run: 0.050 to 0.264 in the files seen) | Stored in `VoO2Math`; the `KpO2` trace itself holds no values | Yes |
 | Second number of `VoO2Math` | | not known | 1.7 to 6.0 in the files seen | Yes |
-| Fall of the measured oxygen (`VrO2`) | µM/min | calculated by the instrument: the fall of `CcO2` per minute, smoothed over the 41 points around each point | A straight line through 29 points comes within 0.16 to 0.51 µM/min for half the points but is up to 240 µM/min off just after an addition: the smoothing is not known exactly | Yes |
-| Oxygen leaking in (`DgO2`) | µM/min | calculated by the instrument: the permeability × (`PtO2` - `PcO2`), smoothed | Our version is within 0.005 to 0.015 µM/min for half the points (largest 1 to 4) and its factor within about 1 % of the stored permeability: the smoothing is not known exactly | Yes |
-| Oxygen consumption rate, OCR (`VoO2`) | µM/min | calculated by the instrument: `VrO2` + `DgO2` | Exact to the last stored digit | Yes |
+| Fall of the measured oxygen (`VrO2`) | µM/min | calculated by the instrument: the fall of `CcO2` per minute, smoothed over the 41 points around each point | Checked on every file read (`ocr_check`). In the 33 sample files our straight line through 29 points is within 0.01 to 0.87 µM/min for half the points and the same size within 11 %, but up to 240 µM/min off just after an addition: the smoothing is not known exactly | Yes |
+| Oxygen leaking in (`DgO2`) | µM/min | calculated by the instrument: the permeability × (`PtO2` - `PcO2`), smoothed | Checked on every file read. In the 33 sample files our 20 s mean is within 0.001 to 0.55 µM/min for half the points and the same size within 1.6 %, but up to 46 µM/min off for tens of seconds after the outside oxygen jumps: the smoothing is not known exactly | Yes |
+| Oxygen consumption rate, OCR (`VoO2`) | µM/min | calculated by the instrument: `VrO2` + `DgO2` | Exact to the last stored digit (within 0.0001 µM/min in the 33 sample files); checked on every file read | Yes |
 | Haem traces (`Cyt...`, named after the shapes of the fit) | µM | calculated by the instrument from the spectra with the fit stored in the file | Ours move the same way (`tests/test_haem_direction.py`); the amounts are not reproduced | Yes; their names and number change with the fit |
 | The fit used (`SpectraFitting`, `FIT: NIR`) | OD/mM/cm | recorded | | Yes |
 | `Expt Pt` | au | not known | Zero throughout | Yes |

@@ -1,4 +1,4 @@
-# Portimao question flow (V1.23)
+# Portimao question flow (V1.24)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -9,6 +9,13 @@ Every question in the order it is asked, with where each answer leads. The quest
 - The numbers here are for reference. On screen the numbers are given in the order the questions are asked, so when a branch is skipped the later numbers move up, and every "Do you accept...?" question takes a number of its own.
 - Every "Do you accept...?" question starts with **1 (Yes, accept)**, which moves on. Its other answers (**2 (No, ...)**, and **3**, **4** ... where there are more) each say what is asked again, with your last answers as the defaults.
 - The plot on the right is redrawn after each step marked **(plot)**. You can flick through the files with the arrows or the drop-down at any time while a question waits.
+- The **strip** under the plot shows what the run uses: **Haems** (ticked when the haems are worked out and shown), the **Fit**, the **Journal**, the **Width** and the **Height** of the figure of each file.
+    - While your files are on the plot (sections 2 to 5), you can change it whenever a question waits. The plot is redrawn at once, the run uses the change, and the question goes on waiting.
+    - Unticking Haems leaves the haems out of the run. Ticking it, or picking a fit, works them out with the fit shown and ticks the box.
+    - If a fit cannot be used, one line says why and the strip goes back to what it showed.
+    - A new journal, width or height redraws the plot only in section 5, the one plot drawn at the figure's size. Before that the change is kept for section 5.
+    - The strip is greyed out while you choose the folder, during the questions of 4.A.1, and from section 6 on.
+- While the program draws a picture of its own (the components found from the data, the figures of sections 6 and 7), a yellow **Drawing ...** sign is on the plot. It goes when the picture is shown or the next question is asked.
 - Sections **1** to **3** are the import: your files, the parts of them that are used, and what is known about each run (the OD values and the labels). The processing starts with section **4**.
 
 ---
@@ -20,13 +27,13 @@ Every question in the order it is asked, with where each answer leads. The quest
 | 1.1 | What is the directory with the .paf files? | The folders in the program folder that hold `.paf` files are listed first, numbered, with how many files each holds. Answer with a number or a name from that list, or type (or drag in) the path of another folder; Enter gives the folder used last time. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused and the question is asked again. Otherwise every file is read and listed, then **1.2**. |
 | 1.2 | To which directory would you like the results to be saved? `[the export folder inside the data folder]` If the dataset was run before, a message says its saved settings are offered as the defaults, and its last results folder is offered here. | the standard plot is drawn **(plot)**, then **2.1** |
 
-The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. The haems are worked out with the standard fit (`bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit file is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them.
+The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. The haems are worked out with the standard fit (`bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit file is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
 
 ---
 
 ## 2. Trimming and ignoring
 
-TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted but not used for calculations. Ignore times count from the new 0 after trimming. All four edges are asked in the same way, in this order: TRIM + START, TRIM + END, IGNORE + START, IGNORE + END. The plot shows the standard plot of the whole recording first (with the haems, when they are shown), and **after every answer in this section the shaded regions are added to the plot**: trimmed parts grey and hatched, ignored parts amber. An answer for ALL the data shades every file; an answer for one file shades just that file, and the plot switches to the file being asked about.
+TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted but not used for calculations. Ignore times count from the new 0 after trimming. All four edges are asked in the same way, in this order: TRIM + START, TRIM + END, IGNORE + START, IGNORE + END. The plot shows the standard plot of the whole recording first (with the haems, when they are shown; the strip turns them on and off and picks their fit), and **after every answer in this section the shaded regions are added to the plot**: trimmed parts grey and hatched, ignored parts amber. An answer for ALL the data shades every file; an answer for one file shades just that file, and the plot switches to the file being asked about.
 
 You can answer every "How many minutes ...?" question below with the mouse: click on the plot where the cut should fall, and the answer box shows how many minutes that takes off the edge being asked about (for ALL the data, measured on the file shown). For an IGNORE question the minutes count from the trimmed edge, and a click inside the trimmed part gives 0. You can change the number before pressing Enter, or type one instead.
 
@@ -112,26 +119,31 @@ The plot is the standard plot, cut to the limits of section 2, with the event la
 
 ### 4.A Haem fit
 
-The haems on the plot are those of the import, worked out with the standard fit or the fit last saved for the dataset, and a message names that fit ("The haems are worked out with *fit*."). The section then starts at **4.2**. 4.1 is asked only when the plot shows no haems yet: the dataset was last saved without them, or the fit could not be used (a message in section 1 said why).
+The haems on the plot are those of the import, worked out with the standard fit, the fit last saved for the dataset, or the fit you picked in the strip. A message names that fit ("The haems are worked out with *fit*."). The section then starts at **4.2**. 4.1 is asked only when the plot shows no haems yet:
+- the dataset was last saved without them;
+- the fit could not be used (a message in section 1 said why);
+- you unticked Haems in the strip.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.1 | *(only when no haems are shown)* Do you want to decompose the haems? `(Y/n)` | **4.1.1** | **4.4** (no haems anywhere in the run) |
+| 4.1 | *(only when no haems are shown)* Do you want to decompose the haems? `(Y/n)`, or `(y/N)` when Haems was unticked in the strip or the dataset was saved without haems | **4.1.1** | **4.4** (no haems, unless you tick Haems in the strip later) |
 
 If the `fits/` folder holds no `.csv` file, 4.1 is still asked, and 4.1.1 then offers only *Find the components from the data*.
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last; the fit shown, or else the standard fit or the fit last saved for the dataset, is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.4**. |
+| 4.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last; the fit in the strip is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.4**. |
 | 4.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **4.2** (or **4.1.1.1** when the components are being found) |
 
-| # | Question | 1 → | 2 → | 3 → |
-|---|---|---|---|---|
-| 4.2 | Do you accept this decomposition? | **4.3** | **4.1.1** (*No, try another fit*: the plot is redrawn with each fit you try, then 4.2 again) | **4.4** (*No, do not decompose the haems*: no haems anywhere in the run) |
+To try another fit, pick it in the strip while 4.2 waits: the plot is redrawn with it. To leave the haems out, untick Haems in the strip; answering 1 then goes on without haems, to **4.4**.
+
+| # | Question | 1 → | 2 → |
+|---|---|---|---|
+| 4.2 | Do you accept this decomposition? | **4.3** (**4.4** when Haems was unticked) | **4.1.1.1** (*No, find the components from the data*: the questions of 4.A.1, then 4.2 again with the components) |
 
 #### 4.A.1 Components from the data (principal component analysis)
 
-Asked when the last choice of 4.1.1 is taken. The numbers keep counting up when a question is asked again, and each component name is a question of its own, so the numbers on screen can be higher than these. The files are read for their spectra (trimmed, without the ignored parts; this can take a moment). Once the components are made, the plot window gets a *PCA components* picture (one panel per component, coloured by the haem type it looks like) and a *PCA examples* picture (the best and worst described spectrum and their residuals) after the files **(plot)**. They go when the decomposition is drawn.
+Asked when the last choice of 4.1.1, or answer 2 of 4.2, is taken. The strip is greyed out until they are answered, and its fit list then includes a fit file saved in 4.1.1.9. The numbers keep counting up when a question is asked again, and each component name is a question of its own, so the numbers on screen can be higher than these. The files are read for their spectra (trimmed, without the ignored parts; this can take a moment). Once the components are made, the plot window gets a *PCA components* picture (one panel per component, coloured by the haem type it looks like) and a *PCA examples* picture (the best and worst described spectrum and their residuals) after the files **(plot)**. The **Drawing ...** sign is on the plot while they are made. They go when the decomposition is drawn.
 
 | # | Question | Leads to |
 |---|---|---|
@@ -143,7 +155,7 @@ Asked when the last choice of 4.1.1 is taken. The numbers keep counting up when 
 
 | # | Question | 1 → | 2 → | 3 → | 4 → |
 |---|---|---|---|---|---|
-| 4.1.1.6 | Do you accept these components? | **4.1.1.7** | **4.1.1.3** (the number of components) | **4.1.1.1** (the window) | **4.1.1** (choose a fit file instead) |
+| 4.1.1.6 | Do you accept these components? | **4.1.1.7** | **4.1.1.3** (the number of components) | **4.1.1.1** (the window) | *No, choose a fit file instead*: **4.1.1**, or **4.2** when you came from 4.2 (pick the fit in the strip) |
 
 | # | Question | Leads to |
 |---|---|---|
@@ -188,11 +200,13 @@ The figure saved for each file is drawn at once **(plot)**, at its real size and
 - the event labels at 45°;
 - Nature, 1 column wide and 0.5 of a page tall.
 
+The haems are in the figure when Haems is ticked in the strip. The journal, width and height are set in the strip too: each change redraws the figure at once.
+
 | # | Question | Leads to |
 |---|---|---|
-| 5.1 | Do you accept this figure? | **1) Yes, accept**: **5.8**. **2) No, change the oxygen and OCR**: **5.2**. **3) No, change which haems are shown** *(only when the haems were decomposed)*: **5.4**. **4) No, change how the haems are shown** *(only when the haems are plotted)*: **5.5**. **5) No, change the angle of the event labels** *(only when something is plotted)*: **5.6**. **6) No, change the journal or size**: **5.7**. |
+| 5.1 | Do you accept this figure? | **1) Yes, accept**: **5.8**. **2) No, change the oxygen and OCR**: **5.2**. **3) No, change which haems are shown** *(only when the haems are plotted)*: **5.4.1**. **4) No, change how the haems are shown** *(only when the haems are plotted)*: **5.5**. **5) No, change the angle of the event labels** *(only when something is plotted)*: **5.6**. |
 
-Each part's questions offer your current choices as the defaults. After them the figure is drawn again **(plot)** and **5.1** is asked again; the numbers on screen keep counting up. If nothing is plotted (5.2 and 5.3 No, and 5.4 No or not offered), a message says no individual figures will be made, nothing is drawn, and 5.1 is asked again so you can turn a panel back on; accepting then makes no individual figures.
+Each part's questions offer your current choices as the defaults. After them the figure is drawn again **(plot)** and **5.1** is asked again; the numbers on screen keep counting up. If nothing is plotted (5.2 and 5.3 No, and Haems unticked), a message says no individual figures will be made, nothing is drawn, and 5.1 is asked again so you can turn a panel back on; accepting then makes no individual figures.
 
 ### 5.A Oxygen and OCR
 
@@ -204,9 +218,7 @@ Each part's questions offer your current choices as the defaults. After them the
 
 ### 5.B Which haems
 
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 5.4 | Do you want to plot the haems? `(Y/n)` | **5.4.1** | the figure is drawn **(plot)**, then **5.1** |
+Whether the haems are plotted at all is the Haems box in the strip; this question picks which of them, and their order.
 
 | # | Question | Leads to |
 |---|---|---|
@@ -227,6 +239,8 @@ Each part's questions offer your current choices as the defaults. After them the
 
 ### 5.E Journal and size
 
+In the window the strip sets the journal, width and height of this figure, so these questions are not asked here. They are listed because the figures of sections 6 and 7 ask their own size in the same way (and terminal mode asks them here).
+
 | # | Question | Leads to |
 |---|---|---|
 | 5.7 | Which journal format would you like? 1) None (use the default: Nature, 1 column wide, 0.5 of a page tall) 2) Nature 3) Science 4) Cell 5) PNAS | **None**: the default size is used, the figure is drawn **(plot)**, then **5.1**. **A journal**: **5.7.1** |
@@ -245,7 +259,9 @@ Each part's questions offer your current choices as the defaults. After them the
 
 If nothing is plotted in section 5, a message says these figures reuse the panels chosen for the individual experiment plots and are skipped, and the next step is **7.1**.
 
-Each figure is drawn from your data once its questions are answered (this reads the files again, so it takes a moment) and shown in the plot area. Nothing is saved to the results folder until the run starts.
+From here on the strip is greyed out: these figures ask their own journal and size.
+
+Each figure is drawn from your data once its questions are answered (this reads the files again, so it takes a moment, and the **Drawing ...** sign is on the plot meanwhile) and shown in the plot area. Nothing is saved to the results folder until the run starts.
 
 ### 6.A Two experiments side by side
 
@@ -293,7 +309,7 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 
 ## 7. Experiment summaries
 
-Both summary figures need the haem fit. If the haems were not decomposed in section 4, the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, so if you said No in 4.4 (and have not been asked since), a message says the averaging window is asked here, and the window and gap questions (**4.4.1**, **4.4.2**) are asked first.
+As in section 6, the **Drawing ...** sign is on the plot while each picture is drawn. Both summary figures need the haem fit. If the haems were not decomposed in section 4 (or Haems was unticked), the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, so if you said No in 4.4 (and have not been asked since), a message says the averaging window is asked here, and the window and gap questions (**4.4.1**, **4.4.2**) are asked first.
 
 ### 7.A Time response
 
@@ -375,6 +391,21 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 The questions and their order are the same, apart from the OD values. These differ:
 
 - In **2** to **5** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer. Nothing can be clicked or dragged on it: every number is typed.
+- There is no strip and no **Drawing ...** sign, so the haems, the fit, the journal and the size are asked as questions:
+    - **4.1** has the dataset's saved answer as its default.
+    - **4.2** has three answers:
+
+| # | Question | 1 → | 2 → | 3 → |
+|---|---|---|---|---|
+| 4.2 | Do you accept this decomposition? | **4.3** | **4.1.1** (*No, try another fit*: the plot is redrawn with each fit you try, then 4.2 again; finding the components from the data is the last choice of 4.1.1) | **4.4** (*No, do not decompose the haems*: no haems anywhere in the run) |
+
+- In **4.1.1.6**, *No, choose a fit file instead* always goes to **4.1.1**.
+- In **5.1**, answer 3 (*No, change which haems are shown*) is offered whenever the haems were decomposed, and asks **5.4** first. A last answer, **No, change the journal or size**, asks **5.7**. The figure has the haems when you said Yes to 5.4 (or to the saved answer):
+
+| # | Question | Yes → | No → |
+|---|---|---|---|
+| 5.4 | Do you want to plot the haems? `(Y/n)` | **5.4.1** | the figure is drawn **(plot)**, then **5.1** |
+
 - In **3.A** there is no table. The values stored for some files are listed, the OD values are asked one file at a time, and then accepted, so the event label questions are numbered one higher on screen (3.3 to 3.6):
 
 | # | Question | Leads to |

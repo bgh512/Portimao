@@ -1,6 +1,7 @@
 """
 Tests that what is read from a .paf file equals the instrument software's own export of
-the same run, at every point, and that the parts read fit together.
+the same run, at every point, that the parts read fit together, and that our OCR maths
+still gives its fixed values on that run.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -13,6 +14,7 @@ import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.attenuation import attenuation_converter
+from utils_shared.ocr_checking import ocr_calculator
 from utils_shared.paf_reader import (experiment_paf_loader,
                                      experiment_summary_reader,
                                      PafFile,
@@ -58,6 +60,27 @@ EXPECTED_EVENTS = [(1681, '1ul 8mm nd-011992'),
                    ]
 ROUNDING = 0.00051  # the text export has 3 decimals
 ROWS_AT_ONCE = 512  # spectra compared at a time, to keep the memory use low
+
+# the VoO2Math settings of the example run (permeability in µM/min/mmHg)
+EXPECTED_PERMEABILITY = 0.120648
+EXPECTED_FALL_EDGE_POINTS = 20
+EXPECTED_LEAK_START_POINTS = 60
+# our OCR maths on the example run, written on 2026-11-20 from its first run
+# (DATA_FORMAT.md, "Our OCR check"). Rewrite these only on purpose, when the recipe
+# changes; µM/min, the sizes in %, the pressure factor in mmHg/µM
+FIXED_ROWS = (500, 2000, 3000, 4500, 6000)
+FIXED_FALL = (-1.489703, 0.260353, -0.448805, -0.221562, -0.006090)
+FIXED_LEAK = (43.465054, 36.937253, 36.299074, 23.040532, -0.009244)
+FIXED_OCR = (41.975351, 37.197606, 35.850269, 22.818970, -0.015334)
+FIXED_DIFFERENCES = {'sum': 0.000054,
+                     'pressure': 0.000046,
+                     'fall': 0.221819,
+                     'fall_size': 1.163523,
+                     'leak': 0.086749,
+                     'leak_size': 0.327130,
+                     }
+FIXED_PRESSURE_FACTOR = 0.747990
+FIXED_DECIMALS = 1e-6
 
 pytestmark = pytest.mark.skipif(
     not PAF_FILE.exists(),
@@ -647,3 +670,123 @@ def test_loaded_traces_match_the_instrument(traces: dict, name: str) -> None:
     assert np.abs(frame[TIME_COLUMN].to_numpy() - exported[:, 0]).max() < ROUNDING
     assert np.abs(frame[LOADED_TRACES[name]].to_numpy() - exported[:, 1],
                   ).max() < ROUNDING
+
+
+# ---- test_ocr_settings_fit_the_rate_traces -------------------------------------------
+def test_ocr_settings_fit_the_rate_traces(traces: dict) -> None:
+    """
+    ---- Summary ----
+    Main function to check the oxygen-rate settings read from the example run: its
+    permeability, and the 20 and 60 empty points at the start of VrO2 and of DgO2.
+
+    ---- Inputs ----
+    traces : dict
+        The traces of the example run, from _trace_loader.
+
+    ---- Globals read ----
+    PAF_FILE, EXPECTED_PERMEABILITY, EXPECTED_FALL_EDGE_POINTS,
+    EXPECTED_LEAK_START_POINTS, FIXED_DECIMALS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    with PafFile(PAF_FILE) as paf:
+        settings = paf.ocr_settings_reader()
+    assert settings is not None
+    assert settings['permeability'] == pytest.approx(EXPECTED_PERMEABILITY,
+                                                     abs=FIXED_DECIMALS,
+                                                     )
+    assert settings['fall_edge_points'] == EXPECTED_FALL_EDGE_POINTS
+    assert settings['leak_start_points'] == EXPECTED_LEAK_START_POINTS
+    for name, empty in (('VrO2', EXPECTED_FALL_EDGE_POINTS),
+                        ('DgO2', EXPECTED_LEAK_START_POINTS),
+                        ):
+        values = traces['values'][name]
+        assert np.isnan(values[:empty]).all()
+        assert np.isfinite(values[empty])
+
+
+# ---- test_example_ocr_agrees ---------------------------------------------------------
+def test_example_ocr_agrees() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the instrument's OCR of the example run agrees with
+    ours, and that the differences stay at their fixed values.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    PAF_FILE, FIXED_DIFFERENCES, FIXED_PRESSURE_FACTOR, FIXED_DECIMALS (module
+    constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    check = experiment_summary_reader(PAF_FILE)['ocr_check']
+    assert check['is_checked'] and check['is_agreeing']
+    found = {name: part['difference'] for name, part in check['parts'].items()}
+    assert found == pytest.approx(FIXED_DIFFERENCES, abs=FIXED_DECIMALS)
+    assert check['pressure_factor'] == pytest.approx(FIXED_PRESSURE_FACTOR,
+                                                     abs=FIXED_DECIMALS,
+                                                     )
+
+
+# ---- test_our_ocr_stays_fixed --------------------------------------------------------
+def test_our_ocr_stays_fixed(traces: dict) -> None:
+    """
+    ---- Summary ----
+    Main function to check that our fall, leak and OCR of the example run keep their
+    fixed values, so a change to our maths is never made by accident.
+
+    ---- Inputs ----
+    traces : dict
+        The traces of the example run, from _trace_loader.
+
+    ---- Globals read ----
+    PAF_FILE, FIXED_ROWS, FIXED_FALL, FIXED_LEAK, FIXED_OCR, FIXED_DECIMALS (module
+    constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    with PafFile(PAF_FILE) as paf:
+        permeability = paf.ocr_settings_reader()['permeability']
+    step_s = float(np.median(np.diff(traces['time_s'])))
+    ours = ocr_calculator(traces['values'], permeability, step_s)
+    rows = list(FIXED_ROWS)
+    for key, fixed in (('fall', FIXED_FALL), ('leak', FIXED_LEAK), ('ocr', FIXED_OCR)):
+        assert ours[key][rows] == pytest.approx(np.array(fixed), abs=FIXED_DECIMALS), (
+            f'Our {key} of the example run has changed. If the recipe was changed on '
+            f'purpose, write the new values in this test and in DATA_FORMAT.md.'
+        )

@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.ocr_checking import ocr_check_describer, ocr_checker, OCR_TRACES
 from utils_shared.schema import TIME_COLUMN
 
 
@@ -40,6 +41,22 @@ FALLBACK_UNIT = 'uM'
 MIN_TRACE_FRACTION = 0.9
 # a trace missing more than this fraction of the clock's length is reported
 SHORT_TRACE_FRACTION = 0.01
+# the oxygen rates; the instrument leaves their last points empty (the number is stored
+# in the VoO2Math record), which is not reported
+RATE_TRACES = ('VrO2', 'DgO2', 'VoO2')
+
+# the VoO2Math record (DATA_FORMAT.md, under Files): after the last trace name come
+# two empty strings and four zero bytes, then the settings at these byte offsets
+OCR_SETTINGS_RECORD = 'VoO2Math'
+OCR_SETTINGS_START = b'\x02\x00\x00\x00' + bytes(4) + b'\x02\x00\x00\x00' + bytes(8)
+PERMEABILITY_OFFSET = 20  # 32-bit float, µM/min/mmHg
+FALL_EDGE_OFFSET = 32  # whole number of points
+LEAK_START_OFFSET = 36  # whole number of points
+OCR_SETTINGS_BYTES = 40
+# what a permeability and a number of points can be; outside these the record is not
+# understood
+PERMEABILITY_RANGE = (0.0, 10.0)
+POINTS_RANGE = (1, 1000)
 
 # how each trace the program uses is called in a message
 TRACE_LABELS = {'CsO2': 'set oxygen (CsO2)',
@@ -142,6 +159,7 @@ class PafFile:
     frame_counter
     missing_trace_describer
     notes_reader
+    ocr_settings_reader
     ocr_trace_checker
     spectra_dataset_reader
     stream_name_lister
@@ -570,6 +588,66 @@ class PafFile:
                                          )
         return ''
 
+    # ---- ocr_settings_reader ---------------------------------------------------------
+    def ocr_settings_reader(self) -> Optional[dict]:
+        """
+        ---- Summary ----
+        Main method to read how the instrument works out its oxygen rates (the
+        VoO2Math record).
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        FALL_EDGE_OFFSET, LEAK_START_OFFSET, OCR_SETTINGS_BYTES, OCR_SETTINGS_RECORD,
+        OCR_SETTINGS_START, PERMEABILITY_OFFSET, PERMEABILITY_RANGE, POINTS_RANGE,
+        LAYOUT_ERRORS (module constants).
+
+        ---- Outputs ----
+        Optional[dict]
+            ocr_settings (DATA_FORMAT.md): 'permeability' (µM/min/mmHg),
+            'fall_edge_points' and 'leak_start_points'; None when the file has no such
+            record or it is not laid out as expected.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        token_reader
+        u32_reader
+        """
+
+        for r in self.records:
+            if r['type'] != OCR_SETTINGS_RECORD:
+                continue
+            try:
+                tokens = token_reader(self._mm, r['off'] + 40, r['end'])
+                start = tokens[-1][2]
+                tail = bytes(self._mm[start:min(start + OCR_SETTINGS_BYTES, r['end'])])
+                if len(tail) < OCR_SETTINGS_BYTES or not tail.startswith(
+                    OCR_SETTINGS_START,
+                    ):
+                    return None
+                permeability = struct.unpack_from('<f', tail, PERMEABILITY_OFFSET)[0]
+                fall_edge = u32_reader(tail, FALL_EDGE_OFFSET)
+                leak_start = u32_reader(tail, LEAK_START_OFFSET)
+            except LAYOUT_ERRORS:
+                return None
+            is_understood = (PERMEABILITY_RANGE[0] < permeability < PERMEABILITY_RANGE[1]
+                             and POINTS_RANGE[0] <= fall_edge <= POINTS_RANGE[1]
+                             and POINTS_RANGE[0] <= leak_start <= POINTS_RANGE[1]
+                             )
+            if not is_understood:
+                return None
+            return {'permeability': float(permeability),
+                    'fall_edge_points': int(fall_edge),
+                    'leak_start_points': int(leak_start),
+                    }
+        return None
+
     # ---- ocr_trace_checker -----------------------------------------------------------
     def ocr_trace_checker(self) -> None:
         """
@@ -729,7 +807,7 @@ class PafFile:
         return list(self._main)
 
     # ---- stream_reader ---------------------------------------------------------------
-    def stream_reader(self, name: str) -> Optional[np.ndarray]:
+    def stream_reader(self, name: str, is_quiet: bool = False) -> Optional[np.ndarray]:
         """
         ---- Summary ----
         Main method to read one trace on the common time base.
@@ -737,9 +815,12 @@ class PafFile:
         ---- Inputs ----
         name : str
             Trace name, e.g. 'VoO2'.
+        is_quiet : bool
+            True to read the trace without the warning about a short trace, when it is
+            given elsewhere.
 
         ---- Globals read ----
-        None.
+        RATE_TRACES (module constant).
 
         ---- Outputs ----
         Optional[np.ndarray]
@@ -748,13 +829,15 @@ class PafFile:
             than the clock), or None if the trace does not exist.
 
         ---- Globals mutated ----
-        None. Prints a warning when more than SHORT_TRACE_FRACTION of the trace is
-        missing (side effect).
+        None. Prints a warning when the trace is short (see _short_trace_describer)
+        (side effect).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
+        _short_trace_describer
+        ocr_settings_reader
         warning_printer
         """
 
@@ -768,12 +851,17 @@ class PafFile:
         n = min(len(out), s['n'])
         out[:n] = np.asarray(s['values'][:n], dtype=float)
         n_missing = len(out) - n
-        if n_missing > SHORT_TRACE_FRACTION * len(out):
-            step_s = float(np.nanmedian(np.diff(self.time_s)))
-            warning_printer(f'{self.path.name}: the {name} trace is {n_missing} points '
-                            f'shorter than the recording, so its last '
-                            f'{n_missing * step_s:.0f} s are left empty.',
-                            )
+        if n_missing and not is_quiet:
+            settings = self.ocr_settings_reader() if name in RATE_TRACES else None
+            message = _short_trace_describer(name,
+                                             n_missing,
+                                             len(out),
+                                             float(np.nanmedian(np.diff(self.time_s))),
+                                             settings['fall_edge_points'] if settings
+                                             else 0,
+                                             )
+            if message:
+                warning_printer(message, self.path.name)
         return out
 
     # ---- stream_unit_reader ----------------------------------------------------------
@@ -930,6 +1018,56 @@ def _event_time_adder(events: Sequence[dict],
             continue
         timed.append(dict(event, time=float(time_min[row]), row_index=row))
     return timed
+
+
+# ---- _short_trace_describer ----------------------------------------------------------
+def _short_trace_describer(name: str,
+                           n_missing: int,
+                           n_clock: int,
+                           step_s: float,
+                           n_expected: int,
+                           ) -> str:
+    """
+    ---- Summary ----
+    Helper function to say whether a trace shorter than the clock is worth a warning,
+    and in what words.
+
+    ---- Inputs ----
+    name : str
+        Trace name, e.g. 'VoO2'.
+    n_missing : int
+        Points of the clock the trace has no value for at the end.
+    n_clock : int
+        Points of the clock.
+    step_s : float
+        Time between two points (s).
+    n_expected : int
+        Points the instrument always leaves empty at the end of this trace (the fall
+        edge of VoO2Math for the oxygen rates, else 0).
+
+    ---- Globals read ----
+    SHORT_TRACE_FRACTION (module constant).
+
+    ---- Outputs ----
+    str
+        The warning, without the file name; empty when the trace is short by no more
+        than n_expected points or by no more than SHORT_TRACE_FRACTION of the clock.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if n_missing <= n_expected or n_missing <= SHORT_TRACE_FRACTION * n_clock:
+        return ''
+    return (f'the {name} trace is {n_missing} points shorter than the recording, so '
+            f'its last {n_missing * step_s:.0f} s are left empty.'
+            )
 
 
 # ---- _spectrum_time_finder -----------------------------------------------------------
@@ -1262,12 +1400,14 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
     ---- Outputs ----
     dict
         {'name' (file stem), 'duration_min', 'frames', 'datasets', 'events' (the
-        additions inside the recording, each with 'time' in minutes), 'traces'}.
-        Raises PafError if the VoO2 trace is missing, so a file that cannot be
-        processed is refused before any question is asked about it.
+        additions inside the recording, each with 'time' in minutes), 'traces',
+        'ocr_check' (ocr_check in DATA_FORMAT.md)}. Raises PafError if the VoO2 trace
+        is missing, so a file that cannot be processed is refused before any question
+        is asked about it.
 
     ---- Globals mutated ----
-    None. Prints a warning for each addition outside the recording (side effect).
+    None. Prints a warning for each addition outside the recording, and one when the
+    instrument's OCR does not agree with ours or cannot be checked (side effect).
 
     ---- Equations ----
     None.
@@ -1278,8 +1418,13 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
     duration_finder
     events_reader
     frame_counter
+    ocr_check_describer
+    ocr_checker
+    ocr_settings_reader
     ocr_trace_checker
     stream_name_lister
+    stream_reader
+    warning_printer
     """
 
     with PafFile(path) as paf:
@@ -1290,13 +1435,30 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
                                    paf.path.name,
                                    )
 
-        # ---- 2 Assemble the summary --------------------------------------------------
+        # ---- 2 Check the instrument's OCR against ours -------------------------------
+        settings = paf.ocr_settings_reader()
+        check = ocr_checker({name: paf.stream_reader(name, is_quiet=True)
+                             for name in OCR_TRACES
+                             },
+                            settings['permeability'] if settings else None,
+                            [event['row_index'] for event in events],
+                            (float(np.median(np.diff(paf.time_s)))
+                             if len(paf.time_s) > 1
+                             else float('nan')
+                             ),
+                            )
+        message = ocr_check_describer(check, paf.path.name)
+        if message:
+            warning_printer(message)
+
+        # ---- 3 Assemble the summary --------------------------------------------------
         return {'name': Path(path).stem,
                 'duration_min': paf.duration_finder,
                 'frames': paf.frame_counter,
                 'datasets': paf.dataset_name_lister(),
                 'events': events,
                 'traces': paf.stream_name_lister(),
+                'ocr_check': check,
                 }
 
 
