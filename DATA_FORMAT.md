@@ -368,20 +368,61 @@ A recording of the instrument software, read by `utils_shared/paf_reader.py`. Th
 | Text | UTF-16, each string after the four bytes `02 00 00 00` and its number of characters (unsigned 32-bit) |
 | Location and name | `<data folder>/<experiment>.paf`; the file stem is the experiment name |
 
-The file is one record after another. Each record starts with the byte `06`, the word `Espana`, five zero bytes and a 16-byte identifier, followed by its strings: the kind of record, the vendor and a name. The reader uses these kinds:
+The file is one record after another. Each record starts with the byte `06`, the word `Espana`, five zero bytes and a 16-byte identifier, followed by its strings: the kind of record, the vendor and a name. The reader uses the first four kinds; the others were found in the four recordings looked at (one from each sample folder and the example run) and are not read:
 
 | Kind of record | What it holds |
 |---|---|
-| `DataItem`, then `Measurement` | One trace (the clock `Time`, `CcO2`, `CsO2`, `VoO2` and others). The number of values is stored twice near the end of the `DataItem` (28 and 20 bytes before it); the `Measurement` ends with that many 32-bit floats and 8 closing bytes, and its strings give the quantity and the unit |
-| `Spectra: CCD` | One spectrometer: the number of spectra and of wavelengths, a table numbering the spectra 1, 2, 3 and so on, a block of settings, the wavelengths (32-bit floats, nm), then the rows of spectra |
+| `DataItem`, then `Measurement` | One trace (the clock `Time`, `CcO2`, `CsO2`, `VoO2` and others). The number of values is stored twice near the end of the `DataItem` (28 and 20 bytes before it); the `Measurement` ends with that many 32-bit floats and 8 closing bytes, and its strings give the quantity and the unit (the first unit named is the one used) |
+| `Spectra: CCD` | One spectrometer: the number of spectra and of wavelengths, a table numbering the spectra 1, 2, 3 and so on, a block of settings, the wavelengths (32-bit floats, nm), the rows of spectra, then the date, grating and light source as strings |
 | `Text Event` | One addition: its name (`Event 1`), the text typed, and its spectrum number (unsigned 32-bit, 20 bytes after the name) |
 | `PaneNote` | The notes of the experiment, as rich text |
+| `VoO2Math` | How the oxygen rates are worked out: the names of the traces used (`Time`, `CcO2`, `PcO2`, `PtO2`, `DgO2`, `VrO2`, `VoO2`), then, counting from the end of the last name, two empty strings, four zero bytes, the oxygen permeability (32-bit float at byte 20, µM/min/mmHg), a 32-bit float not known (byte 24), and the whole numbers 0, 20 and 60 (bytes 28, 32 and 36) |
+| `SpectraFitting`, `FIT: NIR` | The haem fit used: its name, the spectrometer, the names of its shapes, the path of its `.fit` file on the instrument computer, the fit range and number of shapes (32-bit floats 520 and 630 nm, then 9, in the files seen) and the kind of spectra fitted (`ΔAttenuation`). Each shape follows as a `Plot: Scatter` with its wavelengths (nm) and its values (`Specific Absorption`, OD/mM/cm named first). Other fits that were open in the software are kept as further `FIT: NIR` records |
+| `CellItem` | Cell culture data: four numbers (-1 when not filled in), three names (`Unknown` when not filled in) and a list of media. Not filled in, in the files seen |
+| `ExptPart` | The time step of the recording (s) and two 32-bit floats not known (the first is the length of the recording in three of the four files) |
+| `EspanaItem` | One of these is named after a date |
+| `TriggerItem`, `StreamInteger`, `StreamList`, `StreamArray`, `ExptItem` | Not known |
+| `ScrnList`, `ScrnItem`, `PaneList`, `PaneGraph`, `PanePage`, `PlotList`, `Plot: ...`, `AxisList`, `Axis`, `TickItem`, `FontItem`, `EspanaActive`, `FitList`, `Worksheet`, `ColStyle`, `RowStyle` | How the software shows the run (screens, graphs, axes, fonts); no data |
 
 - **Clock:** the `Time` trace, in seconds from the start (0.5 s steps in the recordings seen). When a file holds it twice, the longer one is used.
 - **Traces:** a trace is used when it has at least 90 % of the clock's length. A shorter trace is lined up with the clock from the start, so only its end is empty. A trace whose two stored lengths disagree, that holds no values or that does not fit in its record is not read; this is reported, with the reason, only for the traces the program uses.
 - **Spectra rows:** (number of spectra + 2) rows of 32-bit floats, one value per wavelength: a row of zeros, log10 of the reference spectrum, then log10 of the counts of each spectrum. So counts = 10^row, rounded to a whole number, and transmission = 10^(row - reference row). Spectrum 1 belongs to the first time point of the clock, and so on.
 - **Additions:** each addition is stored more than once; the first copy has the spectrum number 0 and the later ones the real number.
 - **Not read:** files whose spectra are not numbered 1, 2, 3 without gaps, or that have more spectra than time points, are refused with a message.
+- **Rate traces:** `VrO2` has no value for the first 20 and the last 20 points of the clock, `DgO2` and `VoO2` none for the first 60 and the last 20 (the 20 and 60 stored in `VoO2Math`), so these three are stored 20 values shorter than the clock.
+
+What the file holds, each item marked **recorded** (taken as true), **calculated by the instrument** (can be checked) or **not known**. Checked on four recordings: the example run, against the software's own export, and one from each sample folder.
+
+| What | Units | Kind | How we know | In every file seen |
+|---|---|---|---|---|
+| Clock (`Time`) | s | recorded | Agrees with the export | Yes; some files hold a second, shorter or unreadable copy |
+| Counts of each spectrum, per spectrometer (`Cytochromes`, `NADH`) | counts | recorded | Agree with the export at every point | Yes |
+| Reference spectrum (second stored row) | counts | recorded | Gives the export's transmission | Yes |
+| First stored row | | not known | Always zeros | Yes |
+| Wavelengths | nm | recorded | Agree with the export | Yes |
+| Centre wavelength and slit of each spectrometer | nm, µm | recorded | Read from the settings block; the slit agrees with the notes | Yes |
+| Other numbers of the settings block | | not known | One is 300 where the notes give a light source of 300 mA | Yes |
+| Date, grating and light source of each spectrometer (strings after the spectra) | | recorded | For example `600g/mm@500nm`, `4000K-90 Luxeon-CZ` | Yes |
+| Transmission and attenuation | fraction, OD | calculated (by this program; the software's export gives the same) | Agree with the export at every point | |
+| Lifetimes of the two oxygen sensors (`Tau-cO2`, `Tau-tO2`) | µs | recorded | The sensors' own readings; `CcO2` and `PtO2` follow them | Yes |
+| Measured oxygen (`CcO2`) | µM | calculated by the instrument from `Tau-cO2` | Follows 1 / `Tau-cO2` closely but not exactly: the sensor calibration is not stored in a form we can read, so it cannot be checked | Yes |
+| Oxygen pressure in the chamber (`PcO2`) | mmHg | calculated by the instrument: `CcO2` × 0.744 to 0.748 (an oxygen solubility set per run) | Exact to the last stored digit | Yes |
+| Oxygen pressure outside the chamber wall (`PtO2`) | mmHg | calculated by the instrument from `Tau-tO2` | Follows 1 / `Tau-tO2` loosely; cannot be checked, as for `CcO2` | Yes |
+| `FtO2` | % | not known | An oxygen percentage that follows `PtO2` closely (about `PtO2` / 7.7) | Yes |
+| Set oxygen (`CsO2`) | µM | recorded (set by the user) | A few steps | Yes |
+| Oxygen permeability of the chamber wall (`KpO2`) | µM/min/mmHg | recorded (a setting of the run: 0.050 to 0.222 in the files seen) | Stored in `VoO2Math`; the `KpO2` trace itself holds no values | Yes |
+| Second number of `VoO2Math` | | not known | 1.7 to 6.0 in the files seen | Yes |
+| Fall of the measured oxygen (`VrO2`) | µM/min | calculated by the instrument: the fall of `CcO2` per minute, smoothed over the 41 points around each point | A straight line through 29 points comes within 0.16 to 0.51 µM/min for half the points but is up to 240 µM/min off just after an addition: the smoothing is not known exactly | Yes |
+| Oxygen leaking in (`DgO2`) | µM/min | calculated by the instrument: the permeability × (`PtO2` - `PcO2`), smoothed | Our version is within 0.005 to 0.015 µM/min for half the points (largest 1 to 4) and its factor within about 1 % of the stored permeability: the smoothing is not known exactly | Yes |
+| Oxygen consumption rate, OCR (`VoO2`) | µM/min | calculated by the instrument: `VrO2` + `DgO2` | Exact to the last stored digit | Yes |
+| Haem traces (`Cyt...`, named after the shapes of the fit) | µM | calculated by the instrument from the spectra with the fit stored in the file | Ours move the same way (`tests/test_haem_direction.py`); the amounts are not reproduced | Yes; their names and number change with the fit |
+| The fit used (`SpectraFitting`, `FIT: NIR`) | OD/mM/cm | recorded | | Yes |
+| `Expt Pt` | au | not known | Zero throughout | Yes |
+| Additions (`Text Event`) | spectrum number | recorded (typed by the user) | Agree with the export | Only in files with additions (`wt_1.paf` has none) |
+| Notes (`PaneNote`) | | recorded (typed by the user) | | Yes |
+| Cell culture data (`CellItem`) | | recorded | Not filled in | Yes |
+| A date (`EspanaItem`) | | not known | Probably the day of the recording | Yes |
+| Time step (`ExptPart`) | s | recorded | Agrees with the clock | Yes |
 
 #### `individual experiment workbook`
 

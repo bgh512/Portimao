@@ -1,4 +1,4 @@
-# Portimao question flow (V1.21)
+# Portimao question flow (V1.22)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -27,6 +27,8 @@ The standard plot of every file is then drawn with no question asked: the set an
 ## 2. Trimming and ignoring
 
 TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted but not used for calculations. Ignore times count from the new 0 after trimming. All four edges are asked in the same way, in this order: TRIM + START, TRIM + END, IGNORE + START, IGNORE + END. The plot shows the standard plot of the whole recording first (with the haems, when they are shown), and **after every answer in this section the shaded regions are added to the plot**: trimmed parts grey and hatched, ignored parts amber. An answer for ALL the data shades every file; an answer for one file shades just that file, and the plot switches to the file being asked about.
+
+You can answer every "How many minutes ...?" question below with the mouse: click on the plot where the cut should fall, and the answer box shows how many minutes that takes off the edge being asked about (for ALL the data, measured on the file shown). For an IGNORE question the minutes count from the trimmed edge, and a click inside the trimmed part gives 0. You can change the number before pressing Enter, or type one instead.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
@@ -72,18 +74,13 @@ The last part of the import: what is known about each run. Earlier OD and event 
 |---|---|---|---|
 | 3.1 | Do you want to scale by OD (divide by dilution factor x OD x volume)? `(y/N)` | **3.1.1** | **3.3** (no OD scaling anywhere in the run) |
 
+A table opens under the terminal text, above the answer box, with one row per file and a column each for the OD, the volume (mL) and the dilution factor. The values stored for a file are filled in, and the dilution factor is 1 when none is stored. Click a cell and type; Tab moves across and Enter moves down.
+
 | # | Question | Leads to |
 |---|---|---|
-| 3.1.1 | *(only when some files already have OD values stored)* The stored values are listed, then: Do you want to change any of these? `(y/N)` | **Yes**: all files are asked **3.1.2**. **No**: only the files without stored values are asked **3.1.2**. If every file has stored values and you say No, no OD questions are asked and the next step is **3.2**. |
-| 3.1.2 | For each file in turn: What was the OD of the cells added? | **3.1.3** |
-| 3.1.3 | What volume of cells (mL) were spun down and resuspended in 5 mL? | **3.1.4** |
-| 3.1.4 | What is the dilution factor, if the cells were diluted mid run? `[1]` | the next file, then the values of every file are listed and **3.2** |
+| 3.1.1 | Fill in the table under this text for each file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run. Then press Enter here. | If a cell is empty or not a number above 0, those cells are named and the question is asked again (with the next number). Otherwise the table closes, the values of every file are listed and the next step is **3.3**. |
 
 The data is **not** scaled by OD here. The values are only checked; the scaling is chosen in section 5.
-
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 3.2 | Do you accept these OD values? | **3.3** | **3.1** (asked again, then the OD values) |
 
 ### 3.B Event labels
 
@@ -162,7 +159,9 @@ Asked when the last choice of 4.1.1 is taken. The numbers keep counting up when 
 
 ### 4.C Averaging around the events
 
-The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none.
+The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Each window ends a set time before the next addition (the last one 0.5 min before the end of the recording), so it moves with that addition in every file and one setting fits the whole dataset. The window and the gap are given in seconds.
+
+You can set both with the mouse: while 4.4.1 waits, drag across one window on the plot of any file, just before an addition. A band follows the mouse, with its length above it. When you let go, the length goes into the answer box and the gap is offered in 4.4.2, both rounded to whole 5 s, so you can tidy them (to exactly 30 s, say) before pressing Enter.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
@@ -170,8 +169,8 @@ The windows are placed around the events as they were left in 3.B: an event mark
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.4.1 | How long a window (minutes) should the average be taken over? | **4.4.2** |
-| 4.4.2 | How long before the next addition should the averaging window end (minutes)? | the windows are drawn **(plot)**, then **4.5** |
+| 4.4.1 | How long a window (s) should the average be taken over? `[120]` | **4.4.2** |
+| 4.4.2 | How long before the next addition should the averaging window end (s)? `[30]`, or, after a drag in 4.4.1, the time from where you let go to the next addition (no default from a drag after the last addition). A drag here gives the gap alone. | the windows are drawn **(plot)**, then **4.5** |
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
@@ -281,8 +280,8 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 | # | Question | Leads to |
 |---|---|---|
 | 6.3.1 | Which run number should be shown? | **6.3.2** if you said No to averaging in 4.4, otherwise **6.3.4** |
-| 6.3.2 | *(a message says the figure starts at the baseline averaging window, so the events are averaged as in the processing)* How long a window (minutes) should the average be taken over? | **6.3.3** |
-| 6.3.3 | How long before the next addition should the averaging window end (minutes)? | **6.3.4** |
+| 6.3.2 | *(a message says the figure starts at the baseline averaging window, so the events are averaged as in the processing)* How long a window (s) should the average be taken over? `[120]` (typed; the plot shows figures here, so there is nothing to drag across) | **6.3.3** |
+| 6.3.3 | How long before the next addition should the averaging window end (s)? `[30]` | **6.3.4** |
 | 6.3.4 | Do you want the run name written faintly on each plot? `(Y/n)` | **6.3.5** |
 | 6.3.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then **6.4** |
 
