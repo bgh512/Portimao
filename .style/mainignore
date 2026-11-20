@@ -1,0 +1,6 @@
+# What never goes to main (the user download) besides what the release leaves out by
+# itself (style/, .style/, .claude/, FUNCTION_LIST.md). gitignore patterns.
+# The tests and their made-up fit are for developing only; main ships just fits/.
+/tests/
+/.clang-tidy
+/.vscode/
