@@ -12,7 +12,10 @@ import pandas as pd
 from scipy.signal import savgol_filter
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.spectral_decomposer import background_builder, basis_solver
+from utils_shared.spectral_decomposer import (background_builder,
+                                              basis_solver,
+                                              fit_scale_standardiser,
+                                              )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -733,18 +736,20 @@ def fit_table_builder(result: dict, names: Optional[List[str]] = None) -> dict:
 
     ---- Outputs ----
     dict
-        {'haem_list': names, 'data': table of (wavelength, response) column pairs}.
-        The responses are the components as found (a largest peak of +1): the spectra
-        they come from and the fit files have the same sign.
+        {'haem_list': names, 'data': table of (wavelength, response) column pairs,
+        'scale_divisor', 'notes'}. The responses are the components as found (a
+        largest peak of +1) brought to the standard scale of the fit files, so the
+        raw amounts are the same whether the components are used at once or saved and
+        read back: the spectra they come from and the fit files have the same sign.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    response = component.
+    response = component / 1 000 000 (fit_scale_standardiser).
 
     ---- Helpers ----
-    None.
+    fit_scale_standardiser
     """
 
     count = result['components'].shape[1]
@@ -753,4 +758,7 @@ def fit_table_builder(result: dict, names: Optional[List[str]] = None) -> dict:
     for i, name in enumerate(names):
         columns[name] = result['wavelengths']
         columns[f'Unnamed: {2 * i + 1}'] = result['components'][:, i]
-    return {'haem_list': names, 'data': pd.DataFrame(columns)}
+    data, divisor, notes = fit_scale_standardiser(pd.DataFrame(columns),
+                                                  'The components found',
+                                                  )
+    return {'haem_list': names, 'data': data, 'scale_divisor': divisor, 'notes': notes}

@@ -28,7 +28,15 @@ from utils_shared.spectral_decomposer import (delta_abs_calculator,
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
-FIT_FILE = ROOT / 'fits' / 'synthetic_test_fit.csv'
+FIT_FILE = ROOT / 'tests' / 'synthetic_test_fit.csv'
+FITS_FOLDER = ROOT / 'fits'  # the fit files users choose from
+# Last wavelength (nm, as the note writes it) kept of each haem that ends in leftover
+# rows, in the three fit files that have them.
+LEFTOVER_ROWS = {'bswitch_no2_mycobl.csv': ('628.38', '630.05', '639.99'),
+                 'bswitch_no2_mycobl_b557.csv': ('628.38', '630.05', '639.99'),
+                 'bswitch_no2_mycobl_b557_cc.csv': ('628.38', '630.05', '639.99'),
+                 }
+MILLION_FITS = ('OGfit.csv', 'temp_fit_037v.csv')  # written a million times larger
 HAEM_FACTOR = 1000000.0  # the scale the program gives the fit shapes
 # Amounts of the five haems, in file order. With the test fit (peaks of 1e-5) they give
 # haem signals of 1 to 5 mOD, as in a real run; far smaller signals would be lost in
@@ -175,7 +183,376 @@ def _mixed_spectra_builder() -> Tuple[np.ndarray, np.ndarray, list]:
     return wavelengths, shapes, files
 
 
+# ---- _series_decomposer --------------------------------------------------------------
+def _series_decomposer(fit: dict) -> dict:
+    """
+    ---- Summary ----
+    Helper function to decompose, with a given fit, a run of four spectra holding 1, 4,
+    3 and 2 times the known amounts of the five haems of the test fit file.
+
+    ---- Inputs ----
+    fit : dict
+        Fit dictionary from fit_importer, holding the five haems of the test fit file.
+
+    ---- Globals read ----
+    HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
+
+    ---- Outputs ----
+    dict
+        The experiment, with its haem amounts, absorbances and changes.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    spectrum k = multiple_k x sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x
+    background.
+
+    ---- Helpers ----
+    _background_builder
+    _haem_spectrum_builder
+    """
+
+    wavelengths, _, shapes = _haem_spectrum_builder()
+    spectra = (np.outer([1.0, 4.0, 3.0, 2.0], shapes @ AMOUNTS) * HAEM_FACTOR
+               + OFFSET
+               + SLOPE * _background_builder(wavelengths)[None, :]
+               )
+    experiment = {'experiment_name': 'series',
+                  'raw_spectra': {'Cyt': {'wavelengths': wavelengths,
+                                          'spectrum_indices': np.arange(1, 5),
+                                          'time': np.arange(4, dtype=float),
+                                          'attenuation': spectra,
+                                          },
+                                  },
+                  }
+    return experiment_decomposer(experiment,
+                                 fit,
+                                 haemfactor=HAEM_FACTOR,
+                                 delta_exclude_first_minutes=0.0,
+                                 delta_window_points=1,
+                                 )
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- test_blank_rows_do_not_change_the_shapes ----------------------------------------
+def test_blank_rows_do_not_change_the_shapes(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a fit file whose haems have different lengths is read
+    the same wherever the blank rows of the shorter haem are: at the bottom, or between
+    its numbers.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes two small fit files in tmp_path (side effect).
+
+    ---- Equations ----
+    Haem a has five rows (500 to 540 nm); haem b has three (505, 515, 525 nm; 4e-5,
+    5e-5, 6e-5). Both files must give b as those three rows at the top, with two
+    blank rows below.
+
+    ---- Helpers ----
+    None.
+    """
+
+    bottom = tmp_path / 'bottom.csv'
+    bottom.write_text('a,,b,\n'
+                      '500,1e-5,505,4e-5\n'
+                      '510,2e-5,515,5e-5\n'
+                      '520,3e-5,525,6e-5\n'
+                      '530,2e-5,,\n'
+                      '540,1e-5,,\n',
+                      )
+    between = tmp_path / 'between.csv'
+    between.write_text('a,,b,\n'
+                       '500,1e-5,505,4e-5\n'
+                       '510,2e-5,,\n'
+                       '520,3e-5,515,5e-5\n'
+                       '530,2e-5,,\n'
+                       '540,1e-5,525,6e-5\n',
+                       )
+    expected = np.array([[500.0, 1e-5, 505.0, 4e-5],
+                         [510.0, 2e-5, 515.0, 5e-5],
+                         [520.0, 3e-5, 525.0, 6e-5],
+                         [530.0, 2e-5, np.nan, np.nan],
+                         [540.0, 1e-5, np.nan, np.nan],
+                         ],
+                        )
+    for path in (bottom, between):
+        fit = fit_importer(path)
+        assert fit['haem_list'] == ['a', 'b']
+        assert np.array_equal(fit['data'].to_numpy(), expected, equal_nan=True)
+        assert fit['notes'] == []
+        assert fit['scale_divisor'] == 1.0
+
+
+# ---- test_leftover_rows_are_left_out -------------------------------------------------
+def test_leftover_rows_are_left_out(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a haem whose column ends in leftover rows (rows of
+    another haem, whose wavelengths jump backwards) gives the same amounts as the same
+    haem ending in blanks, that these are the amounts the spectrum was built from, and
+    that the user is told which rows were left out.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+
+    ---- Globals read ----
+    FIT_FILE, HAEM_FACTOR, AMOUNTS, EXACT (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes two fit files in tmp_path (side effect).
+
+    ---- Equations ----
+    The second haem of the test fit (400 to 700 nm in 1 nm steps) is ended at 650 nm
+    (row 251). In one file the 50 rows below are blank; in the other they hold the
+    last haem's rows of 420 to 469 nm, so the wavelength jumps from 650 back to 420.
+    The haems then share 400 to 650 nm, where the spectrum still holds AMOUNTS.
+
+    ---- Helpers ----
+    _haem_spectrum_builder
+    """
+
+    wavelengths, spectrum, _ = _haem_spectrum_builder()
+    table = pd.read_csv(FIT_FILE)
+    blank = table.copy()
+    blank.iloc[251:, 2:4] = np.nan
+    leftover = table.copy()
+    leftover.iloc[251:, 2] = table.iloc[20:70, 8].to_numpy()
+    leftover.iloc[251:, 3] = table.iloc[20:70, 9].to_numpy()
+    fits = {}
+    for name, frame in (('blank', blank), ('leftover', leftover)):
+        frame.to_csv(tmp_path / f'{name}.csv', index=False)
+        fits[name] = fit_importer(tmp_path / f'{name}.csv')
+    assert np.array_equal(fits['leftover']['data'].to_numpy(),
+                          fits['blank']['data'].to_numpy(),
+                          equal_nan=True,
+                          )
+    assert fits['blank']['notes'] == []
+    assert len(fits['leftover']['notes']) == 1
+    assert 'Cyt cc' in fits['leftover']['notes'][0]
+    assert '650.00 nm' in fits['leftover']['notes'][0]
+    found = spectrum_decomposer(np.column_stack((wavelengths, spectrum)),
+                                fits['leftover']['data'],
+                                degree_of_scatter=1,
+                                haemfactor=HAEM_FACTOR,
+                                )
+    assert found[1][-1, 0] == 650.0  # the last wavelength the haems share
+    assert np.allclose(found[0][:5], AMOUNTS, rtol=EXACT, atol=0.0)
+
+
+# ---- test_downward_wavelengths_are_turned_round --------------------------------------
+def test_downward_wavelengths_are_turned_round(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a fit file written from the longest wavelength to the
+    shortest is read as the same fit written the usual way.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+
+    ---- Globals read ----
+    FIT_FILE (module constant).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes a fit file in tmp_path (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    pd.read_csv(FIT_FILE).iloc[::-1].to_csv(tmp_path / 'downwards.csv', index=False)
+    fit = fit_importer(tmp_path / 'downwards.csv')
+    assert np.array_equal(fit['data'].to_numpy(),
+                          fit_importer(FIT_FILE)['data'].to_numpy(),
+                          )
+    assert fit['notes'] == []
+
+
+# ---- test_unusable_fit_files_are_refused ---------------------------------------------
+@pytest.mark.parametrize(('text', 'message'),
+                         [('a,x,b\n1,2,3\n2,3,4\n', 'two columns per haem'),
+                          ('a,,,\n1,2,3,4\n2,3,4,5\n', 'no haem name'),
+                          ('a,\n1,2\nx,3\n3,4\n', 'row 3 is not a number'),
+                          ('a,\n1,2\n2,\n3,4\n', 'row 3 of a has a wavelength without'),
+                          ('a,\n1,2\n', 'fewer than two rows'),
+                          ('', 'could not be read'),
+                          ],
+                         )
+def test_unusable_fit_files_are_refused(tmp_path: Path,
+                                        text: str,
+                                        message: str,
+                                        ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a fit file that cannot give a shape is refused with a
+    message that says what is wrong and where: columns not in pairs, a haem with no
+    name, a cell that is not a number, a wavelength with no response, a haem of one
+    row, and an empty file.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+    text : str
+        Contents of the fit file.
+    message : str
+        Words the message must hold.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes a fit file in tmp_path (side effect).
+
+    ---- Equations ----
+    The first row of a file is its header, so the second row of numbers is row 3.
+
+    ---- Helpers ----
+    None.
+    """
+
+    path = tmp_path / 'unusable.csv'
+    path.write_text(text)
+    with pytest.raises(ValueError, match=message):
+        fit_importer(path)
+
+
+# ---- test_a_million_times_larger_fit_gives_the_same_amounts --------------------------
+def test_a_million_times_larger_fit_gives_the_same_amounts(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the same fit written a million times larger gives the
+    same raw amounts, absorbances and changes, and says that it was divided; and that
+    a fit on neither scale is used as it is, with a warning.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+
+    ---- Globals read ----
+    FIT_FILE, EXACT (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes two fit files in tmp_path (side effect).
+
+    ---- Equations ----
+    The shapes of the test fit have peaks of 1e-5 (the standard scale). Times 1e6 the
+    peaks are 10: a million above the standard, so divided by 1e6. Times 1e3 they are
+    0.01: on neither scale (the standard ends at 1e-3, the large one starts at 0.1).
+
+    ---- Helpers ----
+    _series_decomposer
+    """
+
+    table = pd.read_csv(FIT_FILE)
+    for name, factor in (('million', 1e6), ('thousand', 1e3)):
+        larger = table.copy()
+        larger.iloc[:, 1::2] = table.iloc[:, 1::2] * factor
+        larger.to_csv(tmp_path / f'{name}.csv', index=False)
+    standard = fit_importer(FIT_FILE)
+    assert standard['scale_divisor'] == 1.0
+    assert standard['notes'] == []
+
+    million = fit_importer(tmp_path / 'million.csv')
+    assert million['scale_divisor'] == 1e6
+    assert len(million['notes']) == 1
+    assert 'divided by 1 000 000' in million['notes'][0]
+    names = list(standard['haem_list'])
+    expected = _series_decomposer(standard)
+    found = _series_decomposer(million)
+    for key in ('haem_conc', 'haem_abs', 'haem_delta_abs'):
+        assert np.allclose(found[key][names].to_numpy(),
+                           expected[key][names].to_numpy(),
+                           rtol=EXACT,
+                           atol=EXACT * np.abs(expected[key][names].to_numpy()).max(),
+                           )
+
+    thousand = fit_importer(tmp_path / 'thousand.csv')
+    assert thousand['scale_divisor'] == 1.0
+    assert len(thousand['notes']) == 1
+    assert thousand['notes'][0].startswith('Warning')
+    assert np.allclose(thousand['data'].iloc[:, 1::2].to_numpy(),
+                       table.iloc[:, 1::2].to_numpy() * 1e3,
+                       rtol=1e-12,
+                       atol=0.0,
+                       )
+
+
+# ---- test_every_fit_file_is_read -----------------------------------------------------
+def test_every_fit_file_is_read() -> None:
+    """
+    ---- Summary ----
+    Main function to check that every fit file users can choose is read without an
+    error, with wavelengths that go upwards in every haem, on the standard scale, and
+    that the leftover rows of the three files that have them are left out and named.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    FITS_FOLDER, LEFTOVER_ROWS, MILLION_FITS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Standard scale: the highest point of the shapes lies between 1e-7 and 1e-3.
+
+    ---- Helpers ----
+    None.
+    """
+
+    paths = sorted(FITS_FOLDER.glob('*.csv'))
+    assert paths
+    for path in paths:
+        fit = fit_importer(path)
+        data = fit['data']
+        assert len(fit['haem_list']) == data.shape[1] // 2
+        for i in range(len(fit['haem_list'])):
+            pair = data.iloc[:, [2 * i, 2 * i + 1]].dropna().to_numpy()
+            assert len(pair) >= 2
+            assert np.all(np.diff(pair[:, 0]) >= 0)
+        peak = np.nanmax(np.abs(data.iloc[:, 1::2].to_numpy()))
+        assert 1e-7 <= peak <= 1e-3
+        assert fit['scale_divisor'] == (1e6 if path.name in MILLION_FITS else 1.0)
+        leftovers = [note for note in fit['notes'] if 'backwards' in note]
+        ends = LEFTOVER_ROWS.get(path.name, ())
+        assert len(leftovers) == len(ends)
+        for note, end in zip(leftovers, ends):
+            assert f'after {end} nm' in note
 
 
 # ---- test_one_spectrum_gives_its_amounts_back ----------------------------------------

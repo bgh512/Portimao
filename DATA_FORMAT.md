@@ -171,7 +171,9 @@ A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds th
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
 | `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names, in file order |
-| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the response as the basis spectrum; it has the sign of the attenuation, -log10(T) |
+| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the response as the basis spectrum; it has the sign of the attenuation, -log10(T). Each haem's rows are at the top, with wavelengths going upwards and blanks (NaN) below a shorter haem. The responses are on the standard scale: the highest point of the shapes lies between 1e-7 and 1e-3 |
+| `'scale_divisor'` | float | | | What the responses were divided by to reach the standard scale: 1, or 1 000 000 |
+| `'notes'` | List[str] | | | Sentences for the user: leftover rows left out of a haem, a fit divided by a million, a fit on neither scale |
 
 #### `pca_analysis`
 
@@ -242,12 +244,19 @@ Returned by `decomposition_example_finder`: every spectrum decomposed with the c
 
 #### `last_answers`
 
-Saved to `last_answers.json` next to `main.py` and offered as the defaults on the next run.
+Saved to `last_answers.json` next to `main.py`: the data folder offered on the next run. The answers themselves are kept with each dataset (`dataset_settings`).
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'data_folder'` | str | | | Folder of the `.paf` files |
-| `'export_folder'` | str | | | Results folder |
+| `'data_folder'` | str | | | Full path of the folder of the `.paf` files used last |
+
+#### `dataset_settings`
+
+The settings last saved for a dataset. Returned by `dataset_settings_reader` (`utils_shared/dataset_settings.py`), written by `dataset_settings_saver` to `portimao_settings.json` in the data folder, and laid over `config.DEFAULT_ANSWERS` (the standard settings) when the dataset is opened again. Empty for a dataset never saved.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`export`), otherwise the full path |
 | `'answers'` | dict | | | Terminal answers |
 | `'files'` | dict | | min | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}}`; trim times are on the original recording, ignore times count from the new 0 after trimming |
 
@@ -284,6 +293,19 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every 
 | `details` | dict | | | | `{file name: {OD, volume, dilution_factor, events}}` |
 | `show_trim` | bool | | | `False` | Draw the whole recording and shade the trimmed part |
 | `show_ignored` | bool | | | `True` | Shade the ignored start and end |
+
+#### `TimeAxis`
+
+Defined in `utils_viewer/viewer_preview.py`. Created by `time_axis_finder` from a drawn preview and passed to the window with its picture, so the mouse can point at a time. The fractions are measured from the bottom left corner of the picture.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `left` | float | | fraction of the width | | Left edge of the panels |
+| `right` | float | | fraction of the width | | Right edge of the panels |
+| `bottom` | float | | fraction of the height | | Bottom edge of the lowest panel |
+| `top` | float | | fraction of the height | | Top edge of the highest panel |
+| `start_min` | float | | min | | Time at the left edge |
+| `end_min` | float | | min | | Time at the right edge |
 
 #### `ViewerSession`
 
@@ -366,7 +388,9 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 | Column | Type | Units | Description |
 |---|---|---|---|
 | `<haem>` | float | nm | Wavelength column of one haem; the header names the haem (every second column, starting with the first) |
-| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of +1 |
+| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of 1e-6 (the component divided by a million) |
+
+Rules, checked by `fit_importer`: the columns come in pairs and every wavelength column has a haem name; every cell is a number or empty; a row holds both a wavelength and a response, or neither; each haem has at least two rows. The haems may have different lengths, and empty rows are skipped wherever they are. Within a haem the wavelengths go upwards (a haem written wholly downwards is turned round); where they jump backwards, the rows from the jump on are left out and the user is told. Scale: the highest point of the shapes (largest |response| in the file) is between 1e-7 and 1e-3; a file a million above that (0.1 to 1000) is divided by a million when read, and a file on neither scale is used as it is with a warning.
 
 #### `spectral csv`
 
@@ -425,6 +449,16 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 | Location and name | `last_answers.json` next to `main.py` (not committed) |
 
 Structure: see `last_answers` in section 1.1.
+
+#### `portimao_settings.json`
+
+| Property | Value |
+|---|---|
+| File type | JSON |
+| Encoding | UTF-8 |
+| Location and name | `portimao_settings.json` in the folder of the `.paf` files, so it travels with the dataset |
+
+Structure: see `dataset_settings` in section 1.1.
 
 #### `preview picture`
 

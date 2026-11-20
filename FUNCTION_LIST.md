@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.11
+- **Version:** V1.12
 - **Date:** 20/11/2026
 
 ## Contents
@@ -21,10 +21,27 @@
     - [`main`](#main)
     - [`program_runner`](#program_runner)
     - [`special_figures_maker`](#special_figures_maker)
+- [`tests/test_dataset_settings.py`](#teststest_dataset_settingspy)
+    - [`_program_folder_maker`](#_program_folder_maker)
+    - [`test_broken_settings_file_gives_nothing`](#test_broken_settings_file_gives_nothing)
+    - [`test_data_folders_are_listed`](#test_data_folders_are_listed)
+    - [`test_folder_answer_is_resolved`](#test_folder_answer_is_resolved)
+    - [`test_missing_settings_file_gives_nothing`](#test_missing_settings_file_gives_nothing)
+    - [`test_results_folder_inside_is_kept_relative`](#test_results_folder_inside_is_kept_relative)
+    - [`test_results_folder_outside_is_kept_whole`](#test_results_folder_outside_is_kept_whole)
+    - [`test_settings_are_read_back`](#test_settings_are_read_back)
+    - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
 - [`tests/test_haem_decomposition.py`](#teststest_haem_decompositionpy)
     - [`_background_builder`](#_background_builder)
     - [`_haem_spectrum_builder`](#_haem_spectrum_builder)
     - [`_mixed_spectra_builder`](#_mixed_spectra_builder)
+    - [`_series_decomposer`](#_series_decomposer)
+    - [`test_blank_rows_do_not_change_the_shapes`](#test_blank_rows_do_not_change_the_shapes)
+    - [`test_leftover_rows_are_left_out`](#test_leftover_rows_are_left_out)
+    - [`test_downward_wavelengths_are_turned_round`](#test_downward_wavelengths_are_turned_round)
+    - [`test_unusable_fit_files_are_refused`](#test_unusable_fit_files_are_refused)
+    - [`test_a_million_times_larger_fit_gives_the_same_amounts`](#test_a_million_times_larger_fit_gives_the_same_amounts)
+    - [`test_every_fit_file_is_read`](#test_every_fit_file_is_read)
     - [`test_one_spectrum_gives_its_amounts_back`](#test_one_spectrum_gives_its_amounts_back)
     - [`test_a_series_gives_its_amounts_back`](#test_a_series_gives_its_amounts_back)
     - [`test_the_three_routes_give_the_same_amounts`](#test_the_three_routes_give_the_same_amounts)
@@ -105,6 +122,12 @@
     - [`test_difference_needs_its_averages`](#test_difference_needs_its_averages)
     - [`test_average_over_three_runs`](#test_average_over_three_runs)
     - [`test_average_needs_two_runs`](#test_average_needs_two_runs)
+- [`tests/test_time_pointer.py`](#teststest_time_pointerpy)
+    - [`test_pointed_time_inside_the_panels`](#test_pointed_time_inside_the_panels)
+    - [`test_pointed_time_off_the_panels`](#test_pointed_time_off_the_panels)
+    - [`test_pointed_time_on_a_scaled_picture`](#test_pointed_time_on_a_scaled_picture)
+    - [`test_question_wanting_a_time_tells_the_window`](#test_question_wanting_a_time_tells_the_window)
+    - [`test_time_axis_of_a_figure`](#test_time_axis_of_a_figure)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
     - [`exemplar_config_builder`](#exemplar_config_builder)
     - [`haem_labeller`](#haem_labeller)
@@ -284,6 +307,11 @@
     - [`_overhang_calculator`](#_overhang_calculator)
     - [`_renderer_getter`](#_renderer_getter)
     - [`comparison_figure_plotter`](#comparison_figure_plotter)
+- [`utils_shared/dataset_settings.py`](#utils_shareddataset_settingspy)
+    - [`_export_folder_resolver`](#_export_folder_resolver)
+    - [`_export_folder_shortener`](#_export_folder_shortener)
+    - [`dataset_settings_reader`](#dataset_settings_reader)
+    - [`dataset_settings_saver`](#dataset_settings_saver)
 - [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
     - [`_skip_reporter`](#_skip_reporter)
     - [`event_settings_merger`](#event_settings_merger)
@@ -384,6 +412,7 @@
     - [`_input_reader`](#_input_reader)
     - [`_number_builder`](#_number_builder)
     - [`_question_printer`](#_question_printer)
+    - [`_time_announcer`](#_time_announcer)
     - [`choice_asker`](#choice_asker)
     - [`colour_checker`](#colour_checker)
     - [`heading_printer`](#heading_printer)
@@ -402,6 +431,7 @@
     - [`text_asker`](#text_asker)
     - [`text_colourer`](#text_colourer)
     - [`text_italiser`](#text_italiser)
+    - [`time_request_setter`](#time_request_setter)
     - [`yes_no_asker`](#yes_no_asker)
 - [`utils_shared/reference_level.py`](#utils_sharedreference_levelpy)
     - [`reference_level_finder`](#reference_level_finder)
@@ -417,6 +447,9 @@
     - [`time_getter`](#time_getter)
     - [`value_getter`](#value_getter)
 - [`utils_shared/spectral_decomposer.py`](#utils_sharedspectral_decomposerpy)
+    - [`_fit_table_cleaner`](#_fit_table_cleaner)
+    - [`_haem_shape_getter`](#_haem_shape_getter)
+    - [`_number_column_reader`](#_number_column_reader)
     - [`_wavelength_masker`](#_wavelength_masker)
     - [`background_builder`](#background_builder)
     - [`basis_solver`](#basis_solver)
@@ -424,6 +457,7 @@
     - [`delta_abs_calculator`](#delta_abs_calculator)
     - [`experiment_decomposer`](#experiment_decomposer)
     - [`fit_importer`](#fit_importer)
+    - [`fit_scale_standardiser`](#fit_scale_standardiser)
     - [`s_array_generator`](#s_array_generator)
     - [`spectrum_decomposer`](#spectrum_decomposer)
 - [`utils_shared/survey.py`](#utils_sharedsurveypy)
@@ -442,6 +476,8 @@
     - [`_subscript_stripper`](#_subscript_stripper)
     - [`analysis_asker`](#analysis_asker)
     - [`averaging_asker`](#averaging_asker)
+    - [`data_folder_lister`](#data_folder_lister)
+    - [`data_folder_resolver`](#data_folder_resolver)
     - [`decomposition_asker`](#decomposition_asker)
     - [`event_asker`](#event_asker)
     - [`file_focus_setter`](#file_focus_setter)
@@ -469,12 +505,14 @@
     - [`ViewerGui`](#viewergui)
     - [`active_gui_getter`](#active_gui_getter)
     - [`gui_runner`](#gui_runner)
+    - [`pointed_time_finder`](#pointed_time_finder)
 - [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
     - [`_kept_builder`](#_kept_builder)
     - [`_pictures_builder`](#_pictures_builder)
     - [`multi_figure_checker_builder`](#multi_figure_checker_builder)
 - [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
     - [`PreviewSpec`](#previewspec)
+    - [`TimeAxis`](#timeaxis)
     - [`ViewerSession`](#viewersession)
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
@@ -487,6 +525,7 @@
     - [`preview_drawer`](#preview_drawer)
     - [`preview_figure_builder`](#preview_figure_builder)
     - [`skipped_windows_finder`](#skipped_windows_finder)
+    - [`time_axis_finder`](#time_axis_finder)
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
     - [`PreviewRenderer`](#previewrenderer)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
@@ -501,6 +540,7 @@
     - [`_pca_pictures_publisher`](#_pca_pictures_publisher)
     - [`_review_asker`](#_review_asker)
     - [`_skipped_lister`](#_skipped_lister)
+    - [`_standard_fit_loader`](#_standard_fit_loader)
     - [`analysis_stage_runner`](#analysis_stage_runner)
     - [`browser_stage_runner`](#browser_stage_runner)
     - [`pca_stage_runner`](#pca_stage_runner)
@@ -840,7 +880,8 @@ Tuple[dict, Path, List[dict], Optional[dict], Optional[dict], Optional[List[str]
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal; writes last_answers.json through
-last_answers_saver (side effects).
+last_answers_saver and the settings file of the dataset through
+dataset_settings_saver (side effects).
 
 ---- Equations ----
 None.
@@ -848,6 +889,7 @@ None.
 ---- Helpers ----
 active_gui_getter
 comparison_maker
+dataset_settings_saver
 files_asker
 haem_name_formatter
 last_answers_loader
@@ -906,7 +948,7 @@ plot_config_builder
 
 ```text
 ---- Summary ----
-Main function to read the answers remembered from the last run.
+Main function to read which data folder was used in the last run.
 
 ---- Inputs ----
 None.
@@ -916,8 +958,9 @@ LAST_ANSWERS_FILE (module constant).
 
 ---- Outputs ----
 dict
-    Contents of last_answers.json (data_folder, export_folder, answers, files); an
-    empty dict when the file is missing or unreadable.
+    Contents of last_answers.json ({data_folder}); an empty dict when the file is
+    missing or unreadable. The answers themselves are kept with each dataset
+    (utils_shared.dataset_settings).
 
 ---- Globals mutated ----
 None.
@@ -933,12 +976,11 @@ None.
 
 ```text
 ---- Summary ----
-Main function to remember the answers of this run for the next one.
+Main function to remember the data folder of this run for the next one.
 
 ---- Inputs ----
 values : dict
-    Content to write to last_answers.json: data_folder, export_folder, files and
-    answers.
+    Content to write to last_answers.json: {data_folder}.
 
 ---- Globals read ----
 LAST_ANSWERS_FILE (module constant).
@@ -1063,6 +1105,259 @@ ocr_and_haem_response_runner
 time_response_runner
 ```
 
+## `tests/test_dataset_settings.py`
+
+Tests of the settings kept with a dataset and of the list of data folders.
+
+### HELPERS
+
+#### `_program_folder_maker`
+
+```text
+---- Summary ----
+Helper function to make a pretend program folder: two folders with .paf files, one
+without, one hidden work folder with a .paf file, and a loose .paf file.
+
+---- Inputs ----
+root : Path
+    Empty folder to fill.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes the folders and files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_broken_settings_file_gives_nothing`
+
+```text
+---- Summary ----
+Main function to check that a settings file that is not readable JSON, or is not a
+dictionary, gives no settings, so the standard ones are used.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+SETTINGS_FILE_NAME (imported).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_data_folders_are_listed`
+
+```text
+---- Summary ----
+Main function to check that only the folders holding .paf files are listed, in
+natural order (2 hours before 10 hours), without the folders starting with an
+underscore.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_program_folder_maker
+```
+
+#### `test_folder_answer_is_resolved`
+
+```text
+---- Summary ----
+Main function to check the three ways of answering the folder question: a number
+from the list, a name from the list (capitals do not matter), or another path; a
+number that is not in the list is taken as a path.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_program_folder_maker
+```
+
+#### `test_missing_settings_file_gives_nothing`
+
+```text
+---- Summary ----
+Main function to check that a dataset never saved gives no settings.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_results_folder_inside_is_kept_relative`
+
+```text
+---- Summary ----
+Main function to check that a results folder inside the dataset folder is written
+relative to it, so the settings still hold after the dataset is copied: the copy
+gives the results folder inside the copy.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+SETTINGS_FILE_NAME (imported).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_results_folder_outside_is_kept_whole`
+
+```text
+---- Summary ----
+Main function to check that a results folder outside the dataset folder is written
+and read back as its full path.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_settings_are_read_back`
+
+```text
+---- Summary ----
+Main function to check that the trim and ignore times and the answers saved with a
+dataset are read back unchanged.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+FILES, ANSWERS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_unwritable_folder_is_reported`
+
+```text
+---- Summary ----
+Main function to check that saving into a folder that is not there says so (False)
+and does not raise.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `tests/test_haem_decomposition.py`
 
 Tests that the haem decomposition gives back the amounts a spectrum was built from, and
@@ -1156,7 +1451,216 @@ offset + slope x background + noise (SD 0.0001), a and b between 0 and 1.
 _background_builder
 ```
 
+#### `_series_decomposer`
+
+```text
+---- Summary ----
+Helper function to decompose, with a given fit, a run of four spectra holding 1, 4,
+3 and 2 times the known amounts of the five haems of the test fit file.
+
+---- Inputs ----
+fit : dict
+    Fit dictionary from fit_importer, holding the five haems of the test fit file.
+
+---- Globals read ----
+HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
+
+---- Outputs ----
+dict
+    The experiment, with its haem amounts, absorbances and changes.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+spectrum k = multiple_k x sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x
+background.
+
+---- Helpers ----
+_background_builder
+_haem_spectrum_builder
+```
+
 ### MAIN FUNCTIONS
+
+#### `test_blank_rows_do_not_change_the_shapes`
+
+```text
+---- Summary ----
+Main function to check that a fit file whose haems have different lengths is read
+the same wherever the blank rows of the shorter haem are: at the bottom, or between
+its numbers.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes two small fit files in tmp_path (side effect).
+
+---- Equations ----
+Haem a has five rows (500 to 540 nm); haem b has three (505, 515, 525 nm; 4e-5,
+5e-5, 6e-5). Both files must give b as those three rows at the top, with two
+blank rows below.
+
+---- Helpers ----
+None.
+```
+
+#### `test_leftover_rows_are_left_out`
+
+```text
+---- Summary ----
+Main function to check that a haem whose column ends in leftover rows (rows of
+another haem, whose wavelengths jump backwards) gives the same amounts as the same
+haem ending in blanks, that these are the amounts the spectrum was built from, and
+that the user is told which rows were left out.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, EXACT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes two fit files in tmp_path (side effect).
+
+---- Equations ----
+The second haem of the test fit (400 to 700 nm in 1 nm steps) is ended at 650 nm
+(row 251). In one file the 50 rows below are blank; in the other they hold the
+last haem's rows of 420 to 469 nm, so the wavelength jumps from 650 back to 420.
+The haems then share 400 to 650 nm, where the spectrum still holds AMOUNTS.
+
+---- Helpers ----
+_haem_spectrum_builder
+```
+
+#### `test_downward_wavelengths_are_turned_round`
+
+```text
+---- Summary ----
+Main function to check that a fit file written from the longest wavelength to the
+shortest is read as the same fit written the usual way.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+
+---- Globals read ----
+FIT_FILE (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_unusable_fit_files_are_refused`
+
+```text
+---- Summary ----
+Main function to check that a fit file that cannot give a shape is refused with a
+message that says what is wrong and where: columns not in pairs, a haem with no
+name, a cell that is not a number, a wavelength with no response, a haem of one
+row, and an empty file.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+text : str
+    Contents of the fit file.
+message : str
+    Words the message must hold.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+The first row of a file is its header, so the second row of numbers is row 3.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_million_times_larger_fit_gives_the_same_amounts`
+
+```text
+---- Summary ----
+Main function to check that the same fit written a million times larger gives the
+same raw amounts, absorbances and changes, and says that it was divided; and that
+a fit on neither scale is used as it is, with a warning.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+
+---- Globals read ----
+FIT_FILE, EXACT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes two fit files in tmp_path (side effect).
+
+---- Equations ----
+The shapes of the test fit have peaks of 1e-5 (the standard scale). Times 1e6 the
+peaks are 10: a million above the standard, so divided by 1e6. Times 1e3 they are
+0.01: on neither scale (the standard ends at 1e-3, the large one starts at 0.1).
+
+---- Helpers ----
+_series_decomposer
+```
+
+#### `test_every_fit_file_is_read`
+
+```text
+---- Summary ----
+Main function to check that every fit file users can choose is read without an
+error, with wavelengths that go upwards in every haem, on the standard scale, and
+that the leftover rows of the three files that have them are left out and named.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FITS_FOLDER, LEFTOVER_ROWS, MILLION_FITS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Standard scale: the highest point of the shapes lies between 1e-7 and 1e-3.
+
+---- Helpers ----
+None.
+```
 
 #### `test_one_spectrum_gives_its_amounts_back`
 
@@ -3313,6 +3817,152 @@ Knockdown: 10, 20 -> mean 15, spread sqrt((25 + 25) / 1) = 7.0711, N 2.
 
 ---- Helpers ----
 _run_builder
+```
+
+## `tests/test_time_pointer.py`
+
+Tests that the mouse over a preview gives the time worked out by hand, that the time
+
+### MAIN FUNCTIONS
+
+#### `test_pointed_time_inside_the_panels`
+
+```text
+---- Summary ----
+Main function to check the time under the mouse in the middle and at both ends of
+the time axis, for an axis that starts at zero and one that does not.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PICTURE_BOX, TIME_AXIS (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+x = 500 is half way along the axis (200 to 800): 30 min. With an axis from 10 to
+50 min, x = 350 is a quarter of the way: 10 + 0.25 * 40 = 20 min.
+
+---- Helpers ----
+None.
+```
+
+#### `test_pointed_time_off_the_panels`
+
+```text
+---- Summary ----
+Main function to check that no time is given left or right of the time axis, above
+or below the panels, or for a picture with no size.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PICTURE_BOX, TIME_AXIS (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_pointed_time_on_a_scaled_picture`
+
+```text
+---- Summary ----
+Main function to check that the time follows the picture when it is shown at
+another size and place.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_AXIS (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A picture 1600 x 800 at (0, 0): the axis runs from x = 200 to 1400, so x = 500 is
+a quarter of the way: 15 min.
+
+---- Helpers ----
+None.
+```
+
+#### `test_question_wanting_a_time_tells_the_window`
+
+```text
+---- Summary ----
+Main function to check that a number question that wants a time switches the
+registered window on before it reads and off once it has a valid answer, that
+other number questions leave it alone, and that nothing is needed in the terminal.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answer and restores the module state afterwards.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The registered function of the questions is restored by monkeypatch.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_time_axis_of_a_figure`
+
+```text
+---- Summary ----
+Main function to check that the time axis of a figure is found from the panels
+that share the x axis of the first one, and that a figure with no panel has none.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Two panels from 0.2 to 0.9 of the width, the lower from 0.1 and the upper to 0.9
+of the height, showing 0 to 45 min; a small panel with its own x axis is left out.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_custom/custom_config.py`
@@ -9075,6 +9725,142 @@ panel_letter_adder
 watermark_style_builder
 ```
 
+## `utils_shared/dataset_settings.py`
+
+The settings kept with a dataset: read from and written to a file in its folder.
+
+### HELPERS
+
+#### `_export_folder_resolver`
+
+```text
+---- Summary ----
+Helper function to turn the results folder written in the settings file back into
+a full path.
+
+---- Inputs ----
+folder : Path
+    The dataset folder.
+text : Optional[str]
+    The results folder as written in the file: relative to the dataset folder, or
+    a full path; None or empty when none was kept.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Path]
+    The results folder, or None when none was kept or a full path was written on
+    another computer (its drive or root folder is not there).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_export_folder_shortener`
+
+```text
+---- Summary ----
+Helper function to write the results folder relative to the dataset folder when it
+is inside it, so the settings still hold after the dataset is copied elsewhere.
+
+---- Inputs ----
+folder : Path
+    The dataset folder.
+export_root : Path
+    The results folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The path from the dataset folder with forward slashes ('export'), or the full
+    path when the results folder is somewhere else.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `dataset_settings_reader`
+
+```text
+---- Summary ----
+Main function to read the settings last saved for a dataset from the file in its
+folder.
+
+---- Inputs ----
+folder : Path
+    The dataset folder (the folder of the .paf files).
+
+---- Globals read ----
+SETTINGS_FILE_NAME (module constant).
+
+---- Outputs ----
+dict
+    {'export_folder': Optional[Path], 'files': dict, 'answers': dict}
+    (DATA_FORMAT.md, dataset_settings). An empty dict when the dataset was never
+    saved or its file cannot be read, so the standard settings are used.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_export_folder_resolver
+```
+
+#### `dataset_settings_saver`
+
+```text
+---- Summary ----
+Main function to save the settings of a dataset in a file in its folder, so the
+dataset opens with them next time, on this computer or another.
+
+---- Inputs ----
+folder : Path
+    The dataset folder (the folder of the .paf files).
+export_root : Path
+    The results folder.
+files : dict
+    {file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}} in
+    minutes.
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+SETTINGS_FILE_NAME (module constant).
+
+---- Outputs ----
+bool
+    True when the file was written; False when the folder cannot be written to.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_export_folder_shortener
+```
+
 ## `utils_shared/experiment_processing.py`
 
 Reading and processing of one experiment (everything before the figure and the export).
@@ -12386,18 +13172,20 @@ None.
 
 ---- Outputs ----
 dict
-    {'haem_list': names, 'data': table of (wavelength, response) column pairs}.
-    The responses are the components as found (a largest peak of +1): the spectra
-    they come from and the fit files have the same sign.
+    {'haem_list': names, 'data': table of (wavelength, response) column pairs,
+    'scale_divisor', 'notes'}. The responses are the components as found (a
+    largest peak of +1) brought to the standard scale of the fit files, so the
+    raw amounts are the same whether the components are used at once or saved and
+    read back: the spectra they come from and the fit files have the same sign.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-response = component.
+response = component / 1 000 000 (fit_scale_standardiser).
 
 ---- Helpers ----
-None.
+fit_scale_standardiser
 ```
 
 ## `utils_shared/pca_plotter.py`
@@ -12676,6 +13464,34 @@ _number_builder
 text_colourer
 ```
 
+#### `_time_announcer`
+
+```text
+---- Summary ----
+Helper function to tell the window, when there is one, that the question being
+asked wants a time (so a click on the plot can give it), or no longer does.
+
+---- Inputs ----
+is_wanted : bool
+    True while the question waits for a time.
+
+---- Globals read ----
+_time_requester (module state).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the registered function (side effect); nothing happens without one.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `choice_asker`
@@ -12873,7 +13689,9 @@ _question_printer
 ```text
 ---- Summary ----
 Main function to ask a question answered with a number, asking again until the value
-is valid.
+is valid. A question that wants a time says so to the window, where a click on the
+plot then writes the pointed time into the answer box; in the terminal nothing
+changes.
 
 ---- Inputs ----
 question : str
@@ -12892,6 +13710,8 @@ depth : int
     Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
 blank_label : str
     Word shown in [brackets] for an empty answer.
+wants_time : bool
+    True when the number is a time on the plot (min), which the mouse can give.
 
 ---- Globals read ----
 None.
@@ -12910,6 +13730,7 @@ None.
 ---- Helpers ----
 _input_reader
 _question_printer
+_time_announcer
 ```
 
 #### `numbering_getter`
@@ -13228,6 +14049,35 @@ None.
 
 ---- Helpers ----
 colour_checker
+```
+
+#### `time_request_setter`
+
+```text
+---- Summary ----
+Main function to register what is told when a question wants a time: the window
+registers itself while it is open, so a click on its plot can give the time.
+
+---- Inputs ----
+requester : Optional[Callable[[bool], None]]
+    Function called with True when a question starts waiting for a time and False
+    when it has its answer; None to register nothing (the terminal).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+_time_requester (module state).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `yes_no_asker`
@@ -13733,6 +14583,109 @@ Spectral fit loading and haem decomposition routines.
 
 ### SPECTRAL DECOMPOSER HELPERS
 
+#### `_fit_table_cleaner`
+
+```text
+---- Summary ----
+Helper function to check the table of a fit file and to give every haem clean rows:
+numbers only, no blank rows, wavelengths going upwards.
+
+---- Inputs ----
+data : pd.DataFrame
+    The fit file as read: (wavelength, response) column pairs, one pair per haem;
+    the header of each wavelength column names the haem. Row i of the table is row
+    i + 2 of the file.
+label : str
+    Name of the fit file, used in the messages.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[pd.DataFrame, List[str]]
+    (the table with the same headers, each haem's rows at the top and blanks below
+    the shorter haems; the notes for the user, one sentence per haem whose leftover
+    rows were left out). Raises ValueError, with a message for the user, when the
+    columns are not in pairs, a haem has no name, a cell is not a number, a row
+    holds only one of wavelength and response, or a haem has fewer than two rows.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A haem whose wavelengths all go downwards is turned round. Where the wavelengths
+of a haem jump backwards, the rows before the jump are kept and the rest left out:
+such rows are leftovers of another column, not data.
+
+---- Helpers ----
+_number_column_reader
+```
+
+#### `_haem_shape_getter`
+
+```text
+---- Summary ----
+Helper function to give the filled rows of one haem of a fit table, so that the
+blanks below a shorter haem never reach a calculation.
+
+---- Inputs ----
+fit_data : pd.DataFrame
+    Fit table from fit_importer.
+index : int
+    Number of the haem in the table, from 0.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[np.ndarray, np.ndarray]
+    (wavelengths in nm, responses) of that haem, each of shape (n_rows of the
+    haem).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_number_column_reader`
+
+```text
+---- Summary ----
+Helper function to read one column of a fit file as numbers.
+
+---- Inputs ----
+column : pd.Series
+    The column as read from the file; row i is row i + 2 of the file.
+haem : str
+    Name of the haem the column belongs to, used in the message.
+kind : str
+    'wavelength' or 'response', used in the message.
+label : str
+    Name of the fit file, used in the message.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The numbers, shape (n_rows), NaN where the cell is empty. Raises ValueError,
+    with a message for the user, for a cell that holds anything but a number.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_wavelength_masker`
 
 ```text
@@ -13750,7 +14703,8 @@ None.
 
 ---- Outputs ----
 np.ndarray
-    Boolean mask, True inside the shared range.
+    Boolean mask, True inside the shared range. Raises ValueError, with a message
+    for the user, when a haem of the fit has no rows.
 
 ---- Globals mutated ----
 None.
@@ -13759,7 +14713,7 @@ None.
 None.
 
 ---- Helpers ----
-None.
+_haem_shape_getter
 ```
 
 ### MAIN FUNCTIONS
@@ -13850,7 +14804,7 @@ fit_data : pd.DataFrame
     Fit table from fit_importer.
 
 ---- Globals read ----
-None. Calls _wavelength_masker.
+None.
 
 ---- Outputs ----
 np.ndarray
@@ -13975,25 +14929,65 @@ s_array_generator
 
 ```text
 ---- Summary ----
-Main function to import a haem spectral fit CSV.
+Main function to import a haem spectral fit CSV, checked and on the standard scale.
 
 ---- Inputs ----
 filename : Path
     CSV with (wavelength, response) column pairs, one pair per haem; the header of
-    each wavelength column names the haem.
+    each wavelength column names the haem. The haems may have different lengths.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 Dict[str, Any]
-    {"haem_list": haem names in file order, "data": the table as a data frame}.
+    {'haem_list': haem names in file order, 'data': the cleaned table
+    (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the responses
+    of the file were divided by (1 or 1 000 000), 'notes': sentences for the user
+    about rows left out and the scale}. Raises ValueError, with a message for the
+    user, when the file cannot be read as a fit.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_fit_table_cleaner
+fit_scale_standardiser
+```
+
+#### `fit_scale_standardiser`
+
+```text
+---- Summary ----
+Main function to bring a fit table to the standard scale, so that the raw haem
+amounts are on the same scale whichever fit is used.
+
+---- Inputs ----
+data : pd.DataFrame
+    Fit table: (wavelength, response) column pairs, one pair per haem.
+label : str
+    Name of the fit, used in the notes.
+
+---- Globals read ----
+FIT_PEAK_BAND, FIT_LARGE_SCALE (module constants).
+
+---- Outputs ----
+Tuple[pd.DataFrame, float, List[str]]
+    (the table on the standard scale, what its responses were divided by, the
+    notes for the user). A fit a million above the standard is divided by a
+    million, with a note; a fit on neither scale is returned unchanged, with a
+    warning.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-None.
+peak = largest |response| in the table. Standard: low <= peak <= high
+(FIT_PEAK_BAND). Large: low x 1e6 <= peak <= high x 1e6, then response = response
+/ 1e6. The mOD and % values do not depend on the scale; the raw amounts do.
 
 ---- Helpers ----
 None.
@@ -14032,6 +15026,7 @@ haem column = interp(fit) x haemfactor; the constant and the scatter terms are
 those of background_builder.
 
 ---- Helpers ----
+_haem_shape_getter
 background_builder
 data_filterer
 ```
@@ -14573,6 +15568,68 @@ number_asker
 yes_no_asker
 ```
 
+#### `data_folder_lister`
+
+```text
+---- Summary ----
+Main function to list the folders directly inside a folder that hold .paf files,
+so they can be offered by number.
+
+---- Inputs ----
+root : Path
+    Folder to look in (the program folder).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Path]
+    The folders with at least one .paf file directly inside, in natural name
+    order. Folders whose name starts with a dot or an underscore, and folders that
+    cannot be read, are left out.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_natural_sorter
+paf_finder
+```
+
+#### `data_folder_resolver`
+
+```text
+---- Summary ----
+Main function to turn the answer to the folder question into a folder: a number or
+a name from the list of data folders, or any other path.
+
+---- Inputs ----
+text : str
+    The answer as typed (or dragged in).
+listed : List[Path]
+    The data folders offered, in the order they were numbered from 1.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The listed folder of that number or name (capitals do not matter), otherwise
+    the answer as a path. It is not checked to exist.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+path_cleaner
+```
+
 #### `decomposition_asker`
 
 ```text
@@ -14691,20 +15748,23 @@ None.
 
 ```text
 ---- Summary ----
-Main function to ask for the folder of .paf files (1.1) and the results folder
-(1.2), and to read a summary of every file.
+Main function to ask for the folder of .paf files (1.1), offering the data folders
+found in the program folder, and the results folder (1.2), and to read a summary of
+every file and the settings saved with the dataset.
 
 ---- Inputs ----
 last : dict
-    Remembered answers (last_answers.json); uses data_folder and export_folder.
+    Contents of last_answers.json; uses data_folder (the folder used last).
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-Tuple[Path, List[dict], Path]
-    (data folder, summary of each readable file, results folder). Each summary
-    has name, path, duration_min, events and datasets (DATA_FORMAT.md).
+Tuple[Path, List[dict], Path, dict]
+    (data folder, summary of each readable file, results folder, settings saved
+    with the dataset). Each summary has name, path, duration_min, events and
+    datasets; the settings are those of dataset_settings_reader, empty for a
+    dataset never saved (DATA_FORMAT.md).
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect).
@@ -14713,6 +15773,9 @@ None. Reads from and prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
+data_folder_lister
+data_folder_resolver
+dataset_settings_reader
 experiment_summary_reader
 info_printer
 paf_finder
@@ -15338,6 +16401,7 @@ _answer_sender
 _closing_handler
 _display_name_lister
 _drain_runner
+_drawing_sign_drawer
 _event_handler
 _history_stepper
 _icon_setter
@@ -15350,9 +16414,12 @@ _nav_state_setter
 _navigator
 _pane_writer
 _picture_shower
+_pointer_mover
 _resizer
 _step_taker
 _symbol_inserter
+_time_clicker
+_time_line_drawer
 _widgets_builder
 _window_raiser
 extra_publisher
@@ -15365,6 +16432,7 @@ run
 session_attacher
 spec_publisher
 text_sender
+time_wanted_setter
 window_closer
 ```
 
@@ -15513,6 +16581,33 @@ _event_handler
 _pane_writer
 ```
 
+##### `_drawing_sign_drawer`
+
+```text
+---- Summary ----
+Method to draw the "Drawing ..." sign in the top left corner of the plot area,
+to show that the picture for the latest settings is still being made.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_event_handler`
 
 ```text
@@ -15522,7 +16617,7 @@ Method to carry out one message from the other threads, on the window thread.
 ---- Inputs ----
 event : tuple
     (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-    'extra', 'image', 'closed' or 'finished'.
+    'extra', 'image', 'time', 'closed' or 'finished'.
 
 ---- Globals read ----
 None.
@@ -15616,6 +16711,8 @@ png : Optional[bytes]
     Picture, or None when it could not be drawn.
 notes : str
     Warnings, or the reason when there is no picture.
+time_axis : Optional[TimeAxis]
+    Where the time axis sits in the picture, or None when it has none.
 
 ---- Globals read ----
 None.
@@ -15650,6 +16747,8 @@ png : Optional[bytes]
     Picture, or None when it could not be drawn.
 notes : str
     Warnings, or the reason when there is no picture.
+time_axis : Optional[TimeAxis]
+    Where the time axis sits in the picture, or None when it has none.
 
 ---- Globals read ----
 None.
@@ -15840,7 +16939,9 @@ ansi_style_updater
 ```text
 ---- Summary ----
 Method to show the picture of the current file, scaled to fit the plot area, or
-say why there is none yet.
+say why there is none yet. While the picture for the latest settings is still
+being made, the "Drawing ..." sign is on the plot (over the previous picture
+when there is one).
 
 ---- Inputs ----
 None.
@@ -15859,8 +16960,38 @@ None. Redraws the plot area and the status line (side effect).
 scale = min(width / picture width, height / picture height), at most 1.5.
 
 ---- Helpers ----
+_drawing_sign_drawer
 _lock_drawer
 _message_shower
+_time_line_drawer
+```
+
+##### `_pointer_mover`
+
+```text
+---- Summary ----
+Method to note where the mouse is over the plot area and move the time line
+there; the line goes when the mouse leaves.
+
+---- Inputs ----
+event : Any
+    The Tk motion event, or None when the mouse has left the plot area.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Redraws the time line (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_time_line_drawer
 ```
 
 ##### `_resizer`
@@ -15946,6 +17077,64 @@ None.
 None.
 ```
 
+##### `_time_clicker`
+
+```text
+---- Summary ----
+Method to write the time the mouse points at into the answer box when the plot
+is clicked while a question waits for a time. The time replaces what was in the
+box, can still be edited, and is accepted with Enter.
+
+---- Inputs ----
+event : Any
+    The Tk click event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the text of the answer box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+pointed_time_finder
+```
+
+##### `_time_line_drawer`
+
+```text
+---- Summary ----
+Method to draw a vertical line over the panels where the mouse is, with the
+time it points at beside it. Nothing is drawn when the mouse is off the time
+axis or the picture has none.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+POINTER_COLOUR (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area (side effect).
+
+---- Equations ----
+The line runs from the top of the first panel to the bottom of the last:
+y = picture top + (1 - fraction from the bottom) * picture height.
+
+---- Helpers ----
+pointed_time_finder
+```
+
 ##### `_widgets_builder`
 
 ```text
@@ -15975,9 +17164,11 @@ _history_stepper
 _message_shower
 _nav_state_setter
 _navigator
+_pointer_mover
 _resizer
 _step_taker
 _symbol_inserter
+_time_clicker
 ```
 
 ##### `_window_raiser`
@@ -16202,7 +17393,8 @@ int
 
 ---- Globals mutated ----
 None. Replaces sys.stdout, sys.stderr and the built-in input while the window
-runs, and restores them afterwards (side effects).
+runs, registers the window with the questions that want a time, and restores
+them all afterwards (side effects).
 
 ---- Equations ----
 None.
@@ -16301,6 +17493,35 @@ None.
 None.
 ```
 
+##### `time_wanted_setter`
+
+```text
+---- Summary ----
+Method to say that the question being asked wants a time, so a click on the
+plot writes the pointed time into the answer box, or that it no longer does.
+It is called from the question thread.
+
+---- Inputs ----
+is_wanted : bool
+    True while the question waits for a time.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `window_closer`
 
 ```text
@@ -16388,6 +17609,41 @@ None.
 
 ---- Helpers ----
 ViewerGui
+```
+
+#### `pointed_time_finder`
+
+```text
+---- Summary ----
+Main function to turn a point of the plot area into the time it points at on the
+time axis of the picture shown there.
+
+---- Inputs ----
+x : float
+    Distance of the point from the left edge of the plot area, in pixels.
+y : float
+    Distance of the point from the top edge of the plot area, in pixels.
+picture_box : Tuple[float, float, float, float]
+    (left, top, width, height) of the picture in the plot area, in pixels.
+time_axis : TimeAxis
+    Where the time axis sits in the picture, and the times at its ends.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    The time in minutes, or None when the point is not over the panels.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+across = (x - left) / width; up = 1 - (y - top) / height;
+time = start + (across - axis left) / (axis right - axis left) * (end - start).
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_viewer/viewer_multi.py`
@@ -16528,6 +17784,15 @@ Processing and drawing of one experiment as a preview figure.
 ---- Summary ----
 The settings a preview is drawn with: the answers given so far. Every file is drawn
 with the same spec, so the files can be compared.
+Detailed structure can be found in DATA_FORMAT.md.
+```
+
+#### `TimeAxis`
+
+```text
+---- Summary ----
+Where the time axis shared by the panels sits in a preview picture, and the times at
+its two ends, so a point of the picture can be turned into a time.
 Detailed structure can be found in DATA_FORMAT.md.
 ```
 
@@ -16957,6 +18222,37 @@ experiment_data_processor
 preview_info_builder
 ```
 
+#### `time_axis_finder`
+
+```text
+---- Summary ----
+Main function to find where the time axis of a drawn preview sits in its picture:
+the panels that share the x axis of the first panel. Call it once the figure has
+its final layout (after it is saved).
+
+---- Inputs ----
+fig : Figure
+    The drawn preview figure.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[TimeAxis]
+    The place and the range of the time axis, or None when the figure has no panel
+    or its axis has no length.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+left, right, bottom, top = the outer edges of the panels, as fractions of the
+figure measured from its bottom left corner.
+
+---- Helpers ----
+None.
+```
+
 ## `utils_viewer/viewer_renderer.py`
 
 The background thread of the experiment browser window that draws the previews.
@@ -16996,9 +18292,10 @@ Method to set up the thread (it is started by the caller).
 ---- Inputs ----
 session : ViewerSession
     The browser session (files, cache).
-deliver : Callable[[int, str, Optional[bytes], str], None]
-    Function called with (version, file name, PNG bytes or None, notes) for each
-    finished preview. It is called from this thread.
+deliver : Callable[[int, str, Optional[bytes], str, Optional[TimeAxis]], None]
+    Function called with (version, file name, PNG bytes or None, notes, time
+    axis of the picture or None) for each finished preview. It is called from
+    this thread.
 
 ---- Globals read ----
 None.
@@ -17060,9 +18357,10 @@ name : str
 PREVIEW_DPI (imported constant).
 
 ---- Outputs ----
-Tuple[Optional[bytes], str]
-    (PNG bytes, notes); the bytes are None when the preview could not be drawn
-    and the notes then say why.
+Tuple[Optional[bytes], str, Optional[TimeAxis]]
+    (PNG bytes, notes, time axis); the bytes are None when the preview could
+    not be drawn and the notes then say why. The time axis says where the
+    shared time axis sits in the picture, and is None when there is none.
 
 ---- Globals mutated ----
 None.
@@ -17072,6 +18370,7 @@ None.
 
 ---- Helpers ----
 preview_figure_builder
+time_axis_finder
 ```
 
 ##### `request_setter`
@@ -17240,9 +18539,11 @@ answers : dict
 fit : Optional[dict]
     Fit dictionary, used to list the haems to show.
 kind : str
-    'raw' (O2 and the raw OCR only), 'analysis' (also the haems, still without OD
-    scaling), 'plots' (the choices made so far for the individual figures, in a
-    wide preview) or 'final' (exactly as the figure will be).
+    'raw' (O2 and the raw OCR only), 'standard' (the standard plot: O2, the raw OCR
+    and, when a fit is given, every haem of it as the change from the start),
+    'analysis' (also the haems, still without OD scaling), 'plots' (the choices
+    made so far for the individual figures, in a wide preview) or 'final' (exactly
+    as the figure will be).
 
 ---- Globals read ----
 BROWSING_ANSWERS (module constant).
@@ -17568,6 +18869,43 @@ skipped_windows_finder
 text_colourer
 ```
 
+#### `_standard_fit_loader`
+
+```text
+---- Summary ----
+Helper function to load the fit the standard plot shows the haems with, before any
+question about the haems is asked: the fit last saved for the dataset, or the
+standard fit for a dataset never saved. When the haems cannot be shown, one line
+says why and the plot keeps to the oxygen and the OCR.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md); the spectrometers in common are used.
+defaults : dict
+    Default answers (decompose, fit_file, decomposition_dataset).
+fits_folder : Path
+    Folder holding the fit .csv files.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[Optional[dict], Optional[str]]
+    (fit, spectrometer the haems are read from), or (None, None) when the haems
+    are not shown: the dataset was saved without haems, the fit file is missing or
+    unreadable, or the files share no spectrometer the fit can be used on.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+fit_importer
+info_printer
+```
+
 ### MAIN FUNCTIONS
 
 #### `analysis_stage_runner`
@@ -17625,8 +18963,9 @@ saved_values_reader
 
 ```text
 ---- Summary ----
-Main function to show the files in the plot window (the set and measured O2 and the
-OCR, with the events) before any question is asked about them. In the browser window
+Main function to show the standard plot of the files in the plot window (the set
+and measured O2, the OCR and, when a fit is given, the haems, with the events as
+written in the file) before any question is asked about them. In the browser window
 the user can look through them while answering, so the questions carry straight on;
 with the picture fallback a small menu steps through the files.
 
@@ -17635,6 +18974,8 @@ session : ViewerSession
     The browser session; its current file is changed.
 answers : dict
     Answers so far, used for the figure style of the preview.
+fit : Optional[dict]
+    Fit the haems are shown with, or None for the oxygen and the OCR only.
 
 ---- Globals read ----
 None.
@@ -17774,10 +19115,11 @@ size_asker
 
 ```text
 ---- Summary ----
-Main function to ask the trim and ignore questions, adding the shaded trimmed and
-ignored parts to the plot window after every answer, and ask whether to accept them.
-When the limits are asked again, the earlier ones stay on the plot as dashed lines.
-After they are accepted, it offers to export all the data cut to them.
+Main function to ask the trim and ignore questions on the standard plot, adding the
+shaded trimmed and ignored parts to the plot window after every answer, and ask
+whether to accept them. When the limits are asked again, the earlier ones stay on
+the plot as dashed lines. After they are accepted, it offers to export all the data
+cut to them.
 
 ---- Inputs ----
 session : ViewerSession
@@ -17787,6 +19129,8 @@ answers : dict
 remembered : Dict[str, dict]
     {file name: {trim_start, trim_end, ignore_start, ignore_end}} offered as the
     defaults (from the last run, or from the previous attempt).
+fit : Optional[dict]
+    Fit the haems are shown with, or None for the oxygen and the OCR only.
 
 ---- Globals read ----
 None.
@@ -17817,8 +19161,10 @@ trim_asker
 ```text
 ---- Summary ----
 Main function to ask the questions of the experiment browser: the file browser,
-trimming and ignoring, the analysis and the individual figures. The plot window is
-redrawn after each answer, and at the end any step can be gone back to.
+trimming and ignoring, the analysis and the individual figures. The standard plot
+of every file (oxygen, OCR and the haems of the dataset's fit) is shown first, with
+no question asked. The plot window is redrawn after each answer, and at the end any
+step can be gone back to.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -17850,6 +19196,7 @@ draws and closes the plot window (side effects).
 None.
 
 ---- Helpers ----
+_standard_fit_loader
 active_gui_getter
 analysis_stage_runner
 browser_stage_runner

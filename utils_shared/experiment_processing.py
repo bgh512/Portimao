@@ -247,6 +247,8 @@ def experiment_data_processor(info: dict,
                   f'the highest {window_points} points in a row '
                   f"({reference['window_seconds']:.3g} s) of each haem: {spans}",
                   )
+            for note in fit.get('notes', []):
+                print(f'  {note}')
         except (KeyError, ValueError, PafError) as exc:
             _skip_reporter('the decomposition into haems', exc)
     elif a['export_spectra']:

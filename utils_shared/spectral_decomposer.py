@@ -22,7 +22,207 @@ from utils_shared.schema import (measurement_column_finder,
                                  )
 
 
+# ---- CONSTANTS -----------------------------------------------------------------------
+# The standard scale of a fit: the highest point of its shapes (largest |response| in
+# the file) lies inside this band. The bswitch fits, at about 2e-5 to 3e-5, set it.
+FIT_PEAK_BAND = (1e-7, 1e-3)
+# Some fit files hold the same shapes a million times larger; they are divided by this.
+FIT_LARGE_SCALE = 1_000_000.0
+
+
 # ---- SPECTRAL DECOMPOSER HELPERS -----------------------------------------------------
+
+
+# ---- _fit_table_cleaner --------------------------------------------------------------
+def _fit_table_cleaner(data: pd.DataFrame,
+                       label: str,
+                       ) -> Tuple[pd.DataFrame, List[str]]:
+    """
+    ---- Summary ----
+    Helper function to check the table of a fit file and to give every haem clean rows:
+    numbers only, no blank rows, wavelengths going upwards.
+
+    ---- Inputs ----
+    data : pd.DataFrame
+        The fit file as read: (wavelength, response) column pairs, one pair per haem;
+        the header of each wavelength column names the haem. Row i of the table is row
+        i + 2 of the file.
+    label : str
+        Name of the fit file, used in the messages.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[pd.DataFrame, List[str]]
+        (the table with the same headers, each haem's rows at the top and blanks below
+        the shorter haems; the notes for the user, one sentence per haem whose leftover
+        rows were left out). Raises ValueError, with a message for the user, when the
+        columns are not in pairs, a haem has no name, a cell is not a number, a row
+        holds only one of wavelength and response, or a haem has fewer than two rows.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    A haem whose wavelengths all go downwards is turned round. Where the wavelengths
+    of a haem jump backwards, the rows before the jump are kept and the rest left out:
+    such rows are leftovers of another column, not data.
+
+    ---- Helpers ----
+    _number_column_reader
+    """
+
+    # ---- 1 Check the columns come in pairs -------------------------------------------
+    if (data.shape[1] % 2
+        and str(data.columns[-1]).startswith('Unnamed')
+        and data.iloc[:, -1].isna().all()
+        ):
+        data = data.iloc[:, :-1]  # an empty last column, as a spreadsheet may add
+    if data.shape[1] == 0 or data.shape[1] % 2:
+        raise ValueError(f'{label} has {data.shape[1]} columns, but a fit file needs '
+                         'two columns per haem (wavelength, then response). Correct '
+                         'the file, or choose another fit file.',
+                         )
+
+    # ---- 2 Clean each haem -----------------------------------------------------------
+    notes: List[str] = []
+    shapes: List[Tuple[np.ndarray, np.ndarray]] = []
+    for i in range(data.shape[1] // 2):
+        haem = str(data.columns[2 * i])
+        if haem.startswith('Unnamed'):
+            raise ValueError(f'{label}: columns {2 * i + 1} and {2 * i + 2} have no '
+                             'haem name in the first row. Write the name of the haem '
+                             'above its wavelength column, or delete the columns if '
+                             'they are empty.',
+                             )
+        x = _number_column_reader(data.iloc[:, 2 * i], haem, 'wavelength', label)
+        y = _number_column_reader(data.iloc[:, 2 * i + 1], haem, 'response', label)
+        half = np.isnan(x) != np.isnan(y)
+        if half.any():
+            row = int(np.nonzero(half)[0][0]) + 2
+            raise ValueError(f'{label}: row {row} of {haem} has a wavelength without '
+                             'a response, or a response without a wavelength. Fill in '
+                             'or empty both cells, or choose another fit file.',
+                             )
+        filled = ~np.isnan(x)
+        x, y = x[filled], y[filled]
+        steps = np.diff(x)
+        if steps.size and np.all(steps <= 0) and np.any(steps < 0):
+            x, y = x[::-1], y[::-1]
+            steps = np.diff(x)
+        backwards = np.nonzero(steps < 0)[0]
+        if backwards.size:
+            kept = int(backwards[0]) + 1
+            notes.append(f'{label}: the rows of {haem} after {x[kept - 1]:.2f} nm go '
+                         'backwards in wavelength and were left out, so it is used '
+                         f'from {x[0]:.2f} to {x[kept - 1]:.2f} nm.',
+                         )
+            x, y = x[:kept], y[:kept]
+        if len(x) < 2:
+            raise ValueError(f'{label}: {haem} has fewer than two rows of numbers, too '
+                             'few to make a shape. Fill in its columns, or choose '
+                             'another fit file.',
+                             )
+        shapes.append((x, y))
+
+    # ---- 3 Rebuild the table ---------------------------------------------------------
+    n_rows = max(len(x) for x, _ in shapes)
+    values = np.full((n_rows, data.shape[1]), np.nan)
+    for i, (x, y) in enumerate(shapes):
+        values[:len(x), 2 * i] = x
+        values[:len(y), 2 * i + 1] = y
+    return pd.DataFrame(values, columns=data.columns), notes
+
+
+# ---- _haem_shape_getter --------------------------------------------------------------
+def _haem_shape_getter(fit_data: pd.DataFrame,
+                       index: int,
+                       ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    ---- Summary ----
+    Helper function to give the filled rows of one haem of a fit table, so that the
+    blanks below a shorter haem never reach a calculation.
+
+    ---- Inputs ----
+    fit_data : pd.DataFrame
+        Fit table from fit_importer.
+    index : int
+        Number of the haem in the table, from 0.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[np.ndarray, np.ndarray]
+        (wavelengths in nm, responses) of that haem, each of shape (n_rows of the
+        haem).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    x = fit_data.iloc[:, 2 * index].to_numpy(dtype=float)
+    y = fit_data.iloc[:, 2 * index + 1].to_numpy(dtype=float)
+    filled = np.isfinite(x) & np.isfinite(y)
+    return x[filled], y[filled]
+
+
+# ---- _number_column_reader -----------------------------------------------------------
+def _number_column_reader(column: pd.Series,
+                          haem: str,
+                          kind: str,
+                          label: str,
+                          ) -> np.ndarray:
+    """
+    ---- Summary ----
+    Helper function to read one column of a fit file as numbers.
+
+    ---- Inputs ----
+    column : pd.Series
+        The column as read from the file; row i is row i + 2 of the file.
+    haem : str
+        Name of the haem the column belongs to, used in the message.
+    kind : str
+        'wavelength' or 'response', used in the message.
+    label : str
+        Name of the fit file, used in the message.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    np.ndarray
+        The numbers, shape (n_rows), NaN where the cell is empty. Raises ValueError,
+        with a message for the user, for a cell that holds anything but a number.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    blank = (column.isna() | column.astype(str).str.strip().eq('')).to_numpy()
+    numbers = np.array(pd.to_numeric(column, errors='coerce'), dtype=float)
+    numbers[blank] = np.nan
+    unreadable = ~blank & ~np.isfinite(numbers)
+    if unreadable.any():
+        row = int(np.nonzero(unreadable)[0][0])
+        raise ValueError(f'{label}: the {kind} of {haem} in row {row + 2} is not a '
+                         f'number ("{column.iloc[row]}"). Correct the cell, or choose '
+                         'another fit file.',
+                         )
+    return numbers
 
 
 # ---- _wavelength_masker --------------------------------------------------------------
@@ -42,7 +242,8 @@ def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.nd
 
     ---- Outputs ----
     np.ndarray
-        Boolean mask, True inside the shared range.
+        Boolean mask, True inside the shared range. Raises ValueError, with a message
+        for the user, when a haem of the fit has no rows.
 
     ---- Globals mutated ----
     None.
@@ -51,12 +252,18 @@ def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.nd
     None.
 
     ---- Helpers ----
-    None.
+    _haem_shape_getter
     """
 
-    fit_wavelength = fit_data.iloc[:, ::2]
-    wmax = min(np.nanmax(fit_wavelength, axis=0))
-    wmin = max(np.nanmin(fit_wavelength, axis=0))
+    ranges = [_haem_shape_getter(fit_data, i)[0]
+              for i in range(fit_data.shape[1] // 2)
+              ]
+    if not ranges or any(x.size == 0 for x in ranges):
+        raise ValueError('One of the haems of the fit has no values, so the amounts '
+                         'cannot be worked out. Choose another fit file.',
+                         )
+    wmax = min(float(x.max()) for x in ranges)
+    wmin = max(float(x.min()) for x in ranges)
     return (wavelengths >= wmin) & (wavelengths <= wmax)
 
 
@@ -185,7 +392,7 @@ def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.n
         Fit table from fit_importer.
 
     ---- Globals read ----
-    None. Calls _wavelength_masker.
+    None.
 
     ---- Outputs ----
     np.ndarray
@@ -454,34 +661,111 @@ def experiment_decomposer(experiment: dict,
 def fit_importer(filename: Path) -> Dict[str, Any]:
     """
     ---- Summary ----
-    Main function to import a haem spectral fit CSV.
+    Main function to import a haem spectral fit CSV, checked and on the standard scale.
 
     ---- Inputs ----
     filename : Path
         CSV with (wavelength, response) column pairs, one pair per haem; the header of
-        each wavelength column names the haem.
+        each wavelength column names the haem. The haems may have different lengths.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     Dict[str, Any]
-        {"haem_list": haem names in file order, "data": the table as a data frame}.
+        {'haem_list': haem names in file order, 'data': the cleaned table
+        (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the responses
+        of the file were divided by (1 or 1 000 000), 'notes': sentences for the user
+        about rows left out and the scale}. Raises ValueError, with a message for the
+        user, when the file cannot be read as a fit.
 
     ---- Globals mutated ----
-    None.
+    None. Reads the file (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _fit_table_cleaner
+    fit_scale_standardiser
+    """
+
+    label = Path(filename).name
+    try:
+        raw = pd.read_csv(filename, delimiter=',')
+    except (OSError,
+            UnicodeDecodeError,
+            pd.errors.EmptyDataError,
+            pd.errors.ParserError,
+            ):
+        raise ValueError(f'{label} could not be read as a table with commas between '
+                         'its columns. Open it to check it, or choose another fit '
+                         'file.',
+                         ) from None
+    cleaned, notes = _fit_table_cleaner(raw, label)
+    data, divisor, scale_notes = fit_scale_standardiser(cleaned, label)
+    return {'haem_list': [str(name) for name in data.columns[::2]],
+            'data': data,
+            'scale_divisor': divisor,
+            'notes': notes + scale_notes,
+            }
+
+
+# ---- fit_scale_standardiser ----------------------------------------------------------
+def fit_scale_standardiser(data: pd.DataFrame,
+                           label: str,
+                           ) -> Tuple[pd.DataFrame, float, List[str]]:
+    """
+    ---- Summary ----
+    Main function to bring a fit table to the standard scale, so that the raw haem
+    amounts are on the same scale whichever fit is used.
+
+    ---- Inputs ----
+    data : pd.DataFrame
+        Fit table: (wavelength, response) column pairs, one pair per haem.
+    label : str
+        Name of the fit, used in the notes.
+
+    ---- Globals read ----
+    FIT_PEAK_BAND, FIT_LARGE_SCALE (module constants).
+
+    ---- Outputs ----
+    Tuple[pd.DataFrame, float, List[str]]
+        (the table on the standard scale, what its responses were divided by, the
+        notes for the user). A fit a million above the standard is divided by a
+        million, with a note; a fit on neither scale is returned unchanged, with a
+        warning.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    peak = largest |response| in the table. Standard: low <= peak <= high
+    (FIT_PEAK_BAND). Large: low x 1e6 <= peak <= high x 1e6, then response = response
+    / 1e6. The mOD and % values do not depend on the scale; the raw amounts do.
+
+    ---- Helpers ----
     None.
     """
 
-    data = pd.read_csv(filename, delimiter=',')
-    headers = data.columns
-    haem_names = [str(headers[i]) for i in range(len(headers)) if i % 2 == 0]
-    return {'haem_list': haem_names, 'data': data}
+    responses = data.iloc[:, 1::2].to_numpy(dtype=float)
+    peak = float(np.nanmax(np.abs(responses))) if np.isfinite(responses).any() else 0.0
+    low, high = FIT_PEAK_BAND
+    if low <= peak <= high:
+        return data, 1.0, []
+    if low * FIT_LARGE_SCALE <= peak <= high * FIT_LARGE_SCALE:
+        scaled = data.copy()
+        scaled.iloc[:, 1::2] = responses / FIT_LARGE_SCALE
+        return scaled, FIT_LARGE_SCALE, [
+            f'{label}: its shapes are a million times larger than the standard scale, '
+            'so they were divided by 1 000 000. The raw haem amounts are then on the '
+            'same scale as with the other fits; mOD and % are the same on any scale.',
+            ]
+    return data, 1.0, [
+        f'Warning: {label}: the highest point of its shapes is {peak:.3g}, far from '
+        f'the standard scale ({low:g} to {high:g}), so the raw haem amounts will be '
+        'on another scale than with the other fits. mOD and % are not affected.',
+        ]
 
 
 # ---- s_array_generator ---------------------------------------------------------------
@@ -521,6 +805,7 @@ def s_array_generator(experimental_data: np.ndarray,
     those of background_builder.
 
     ---- Helpers ----
+    _haem_shape_getter
     background_builder
     data_filterer
     """
@@ -532,8 +817,7 @@ def s_array_generator(experimental_data: np.ndarray,
 
     # ---- 2 Fill the haem spectra -----------------------------------------------------
     for i in range(no_haems):
-        fit_x = fit_data.iloc[:, 2 * i]
-        fit_y = fit_data.iloc[:, 2 * i + 1]
+        fit_x, fit_y = _haem_shape_getter(fit_data, i)
         s_array[:, i] = np.interp(filtered[:, 0], fit_x, fit_y) * haemfactor
 
     # ---- 3 Add the scatter terms -----------------------------------------------------

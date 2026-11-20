@@ -1,10 +1,10 @@
-# Portimao question flow (V1.12)
+# Portimao question flow (V1.13)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
 **How to read it**
 
-- `(Y/n)` and `(y/N)` questions: the capital letter is what Enter gives. The letters shown are the first-run defaults; after a run, the answers you gave are offered instead. Press Enter on any question to use the value in `[brackets]`.
+- `(Y/n)` and `(y/N)` questions: the capital letter is what Enter gives. The letters shown are the standard settings, offered for a dataset you have never run. Once you have started a run, your answers are saved in a small file inside the data folder (`portimao_settings.json`), and that dataset offers them instead, on this computer or on another one the folder is copied to. Press Enter on any question to use the value in `[brackets]`.
 - **Yes → / No →** says which question comes next. **Next** means the next question in this list.
 - The numbers here are for reference. On screen the numbers are given in the order the questions are asked, so when a branch is skipped the later numbers move up, and every "Do you accept...?" question takes a number of its own.
 - Every "Do you accept...?" question has the same two answers. **1 (Yes, accept)** moves on. **2 (No, ...)** asks the questions of that step again, with your last answers as the defaults.
@@ -16,14 +16,16 @@ Every question in the order it is asked, with where each answer leads. The quest
 
 | # | Question | Answer leads to |
 |---|---|---|
-| 1.1 | What is the directory with the .paf files? | Any folders ending in `_data` in the program folder are listed first, as a reminder. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused and the question is asked again. Otherwise every file is read and listed, then **1.2**. |
-| 1.2 | To which directory would you like the results to be saved? | **2.1** |
+| 1.1 | What is the directory with the .paf files? | The folders in the program folder that hold `.paf` files are listed first, numbered, with how many files each holds. Answer with a number or a name from that list, or type (or drag in) the path of another folder; Enter gives the folder used last time. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused and the question is asked again. Otherwise every file is read and listed, then **1.2**. |
+| 1.2 | To which directory would you like the results to be saved? `[the export folder inside the data folder]` If the dataset was run before, a message says its saved settings are offered as the defaults, and its last results folder is offered here. | the standard plot is drawn **(plot)**, then **2.1** |
+
+The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. The haems are worked out with the standard fit (`bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit file is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them.
 
 ---
 
 ## 2. Trimming and ignoring
 
-TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted but not used for calculations. Ignore times count from the new 0 after trimming. All four edges are asked in the same way, in this order: TRIM + START, TRIM + END, IGNORE + START, IGNORE + END. The plot shows the raw data first, and **after every answer in this section the shaded regions are added to the plot**: trimmed parts grey and hatched, ignored parts amber. An answer for ALL the data shades every file; an answer for one file shades just that file, and the plot switches to the file being asked about.
+TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted but not used for calculations. Ignore times count from the new 0 after trimming. All four edges are asked in the same way, in this order: TRIM + START, TRIM + END, IGNORE + START, IGNORE + END. The plot shows the standard plot of the whole recording first (with the haems, when they are shown), and **after every answer in this section the shaded regions are added to the plot**: trimmed parts grey and hatched, ignored parts amber. An answer for ALL the data shades every file; an answer for one file shades just that file, and the plot switches to the file being asked about.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
@@ -67,13 +69,13 @@ Earlier OD and event values found in the files' workbooks are offered as default
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.1 | Do you want to decompose the haems? `(y/N)` | **3.1.1** | **3.3** (no haems anywhere in the run) |
+| 3.1 | Do you want to decompose the haems? `(Y/n)` | **3.1.1** | **3.3** (no haems anywhere in the run) |
 
 If the `fits/` folder holds no `.csv` file, 3.1 is still asked, and 3.1.1 then offers only *Find the components from the data*.
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last) | **3.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **3.2**; the last choice leads to **3.1.1.1** (after 3.1.2 if that is needed) |
+| 3.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last; the standard fit, or the fit last saved for the dataset, is the default) | **3.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **3.2**; the last choice leads to **3.1.1.1** (after 3.1.2 if that is needed) |
 | 3.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **3.2** (or **3.1.1.1** when the components are being found) |
 
 | # | Question | 1 → | 2 → |
@@ -354,7 +356,7 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 8.1 | Do you want to start? `(Y/n)` | Your answers are remembered for next time and the run starts. Every file is processed, plotted and exported, then the multi-experiment figures and summaries are made. | The program stops and nothing is changed. |
+| 8.1 | Do you want to start? `(Y/n)` | Your answers are saved in the data folder (`portimao_settings.json`) for the next time this dataset is opened, and the run starts. If the data folder cannot be written to, a message says the dataset will start from the standard settings next time. Every file is processed, plotted and exported, then the multi-experiment figures and summaries are made. | The program stops and nothing is changed. |
 
 ---
 
@@ -363,5 +365,5 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 The questions and their order are the same. These differ:
 
 - In **2** and **3** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer.
-- After **1.2** comes a section of its own, **2. Experiment browser**, with a small menu that steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring. Every later section is therefore numbered one higher on screen than in this list (trimming and ignoring is 3, analysis is 4, and so on), and the going back question (**4.12**) offers the experiment browser as well.
+- After **1.2** comes a section of its own, **2. Experiment browser**, where the standard plot is shown, with a small menu that steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring. Every later section is therefore numbered one higher on screen than in this list (trimming and ignoring is 3, analysis is 4, and so on), and the going back question (**4.12**) offers the experiment browser as well.
 - Every "Do you accept...?" question has a third answer, **3) Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.
