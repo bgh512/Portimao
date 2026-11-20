@@ -26,6 +26,7 @@ from utils_custom.custom_runner import (exemplar_runner,
                                         ocr_and_haem_response_runner,
                                         time_response_runner,
                                         )
+from utils_shared.app_messages import SEND_DETAILS, start_problem_shower
 from utils_shared.comparison_plotter import comparison_figure_plotter
 from utils_shared.dataset_settings import dataset_settings_saver
 from utils_shared.experiment_processing import experiment_data_processor
@@ -40,17 +41,21 @@ from utils_shared.survey import (files_asker,
                                  JOURNAL_NAMES,
                                  multi_experiment_asker,
                                  )
+from utils_shared.user_places import (app_output_logger,
+                                      user_folder_preparer,
+                                      user_places_finder,
+                                      )
 from utils_viewer.viewer_gui import active_gui_getter, gui_runner
 from utils_viewer.viewer_multi import multi_figure_checker_builder
 from utils_viewer.viewer_stages import viewer_asker
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-HERE = Path(__file__).resolve().parent
-FITS_FOLDER = HERE / 'fits'
-LAST_ANSWERS_FILE = HERE / 'last_answers.json'
-VERSION = program_version_reader(HERE)
-PROGRAM_TITLE = program_title_builder(HERE, VERSION)
+# From source everything is in this folder; the Mac app keeps the user's things in a
+# folder of their own (utils_shared/user_places.py).
+PLACES = user_places_finder()
+VERSION = program_version_reader(PLACES.program_folder)
+PROGRAM_TITLE = program_title_builder(PLACES.program_folder, VERSION)
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -157,7 +162,7 @@ def everything_asker() -> Tuple[dict,
     None.
 
     ---- Globals read ----
-    FITS_FOLDER, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
+    PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
 
     ---- Outputs ----
     Tuple[dict, Path, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
@@ -201,7 +206,9 @@ def everything_asker() -> Tuple[dict,
     # A dataset never saved starts from the standard settings (config.py); a dataset
     # saved before starts from the settings kept in its own folder.
     section_starter('Your files')
-    folder, summaries, export_root, saved = files_asker(last_answers_loader())
+    folder, summaries, export_root, saved = files_asker(last_answers_loader(),
+                                                        PLACES.own_folder,
+                                                        )
     names = [s['name'] for s in summaries]
     defaults = dict(settings.DEFAULT_ANSWERS, **saved.get('answers', {}))
     answers = dict(defaults)
@@ -213,7 +220,7 @@ def everything_asker() -> Tuple[dict,
                                                  answers,
                                                  defaults,
                                                  remembered,
-                                                 FITS_FOLDER,
+                                                 PLACES.fits_folder,
                                                  export_root,
                                                  )
 
@@ -245,7 +252,7 @@ def everything_asker() -> Tuple[dict,
                                        defaults,
                                        summaries,
                                        fit,
-                                       FITS_FOLDER,
+                                       PLACES.fits_folder,
                                        checker,
                                        )
 
@@ -508,7 +515,7 @@ def last_answers_loader() -> dict:
     None.
 
     ---- Globals read ----
-    LAST_ANSWERS_FILE (module constant).
+    PLACES (module constant; its last_answers_file).
 
     ---- Outputs ----
     dict
@@ -527,7 +534,7 @@ def last_answers_loader() -> dict:
     """
 
     try:
-        return json.loads(LAST_ANSWERS_FILE.read_text(encoding='utf-8'))
+        return json.loads(PLACES.last_answers_file.read_text(encoding='utf-8'))
     except (OSError, ValueError):
         return {}
 
@@ -543,7 +550,7 @@ def last_answers_saver(values: dict) -> None:
         Content to write to last_answers.json: {data_folder}.
 
     ---- Globals read ----
-    LAST_ANSWERS_FILE (module constant).
+    PLACES (module constant; its last_answers_file).
 
     ---- Outputs ----
     None
@@ -561,7 +568,9 @@ def last_answers_saver(values: dict) -> None:
     """
 
     try:
-        LAST_ANSWERS_FILE.write_text(json.dumps(values, indent=2), encoding='utf-8')
+        PLACES.last_answers_file.write_text(json.dumps(values, indent=2),
+                                            encoding='utf-8',
+                                            )
     except OSError:
         pass  # a read-only folder just means the defaults are not remembered
 
@@ -573,36 +582,61 @@ def main() -> int:
     Main function of the program: run it in the experiment browser window (terminal on
     the left, plots on the right), or in the terminal when the window cannot open. With
     the check switch (PORTIMAO_SELF_TEST set to any value) it only checks that the
-    window opens and shows a made-up preview, then closes by itself.
+    window opens and shows a made-up preview, then closes by itself. The Mac app first
+    makes its own folder and sends what it prints to its log; it has no terminal, so
+    when its folder cannot be made or the window cannot open, a message says what to
+    do.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    HERE, PROGRAM_TITLE (shown in the window title); os.environ['PORTIMAO_SELF_TEST'].
+    PLACES, PROGRAM_TITLE (shown in the window title);
+    os.environ['PORTIMAO_SELF_TEST'].
 
     ---- Outputs ----
     int
-        0 when every file finished, 1 when the run was cancelled or a file failed.
-        With the check switch: 0 when the check passed, 1 when it failed.
+        0 when every file finished, 1 when the run was cancelled, a file failed, the
+        app's own folder could not be made or the app's window could not open. With the
+        check switch: 0 when the check passed, 1 when it failed.
 
     ---- Globals mutated ----
-    None. Opens the window or runs in the terminal (side effects).
+    None. Opens the window or runs in the terminal; the app makes its own folder and
+    replaces sys.stdout and sys.stderr by its log; the app may show a message (side
+    effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    app_output_logger
     gui_runner
     program_runner
     self_test_runner
+    start_problem_shower
+    user_folder_preparer
     """
 
+    try:
+        user_folder_preparer(PLACES)
+    except OSError:
+        start_problem_shower(f'Portimao could not make its folder {PLACES.own_folder}: '
+                             f'check that your home folder can be written to, then '
+                             f'open Portimao again.',
+                             PLACES,
+                             )
+        return 1
+    app_output_logger(PLACES)
     if os.environ.get('PORTIMAO_SELF_TEST'):
         # Imported only for the check, so a normal start never depends on its file.
         from utils_viewer.viewer_self_test import self_test_runner
-        return self_test_runner(PROGRAM_TITLE, HERE)
+        return self_test_runner(PROGRAM_TITLE, PLACES)
     code = gui_runner(program_runner, PROGRAM_TITLE)
+    if code is None and PLACES.is_app:  # the app has no terminal to ask the questions in
+        start_problem_shower(f"Portimao's window could not open: {SEND_DETAILS}.",
+                             PLACES,
+                             )
+        return 1
     if code is None:
         code = program_runner()
     return code

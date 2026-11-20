@@ -267,8 +267,9 @@ Portimao/
     main.py                 entry point
     config.py               defaults, journal sizes and colours
     Portimao.pyw, Portimao.app, run.bat, run.sh   launchers (no terminal window)
-    launchers/              the launcher program, shortcut and icon scripts, and the Mac report (mac_report.sh)
+    launchers/              the launcher program, shortcut and icon scripts, the Mac report (mac_report.sh), the Mac app's build recipe (mac_app_builder.py), its start (mac_app_starter.py) and its swap for updates (mac_app_swapper.sh)
     .github/ISSUE_TEMPLATE/ the "Mac problem" form of the Issues page
+    .github/workflows/      the Mac check: GitHub's Macs run the tests, start Portimao, then build the Mac app and start it; at each release the apps go on the Releases page and the release before is checked to update itself
     assets/                 icons
     fits/                   haem fit CSVs (your own fit goes here; layout in DATA_FORMAT.md, "fit csv")
     utils_shared/           reading, processing, plotting and export of single experiments
@@ -276,6 +277,9 @@ Portimao/
         paf_reader.py       direct .paf reader
         experiment_processing.py   the processing steps shared by the run and the previews
         output_capture.py   per-thread capture of printed output
+        user_places.py      where your own things are kept: the program folder, or ~/Portimao in the Mac app
+        app_updater.py      the Mac app's update at each start, from the newest release on GitHub
+        app_messages.py     the Mac app's messages: why it could not start (with Copy details), and where to download a newer version
         pca_fitter.py       principal component analysis of the spectra (components, fit file)
         pca_plotter.py      the figures of the components and example decompositions
         ...

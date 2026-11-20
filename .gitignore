@@ -1,6 +1,7 @@
 # ---- project ----
 .venv_unix/
 build/
+/dist/
 logs/
 /data_*/
 all_data/

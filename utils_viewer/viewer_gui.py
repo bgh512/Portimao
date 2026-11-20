@@ -127,6 +127,9 @@ class ViewerGui:
         The thread running the program, whose output belongs in the terminal.
     exit_code : int
         What the program returned (1 when it was stopped).
+    window_errors : List[str]
+        The traceback of each error met in the window's own work (its Tk callbacks),
+        in order; empty when there was none.
 
     ---- Globals read ----
     MONO_FONTS and the colour constants (module constants).
@@ -137,6 +140,7 @@ class ViewerGui:
     _answer_writer
     _axis_box_finder
     _band_drawer
+    _callback_error_keeper
     _closing_handler
     _display_name_lister
     _drag_ender
@@ -196,6 +200,7 @@ class ViewerGui:
                  root: Any,
                  program: Callable[[], int],
                  title: str,
+                 close_after_s: Optional[float] = None,
                  ) -> None:
         """
         ---- Summary ----
@@ -210,6 +215,10 @@ class ViewerGui:
             The program to run; it asks the questions and returns its exit code.
         title : str
             Window title.
+        close_after_s : Optional[float]
+            Seconds after the program finishes when the window closes by itself,
+            without asking (the check switch); None leaves it open until the user
+            closes it.
 
         ---- Globals read ----
         None.
@@ -219,12 +228,14 @@ class ViewerGui:
             Nothing.
 
         ---- Globals mutated ----
-        None. Sets the attributes on the instance and builds the widgets.
+        None. Sets the attributes on the instance, builds the widgets and has the root
+        window report its errors to _callback_error_keeper.
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
+        _callback_error_keeper
         _icon_setter
         _widgets_builder
         """
@@ -232,8 +243,11 @@ class ViewerGui:
         self._tk = tk
         self._root = root
         self._program = program
+        self._close_after_s = close_after_s
         self.logic_thread: Optional[threading.Thread] = None
         self.exit_code = 1
+        self.window_errors: List[str] = []
+        root.report_callback_exception = self._callback_error_keeper
         self._events: 'queue.Queue' = queue.Queue()
         self._answers: 'queue.Queue' = queue.Queue()
         self._session: Optional[ViewerSession] = None
@@ -451,6 +465,47 @@ class ViewerGui:
                                  font=(self._family, 10, 'bold'),
                                  tags='band',
                                  )
+
+    # ---- _callback_error_keeper ------------------------------------------------------
+    def _callback_error_keeper(self,
+                               kind: type,
+                               value: BaseException,
+                               trace: Any,
+                               ) -> None:
+        """
+        ---- Summary ----
+        Method that Tk calls when the window's own work (a Tk callback) meets an error:
+        the traceback is printed as Tk does by default, and kept in window_errors so a
+        check can tell the window went wrong.
+
+        ---- Inputs ----
+        kind : type
+            Class of the error.
+        value : BaseException
+            The error.
+        trace : Any
+            Its traceback.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Adds to window_errors and prints to the error stream (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        text = ''.join(traceback.format_exception(kind, value, trace))
+        self.window_errors.append(text)
+        sys.stderr.write(f'Exception in Tkinter callback\n{text}')
 
     # ---- _closing_handler ------------------------------------------------------------
     def _closing_handler(self) -> None:
@@ -719,7 +774,8 @@ class ViewerGui:
             (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
             'extra', 'image', 'time', 'strip', 'strip_fits', 'strip_state', 'busy',
             'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..." sign of
-            'busy' stays until the next question, preview or picture shown.
+            'busy' stays until the next question, preview or picture shown. With
+            close_after_s, 'finished' also closes the window after that time.
 
         ---- Globals read ----
         None.
@@ -735,6 +791,7 @@ class ViewerGui:
         None.
 
         ---- Helpers ----
+        _closing_handler
         _display_name_lister
         _image_deliverer
         _image_receiver
@@ -863,6 +920,10 @@ class ViewerGui:
             self._nav_state_setter(False)
             self._hint.configure(text='Finished - close this window when you are done')
             self._pane_writer('\n[Finished. You can close this window.]\n', 'answer')
+            if self._close_after_s is not None:
+                self._root.after(round(self._close_after_s * 1000),
+                                 self._closing_handler,
+                                 )
 
     # ---- _history_stepper ------------------------------------------------------------
     def _history_stepper(self, step: int) -> None:
@@ -2772,8 +2833,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
         Window title.
 
     ---- Globals read ----
-    MINIMUM_TK (module constant); os.environ["PORTIMAO_NO_GUI"] (set to anything to
-    keep the terminal).
+    None.
 
     ---- Outputs ----
     Optional[int]
@@ -2788,39 +2848,11 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
 
     ---- Helpers ----
     ViewerGui
+    window_opener
     """
 
     try:
-        if os.environ.get('PORTIMAO_NO_GUI'):
-            raise GuiUnavailableError('PORTIMAO_NO_GUI is set')
-        try:
-            import tkinter as tk
-        except ImportError:
-            raise GuiUnavailableError('Tkinter is not installed')
-        has_display = (os.environ.get('DISPLAY')
-                       or os.environ.get('WAYLAND_DISPLAY')
-                       )
-        if sys.platform.startswith('linux') and not has_display:
-            raise GuiUnavailableError('there is no display')
-        if sys.platform == 'win32':
-            try:
-                import ctypes
-                ctypes.windll.shcore.SetProcessDpiAwareness(1)  # sharp text
-                # own taskbar group, so the taskbar shows our icon, not Python's
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                    'Portimao.ExperimentBrowser',
-                    )
-            except Exception:
-                pass
-        if tk.TkVersion < MINIMUM_TK:
-            raise GuiUnavailableError(f'this Python has Tk {tk.TkVersion:g}, which '
-                                      f'draws blank windows; install Python from '
-                                      f'python.org',
-                                      )
-        try:
-            root = tk.Tk()
-        except tk.TclError as exc:
-            raise GuiUnavailableError(str(exc))
+        tk, root = window_opener()
     except GuiUnavailableError as exc:
         print(f'The experiment browser window cannot open ({exc}), so the questions '
               f'run in this terminal and previews are saved as a picture.',
@@ -2879,3 +2911,69 @@ def pointed_time_finder(x: float,
         return None
     share = (across - time_axis.left) / (time_axis.right - time_axis.left)
     return time_axis.start_min + share * (time_axis.end_min - time_axis.start_min)
+
+
+# ---- window_opener -------------------------------------------------------------------
+def window_opener() -> Tuple[Any, Any]:
+    """
+    ---- Summary ----
+    Main function to check that the browser window can open here and open its Tk root
+    window.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    MINIMUM_TK (module constant); os.environ["PORTIMAO_NO_GUI"] (set to anything to
+    keep the terminal), os.environ["DISPLAY"] and os.environ["WAYLAND_DISPLAY"] (on
+    Linux).
+
+    ---- Outputs ----
+    Tuple[Any, Any]
+        (the tkinter module, the Tk root window). Raises GuiUnavailableError, with the
+        reason in plain words, when the window cannot open.
+
+    ---- Globals mutated ----
+    None. On Windows, makes the text sharp and gives the program its own taskbar group
+    (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Check that a window can open ----------------------------------------------
+    if os.environ.get('PORTIMAO_NO_GUI'):
+        raise GuiUnavailableError('PORTIMAO_NO_GUI is set')
+    try:
+        import tkinter as tk
+    except ImportError:
+        raise GuiUnavailableError('Tkinter is not installed')
+    has_display = os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')
+    if sys.platform.startswith('linux') and not has_display:
+        raise GuiUnavailableError('there is no display')
+
+    # ---- 2 Prepare Windows -----------------------------------------------------------
+    if sys.platform == 'win32':
+        try:
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)  # sharp text
+            # own taskbar group, so the taskbar shows our icon, not Python's
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                'Portimao.ExperimentBrowser',
+                )
+        except Exception:
+            pass
+
+    # ---- 3 Open the root window ------------------------------------------------------
+    if tk.TkVersion < MINIMUM_TK:
+        raise GuiUnavailableError(f'this Python has Tk {tk.TkVersion:g}, which draws '
+                                  f'blank windows; install Python from python.org',
+                                  )
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        raise GuiUnavailableError(str(exc))
+    return tk, root

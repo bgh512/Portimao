@@ -2,10 +2,24 @@
 # The Mac report: prints, and copies to the clipboard, what is needed to find out why
 # Portimao does not start on a Mac. It only reads: nothing on the Mac is changed.
 # Run it from Terminal: type sh and a space, drag this file onto the window, press Enter.
+# The Mac app carries a copy and runs it for its Copy details button; the report then
+# describes the app.
 
 # ---- CONSTANTS ----
 FOLDER="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
 REAL_FOLDER="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd -P)"
+# Inside the app the report is in Portimao.app/Contents, and the user's own things
+# (the logs among them) are in the Portimao folder in the home folder.
+case "$FOLDER/" in
+    *.app/Contents/*)
+        APP="${FOLDER%%.app/Contents*}.app"
+        OWN_FOLDER="$HOME/Portimao"
+        ;;
+    *)
+        APP=''
+        OWN_FOLDER="$FOLDER"
+        ;;
+esac
 FORM_LINK='https://github.com/bgh512/Portimao/issues/new?template=mac_problem.yml'
 LOG_LINES=30
 FRAMEWORK='/Library/Frameworks/Python.framework/Versions'
@@ -105,9 +119,9 @@ _guarded_folder_namer() {
 # Shows the end of one of Portimao's logs, with the time it last changed.
 _log_shower() {
     printf '%s\n' "== $1 =="
-    if [ -f "$FOLDER/$1" ]; then
-        printf '%s\n' "(last changed $(_file_time_finder "$FOLDER/$1"); its last $LOG_LINES lines)"
-        tail -n "$LOG_LINES" "$FOLDER/$1"
+    if [ -f "$OWN_FOLDER/$1" ]; then
+        printf '%s\n' "(last changed $(_file_time_finder "$OWN_FOLDER/$1"); its last $LOG_LINES lines)"
+        tail -n "$LOG_LINES" "$OWN_FOLDER/$1"
     else
         printf '%s\n' '(no such file)'
     fi
@@ -140,6 +154,19 @@ _python_lister() {
 }
 
 
+# ---- _signature_describer ----
+# Checks the app's signature (this only reads); gives ok, or codesign's last words.
+_signature_describer() {
+    if ! _command_finder codesign; then
+        printf '%s\n' 'unknown (no codesign here)'
+    elif answer="$(codesign --verify --deep --strict "$1" 2>&1)"; then
+        printf '%s\n' 'ok'
+    else
+        printf '%s\n' "$answer" | tail -n 1
+    fi
+}
+
+
 # ---- _version_finder ----
 # Gives Portimao's version as the program finds it (program_version_reader).
 _version_finder() {
@@ -153,6 +180,30 @@ _version_finder() {
 
 
 # ---- MAIN FUNCTIONS ----
+
+
+# ---- app_reporter ----
+# Reports where the app is, how macOS sees it and whether its own folder can be written.
+app_reporter() {
+    copy='no'
+    case "$APP" in
+        */AppTranslocation/*) copy='yes' ;;
+    esac
+    own='missing'
+    if [ -d "$OWN_FOLDER" ] && [ -w "$OWN_FOLDER" ]; then
+        own='there, can be written to'
+    elif [ -d "$OWN_FOLDER" ]; then
+        own='there, cannot be written to'
+    fi
+    printf '%s\n' '== Portimao app ==' \
+                  "Where: $APP" \
+                  "Opened from a temporary copy macOS made: $copy" \
+                  "In a folder macOS guards: $(_guarded_folder_namer "$APP")" \
+                  "Version: V$(_version_finder)" \
+                  "Download flag: $(_flag_describer "$APP")" \
+                  "Signature: $(_signature_describer "$APP")" \
+                  "Own folder ($OWN_FOLDER): $own"
+}
 
 
 # ---- folder_reporter ----
@@ -222,16 +273,17 @@ main() {
     fi
     report="$(report_maker 2>&1)"
     printf '%s\n\n' "$report"
+    # the help goes to the error stream, so the app copies only the report
     if [ -t 1 ] && _command_finder pbcopy; then
         printf '%s\n' "$report" | pbcopy
-        printf '%s\n' 'The report is copied. Paste it (Cmd + V) into the "Mac problem" form:'
+        printf '%s\n' 'The report is copied. Paste it (Cmd + V) into the "Mac problem" form:' >&2
     else
         printf '%s\n' 'Select the report above, copy it (Cmd + C) and paste it into the' \
-                      '"Mac problem" form:'
+                      '"Mac problem" form:' >&2
     fi
     printf '%s\n' "$FORM_LINK" \
                   'It shows where the Portimao folder is, which includes your Mac user' \
-                  'name; change it before sending if you prefer.'
+                  'name; change it before sending if you prefer.' >&2
 }
 
 
@@ -271,11 +323,19 @@ EOF
 
 
 # ---- report_maker ----
-# Puts the parts of the report together.
+# Puts the parts of the report together: of the app, or of the folder with its launcher.
 report_maker() {
     printf '%s\n\n' "Portimao Mac report, $(date '+%Y-%m-%d %H:%M')"
     mac_reporter
     printf '\n'
+    if [ -n "$APP" ]; then
+        app_reporter
+        printf '\n'
+        _log_shower logs/launch.log
+        printf '\n'
+        _log_shower logs/update.log
+        return
+    fi
     folder_reporter
     printf '\n'
     pythons_reporter

@@ -293,7 +293,7 @@ Returned by `decomposition_example_finder`: every spectrum decomposed with the c
 
 #### `last_answers`
 
-Saved to `last_answers.json` next to `main.py`: the data folder offered on the next run. The answers themselves are kept with each dataset (`dataset_settings`).
+Saved to `last_answers.json` in the user's own folder (`UserPlaces`): the data folder offered on the next run. The answers themselves are kept with each dataset (`dataset_settings`).
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
@@ -365,6 +365,19 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every 
 | `details` | dict | | | | `{file name: {OD, volume, dilution_factor, events}}` |
 | `show_trim` | bool | | | `False` | Draw the whole recording and shade the trimmed part |
 | `show_ignored` | bool | | | `True` | Shade the ignored start and end |
+
+#### `UserPlaces`
+
+Defined in `utils_shared/user_places.py`. Created by `user_places_finder` when `main.py` is loaded (`PLACES`); the app's folders are made, and the program's fits copied in, by `user_folder_preparer`. Run from source (Windows, Linux, developers), every folder is the program folder. Run as the Mac app (`sys.frozen`), the program's own files are inside the app, which is never written to, and the user's things are in `Portimao` in the home folder.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `program_folder` | Path | | | | The program's own files (`fits/`, `assets/`, `QUESTION_FLOW.md`): the folder of `main.py`, or `sys._MEIPASS` inside the app |
+| `own_folder` | Path | | | | The user's own folder; the data folders directly inside it are offered by number at question 1.1. The program folder, or `~/Portimao` in the app |
+| `fits_folder` | Path | | | | `<own_folder>/fits`: the fits offered, and where fits saved from the components go. In the app, each fit of the program that is missing is copied in at every start; one already there is never overwritten |
+| `last_answers_file` | Path | | | | `<own_folder>/last_answers.json` (`last_answers`) |
+| `logs_folder` | Path | | | | `<own_folder>/logs`: the self-test log and, in the app, the launch log and the update log |
+| `is_app` | bool | | | | True when running as the Mac app |
 
 #### `TimeAxis`
 
@@ -594,7 +607,7 @@ Rules, checked by `fit_importer`: the columns come in pairs and every wavelength
 |---|---|
 | File type | JSON |
 | Encoding | UTF-8 |
-| Location and name | `last_answers.json` next to `main.py` (not committed) |
+| Location and name | `last_answers.json` in the user's own folder (`UserPlaces`): next to `main.py` (not committed), or in `~/Portimao` in the Mac app |
 
 Structure: see `last_answers` in section 1.1.
 
@@ -626,6 +639,53 @@ Written, and opened in the default picture viewer, only when the experiment brow
 | Location and name | `<results>/logs/YYYY_MM_DD-HH_MM_SS.log` |
 
 The first lines are the project version, the random seed (none: the program uses no random numbers) and the settings of the run, then everything printed during the run.
+
+#### `self-test log`
+
+| Property | Value |
+|---|---|
+| File type | text |
+| Encoding | UTF-8 |
+| Location and name | `logs/self_test.log` in the user's own folder (`UserPlaces`): next to `main.py` (not committed), or in `~/Portimao` in the Mac app; overwritten by each check |
+
+Written only with the check switch (the environment variable `PORTIMAO_SELF_TEST` set to any value), which opens the window, shows a made-up experiment as a preview and closes the window by itself. The same lines go to the terminal. In order:
+
+- the program name and version, and the date and time;
+- whether it runs from source or as the Mac app, and where the user's own folder is;
+- the computer: Python, the system and its chip, Tk, and the versions of the main packages;
+- each step of the check;
+- any error, with its traceback;
+- last, `Self-test passed.` or a line starting `Self-test failed`.
+
+The line starting `The made-up preview is on show` tells the Mac check (`.github/workflows/mac_check.yml`) when to take its picture of the window.
+
+#### `launch log`
+
+| Property | Value |
+|---|---|
+| File type | text |
+| Encoding | UTF-8 |
+| Location and name | `logs/launch.log`: next to `main.py` when the launcher starts the program (not committed), or in `~/Portimao` in the Mac app; overwritten at each start |
+
+Everything the program prints from its start, written by the launcher (`launchers/bootstrap.pyw`) or, in the Mac app, which has no launcher, by `app_output_logger`. When the launcher itself fails, it writes its error there instead. When the Mac app stops while starting, or its update stops, the app's start (`launchers/mac_app_starter.py`) adds a line saying which, with the date and time and the error's traceback.
+
+#### `update log`
+
+| Property | Value |
+|---|---|
+| File type | text |
+| Encoding | UTF-8 |
+| Location and name | `logs/update.log` in `~/Portimao`, the Mac app's own folder; added to at each start, after cutting it to its last 200 lines |
+
+Written only by the Mac app: at each start by its update (`update_installer`), and during a swap by `launchers/mac_app_swapper.sh`. One line per step, each starting with the date and time (`YYYY-MM-DD HH:MM:SS`):
+
+- the app's version and where it is;
+- what GitHub's newest release is, or that GitHub did not answer;
+- the zip this Mac needs, or why the app cannot update itself;
+- why a download did not finish, when it did not;
+- from the swap: `The new app is in place.`, or why the old app was kept.
+
+The Mac report shows its last 30 lines.
 
 #### Figure files
 

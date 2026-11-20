@@ -842,7 +842,7 @@ def data_folder_lister(root: Path) -> List[Path]:
 
     ---- Inputs ----
     root : Path
-        Folder to look in (the program folder).
+        Folder to look in (the user's own folder, UserPlaces.own_folder).
 
     ---- Globals read ----
     None.
@@ -1203,16 +1203,20 @@ def file_focus_setter(hook: Optional[Callable[[str], None]]) -> None:
 
 
 # ---- files_asker ---------------------------------------------------------------------
-def files_asker(last: dict) -> Tuple[Path, List[dict], Path, dict]:
+def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, dict]:
     """
     ---- Summary ----
     Main function to ask for the folder of .paf files (1.1), offering the data folders
-    found in the program folder, and the results folder (1.2), and to read a summary of
-    every file and the settings saved with the dataset.
+    found in the user's own folder, and the results folder (1.2), and to read a summary
+    of every file and the settings saved with the dataset.
 
     ---- Inputs ----
     last : dict
         Contents of last_answers.json; uses data_folder (the folder used last).
+    own_folder : Path
+        Folder whose data folders are offered by number (UserPlaces.own_folder): the
+        program folder from source, the Portimao folder in the home folder in the Mac
+        app.
 
     ---- Globals read ----
     None.
@@ -1244,10 +1248,9 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path, dict]:
     """
 
     # ---- 1 Ask for the .paf folder ---------------------------------------------------
-    root = Path(__file__).resolve().parents[1]
-    listed = data_folder_lister(root)
+    listed = data_folder_lister(own_folder)
     if listed:
-        info_printer(f'Data folders found in {root}:')
+        info_printer(f'Data folders found in {own_folder}:')
         for number, found in enumerate(listed, start=1):
             count = len(paf_finder(found))
             info_printer(f"  {number}) {found.name} ({count} file"

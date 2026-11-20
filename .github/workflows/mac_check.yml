@@ -1,0 +1,286 @@
+# GitHub's own Macs run the tests and start Portimao at every push to dev, so problems
+# on a Mac show without a Mac. Each Mac then builds the Mac app (Python, Tk and every
+# package inside) and starts it too. It can also be started by hand from the Actions
+# page ("Run workflow"). The logs, a picture of each window when the Mac allows it, and
+# the app of each kind of Mac as a zip, are kept on the run's page.
+# At each --major or --hotfix release (the tag V<version> on main's commit), both zips
+# then go on the Releases page, where the app looks for updates, and each Mac checks
+# that the release before updates itself to the new one.
+name: Mac check
+
+on:
+  push:
+    branches: [dev]
+    tags: ['V*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: ${{ matrix.mac }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      # One Mac failing still shows how the other one does.
+      fail-fast: false
+      matrix:
+        include:
+          - mac: Apple Silicon Mac
+            runner: macos-15
+            app_zip: Portimao-mac-apple-silicon
+          - mac: Intel Mac
+            runner: macos-15-intel
+            app_zip: Portimao-mac-intel
+    env:
+      PYTHON: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12
+    steps:
+      - name: Get the program
+        uses: actions/checkout@v7
+
+      # 3.12.10 is the last Python 3.12 with a Mac installer on python.org.
+      - name: Install Python 3.12 from python.org, as users do
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/python.pkg" \
+            https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg
+          sudo installer -pkg "$RUNNER_TEMP/python.pkg" -target /
+          "$PYTHON" --version
+
+      # The launcher's own code builds .venv_unix from requirements.txt.
+      - name: Set up the environment as the launcher does
+        run: |
+          "$PYTHON" - <<'EOF'
+          import importlib.machinery
+          import importlib.util
+          loader = importlib.machinery.SourceFileLoader('bootstrap',
+                                                        'launchers/bootstrap.pyw')
+          spec = importlib.util.spec_from_loader('bootstrap', loader)
+          launcher = importlib.util.module_from_spec(spec)
+          loader.exec_module(launcher)
+          launcher.environment_builder(print)
+          EOF
+          .venv_unix/bin/python -m pip list
+
+      - name: Check its Tk is 8.6 or newer
+        run: |
+          .venv_unix/bin/python - <<'EOF'
+          import sys
+          import tkinter
+          patch = tkinter.Tcl().eval('info patchlevel')
+          print(f'Tk {tkinter.TkVersion} (Tcl {patch})')
+          sys.exit(0 if tkinter.TkVersion >= 8.6 else 1)
+          EOF
+
+      # main has no tests folder, so this step is skipped there.
+      - name: Run the tests
+        if: hashFiles('tests/conftest.py') != ''
+        run: |
+          .venv_unix/bin/python -m pip install --quiet --disable-pip-version-check pytest
+          .venv_unix/bin/python -m pytest tests -q
+
+      # The program closes by itself and ends with 0, or with 1 and the error in
+      # logs/self_test.log. The picture is taken once the log says the preview is on
+      # show (the same words as SHOWN_MARK in utils_viewer/viewer_self_test.py);
+      # screencapture is given 20 s, as macOS may refuse it.
+      - name: Start Portimao with the check switch
+        timeout-minutes: 10
+        env:
+          PORTIMAO_SELF_TEST: '1'
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: '1'
+        run: |
+          mkdir -p logs
+          .venv_unix/bin/python main.py &
+          program=$!
+          for second in $(seq 1 300); do
+            if grep -q 'The made-up preview is on show' logs/self_test.log 2>/dev/null; then
+              perl -e 'alarm 20; exec @ARGV' screencapture -x logs/self_test_window.png \
+                || echo 'No picture of the window: the Mac did not allow it.'
+              break
+            fi
+            kill -0 "$program" 2>/dev/null || break
+            sleep 1
+          done
+          wait "$program"
+
+      # The recipe is launchers/mac_app_builder.py: dist/Portimao.app for this kind of
+      # Mac, signed ad hoc.
+      - name: Build the Mac app
+        run: |
+          .venv_unix/bin/python -m pip install --quiet --disable-pip-version-check \
+            'pyinstaller>=6.10,<7'
+          .venv_unix/bin/python launchers/mac_app_builder.py
+
+      # For information: the newest macOS any part of the app asks for is the oldest
+      # macOS the app runs on.
+      - name: Say which macOS the app needs at least
+        run: |
+          oldest="$(find dist/Portimao.app -type f \( -perm -u+x -o -name '*.so' -o -name '*.dylib' \) -print0 \
+            | xargs -0 -n 1 vtool -show-build 2>/dev/null \
+            | awk '$1 == "minos" {print $2}' | sort -t. -k1,1n -k2,2n | tail -n 1 || true)"
+          echo "The app needs macOS ${oldest:-(not found)} or newer."
+
+      # The app is copied away from the program folder and started from there, so it can
+      # only use what is inside it. Its own folder is ~/Portimao, so its log is
+      # ~/Portimao/logs/self_test.log (the same words are waited for as above).
+      - name: Start the app with the check switch
+        timeout-minutes: 10
+        env:
+          PORTIMAO_SELF_TEST: '1'
+        run: |
+          app_logs="$HOME/Portimao/logs"
+          mkdir -p "$RUNNER_TEMP/app" logs/app
+          ditto dist/Portimao.app "$RUNNER_TEMP/app/Portimao.app"
+          rm -f "$app_logs/self_test.log"
+          cd "$RUNNER_TEMP/app"
+          ./Portimao.app/Contents/MacOS/Portimao &
+          program=$!
+          for second in $(seq 1 300); do
+            if grep -q 'The made-up preview is on show' "$app_logs/self_test.log" 2>/dev/null; then
+              perl -e 'alarm 20; exec @ARGV' screencapture -x "$GITHUB_WORKSPACE/logs/app/self_test_window.png" \
+                || echo 'No picture of the window: the Mac did not allow it.'
+              break
+            fi
+            kill -0 "$program" 2>/dev/null || break
+            sleep 1
+          done
+          code=0
+          wait "$program" || code=$?
+          cat "$app_logs/self_test.log" || echo 'The app wrote no self-test log.'
+          exit "$code"
+
+      # ditto keeps the app's links and signature, which a plain zip would break.
+      - name: Zip the app
+        run: ditto -c -k --sequesterRsrc --keepParent dist/Portimao.app "${{ matrix.app_zip }}.zip"
+
+      - name: Keep the app on the run's page
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.app_zip }}
+          path: ${{ matrix.app_zip }}.zip
+          if-no-files-found: error
+
+      - name: Copy the app's logs
+        if: always()
+        run: |
+          mkdir -p logs/app
+          cp -R "$HOME/Portimao/logs/." logs/app/ 2>/dev/null || echo 'The app made no logs.'
+
+      - name: Keep the logs on the run's page
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ matrix.runner }}
+          path: logs/
+          if-no-files-found: warn
+
+  release:
+    name: Put the apps on the Releases page
+    needs: mac
+    if: startsWith(github.ref, 'refs/tags/V')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Get the release's commit
+        uses: actions/checkout@v7
+
+      - name: Get both apps
+        uses: actions/download-artifact@v8
+        with:
+          pattern: Portimao-mac-*
+          path: apps
+          merge-multiple: true
+
+      # The app looks for these two zip names (utils_shared/app_updater.py). The note is
+      # the release's summary. Run again, the zips of the release are replaced.
+      - name: Make the release with both zips
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zips='apps/Portimao-mac-apple-silicon.zip apps/Portimao-mac-intel.zip'
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" $zips --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" $zips \
+              --title "Portimao $GITHUB_REF_NAME" \
+              --notes "$(git log -1 --format=%s)" \
+              --verify-tag
+          fi
+
+  update_check:
+    name: ${{ matrix.mac }} updates the release before
+    needs: release
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mac: Apple Silicon Mac
+            runner: macos-15
+            app_zip: Portimao-mac-apple-silicon
+          - mac: Intel Mac
+            runner: macos-15-intel
+            app_zip: Portimao-mac-intel
+    steps:
+      # The release before is the second newest on the Releases page. The first release
+      # with the apps has none, so there is nothing to check.
+      - name: Install the release before in a stand-in Applications folder
+        id: before
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          before="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 2 \
+            --json tagName --jq '.[1].tagName // empty')"
+          if [ -z "$before" ]; then
+            echo 'This is the first release with the apps: there is no earlier app to update.'
+            exit 0
+          fi
+          gh release download "$before" --repo "$GITHUB_REPOSITORY" \
+            --pattern '${{ matrix.app_zip }}.zip' --dir "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/Applications"
+          ditto -x -k "$RUNNER_TEMP/${{ matrix.app_zip }}.zip" "$RUNNER_TEMP/Applications"
+          echo "before=$before" >> "$GITHUB_OUTPUT"
+          echo "Installed $before."
+
+      # The old app finds this release, downloads it, closes, and the swap opens the new
+      # one with the check switch passed on. Done when the new app's self-test ends.
+      - name: Start it with the check switch and wait for the new version's self-test
+        if: steps.before.outputs.before != ''
+        timeout-minutes: 12
+        env:
+          PORTIMAO_SELF_TEST: '1'
+        run: |
+          app="$RUNNER_TEMP/Applications/Portimao.app"
+          log="$HOME/Portimao/logs/self_test.log"
+          rm -f "$log"
+          "$app/Contents/MacOS/Portimao" &
+          result='did not end'
+          for second in $(seq 1 600); do
+            if grep -q 'Self-test passed' "$log" 2>/dev/null; then
+              result='passed'
+              break
+            fi
+            if grep -q 'Self-test failed' "$log" 2>/dev/null; then
+              result='failed'
+              break
+            fi
+            sleep 1
+          done
+          version="$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist" 2>/dev/null || true)"
+          echo "The app is now V${version:-(unreadable)}; its self-test $result."
+          echo '== update.log =='
+          cat "$HOME/Portimao/logs/update.log" 2>/dev/null || echo 'No update log.'
+          echo '== self_test.log =='
+          cat "$log" 2>/dev/null || echo 'No self-test log.'
+          [ "$result" = 'passed' ] && [ "$version" = "${GITHUB_REF_NAME#V}" ]
+
+      - name: Keep the app's logs on the run's page
+        if: always() && steps.before.outputs.before != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: update-logs-${{ matrix.runner }}
+          path: ~/Portimao/logs/
+          if-no-files-found: warn
