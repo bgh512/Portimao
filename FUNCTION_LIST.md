@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.15
+- **Version:** V1.19
 - **Date:** 20/11/2026
 
 ## Contents
@@ -33,6 +33,7 @@
     - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
 - [`tests/test_haem_decomposition.py`](#teststest_haem_decompositionpy)
     - [`_background_builder`](#_background_builder)
+    - [`_background_shape_builder`](#_background_shape_builder)
     - [`_haem_spectrum_builder`](#_haem_spectrum_builder)
     - [`_mixed_spectra_builder`](#_mixed_spectra_builder)
     - [`_series_decomposer`](#_series_decomposer)
@@ -48,6 +49,10 @@
     - [`test_same_shapes_give_a_plain_error`](#test_same_shapes_give_a_plain_error)
     - [`test_a_failed_decomposition_leaves_nothing`](#test_a_failed_decomposition_leaves_nothing)
     - [`test_delta_a_zero_is_the_median_of_the_highest_points`](#test_delta_a_zero_is_the_median_of_the_highest_points)
+    - [`test_each_background_gives_back_the_amounts`](#test_each_background_gives_back_the_amounts)
+    - [`test_an_unknown_background_is_refused`](#test_an_unknown_background_is_refused)
+    - [`test_some_haems_only_give_back_their_amounts`](#test_some_haems_only_give_back_their_amounts)
+    - [`test_the_change_from_the_first_spectrum`](#test_the_change_from_the_first_spectrum)
     - [`test_two_mixed_shapes_give_two_components`](#test_two_mixed_shapes_give_two_components)
     - [`test_component_names_must_differ`](#test_component_names_must_differ)
     - [`test_the_two_shapes_are_found_again`](#test_the_two_shapes_are_found_again)
@@ -57,6 +62,7 @@
     - [`test_haem_amounts_move_with_the_instrument`](#test_haem_amounts_move_with_the_instrument)
     - [`test_haem_amounts_fall_when_reduced`](#test_haem_amounts_fall_when_reduced)
     - [`test_haem_shapes_are_those_of_the_instrument`](#test_haem_shapes_are_those_of_the_instrument)
+    - [`test_valencia_background_is_the_instruments`](#test_valencia_background_is_the_instruments)
     - [`test_instrument_traces_fall_when_reduced`](#test_instrument_traces_fall_when_reduced)
 - [`tests/test_label_tidier.py`](#teststest_label_tidierpy)
     - [`test_exponent_after_a_caret_is_raised`](#test_exponent_after_a_caret_is_raised)
@@ -467,16 +473,19 @@
     - [`_fit_table_cleaner`](#_fit_table_cleaner)
     - [`_haem_shape_getter`](#_haem_shape_getter)
     - [`_number_column_reader`](#_number_column_reader)
+    - [`_unit_scaler`](#_unit_scaler)
     - [`_wavelength_masker`](#_wavelength_masker)
     - [`background_builder`](#background_builder)
     - [`basis_solver`](#basis_solver)
     - [`data_filterer`](#data_filterer)
     - [`delta_abs_calculator`](#delta_abs_calculator)
     - [`experiment_decomposer`](#experiment_decomposer)
+    - [`fit_haem_selector`](#fit_haem_selector)
     - [`fit_importer`](#fit_importer)
     - [`fit_range_finder`](#fit_range_finder)
     - [`fit_scale_standardiser`](#fit_scale_standardiser)
     - [`s_array_generator`](#s_array_generator)
+    - [`scatter_background_builder`](#scatter_background_builder)
     - [`spectrum_decomposer`](#spectrum_decomposer)
 - [`utils_shared/survey.py`](#utils_sharedsurveypy)
     - [`_columns_text_builder`](#_columns_text_builder)
@@ -493,7 +502,6 @@
     - [`_natural_sorter`](#_natural_sorter)
     - [`_subscript_stripper`](#_subscript_stripper)
     - [`_tidy_labels_offerer`](#_tidy_labels_offerer)
-    - [`analysis_asker`](#analysis_asker)
     - [`averaging_asker`](#averaging_asker)
     - [`data_folder_lister`](#data_folder_lister)
     - [`data_folder_resolver`](#data_folder_resolver)
@@ -510,6 +518,7 @@
     - [`label_angle_asker`](#label_angle_asker)
     - [`label_tidier`](#label_tidier)
     - [`multi_experiment_asker`](#multi_experiment_asker)
+    - [`ocr_kind_lister`](#ocr_kind_lister)
     - [`ocr_option_builder`](#ocr_option_builder)
     - [`od_asker`](#od_asker)
     - [`od_scaling_asker`](#od_scaling_asker)
@@ -554,8 +563,11 @@
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
     - [`_all_data_asker`](#_all_data_asker)
     - [`_answers_previewer`](#_answers_previewer)
+    - [`_averaging_reviewer`](#_averaging_reviewer)
+    - [`_choice_reviewer`](#_choice_reviewer)
     - [`_component_namer`](#_component_namer)
     - [`_empty_limits_builder`](#_empty_limits_builder)
+    - [`_figure_starter`](#_figure_starter)
     - [`_file_chooser`](#_file_chooser)
     - [`_fit_file_saver`](#_fit_file_saver)
     - [`_limits_lister`](#_limits_lister)
@@ -564,11 +576,11 @@
     - [`_review_asker`](#_review_asker)
     - [`_skipped_lister`](#_skipped_lister)
     - [`_standard_fit_loader`](#_standard_fit_loader)
-    - [`analysis_stage_runner`](#analysis_stage_runner)
     - [`browser_stage_runner`](#browser_stage_runner)
     - [`details_stage_runner`](#details_stage_runner)
     - [`pca_stage_runner`](#pca_stage_runner)
     - [`plots_stage_runner`](#plots_stage_runner)
+    - [`processing_stage_runner`](#processing_stage_runner)
     - [`trim_stage_runner`](#trim_stage_runner)
     - [`viewer_asker`](#viewer_asker)
 - [`utils_viewer/viewer_strip.py`](#utils_viewerviewer_strippy)
@@ -1391,7 +1403,7 @@ None.
 
 ## `tests/test_haem_decomposition.py`
 
-Tests that the haem decomposition gives back the amounts a spectrum was built from, and
+Tests that the haem decomposition gives back the amounts a spectrum was built from,
 
 ### HELPERS
 
@@ -1418,6 +1430,38 @@ None.
 
 ---- Equations ----
 (1/wl - min(1/wl)) / (max(1/wl) - min(1/wl)).
+
+---- Helpers ----
+None.
+```
+
+#### `_background_shape_builder`
+
+```text
+---- Summary ----
+Helper function to write out, by hand and in other units than the program's, the
+shapes a background of the program must be able to fit beside a flat level.
+
+---- Inputs ----
+background : str
+    Name of the background, as the program names it.
+wavelengths : np.ndarray
+    Wavelengths (nm), shape (n_wavelengths).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    The shapes, each of shape (n_wavelengths).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+x = wl / 100 nm. scatter_1: 1/x; scatter_2: 1/x and 1/x^2; linear: x - 5.5;
+quadratic: x - 5.5 and (x - 6)^2, a curve with its bottom off the middle;
+valencia: 1/x^2.
 
 ---- Helpers ----
 None.
@@ -1492,6 +1536,8 @@ Helper function to decompose, with a given fit, a run of four spectra holding 1,
 ---- Inputs ----
 fit : dict
     Fit dictionary from fit_importer, holding the five haems of the test fit file.
+is_change_from_first : bool
+    True fits the change of each spectrum from the first.
 
 ---- Globals read ----
 HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
@@ -1867,6 +1913,128 @@ the zero. A window of nine points does not fit in eight.
 None.
 ```
 
+#### `test_each_background_gives_back_the_amounts`
+
+```text
+---- Summary ----
+Main function to check that a spectrum built from known amounts of each haem on a
+background of one kind decomposes, with that background, into those amounts and
+that background, with nothing left over.
+
+---- Inputs ----
+background : str
+    Name of the background, as the program names it.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE, EXACT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+spectrum = sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x each shape of
+the background (_background_shape_builder). The amounts found must be AMOUNTS, and
+the background found the part of the spectrum that is not haem.
+
+---- Helpers ----
+_background_shape_builder
+_haem_spectrum_builder
+```
+
+#### `test_an_unknown_background_is_refused`
+
+```text
+---- Summary ----
+Main function to check that a background the program does not know is refused with
+a message that names it and the ones it knows, and that the standard background in
+config.py is one it knows.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BACKGROUNDS (module constant); settings.HAEM_BACKGROUND.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_some_haems_only_give_back_their_amounts`
+
+```text
+---- Summary ----
+Main function to check that a fit can keep only some of its haems: they are kept in
+the order of the file, a spectrum built from them alone decomposes into their
+amounts, leaving out a short haem widens the wavelengths used, the fit given is not
+changed, and naming no haem or one the fit does not hold is refused.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE, EXACT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+The test fit runs from 400 to 700 nm in 1 nm steps; Cyt cc is ended at 650 nm (row
+251), so the five haems share 400 to 650 nm and the four others 400 to 700 nm.
+spectrum = AMOUNTS of Cyt cc and Cyt bL only x their shapes x HAEM_FACTOR + OFFSET
++ SLOPE x background.
+
+---- Helpers ----
+_background_builder
+_haem_spectrum_builder
+```
+
+#### `test_the_change_from_the_first_spectrum`
+
+```text
+---- Summary ----
+Main function to check that fitting the change of each spectrum from the first, as
+the instrument does, gives each amount and absorbance minus that of the first
+spectrum, and the same change from the highest point (delta A) as fitting the
+spectra themselves; and that a first spectrum with a blank value is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, EXACT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The run holds 1, 4, 3 and 2 times AMOUNTS (_series_decomposer), so its changes from
+the first spectrum are 0, 3, 2 and 1 times AMOUNTS; absorbance = amount x highest
+point of |shape_i| x HAEM_FACTOR x 1000.
+
+---- Helpers ----
+_haem_spectrum_builder
+_series_decomposer
+```
+
 #### `test_two_mixed_shapes_give_two_components`
 
 ```text
@@ -2118,6 +2286,34 @@ None.
 ---- Equations ----
 Correlation of the two shapes at the instrument's wavelengths inside the range it
 fits over, where our file has the haem too: +1 or -1 for the same shape.
+
+---- Helpers ----
+_instrument_fit_reader
+```
+
+#### `test_valencia_background_is_the_instruments`
+
+```text
+---- Summary ----
+Main function to check that our Valencia background can make the background shape
+of the instrument's own fit file, over the wavelengths the instrument fits.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+INSTRUMENT_FIT_FILE, INSTRUMENT_BACKGROUND, SAME_BACKGROUND (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The instrument's shape is matched by the best mix of our flat level and our shape
+(least squares); the largest difference left, divided by the instrument's range
+(highest - lowest), must be below SAME_BACKGROUND.
 
 ---- Helpers ----
 _instrument_fit_reader
@@ -5062,7 +5258,7 @@ fit : dict
     Fit dictionary from import_fit.
 
 ---- Globals read ----
-config.DEGREE_OF_SCATTER, config.HAEM_FACTOR.
+config.HAEM_BACKGROUND, config.HAEM_FACTOR.
 
 ---- Outputs ----
 dict
@@ -8696,8 +8892,8 @@ experiment : dict
     Experiment dictionary, as defined in DATA_FORMAT.md.
 fit : dict
     Fit dictionary from import_fit: {haem_list, data}.
-degree_of_scatter : int
-    Number of scatter terms in the decomposition.
+background : str
+    Background fitted under the haems (BACKGROUND_LABELS in spectral_decomposer).
 haemfactor : float
     Scale factor applied to the fit spectra.
 percent_basis : str
@@ -10375,8 +10571,8 @@ experiment : Optional[dict]
     so the file is not read again). It is processed in place. None reads the file.
 
 ---- Globals read ----
-settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
-settings.BASELINE_MINIMUM_SECONDS.
+settings.HAEM_BACKGROUND, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
+settings.BASELINE_MINIMUM_SECONDS; BACKGROUND_LABELS.
 
 ---- Outputs ----
 dict
@@ -13251,9 +13447,9 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to build the offset and scatter terms that the haem decomposition
-fits alongside the haems, as an orthonormal basis, so they can be taken out of the
-spectra before the components are searched for.
+Helper function to build the offset and scatter terms (one of the scatter
+backgrounds of the haem decomposition) as an orthonormal basis, so they can be
+taken out of the spectra before the components are searched for.
 
 ---- Inputs ----
 wavelengths : np.ndarray
@@ -13273,11 +13469,11 @@ np.ndarray
 None.
 
 ---- Equations ----
-The columns of background_builder (the same terms as the haem decomposition),
-orthonormalised by QR.
+The columns of scatter_background_builder (the haem decomposition's scatter
+backgrounds), orthonormalised by QR.
 
 ---- Helpers ----
-background_builder
+scatter_background_builder
 ```
 
 #### `_peak_finder`
@@ -15147,6 +15343,35 @@ None.
 None.
 ```
 
+#### `_unit_scaler`
+
+```text
+---- Summary ----
+Helper function to scale one background shape to run from 0 to 1.
+
+---- Inputs ----
+values : np.ndarray
+    The shape at each wavelength, shape (n_wavelengths).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The scaled shape, same shape; all 0 when the values do not change (one
+    wavelength), and empty when there are none, so that the solver can say there
+    are too few wavelengths.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+scaled = (values - min) / (max - min).
+
+---- Helpers ----
+None.
+```
+
 #### `_wavelength_masker`
 
 ```text
@@ -15183,32 +15408,36 @@ fit_range_finder
 
 ```text
 ---- Summary ----
-Main function to build the background terms that every decomposition fits beside
-its shapes: a constant and the scatter terms.
+Main function to build the background terms that a haem decomposition fits beside
+its shapes: a flat level and the shapes of the chosen background.
 
 ---- Inputs ----
 wavelengths : np.ndarray
     Wavelengths of the spectra (nm), shape (n_wavelengths).
-degree_of_scatter : int
-    Number of 1/wavelength^k scatter terms (>= 0).
+background : str
+    Name of the background, a key of BACKGROUND_LABELS.
 
 ---- Globals read ----
-None.
+BACKGROUND_LABELS (module constant).
 
 ---- Outputs ----
 np.ndarray
-    The terms as columns, shape (n_wavelengths, degree_of_scatter + 1): the
-    constant 1 first, then scatter term k = 1, 2, ... Each scatter term runs from 1
-    at the shortest wavelength to 0 at the longest.
+    The terms as columns, shape (n_wavelengths, n_terms): the flat 1 first, then
+    the shapes, each running from 0 to 1 over the wavelengths. Raises ValueError,
+    with a message for the user, for a background the program does not know.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-scatter term k = (1/wl^k - min) / (max - min) of 1/wl^k.
+scatter_1: 1, 1/wl; scatter_2: 1, 1/wl, 1/wl^2 (scatter_background_builder);
+linear: 1, wl; quadratic: 1, wl, (wl - centre)^2 with the centre in the middle of
+the wavelengths; valencia: 1, 1/wl^2. Scaling a shape to run from 0 to 1 changes
+only the size of its amount, not the fit.
 
 ---- Helpers ----
-None.
+_unit_scaler
+scatter_background_builder
 ```
 
 #### `basis_solver`
@@ -15341,11 +15570,11 @@ and absorbances.
 experiment : dict
     Experiment dictionary, as defined in DATA_FORMAT.md.
 fit : dict
-    Fit dictionary from fit_importer.
+    Fit dictionary from fit_importer (or fit_haem_selector).
 dataset_name : str
     Spectral dataset to decompose.
-degree_of_scatter : int
-    Number of scatter terms.
+background : str
+    Background fitted under the haems, a key of BACKGROUND_LABELS.
 haemfactor : float
     Scale factor applied to the haem basis spectra.
 delta_exclude_first_minutes : float
@@ -15358,32 +15587,74 @@ spectrum_type : str
 delta_exclude_last_minutes : float
     Minutes before the last spectrum that are ignored when finding the delta
     absorbance reference.
+is_change_from_first : bool
+    True fits the change of every spectrum from the first one (the first kept, in
+    a trimmed run), as the instrument does; False fits the spectra themselves.
 
 ---- Globals read ----
 schema.TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
 
 ---- Outputs ----
 dict
-    The same experiment dictionary. Raises ValueError for an invalid fit or dataset
-    or inconsistent array shapes.
+    The same experiment dictionary. Raises ValueError for an invalid fit, dataset
+    or background, inconsistent array shapes, or, for the change from the first
+    spectrum, a first spectrum with blank values inside the fitted wavelengths.
 
 ---- Globals mutated ----
 experiment: adds haem_conc (time, spectrum index, one column per haem), haem_abs
 (mOD, same layout; attrs["peak_amplitude_OD"]) and haem_delta_abs
-(delta_abs_calculator). The three are added together at the end; when anything
-fails, the experiment holds none of them, not even those of an earlier
+(delta_abs_calculator). With is_change_from_first, haem_conc and haem_abs are the
+changes from the first spectrum. The three are added together at the end; when
+anything fails, the experiment holds none of them, not even those of an earlier
 decomposition.
 
 ---- Equations ----
-c = the least-squares amounts of the basis S in every spectrum (basis_solver);
-haem_abs = c x peak amplitude of the haem basis spectrum x 1000 (OD to mOD);
-haem_delta_abs = haem_abs - median of the highest points in a row.
+a = each spectrum, or each spectrum - the first spectrum; c = the least-squares
+amounts of the basis S in a (basis_solver); haem_abs = c x peak amplitude of the
+haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs - median of the
+highest points in a row. The fit is linear, so with the same basis the change
+from the first spectrum gives each amount minus that of the first spectrum, and
+the same haem_delta_abs.
 
 ---- Helpers ----
 _wavelength_masker
 basis_solver
 delta_abs_calculator
 s_array_generator
+```
+
+#### `fit_haem_selector`
+
+```text
+---- Summary ----
+Main function to keep only some of the haems of a fit, so that a decomposition fits
+those alone.
+
+---- Inputs ----
+fit : Dict[str, Any]
+    Fit dictionary from fit_importer.
+haems : List[str]
+    Names of the haems to keep, as the fit names them; their order does not matter.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Any]
+    A new fit dictionary with the same keys: 'haem_list' and 'data' hold only the
+    kept haems, in the order of the file, without the rows that are blank in all of
+    them. The fit given is not changed. Raises ValueError, with a message for the
+    user, when no haem is named or a name is not in the fit.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None. The wavelengths a decomposition uses are those shared by the kept haems
+(fit_range_finder), so leaving out a short haem can widen them.
+
+---- Helpers ----
+None.
 ```
 
 #### `fit_importer`
@@ -15488,15 +15759,16 @@ None.
 
 ```text
 ---- Summary ----
-Main function to generate the haem and scatter basis components for one spectrum.
+Main function to generate the haem and background basis components for one
+spectrum.
 
 ---- Inputs ----
 experimental_data : np.ndarray
     Array of (wavelength, value) rows.
 fit_data : pd.DataFrame
     Fit table from fit_importer.
-degree_of_scatter : int
-    Number of 1/wavelength^k scatter terms.
+background : str
+    Background fitted under the haems, a key of BACKGROUND_LABELS.
 haemfactor : float
     Scale factor applied to the haem basis spectra.
 
@@ -15505,16 +15777,15 @@ None.
 
 ---- Outputs ----
 np.ndarray
-    Basis matrix, shape (n_filtered_wavelengths, n_haems + degree_of_scatter + 1):
-    haem fits (interpolated, times haemfactor), a constant column, then the
-    normalised scatter terms.
+    Basis matrix, shape (n_filtered_wavelengths, n_haems + n_background_terms):
+    haem fits (interpolated, times haemfactor), then the terms of the background.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-haem column = interp(fit) x haemfactor; the constant and the scatter terms are
-those of background_builder.
+haem column = interp(fit) x haemfactor; the background terms are those of
+background_builder.
 
 ---- Helpers ----
 _haem_shape_getter
@@ -15522,20 +15793,53 @@ background_builder
 data_filterer
 ```
 
+#### `scatter_background_builder`
+
+```text
+---- Summary ----
+Main function to build a flat level and the scatter terms 1/wavelength^k: the
+scatter backgrounds of the haem decomposition, and what the component finder takes
+out of the spectra.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths of the spectra (nm), shape (n_wavelengths).
+degree_of_scatter : int
+    Number of 1/wavelength^k scatter terms (>= 0).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The terms as columns, shape (n_wavelengths, degree_of_scatter + 1): the
+    constant 1 first, then scatter term k = 1, 2, ... Each scatter term runs from 1
+    at the shortest wavelength to 0 at the longest.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+scatter term k = (1/wl^k - min) / (max - min) of 1/wl^k.
+
+---- Helpers ----
+_unit_scaler
+```
+
 #### `spectrum_decomposer`
 
 ```text
 ---- Summary ----
 Main function to decompose one experimental spectrum into haem contributions and
-scatter.
+background.
 
 ---- Inputs ----
 experimental_data : np.ndarray
     Array of (wavelength, value) rows.
 fit_data : pd.DataFrame
     Fit table from fit_importer.
-degree_of_scatter : int
-    Number of scatter terms.
+background : str
+    Background fitted under the haems, a key of BACKGROUND_LABELS.
 haemfactor : float
     Scale factor applied to the haem basis spectra.
 
@@ -15545,16 +15849,19 @@ None.
 ---- Outputs ----
 Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
 List[np.ndarray], np.ndarray]
-    (c_array, filtered_data, scatter, background_subtracted, haems, haem_individual,
-    residual); the spectra are (wavelength, value) columns. Useful for inspecting
-    one fit; experiment_decomposer uses an equivalent, faster route.
+    (c_array, filtered_data, background, background_subtracted, haems,
+    haem_individual, residual); the spectra are (wavelength, value) columns.
+    c_array holds the haem amounts, then the amounts of the background terms.
+    Useful for inspecting one fit; experiment_decomposer uses an equivalent,
+    faster route.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
 c = the least-squares amounts of the basis S in the spectrum a (basis_solver);
-residual = a - (haems + scatter).
+background = the background columns of S x their amounts; residual = a - (haems +
+background).
 
 ---- Helpers ----
 basis_solver
@@ -16016,47 +16323,6 @@ yes_no_asker
 ```
 
 ### MAIN FUNCTIONS
-
-#### `analysis_asker`
-
-```text
----- Summary ----
-Main function to ask the OD values and the event labels of the import, then the
-haem decomposition and the event averaging.
-
----- Inputs ----
-summaries : List[dict]
-    File summaries (DATA_FORMAT.md).
-answers : dict
-    Answers dictionary the values are stored in.
-defaults : dict
-    Default answers.
-fits_folder : Path
-    Folder holding the fit .csv files.
-export_root : Path
-    Results folder, where the saved OD and event values are looked for.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (fit, details). details is {file name: {'OD', 'volume', 'dilution_factor',
-    'events'}}; the OD entries are only present when scaling by OD.
-
----- Globals mutated ----
-None. Stores the answers in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-averaging_asker
-decomposition_asker
-event_asker
-od_scaling_asker
-saved_values_reader
-```
 
 #### `averaging_asker`
 
@@ -16561,8 +16827,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to ask section 5: the side-by-side figure of two experiments and
-the 2x2 figure of four experiments.
+Main function to ask the multi-experiment plots: the side-by-side figure of two
+experiments and the 2x2 figure of four experiments.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -16572,7 +16838,8 @@ answers : dict
 defaults : dict
     Default answers.
 plotted : bool
-    True when section 4 plots at least one panel (both figures reuse its choices).
+    True when the individual experiment plots show at least one panel (both
+    figures reuse their choices).
 figure_checker : Optional[Callable[[str, dict], bool]]
     Function called after the questions of each figure with a name and a dictionary:
     ('comparison', {'comparison': ...}) or ('exemplar', {'exemplar_names': ...}). It
@@ -16601,6 +16868,35 @@ info_printer
 run_name_lister
 size_asker
 yes_no_asker
+```
+
+#### `ocr_kind_lister`
+
+```text
+---- Summary ----
+Main function to list the kinds of OCR that can be offered: the OCR itself, the OCR
+per OD when OD values were entered, and the OCR as a percentage of its range.
+
+---- Inputs ----
+has_od : bool
+    True when OD values were entered (scaling by OD is on).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    The keys 'raw', 'od' (only with OD values) and 'percent', in the order they are
+    offered.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `ocr_option_builder`
@@ -16790,6 +17086,7 @@ None.
 
 ---- Helpers ----
 choice_asker
+ocr_kind_lister
 ocr_option_builder
 yes_no_asker
 ```
@@ -19671,7 +19968,7 @@ yes_no_asker
 ```text
 ---- Summary ----
 Helper function to build the answers used to draw a preview: the raw data while
-browsing and trimming, and the analysis chosen so far afterwards.
+browsing and trimming, and the processing chosen so far afterwards.
 
 ---- Inputs ----
 answers : dict
@@ -19681,9 +19978,8 @@ fit : Optional[dict]
 kind : str
     'raw' (O2 and the raw OCR only), 'standard' (the standard plot: O2, the raw OCR
     and, when a fit is given, every haem of it as the change from the start),
-    'analysis' (also the haems, still without OD scaling), 'plots' (the choices
-    made so far for the individual figures, in a wide preview) or 'final' (exactly
-    as the figure will be).
+    'analysis' (also the haems and the averaging windows, still without OD
+    scaling) or 'final' (exactly as the figure will be).
 
 ---- Globals read ----
 BROWSING_ANSWERS (module constant).
@@ -19700,6 +19996,87 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+#### `_averaging_reviewer`
+
+```text
+---- Summary ----
+Helper function to ask whether to average around the events and over which window,
+draw the windows, list in red those that do not fit, and ask whether to accept them
+or answer again.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file; the windows are drawn around the events
+    not ignored there.
+redraw : Callable[[], bool]
+    Function that draws the preview of the current file with the answers so far.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers``, reads from and prints to the terminal and
+redraws the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_review_asker
+_skipped_lister
+averaging_asker
+```
+
+#### `_choice_reviewer`
+
+```text
+---- Summary ----
+Helper function to ask whether the user accepts what the plot window shows, with as
+many answers as the step needs. In the browser window the user flicks through the
+files while the question waits; with the picture fallback a last answer lets the
+user look at another file, which redraws it, before the question is asked again.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its current file may be changed.
+question : str
+    The accept question, for example 'Do you accept this figure?'.
+options : List[Tuple[str, str]]
+    (key, label) of each answer; the first is the one Enter gives. The key 'file'
+    is kept for looking at another file.
+redraw : Callable[[], bool]
+    Function that draws the preview of the current file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Key of the answer chosen (never 'file').
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and redraws the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_chooser
+choice_asker
 ```
 
 #### `_component_namer`
@@ -19765,6 +20142,44 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+#### `_figure_starter`
+
+```text
+---- Summary ----
+Helper function to set the figure of each file from the standard settings or the
+ones last saved for the dataset, keeping only what this run allows: the OCR per OD
+and the haems scaled by OD only when OD values were entered, and the haems only
+when they are decomposed, limited to those of the fit in use (all of them when none
+of the saved ones is in it).
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the figure settings are stored in; must hold normalise_od
+    and decompose.
+defaults : dict
+    The standard or saved answers (plot_o2, plot_ocr, ocr_mode, plot_haems, haems,
+    haem_mode, haem_per_od, event_label_angle, journal, columns, height,
+    size_mode).
+fit : Optional[dict]
+    Fit dictionary (haem_list), or None when the haems are not decomposed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores the figure settings in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+ocr_kind_lister
 ```
 
 #### `_file_chooser`
@@ -19939,9 +20354,8 @@ pca_picture_builder
 
 ```text
 ---- Summary ----
-Helper function to ask whether the user accepts what the plot window shows. In the
-browser window the user flicks through the files while the question waits; with the
-picture fallback the user can ask to look at another file, which redraws it.
+Helper function to ask whether the user accepts what the plot window shows, with
+the two answers yes and no (see _choice_reviewer).
 
 ---- Inputs ----
 session : ViewerSession
@@ -19967,8 +20381,7 @@ None. Reads from and prints to the terminal and redraws the window (side effects
 None.
 
 ---- Helpers ----
-_file_chooser
-choice_asker
+_choice_reviewer
 ```
 
 #### `_skipped_lister`
@@ -20047,51 +20460,6 @@ info_printer
 ```
 
 ### MAIN FUNCTIONS
-
-#### `analysis_stage_runner`
-
-```text
----- Summary ----
-Main function to ask the analysis questions (haem decomposition and event
-averaging) one at a time. The plot is redrawn after each.
-
----- Inputs ----
-session : ViewerSession
-    The browser session.
-answers : dict
-    Answers dictionary the values are stored in.
-defaults : dict
-    Default answers offered by the questions.
-limits : Dict[str, dict]
-    Trim and ignore limits of every file (trim_asker).
-fits_folder : Path
-    Folder holding the fit .csv files.
-details : Dict[str, dict]
-    OD values and events of every file (details_stage_runner); the averaging
-    windows are drawn around the events not ignored there.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Optional[dict]
-    The fit, or None when the haems are not decomposed.
-
----- Globals mutated ----
-None. Stores the answers in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_answers_previewer
-_review_asker
-_skipped_lister
-averaging_asker
-decomposition_asker
-pca_stage_runner
-preview_drawer
-```
 
 #### `browser_stage_runner`
 
@@ -20248,10 +20616,12 @@ yes_no_asker
 
 ```text
 ---- Summary ----
-Main function to ask how the figure saved for each file looks, one choice at a
-time: the oxygen and OCR, the haems and their order, how the haems are shown (and
-whether they are scaled by OD), the event labels and finally the journal and size.
-The plot is redrawn after each choice and the user accepts it or chooses again.
+Main function to show the figure saved for each file, drawn as it will be saved
+from the standard settings or the ones last saved for the dataset, and ask whether
+it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
+how the haems are shown, the angle of the event labels, the journal and size): only
+that part's questions are asked, with the current choices as the defaults, and the
+figure is drawn and asked about again.
 
 ---- Inputs ----
 session : ViewerSession
@@ -20282,7 +20652,8 @@ None.
 
 ---- Helpers ----
 _answers_previewer
-_review_asker
+_choice_reviewer
+_figure_starter
 haem_choice_asker
 haem_form_asker
 haem_scaling_asker
@@ -20291,6 +20662,61 @@ label_angle_asker
 preview_drawer
 signal_asker
 size_asker
+```
+
+#### `processing_stage_runner`
+
+```text
+---- Summary ----
+Main function to talk the user through the processing, with the plot redrawn after
+each answer: first the haem fit (the fit already shown is accepted, another is
+tried, or the haems are left out), then, now that the haems are seen, an offer to
+change the trim and ignore times, and last the averaging around the events.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary the values are stored in; fit_file and
+    decomposition_dataset name the fit shown.
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file (trim_asker).
+fits_folder : Path
+    Folder holding the fit .csv files.
+details : Dict[str, dict]
+    OD values and events of every file (details_stage_runner); the averaging
+    windows are drawn around the events not ignored there.
+shown : Optional[dict]
+    Fit the plot shows the haems with so far, or None when it shows none.
+trim_runner : Callable[[Optional[dict]], Dict[str, dict]]
+    Function that asks the trim and ignore questions again with the haems of the
+    given fit on the plot, and returns the new limits.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[dict]
+    The fit, or None when the haems are not decomposed.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers``, reads from and prints to the terminal and
+redraws the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_averaging_reviewer
+_choice_reviewer
+decomposition_asker
+info_printer
+pca_stage_runner
+preview_drawer
+yes_no_asker
 ```
 
 #### `trim_stage_runner`
@@ -20344,10 +20770,11 @@ trim_asker
 ---- Summary ----
 Main function to ask the questions of the experiment browser: the file browser,
 trimming and ignoring, the OD values and the event labels (which end the import),
-the analysis and the individual figures. The standard plot
-of every file (oxygen, OCR and the haems of the dataset's fit) is shown first, with
-no question asked. The plot window is redrawn after each answer, and at the end any
-step can be gone back to.
+the processing (the haem fit, the trim and ignore times again if wanted, the
+averaging) and the individual figures. The standard plot of every file (oxygen, OCR
+and the haems of the dataset's fit) is shown first, with no question asked. The
+plot window is redrawn after each answer, and at the end any step can be gone back
+to.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -20381,7 +20808,6 @@ None.
 ---- Helpers ----
 _standard_fit_loader
 active_gui_getter
-analysis_stage_runner
 browser_stage_runner
 choice_asker
 details_stage_runner
@@ -20391,6 +20817,7 @@ info_printer
 numbering_getter
 numbering_setter
 plots_stage_runner
+processing_stage_runner
 section_starter
 trim_stage_runner
 ```

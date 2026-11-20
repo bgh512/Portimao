@@ -35,7 +35,8 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ocr_mode': 'od',
                    # event label rotation in degrees: 0 = horizontal, 90 = vertical
                    'event_label_angle': 45,
-                   'plot_haems': False,
+                   # the haems of the fit, when decomposed, in the figure of each file
+                   'plot_haems': True,
                    'haems': [],
                    # "abs", "delta", "conc" or "percent"
                    'haem_mode': 'delta',
@@ -93,6 +94,12 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ho_pub_height': 0.75,
                    'ho_size_mode': 'default',
                    }
+# the background fitted under the haems (names and words in
+# utils_shared.spectral_decomposer.BACKGROUND_LABELS); one that can bend is needed for bL
+# to fall when reduced, as the instrument's own trace does
+HAEM_BACKGROUND = 'scatter_2'
+# scatter terms the component finder takes out of the spectra; it does not follow
+# HAEM_BACKGROUND yet
 DEGREE_OF_SCATTER = 1
 HAEM_FACTOR = 1_000_000
 # points in a row whose median is a reference level: the 0 of delta A, the 0 % and the

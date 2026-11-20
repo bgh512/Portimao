@@ -1,4 +1,4 @@
-# Portimao question flow (V1.19)
+# Portimao question flow (V1.20)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -7,7 +7,7 @@ Every question in the order it is asked, with where each answer leads. The quest
 - `(Y/n)` and `(y/N)` questions: the capital letter is what Enter gives. The letters shown are the standard settings, offered for a dataset you have never run. Once you have started a run, your answers are saved in a small file inside the data folder (`portimao_settings.json`), and that dataset offers them instead, on this computer or on another one the folder is copied to. Press Enter on any question to use the value in `[brackets]`.
 - **Yes → / No →** says which question comes next. **Next** means the next question in this list.
 - The numbers here are for reference. On screen the numbers are given in the order the questions are asked, so when a branch is skipped the later numbers move up, and every "Do you accept...?" question takes a number of its own.
-- Every "Do you accept...?" question has the same two answers. **1 (Yes, accept)** moves on. **2 (No, ...)** asks the questions of that step again, with your last answers as the defaults.
+- Every "Do you accept...?" question starts with **1 (Yes, accept)**, which moves on. Its other answers (**2 (No, ...)**, and **3**, **4** ... where there are more) each say what is asked again, with your last answers as the defaults.
 - The plot on the right is redrawn after each step marked **(plot)**. You can flick through the files with the arrows or the drop-down at any time while a question waits.
 - Sections **1** to **3** are the import: your files, the parts of them that are used, and what is known about each run (the OD values and the labels). The processing starts with section **4**.
 
@@ -109,24 +109,28 @@ If no file has any event, 3.3 to 3.5 are not asked and the next step is **3.6**.
 
 ---
 
-## 4. Analysis
+## 4. Processing
 
-### 4.A Haem decomposition
+The plot is the standard plot, cut to the limits of section 2, with the event labels of section 3. It is redrawn after each step marked **(plot)**.
+
+### 4.A Haem fit
+
+The haems on the plot are those of the import, worked out with the standard fit or the fit last saved for the dataset, and a message names that fit ("The haems are worked out with *fit*."). The section then starts at **4.2**. 4.1 is asked only when the plot shows no haems yet: the dataset was last saved without them, or the fit could not be used (a message in section 1 said why).
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.1 | Do you want to decompose the haems? `(Y/n)` | **4.1.1** | **4.3** (no haems anywhere in the run) |
+| 4.1 | *(only when no haems are shown)* Do you want to decompose the haems? `(Y/n)` | **4.1.1** | **4.4** (no haems anywhere in the run) |
 
 If the `fits/` folder holds no `.csv` file, 4.1 is still asked, and 4.1.1 then offers only *Find the components from the data*.
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last; the standard fit, or the fit last saved for the dataset, is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed) |
+| 4.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last; the fit shown, or else the standard fit or the fit last saved for the dataset, is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.4**. |
 | 4.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **4.2** (or **4.1.1.1** when the components are being found) |
 
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 4.2 | Do you accept this decomposition? | **4.3** | **4.1** (choose the fit again) |
+| # | Question | 1 → | 2 → | 3 → |
+|---|---|---|---|---|
+| 4.2 | Do you accept this decomposition? | **4.3** | **4.1.1** (*No, try another fit*: the plot is redrawn with each fit you try, then 4.2 again) | **4.4** (*No, do not decompose the haems*: no haems anywhere in the run) |
 
 #### 4.A.1 Components from the data (principal component analysis)
 
@@ -150,101 +154,97 @@ Asked when the last choice of 4.1.1 is taken. The numbers keep counting up when 
 | 4.1.1.8 | Do you want to save these components as a fit file in the fits folder? `(Y/n)` | yes: **4.1.1.9**; no: the decomposition is drawn **(plot)**, then **4.2** |
 | 4.1.1.9 | What should the fit file be called (without .csv)? | if a fit file of that name exists, it asks "*name*.csv already exists. Do you want to replace it?" `(y/N)` (no asks for a name again); then the decomposition is drawn **(plot)**, then **4.2** |
 
-### 4.B Averaging around the events
+### 4.B Trim and ignore times again
+
+| # | Question | Yes → | No → |
+|---|---|---|---|
+| 4.3 | *(only when the haems are decomposed)* Do you want to change the trim and ignore times now that the haems are shown? `(y/N)` | the questions of section 2 (**2.1** to **2.6**, the offer to export all the data included) are asked again, numbered on from here, with your limits as the defaults and the haems of the chosen fit on the plot; then the plot is redrawn **(plot)** and **4.4** | **4.4** |
+
+### 4.C Averaging around the events
 
 The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.3 | Do you want to average around the events? `(y/N)` | **4.3.1** | **5.1** (no averaging in the run) |
+| 4.4 | Do you want to average around the events? `(y/N)` | **4.4.1** | **5.1** (no averaging in the run) |
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.3.1 | How long a window (minutes) should the average be taken over? | **4.3.2** |
-| 4.3.2 | How long before the next addition should the averaging window end (minutes)? | the windows are drawn **(plot)**, then **4.4** |
+| 4.4.1 | How long a window (minutes) should the average be taken over? | **4.4.2** |
+| 4.4.2 | How long before the next addition should the averaging window end (minutes)? | the windows are drawn **(plot)**, then **4.5** |
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
-| 4.4 | Do you accept these averaging windows? Windows that do not fit are skipped; they are drawn red with a warning sign and listed in red in the terminal first. | **5.1** | **4.3** |
+| 4.5 | Do you accept these averaging windows? Windows that do not fit are skipped; they are drawn red with a warning sign and listed in red in the terminal first. | **5.1** | **4.4** |
 
 ---
 
 ## 5. Individual experiment plots
 
-You now choose how the figure saved for each file will look. The plot is redrawn after each choice.
+The figure saved for each file is drawn at once **(plot)**, at its real size and as it will be saved, with the standard settings or, for a dataset run before, the settings last saved for it. You change only what you want different. The standard figure has:
+
+- the set and measured oxygen;
+- the OCR per OD (µM min⁻¹ OD⁻¹) if you said yes to OD scaling in 3.1, otherwise the OCR in µM min⁻¹;
+- when the haems were decomposed in 4.A, every haem of the fit as ΔA, the change from the start (scaled by OD as well if you said yes in 3.1);
+- the event labels at 45°;
+- Nature, 1 column wide and 0.5 of a page tall.
+
+| # | Question | Leads to |
+|---|---|---|
+| 5.1 | Do you accept this figure? | **1) Yes, accept**: **5.8**. **2) No, change the oxygen and OCR**: **5.2**. **3) No, change which haems are shown** *(only when the haems were decomposed)*: **5.4**. **4) No, change how the haems are shown** *(only when the haems are plotted)*: **5.5**. **5) No, change the angle of the event labels** *(only when something is plotted)*: **5.6**. **6) No, change the journal or size**: **5.7**. |
+
+Each part's questions offer your current choices as the defaults. After them the figure is drawn again **(plot)** and **5.1** is asked again; the numbers on screen keep counting up. If nothing is plotted (5.2 and 5.3 No, and 5.4 No or not offered), a message says no individual figures will be made, nothing is drawn, and 5.1 is asked again so you can turn a panel back on; accepting then makes no individual figures.
 
 ### 5.A Oxygen and OCR
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.1 | Do you want to plot the set and measured [O2] (CsO2 and CcO2)? `(Y/n)` | **5.2** |
-| 5.2 | Do you want to plot the OCR? `(Y/n)` | **Yes**: **5.2.1**. **No**: if 5.1 was also No, nothing is drawn and the next step is **5.4**; otherwise the plot is drawn **(plot)** and **5.3**. |
-| 5.2.1 | Which OCR would you like to plot? 1) OCR (µM min⁻¹) 2) OCR / OD (µM min⁻¹ OD⁻¹), *only offered if you said yes to OD scaling in 3.1*. 3) OCR (% of the range) | the plot is drawn **(plot)**, then **5.3** |
+| 5.2 | Do you want to plot the set and measured [O2] (CsO2 and CcO2)? `(Y/n)` | **5.3** |
+| 5.3 | Do you want to plot the OCR? `(Y/n)` | **Yes**: **5.3.1**. **No**: the figure is drawn **(plot)**, then **5.1**. |
+| 5.3.1 | Which OCR would you like to plot? 1) OCR (µM min⁻¹) 2) OCR / OD (µM min⁻¹ OD⁻¹), *only offered if you said yes to OD scaling in 3.1*. 3) OCR (% of the range) | the figure is drawn **(plot)**, then **5.1** |
 
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 5.3 | Do you accept the oxygen and OCR plots? | **5.4** | **5.1** |
-
-### 5.B Haems
-
-5.4 is only asked if the haems were decomposed in 4.1. Otherwise go straight to **5.8**.
+### 5.B Which haems
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 5.4 | Do you want to plot the haems? `(y/N)` | **5.4.1** | **5.8** |
+| 5.4 | Do you want to plot the haems? `(Y/n)` | **5.4.1** | the figure is drawn **(plot)**, then **5.1** |
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.4.1 | Which haems would you like to plot, and in which order? (numbers separated by commas; Enter = all) | the haems are drawn **(plot)**, then **5.5** |
+| 5.4.1 | Which haems would you like to plot, and in which order? (numbers separated by commas; Enter = the haems shown) | the figure is drawn **(plot)**, then **5.1** |
 
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 5.5 | Do you accept these haems and their order? | **5.6** | **5.4** |
+### 5.C How the haems are shown
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.6 | How would you like to plot the haems? Options: absorbance (mOD), ΔA (mOD) the change from the start, concentration, % oxidised | the plot is drawn **(plot)**, then **5.6.1** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise **5.7** |
-| 5.6.1 | Do you want to scale the haems by OD as well? `(Y/n)` | the plot is drawn **(plot)**, then **5.7** |
+| 5.5 | How would you like to plot the haems? Options: absorbance (mOD), ΔA (mOD) the change from the start, concentration, % oxidised | **5.5.1** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise the figure is drawn **(plot)**, then **5.1** |
+| 5.5.1 | Do you want to scale the haems by OD as well? `(Y/n)` | the figure is drawn **(plot)**, then **5.1** |
 
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 5.7 | Do you accept this haem presentation? | **5.8** | **5.6** |
-
-### 5.C Event labels
-
-If nothing at all is plotted (5.1 No, 5.2 No, 5.4 No or skipped), a message says no individual figures will be made, 5.8 and 5.9 are skipped and the next step is **5.10**.
+### 5.D Event labels
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.8 | At what angle should the event labels be plotted (0 = horizontal, 90 = vertical)? | the plot is drawn **(plot)**, then **5.9** |
+| 5.6 | At what angle should the event labels be plotted (0 = horizontal, 90 = vertical)? `[45]` | the figure is drawn **(plot)**, then **5.1** |
 
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 5.9 | Do you accept the event labels? | **5.10** | **5.8** |
-
-### 5.D Journal and size
+### 5.E Journal and size
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.10 | Which journal format would you like? 1) None (use the default: Nature, 1 column wide, 0.5 of a page tall) 2) Nature 3) Science 4) Cell 5) PNAS | **None**: the default size is used, then **5.11** (or **5.12** if nothing is plotted). **A journal**: **5.10.1** |
-| 5.10.1 | How wide should the figure be? (the widths that journal allows) | **5.10.2** |
-| 5.10.2 | How tall should the figure be, as a fraction of the page height (1 = a full page = *X* mm)? | the figure is drawn at its real size **(plot)**, then **5.11** (or **5.12** if nothing is plotted) |
+| 5.7 | Which journal format would you like? 1) None (use the default: Nature, 1 column wide, 0.5 of a page tall) 2) Nature 3) Science 4) Cell 5) PNAS | **None**: the default size is used, the figure is drawn **(plot)**, then **5.1**. **A journal**: **5.7.1** |
+| 5.7.1 | How wide should the figure be? (the widths that journal allows) | **5.7.2** |
+| 5.7.2 | How tall should the figure be, as a fraction of the page height (1 = a full page = *X* mm)? | the figure is drawn at its real size **(plot)**, then **5.1** |
 
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 5.11 | Do you accept this figure? | **5.12** | **5.10** |
-
-### 5.E Going back
+### 5.F Going back
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.12 | Do you want to go back to any of these steps? 1) No, continue 2) Trimming and ignoring 3) OD values and event labels 4) Analysis 5) Individual experiment plots | **1**: **6.1**. **2, 3, 4 or 5**: that section's questions are asked again from its first question, with your answers as the defaults. Your answers to the later sections are kept. Then **5.12** is asked again. |
+| 5.8 | Do you want to go back to any of these steps? 1) No, continue 2) Trimming and ignoring 3) OD values and event labels 4) Processing 5) Individual experiment plots | **1**: **6.1**. **2, 3, 4 or 5**: that section's questions are asked again from its first question, with your answers as the defaults. Your answers to the later sections are kept. Then **5.8** is asked again. |
 
 ---
 
 ## 6. Multi-experiment plots
 
-If nothing is plotted in section 5, a message says these figures reuse the section 5 choices and are skipped, and the next step is **7.1**.
+If nothing is plotted in section 5, a message says these figures reuse the panels chosen for the individual experiment plots and are skipped, and the next step is **7.1**.
 
 Each figure is drawn from your data once its questions are answered (this reads the files again, so it takes a moment) and shown in the plot area. Nothing is saved to the results folder until the run starts.
 
@@ -260,7 +260,7 @@ Each figure is drawn from your data once its questions are answered (this reads 
 |---|---|---|
 | 6.1.1 | Which experiment goes on the left? | **6.1.2** |
 | 6.1.2 | Which experiment goes on the right? | **6.1.3** |
-| 6.1.3 | Which journal format would you like? (then, for a journal, how wide and how tall, as in 5.10) | the figure is drawn **(plot)**, then **6.2** |
+| 6.1.3 | Which journal format would you like? (then, for a journal, how wide and how tall, as in 5.7) | the figure is drawn **(plot)**, then **6.2** |
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
@@ -280,11 +280,11 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 
 | # | Question | Leads to |
 |---|---|---|
-| 6.3.1 | Which run number should be shown? | **6.3.2** if you said No to averaging in 4.3, otherwise **6.3.4** |
-| 6.3.2 | *(a message says the figure starts at the baseline averaging window)* How long a window (minutes) should the average be taken over? | **6.3.3** |
+| 6.3.1 | Which run number should be shown? | **6.3.2** if you said No to averaging in 4.4, otherwise **6.3.4** |
+| 6.3.2 | *(a message says the figure starts at the baseline averaging window, so the events are averaged as in the processing)* How long a window (minutes) should the average be taken over? | **6.3.3** |
 | 6.3.3 | How long before the next addition should the averaging window end (minutes)? | **6.3.4** |
 | 6.3.4 | Do you want the run name written faintly on each plot? `(Y/n)` | **6.3.5** |
-| 6.3.5 | Which journal format would you like? (then width and height, as in 5.10) | the figure is drawn **(plot)**, then **6.4** |
+| 6.3.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then **6.4** |
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
@@ -294,7 +294,7 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 
 ## 7. Experiment summaries
 
-Both summary figures need the haem fit. If no fit was chosen in 4.1, the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, so if you said No in 4.3 (and have not been asked since), a message says the averaging window is asked here, and the window and gap questions (**4.3.1**, **4.3.2**) are asked first.
+Both summary figures need the haem fit. If the haems were not decomposed in section 4, the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, so if you said No in 4.4 (and have not been asked since), a message says the averaging window is asked here, and the window and gap questions (**4.4.1**, **4.4.2**) are asked first.
 
 ### 7.A Time response
 
@@ -315,7 +315,7 @@ The figure is built up in the plot window: the drop-down lists the individual ex
 | 7.1.5 | Which experiment should decomposition plot 1 show? | drawn **(plot)**, accept question, then **7.1.6** |
 | 7.1.6 | Which experiment should decomposition plot 2 show? | drawn **(plot)**, accept question, then **7.1.7** |
 | 7.1.7 | Which experiment should decomposition plot 3 show? | drawn **(plot)**, accept question, then **7.1.8** |
-| 7.1.8 | Which journal format would you like? (then width and height, as in 5.10) | the figure is drawn **(plot)**, then the final accept question |
+| 7.1.8 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then the final accept question |
 
 | Question | 1 → | 2 → |
 |---|---|---|
@@ -335,11 +335,11 @@ The figure is built up in the plot window in stages. First only the baseline OCR
 
 | # | Question | Leads to |
 |---|---|---|
-| 7.2.1 | Which OCR would you like to use? (the same options as 5.2.1) | the OCR plots are drawn **(plot)**, accept question, then **7.2.2** |
-| 7.2.2 | How would you like to show the haems? (the same options as 5.6) | **7.2.3** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **7.2.4** |
+| 7.2.1 | Which OCR would you like to use? (the same options as 5.3.1) | the OCR plots are drawn **(plot)**, accept question, then **7.2.2** |
+| 7.2.2 | How would you like to show the haems? (the same options as 5.5) | **7.2.3** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **7.2.4** |
 | 7.2.3 | Do you want to scale the haems by OD as well? `(Y/n)` | all the haems are drawn **(plot)**, accept question, then **7.2.4** |
 | 7.2.4 | Which haems should get a row, and in which order? | drawn **(plot)**, accept question, then **7.2.5** |
-| 7.2.5 | Which journal format would you like? (then width and height, as in 5.10) | the figure is drawn **(plot)**, then the final accept question |
+| 7.2.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then the final accept question |
 
 | Question | 1 → | 2 → |
 |---|---|---|
@@ -375,7 +375,7 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 
 The questions and their order are the same. These differ:
 
-- In **2**, **3** and **4** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer.
-- After **1.2** comes a section of its own, **2. Experiment browser**, where the standard plot is shown, with a small menu that steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring. Every later section is therefore numbered one higher on screen than in this list (trimming and ignoring is 3, the OD values and event labels are 4, and so on), and the going back question (**5.12**) offers the experiment browser as well.
-- Every "Do you accept...?" question has a third answer, **3) Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.
+- In **2** to **5** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer.
+- After **1.2** comes a section of its own, **2. Experiment browser**, where the standard plot is shown, with a small menu that steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring. Every later section is therefore numbered one higher on screen than in this list (trimming and ignoring is 3, the OD values and event labels are 4, and so on), and the going back question (**5.8**) offers the experiment browser as well.
+- Every "Do you accept...?" question of sections 2 to 5 has one more answer at the end, **Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.
 - There is no **Symbols** row: a symbol is typed or pasted from the keyboard.

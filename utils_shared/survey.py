@@ -671,72 +671,6 @@ def _tidy_labels_offerer(with_events: List[dict],
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- analysis_asker ------------------------------------------------------------------
-def analysis_asker(summaries: List[dict],
-                   answers: dict,
-                   defaults: dict,
-                   fits_folder: Path,
-                   export_root: Path,
-                   ) -> tuple:
-    """
-    ---- Summary ----
-    Main function to ask the OD values and the event labels of the import, then the
-    haem decomposition and the event averaging.
-
-    ---- Inputs ----
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md).
-    answers : dict
-        Answers dictionary the values are stored in.
-    defaults : dict
-        Default answers.
-    fits_folder : Path
-        Folder holding the fit .csv files.
-    export_root : Path
-        Results folder, where the saved OD and event values are looked for.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    tuple
-        (fit, details). details is {file name: {'OD', 'volume', 'dilution_factor',
-        'events'}}; the OD entries are only present when scaling by OD.
-
-    ---- Globals mutated ----
-    None. Stores the answers in ``answers`` (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    averaging_asker
-    decomposition_asker
-    event_asker
-    od_scaling_asker
-    saved_values_reader
-    """
-
-    # ---- 1 OD scaling ----------------------------------------------------------------
-    saved = saved_values_reader(summaries, export_root)
-    details = od_scaling_asker(summaries, answers, defaults, saved)
-
-    # ---- 2 Event labels --------------------------------------------------------------
-    for name, events in event_asker(summaries, saved).items():
-        details[name]['events'] = events
-
-    # ---- 3 Decomposition -------------------------------------------------------------
-    (answers['decompose'],
-     answers['fit_file'],
-     fit,
-     answers['decomposition_dataset'],
-     ) = decomposition_asker(summaries, defaults, fits_folder)
-
-    # ---- 4 Averaging -----------------------------------------------------------------
-    averaging_asker(answers, defaults)
-    return fit, details
-
-
 # ---- averaging_asker -----------------------------------------------------------------
 def averaging_asker(answers: dict,
                     defaults: dict,
@@ -1612,8 +1546,8 @@ def multi_experiment_asker(summaries: List[dict],
                            ) -> tuple:
     """
     ---- Summary ----
-    Main function to ask section 5: the side-by-side figure of two experiments and
-    the 2x2 figure of four experiments.
+    Main function to ask the multi-experiment plots: the side-by-side figure of two
+    experiments and the 2x2 figure of four experiments.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1623,7 +1557,8 @@ def multi_experiment_asker(summaries: List[dict],
     defaults : dict
         Default answers.
     plotted : bool
-        True when section 4 plots at least one panel (both figures reuse its choices).
+        True when the individual experiment plots show at least one panel (both
+        figures reuse their choices).
     figure_checker : Optional[Callable[[str, dict], bool]]
         Function called after the questions of each figure with a name and a dictionary:
         ('comparison', {'comparison': ...}) or ('exemplar', {'exemplar_names': ...}). It
@@ -1659,9 +1594,9 @@ def multi_experiment_asker(summaries: List[dict],
     answers['plot_comparison'] = False
     answers['plot_exemplar'] = False
     if not plotted:
-        info_printer('The figures below reuse the panels chosen in section 4, and '
-                     'nothing '
-                     'is plotted there, so they are skipped.',
+        info_printer('The figures below reuse the panels chosen for the individual '
+                     'experiment plots, and nothing is plotted there, so they are '
+                     'skipped.',
                      )
         return comparison, exemplar_names
 
@@ -1733,9 +1668,7 @@ def multi_experiment_asker(summaries: List[dict],
                 answers['ho_exemplar_run'] = int(run)
                 if not answers['averaging']:
                     info_printer('This figure starts at the baseline averaging window, '
-                                 'so '
-                                 'the '
-                                 'events are averaged as in section 3.3.',
+                                 'so the events are averaged as in the processing.',
                                  depth=2,
                                  )
                     averaging_asker(answers, defaults, forced=True, depth=2)
@@ -1764,6 +1697,38 @@ def multi_experiment_asker(summaries: List[dict],
             break
         defaults = dict(answers)
     return comparison, exemplar_names
+
+
+# ---- ocr_kind_lister -----------------------------------------------------------------
+def ocr_kind_lister(has_od: bool) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to list the kinds of OCR that can be offered: the OCR itself, the OCR
+    per OD when OD values were entered, and the OCR as a percentage of its range.
+
+    ---- Inputs ----
+    has_od : bool
+        True when OD values were entered (scaling by OD is on).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[str]
+        The keys 'raw', 'od' (only with OD values) and 'percent', in the order they are
+        offered.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return ['raw'] + (['od'] if has_od else []) + ['percent']
 
 
 # ---- ocr_option_builder --------------------------------------------------------------
@@ -2067,6 +2032,7 @@ def signal_asker(answers: dict, defaults: dict) -> bool:
 
     ---- Helpers ----
     choice_asker
+    ocr_kind_lister
     ocr_option_builder
     yes_no_asker
     """
@@ -2079,7 +2045,7 @@ def signal_asker(answers: dict, defaults: dict) -> bool:
                                        defaults['plot_ocr'],
                                        )
     if answers['plot_ocr']:
-        keys = ['raw'] + (['od'] if answers['normalise_od'] else []) + ['percent']
+        keys = ocr_kind_lister(answers['normalise_od'])
         answers['ocr_mode'] = choice_asker('Which OCR would you like to plot?',
                                            ocr_option_builder(keys),
                                            defaults['ocr_mode']
