@@ -250,7 +250,7 @@ Portimao/
     Portimao.pyw, Portimao.app, run.bat, run.sh   launchers (no terminal window)
     launchers/              the launcher program, shortcut and icon scripts
     assets/                 icons
-    fits/                   haem fit CSVs (your own fit goes here)
+    fits/                   haem fit CSVs (your own fit goes here; layout in DATA_FORMAT.md, "fit csv")
     utils_shared/           reading, processing, plotting and export of single experiments
         __init__.py
         paf_reader.py       direct .paf reader

@@ -5,6 +5,7 @@ component finder gives back the shapes its spectra were mixed from.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import io
 from pathlib import Path
 from typing import Tuple
 
@@ -19,15 +20,20 @@ from utils_shared.pca_fitter import (component_builder,
                                      component_count_suggester,
                                      component_finder,
                                      decomposition_example_finder,
+                                     fit_saver,
                                      fit_table_builder,
                                      )
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
 from utils_shared.spectral_decomposer import (background_builder,
                                               delta_abs_calculator,
                                               experiment_decomposer,
+                                              FIT_FILE_MARK,
+                                              fit_file_writer,
                                               fit_haem_selector,
                                               fit_importer,
                                               fit_range_finder,
+                                              haem_name_plainer,
+                                              haem_name_typesetter,
                                               spectrum_decomposer,
                                               )
 
@@ -36,14 +42,13 @@ from utils_shared.spectral_decomposer import (background_builder,
 ROOT = Path(__file__).resolve().parent.parent
 FIT_FILE = ROOT / 'tests' / 'synthetic_test_fit.csv'
 FITS_FOLDER = ROOT / 'fits'  # the fit files users choose from
-# Last wavelength (nm, as the note writes it) kept of each haem that ends in leftover
-# rows, in the three fit files that have them.
-LEFTOVER_ROWS = {'bswitch_no2_mycobl.csv': ('628.38', '630.05', '639.99'),
-                 'bswitch_no2_mycobl_b557.csv': ('628.38', '630.05', '639.99'),
-                 'bswitch_no2_mycobl_b557_cc.csv': ('628.38', '630.05', '639.99'),
-                 }
-MILLION_FITS = ('OGfit.csv', 'temp_fit_037v.csv')  # written a million times larger
 HAEM_FACTOR = 1000000.0  # the scale the program gives the fit shapes
+# What the values of a fit file in each unit are divided by to reach the standard scale
+# (OD/mM/cm divided by a million), written out by hand.
+UNIT_DIVISORS = {'OD/mM/cm': 1e6, 'OD/µM/cm': 1e3, 'OD/nM/cm': 1.0}
+# How closely a fit written to a file and read back must give the same shapes: the file
+# keeps 15 significant digits.
+ROUND_TRIP = 1e-14
 # Amounts of the five haems, in file order. With the test fit (peaks of 1e-5) they give
 # haem signals of 1 to 5 mOD, as in a real run; far smaller signals would be lost in
 # the rounding of the 0.4 OD background itself, whatever the maths.
@@ -134,6 +139,41 @@ def _background_shape_builder(background: str, wavelengths: np.ndarray) -> list:
             'quadratic': [x - 5.5, (x - 6.0) ** 2],
             'valencia': [1.0 / x ** 2],
             }[background]
+
+
+# ---- _file_values_reader -------------------------------------------------------------
+def _file_values_reader(path: Path) -> np.ndarray:
+    """
+    ---- Summary ----
+    Helper function to read the shape values of a fit file in the layout with heading
+    lines exactly as they are written in it, before any unit or way up is applied.
+
+    ---- Inputs ----
+    path : Path
+        The fit file.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    np.ndarray
+        The values, shape (n_rows, n_haems), NaN below a shorter haem.
+
+    ---- Globals mutated ----
+    None. Reads the file (side effect).
+
+    ---- Equations ----
+    None. The table starts at the first line after the first empty line: the haem
+    names, the row saying what each column holds, then the numbers.
+
+    ---- Helpers ----
+    None.
+    """
+
+    lines = path.read_text(encoding='utf-8-sig').splitlines()
+    empty = lines.index('')
+    table = pd.read_csv(io.StringIO('\n'.join(lines[empty + 3:])), header=None)
+    return table.iloc[:, 1::2].to_numpy(dtype=float)
 
 
 # ---- _haem_spectrum_builder ----------------------------------------------------------
@@ -566,15 +606,16 @@ def test_a_million_times_larger_fit_gives_the_same_amounts(tmp_path: Path) -> No
 def test_every_fit_file_is_read() -> None:
     """
     ---- Summary ----
-    Main function to check that every fit file users can choose is read without an
-    error, with wavelengths that go upwards in every haem, on the standard scale, and
-    that the leftover rows of the three files that have them are left out and named.
+    Main function to check that every fit file users can choose is in the layout with
+    heading lines, in OD/mM/cm, and is read without an error or a note, with
+    wavelengths that go upwards in every haem, on the standard scale. Leftover rows and
+    the million scale of the older layout are tested on made-up files.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    FITS_FOLDER, LEFTOVER_ROWS, MILLION_FITS (module constants).
+    FITS_FOLDER, UNIT_DIVISORS (module constants).
 
     ---- Outputs ----
     None.
@@ -592,6 +633,9 @@ def test_every_fit_file_is_read() -> None:
     paths = sorted(FITS_FOLDER.glob('*.csv'))
     assert paths
     for path in paths:
+        lines = path.read_text(encoding='utf-8-sig').splitlines()
+        assert lines[0].startswith(f'{FIT_FILE_MARK},'), path.name
+        assert 'Unit,OD/mM/cm' in lines, path.name
         fit = fit_importer(path)
         data = fit['data']
         assert len(fit['haem_list']) == data.shape[1] // 2
@@ -601,12 +645,343 @@ def test_every_fit_file_is_read() -> None:
             assert np.all(np.diff(pair[:, 0]) >= 0)
         peak = np.nanmax(np.abs(data.iloc[:, 1::2].to_numpy()))
         assert 1e-7 <= peak <= 1e-3
-        assert fit['scale_divisor'] == (1e6 if path.name in MILLION_FITS else 1.0)
-        leftovers = [note for note in fit['notes'] if 'backwards' in note]
-        ends = LEFTOVER_ROWS.get(path.name, ())
-        assert len(leftovers) == len(ends)
-        for note, end in zip(leftovers, ends):
-            assert f'after {end} nm' in note
+        assert fit['scale_divisor'] == UNIT_DIVISORS['OD/mM/cm']
+        assert fit['notes'] == [], path.name
+
+
+# ---- test_haem_names_go_to_figure_form_and_back --------------------------------------
+@pytest.mark.parametrize(('plain', 'figure'),
+                         [('Cyt bH', 'Cyt $b_H$'),
+                          ('Cyt bL', 'Cyt $b_L$'),
+                          ('Cyt b557', 'Cyt $b_{557}$'),
+                          ('Cyt a605', 'Cyt $a_{605}$'),
+                          ('Cyt cc', 'Cyt $cc$'),
+                          ('Cyt c1', 'Cyt $c_1$'),
+                          ('Cyt aa3', 'Cyt $aa_3$'),
+                          ('PC1', 'PC1'),
+                          ('a-like', 'a-like'),
+                          ('other', 'other'),
+                          ],
+                         )
+def test_haem_names_go_to_figure_form_and_back(plain: str, figure: str) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a plain haem name is put in the form the figures draw
+    (haem letters in italics, a capital letter or number after them below the line),
+    that other words are left alone, and that the figure form gives the plain name
+    back.
+
+    ---- Inputs ----
+    plain : str
+        The name as a fit file writes it.
+    figure : str
+        The name the figures draw, written out by hand.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    assert haem_name_typesetter(plain) == figure
+    assert haem_name_plainer(figure) == plain
+
+
+# ---- test_a_fit_file_reads_back_the_same_in_each_unit --------------------------------
+@pytest.mark.parametrize('unit', sorted(UNIT_DIVISORS))
+def test_a_fit_file_reads_back_the_same_in_each_unit(tmp_path: Path, unit: str) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the test fit, written in the layout with heading lines
+    in one of the units, holds its shapes in that unit and is read back as the same
+    shapes, names in figure form and amounts.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+    unit : str
+        The unit written.
+
+    ---- Globals read ----
+    FIT_FILE, UNIT_DIVISORS, ROUND_TRIP, EXACT (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes a fit file in tmp_path (side effect).
+
+    ---- Equations ----
+    The shapes of the test fit are on the standard scale (OD/mM/cm divided by a
+    million), so the file holds them x 1e6 in OD/mM/cm, x 1e3 in OD/µM/cm and x 1 in
+    OD/nM/cm.
+
+    ---- Helpers ----
+    _file_values_reader
+    _series_decomposer
+    """
+
+    standard = fit_importer(FIT_FILE)
+    path = fit_file_writer(standard,
+                           tmp_path / 'unit.csv',
+                           unit,
+                           'made-up shapes',
+                           'oxidised minus reduced',
+                           )
+    written = _file_values_reader(path)
+    shapes = standard['data'].iloc[:, 1::2].to_numpy(dtype=float)
+    assert np.allclose(written,
+                       shapes * UNIT_DIVISORS[unit],
+                       rtol=ROUND_TRIP,
+                       atol=0.0,
+                       equal_nan=True,
+                       )
+
+    found = fit_importer(path)
+    assert found['haem_list'] == [haem_name_typesetter(name)
+                                  for name in standard['haem_list']
+                                  ]
+    assert found['scale_divisor'] == UNIT_DIVISORS[unit]
+    assert found['notes'] == []
+    assert np.allclose(found['data'].to_numpy(),
+                       standard['data'].to_numpy(),
+                       rtol=ROUND_TRIP,
+                       atol=0.0,
+                       equal_nan=True,
+                       )
+    expected = _series_decomposer(standard)['haem_conc'][standard['haem_list']]
+    amounts = _series_decomposer(found)['haem_conc'][found['haem_list']]
+    assert np.allclose(amounts.to_numpy(), expected.to_numpy(), rtol=EXACT, atol=0.0)
+
+
+# ---- test_reduced_minus_oxidised_is_turned_over --------------------------------------
+def test_reduced_minus_oxidised_is_turned_over(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a fit file whose Way up line says 'reduced minus
+    oxidised' holds its shapes upside down and is turned over when read, so it gives
+    the same shapes as the same fit written the way the decomposition uses them.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+
+    ---- Globals read ----
+    FIT_FILE, UNIT_DIVISORS, ROUND_TRIP (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes a fit file in tmp_path (side effect).
+
+    ---- Equations ----
+    value written = -shape x 1e6 (OD/mM/cm).
+
+    ---- Helpers ----
+    _file_values_reader
+    """
+
+    standard = fit_importer(FIT_FILE)
+    path = fit_file_writer(standard,
+                           tmp_path / 'upside_down.csv',
+                           'OD/mM/cm',
+                           'made-up shapes',
+                           'reduced minus oxidised',
+                           )
+    shapes = standard['data'].iloc[:, 1::2].to_numpy(dtype=float)
+    assert np.allclose(_file_values_reader(path),
+                       -shapes * UNIT_DIVISORS['OD/mM/cm'],
+                       rtol=ROUND_TRIP,
+                       atol=0.0,
+                       equal_nan=True,
+                       )
+    assert np.allclose(fit_importer(path)['data'].to_numpy(),
+                       standard['data'].to_numpy(),
+                       rtol=ROUND_TRIP,
+                       atol=0.0,
+                       equal_nan=True,
+                       )
+
+
+# ---- test_a_single_haem_file_reads_back_the_same -------------------------------------
+def test_a_single_haem_file_reads_back_the_same(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a fit file holding one haem only is written and read
+    back as that haem.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+
+    ---- Globals read ----
+    FIT_FILE, ROUND_TRIP (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes a fit file in tmp_path (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    single = fit_haem_selector(fit_importer(FIT_FILE), ['Cyt bL'])
+    path = fit_file_writer(single,
+                           tmp_path / 'bL.csv',
+                           'OD/mM/cm',
+                           'one made-up shape',
+                           'oxidised minus reduced',
+                           )
+    found = fit_importer(path)
+    assert found['haem_list'] == ['Cyt $b_L$']
+    assert found['notes'] == []
+    assert np.allclose(found['data'].to_numpy(),
+                       single['data'].to_numpy(),
+                       rtol=ROUND_TRIP,
+                       atol=0.0,
+                       )
+
+
+# ---- test_wrong_headed_fit_files_are_refused -----------------------------------------
+@pytest.mark.parametrize(('text', 'message'),
+                         [('Portimao fit file\nUnit,OD/mM/cm\n\na,\n'
+                           'Wavelength (nm),OD/mM/cm\n1,2\n2,3\n',
+                           'its first line must say',
+                           ),
+                          ('Portimao fit file,format 2\nUnit,OD/mM/cm\n\na,\n'
+                           'Wavelength (nm),OD/mM/cm\n1,2\n2,3\n',
+                           'newer than',
+                           ),
+                          ('Portimao fit file,format 1\nHolds,shapes\n\na,\n'
+                           'Wavelength (nm),OD/mM/cm\n1,2\n2,3\n',
+                           'has no Unit line',
+                           ),
+                          ('Portimao fit file,format 1\nUnit,OD/M/cm\n\na,\n'
+                           'Wavelength (nm),OD/M/cm\n1,2\n2,3\n',
+                           'the unit must be one of',
+                           ),
+                          ('Portimao fit file,format 1\nUnit,OD/mM/cm\n'
+                           'Way up,upside down\n\na,\nWavelength (nm),OD/mM/cm\n'
+                           '1,2\n2,3\n',
+                           'Way up line says',
+                           ),
+                          ('Portimao fit file,format 1\nUnit,OD/mM/cm\n\na,\n1,2\n'
+                           '2,3\n',
+                           r'the row under the haem names \(row 5\)',
+                           ),
+                          ('Portimao fit file,format 1\nUnit,OD/mM/cm\n',
+                           'no table of shapes',
+                           ),
+                          ('Portimao fit file,format 1\nUnit,OD/mM/cm\n\na,\n'
+                           'Wavelength (nm),OD/mM/cm\n1,2\nx,3\n',
+                           'row 7 is not a number',
+                           ),
+                          ],
+                         )
+def test_wrong_headed_fit_files_are_refused(tmp_path: Path,
+                                            text: str,
+                                            message: str,
+                                            ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a fit file in the layout with heading lines is refused
+    with a message that says what is wrong and where: no format, a newer format, no
+    Unit line, an unknown unit, an unknown way up, no row saying what the columns
+    hold, no table, and a cell that is not a number (named by its row in the file).
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+    text : str
+        Contents of the fit file.
+    message : str
+        Words the message must hold (a regular expression).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes a fit file in tmp_path (side effect).
+
+    ---- Equations ----
+    In the last file the lines are: the format, the unit, an empty line, the names,
+    the row saying what the columns hold, then '1,2' and 'x,3': the x is in row 7.
+
+    ---- Helpers ----
+    None.
+    """
+
+    path = tmp_path / 'wrong.csv'
+    path.write_text(text, encoding='utf-8')
+    with pytest.raises(ValueError, match=message):
+        fit_importer(path)
+
+
+# ---- test_saved_components_read_back_the_same ----------------------------------------
+def test_saved_components_read_back_the_same(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that components found by the component finder and saved as
+    a fit file hold their shapes as found (largest point 1, unit 'relative') and are
+    read back as the same fit.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+
+    ---- Globals read ----
+    ROUND_TRIP (module constant).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes a fit file in tmp_path (side effect).
+
+    ---- Equations ----
+    value written = response x 1e6 = the component as found, whose largest point is 1.
+
+    ---- Helpers ----
+    _file_values_reader
+    _mixed_spectra_builder
+    """
+
+    _, _, files = _mixed_spectra_builder()
+    result = component_builder(component_finder(files, (500.0, 650.0)), 2)
+    fit = fit_table_builder(result, ['b-like', 'c-like'])
+    path = fit_saver(fit, tmp_path / 'components.csv')
+    assert 'Unit,relative' in path.read_text(encoding='utf-8-sig').splitlines()
+    assert np.allclose(np.nanmax(_file_values_reader(path), axis=0),
+                       1.0,
+                       rtol=ROUND_TRIP,
+                       )
+    found = fit_importer(path)
+    assert found['haem_list'] == ['b-like', 'c-like']
+    assert found['notes'] == []
+    assert np.allclose(found['data'].to_numpy(),
+                       fit['data'].to_numpy(),
+                       rtol=ROUND_TRIP,
+                       atol=0.0,
+                       )
 
 
 # ---- test_one_spectrum_gives_its_amounts_back ----------------------------------------

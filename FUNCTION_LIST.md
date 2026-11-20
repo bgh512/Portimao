@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.24
+- **Version:** V2.0
 - **Date:** 20/11/2026
 
 ## Contents
@@ -34,6 +34,7 @@
 - [`tests/test_haem_decomposition.py`](#teststest_haem_decompositionpy)
     - [`_background_builder`](#_background_builder)
     - [`_background_shape_builder`](#_background_shape_builder)
+    - [`_file_values_reader`](#_file_values_reader)
     - [`_haem_spectrum_builder`](#_haem_spectrum_builder)
     - [`_mixed_spectra_builder`](#_mixed_spectra_builder)
     - [`_series_decomposer`](#_series_decomposer)
@@ -43,6 +44,12 @@
     - [`test_unusable_fit_files_are_refused`](#test_unusable_fit_files_are_refused)
     - [`test_a_million_times_larger_fit_gives_the_same_amounts`](#test_a_million_times_larger_fit_gives_the_same_amounts)
     - [`test_every_fit_file_is_read`](#test_every_fit_file_is_read)
+    - [`test_haem_names_go_to_figure_form_and_back`](#test_haem_names_go_to_figure_form_and_back)
+    - [`test_a_fit_file_reads_back_the_same_in_each_unit`](#test_a_fit_file_reads_back_the_same_in_each_unit)
+    - [`test_reduced_minus_oxidised_is_turned_over`](#test_reduced_minus_oxidised_is_turned_over)
+    - [`test_a_single_haem_file_reads_back_the_same`](#test_a_single_haem_file_reads_back_the_same)
+    - [`test_wrong_headed_fit_files_are_refused`](#test_wrong_headed_fit_files_are_refused)
+    - [`test_saved_components_read_back_the_same`](#test_saved_components_read_back_the_same)
     - [`test_one_spectrum_gives_its_amounts_back`](#test_one_spectrum_gives_its_amounts_back)
     - [`test_a_series_gives_its_amounts_back`](#test_a_series_gives_its_amounts_back)
     - [`test_the_three_routes_give_the_same_amounts`](#test_the_three_routes_give_the_same_amounts)
@@ -498,8 +505,11 @@
     - [`time_getter`](#time_getter)
     - [`value_getter`](#value_getter)
 - [`utils_shared/spectral_decomposer.py`](#utils_sharedspectral_decomposerpy)
+    - [`_fit_heading_reader`](#_fit_heading_reader)
     - [`_fit_table_cleaner`](#_fit_table_cleaner)
+    - [`_fit_unit_finder`](#_fit_unit_finder)
     - [`_haem_shape_getter`](#_haem_shape_getter)
+    - [`_headed_fit_reader`](#_headed_fit_reader)
     - [`_number_column_reader`](#_number_column_reader)
     - [`_unit_scaler`](#_unit_scaler)
     - [`_wavelength_masker`](#_wavelength_masker)
@@ -508,10 +518,13 @@
     - [`data_filterer`](#data_filterer)
     - [`delta_abs_calculator`](#delta_abs_calculator)
     - [`experiment_decomposer`](#experiment_decomposer)
+    - [`fit_file_writer`](#fit_file_writer)
     - [`fit_haem_selector`](#fit_haem_selector)
     - [`fit_importer`](#fit_importer)
     - [`fit_range_finder`](#fit_range_finder)
     - [`fit_scale_standardiser`](#fit_scale_standardiser)
+    - [`haem_name_plainer`](#haem_name_plainer)
+    - [`haem_name_typesetter`](#haem_name_typesetter)
     - [`s_array_generator`](#s_array_generator)
     - [`scatter_background_builder`](#scatter_background_builder)
     - [`spectrum_decomposer`](#spectrum_decomposer)
@@ -1506,6 +1519,35 @@ valencia: 1/x^2.
 None.
 ```
 
+#### `_file_values_reader`
+
+```text
+---- Summary ----
+Helper function to read the shape values of a fit file in the layout with heading
+lines exactly as they are written in it, before any unit or way up is applied.
+
+---- Inputs ----
+path : Path
+    The fit file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The values, shape (n_rows, n_haems), NaN below a shorter haem.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None. The table starts at the first line after the first empty line: the haem
+names, the row saying what each column holds, then the numbers.
+
+---- Helpers ----
+None.
+```
+
 #### `_haem_spectrum_builder`
 
 ```text
@@ -1755,15 +1797,16 @@ _series_decomposer
 
 ```text
 ---- Summary ----
-Main function to check that every fit file users can choose is read without an
-error, with wavelengths that go upwards in every haem, on the standard scale, and
-that the leftover rows of the three files that have them are left out and named.
+Main function to check that every fit file users can choose is in the layout with
+heading lines, in OD/mM/cm, and is read without an error or a note, with
+wavelengths that go upwards in every haem, on the standard scale. Leftover rows and
+the million scale of the older layout are tested on made-up files.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-FITS_FOLDER, LEFTOVER_ROWS, MILLION_FITS (module constants).
+FITS_FOLDER, UNIT_DIVISORS (module constants).
 
 ---- Outputs ----
 None.
@@ -1776,6 +1819,188 @@ Standard scale: the highest point of the shapes lies between 1e-7 and 1e-3.
 
 ---- Helpers ----
 None.
+```
+
+#### `test_haem_names_go_to_figure_form_and_back`
+
+```text
+---- Summary ----
+Main function to check that a plain haem name is put in the form the figures draw
+(haem letters in italics, a capital letter or number after them below the line),
+that other words are left alone, and that the figure form gives the plain name
+back.
+
+---- Inputs ----
+plain : str
+    The name as a fit file writes it.
+figure : str
+    The name the figures draw, written out by hand.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_fit_file_reads_back_the_same_in_each_unit`
+
+```text
+---- Summary ----
+Main function to check that the test fit, written in the layout with heading lines
+in one of the units, holds its shapes in that unit and is read back as the same
+shapes, names in figure form and amounts.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+unit : str
+    The unit written.
+
+---- Globals read ----
+FIT_FILE, UNIT_DIVISORS, ROUND_TRIP, EXACT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+The shapes of the test fit are on the standard scale (OD/mM/cm divided by a
+million), so the file holds them x 1e6 in OD/mM/cm, x 1e3 in OD/µM/cm and x 1 in
+OD/nM/cm.
+
+---- Helpers ----
+_file_values_reader
+_series_decomposer
+```
+
+#### `test_reduced_minus_oxidised_is_turned_over`
+
+```text
+---- Summary ----
+Main function to check that a fit file whose Way up line says 'reduced minus
+oxidised' holds its shapes upside down and is turned over when read, so it gives
+the same shapes as the same fit written the way the decomposition uses them.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+
+---- Globals read ----
+FIT_FILE, UNIT_DIVISORS, ROUND_TRIP (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+value written = -shape x 1e6 (OD/mM/cm).
+
+---- Helpers ----
+_file_values_reader
+```
+
+#### `test_a_single_haem_file_reads_back_the_same`
+
+```text
+---- Summary ----
+Main function to check that a fit file holding one haem only is written and read
+back as that haem.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+
+---- Globals read ----
+FIT_FILE, ROUND_TRIP (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_wrong_headed_fit_files_are_refused`
+
+```text
+---- Summary ----
+Main function to check that a fit file in the layout with heading lines is refused
+with a message that says what is wrong and where: no format, a newer format, no
+Unit line, an unknown unit, an unknown way up, no row saying what the columns
+hold, no table, and a cell that is not a number (named by its row in the file).
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+text : str
+    Contents of the fit file.
+message : str
+    Words the message must hold (a regular expression).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+In the last file the lines are: the format, the unit, an empty line, the names,
+the row saying what the columns hold, then '1,2' and 'x,3': the x is in row 7.
+
+---- Helpers ----
+None.
+```
+
+#### `test_saved_components_read_back_the_same`
+
+```text
+---- Summary ----
+Main function to check that components found by the component finder and saved as
+a fit file hold their shapes as found (largest point 1, unit 'relative') and are
+read back as the same fit.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest.
+
+---- Globals read ----
+ROUND_TRIP (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+value written = response x 1e6 = the component as found, whose largest point is 1.
+
+---- Helpers ----
+_file_values_reader
+_mixed_spectra_builder
 ```
 
 #### `test_one_spectrum_gives_its_amounts_back`
@@ -14667,9 +14892,9 @@ basis_solver
 
 ```text
 ---- Summary ----
-Main function to save a fit in the layout of the fit files in the fits folder
-(a header naming each haem over its wavelength column, one (wavelength, response)
-pair of columns per haem).
+Main function to save the components found as a fit file in the fits folder, in
+the layout with heading lines (DATA_FORMAT.md, "fit csv"), with the unit
+'relative': each component scaled so that its largest point is 1.
 
 ---- Inputs ----
 fit : dict
@@ -14688,10 +14913,10 @@ Path
 None. Writes the file (side effect).
 
 ---- Equations ----
-None.
+value written = response x 1 000 000: the component as found (fit_file_writer).
 
 ---- Helpers ----
-None.
+fit_file_writer
 ```
 
 #### `fit_table_builder`
@@ -16137,6 +16362,42 @@ Spectral fit loading and haem decomposition routines.
 
 ### SPECTRAL DECOMPOSER HELPERS
 
+#### `_fit_heading_reader`
+
+```text
+---- Summary ----
+Helper function to read the lines at the top of a fit file in the layout with
+heading lines: its format, then one 'name,text' line each, up to the first empty
+line.
+
+---- Inputs ----
+lines : List[str]
+    The lines of the file; the first holds FIT_FILE_MARK.
+label : str
+    Name of the fit file, used in the messages.
+
+---- Globals read ----
+FIT_FILE_MARK, FIT_FILE_FORMAT (module constants).
+
+---- Outputs ----
+Tuple[Dict[str, str], int]
+    ({name of each heading line, in lower case: its text, the cells after the name
+    joined by ', '}, index in lines of the haem names: the first line that is not
+    empty after the heading lines). A name used twice keeps its first text. Raises
+    ValueError, with a message for the user, when the first line gives no format,
+    the format is newer than FIT_FILE_FORMAT, or no table follows.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None. A line is empty when all its cells are, as a spreadsheet saves an empty line
+(',,,,').
+
+---- Helpers ----
+None.
+```
+
 #### `_fit_table_cleaner`
 
 ```text
@@ -16146,11 +16407,14 @@ numbers only, no blank rows, wavelengths going upwards.
 
 ---- Inputs ----
 data : pd.DataFrame
-    The fit file as read: (wavelength, response) column pairs, one pair per haem;
-    the header of each wavelength column names the haem. Row i of the table is row
-    i + 2 of the file.
+    The fit table as read: (wavelength, response) column pairs, one pair per haem;
+    the header of each wavelength column names the haem.
 label : str
     Name of the fit file, used in the messages.
+first_row : int
+    Row of the file that holds row 0 of the table (counted from 1), so that the
+    messages name the row as the file has it: 2 for a file whose only heading is
+    the haem names.
 
 ---- Globals read ----
 None.
@@ -16173,6 +16437,34 @@ such rows are leftovers of another column, not data.
 
 ---- Helpers ----
 _number_column_reader
+```
+
+#### `_fit_unit_finder`
+
+```text
+---- Summary ----
+Helper function to find which of the fit units the Unit line of a fit file names,
+however it is spaced, capitalised or written with a micro sign.
+
+---- Inputs ----
+text : str
+    Text of the Unit line, for example 'OD/mM/cm' or 'od / uM / cm'.
+
+---- Globals read ----
+FIT_UNITS (module constant).
+
+---- Outputs ----
+Optional[str]
+    The unit as FIT_UNITS writes it, or None when the text names none of them.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None. The Greek mu (μ) and a u in place of µ count as the micro sign.
+
+---- Helpers ----
+None.
 ```
 
 #### `_haem_shape_getter`
@@ -16206,6 +16498,47 @@ None.
 None.
 ```
 
+#### `_headed_fit_reader`
+
+```text
+---- Summary ----
+Helper function to read a fit file in the layout with heading lines (DATA_FORMAT.md,
+"fit csv") and bring it to the standard scale, the way up the decomposition uses
+and the haem names in figure form.
+
+---- Inputs ----
+lines : List[str]
+    The lines of the file; the first holds FIT_FILE_MARK.
+label : str
+    Name of the fit file, used in the messages.
+
+---- Globals read ----
+FIT_UNITS, FIT_WAY_UP, FIT_PEAK_BAND (module constants).
+
+---- Outputs ----
+Tuple[pd.DataFrame, float, List[str]]
+    (the cleaned table, as _fit_table_cleaner gives it, on the standard scale with
+    each haem's name in figure form; what the values of the file were divided by;
+    the notes for the user). Raises ValueError, with a message for the user, when
+    the Unit line is missing or names no fit unit, the Way up line is not one of
+    the two ways, the row under the haem names does not say what the columns
+    hold, or the table cannot be read.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+response = value of the file x way-up sign (+1, or -1 for 'reduced minus
+oxidised') / divisor of the unit (FIT_UNITS). A file with no Way up line is used
+as it is written.
+
+---- Helpers ----
+_fit_heading_reader
+_fit_table_cleaner
+_fit_unit_finder
+haem_name_typesetter
+```
+
 #### `_number_column_reader`
 
 ```text
@@ -16214,13 +16547,15 @@ Helper function to read one column of a fit file as numbers.
 
 ---- Inputs ----
 column : pd.Series
-    The column as read from the file; row i is row i + 2 of the file.
+    The column as read from the file; row i is row i + first_row of the file.
 haem : str
     Name of the haem the column belongs to, used in the message.
 kind : str
     'wavelength' or 'response', used in the message.
 label : str
     Name of the fit file, used in the message.
+first_row : int
+    Row of the file that holds row 0 of the column (counted from 1).
 
 ---- Globals read ----
 None.
@@ -16520,6 +16855,52 @@ delta_abs_calculator
 s_array_generator
 ```
 
+#### `fit_file_writer`
+
+```text
+---- Summary ----
+Main function to save a fit as a fit file in the layout with heading lines
+(DATA_FORMAT.md, "fit csv"), which fit_importer reads back as the same fit.
+
+---- Inputs ----
+fit : Dict[str, Any]
+    Fit dictionary, as fit_importer or fit_table_builder give it: names in figure
+    form or plain, the table on the standard scale.
+path : Path
+    File to write (.csv).
+unit : str
+    Unit of the values written, one of FIT_UNITS.
+holds : str
+    What the file holds, in words, for its Holds line.
+way_up : Optional[str]
+    One of FIT_WAY_UP for a file of haem shapes, which then has a Way up line;
+    None for no Way up line (the shapes are written as the decomposition uses them).
+notes : Sequence[Tuple[str, str]]
+    Further heading lines for people, as (name, text), for example ('Made from',
+    'the instrument's fit ...'), written in this order under the Names line.
+
+---- Globals read ----
+FIT_FILE_MARK, FIT_FILE_FORMAT, FIT_UNITS, FIT_WAY_UP, FIT_WAY_UP_TEXTS,
+FIT_NAMES_TEXT (module constants).
+
+---- Outputs ----
+Path
+    The file written. Raises ValueError when the unit or the way up is not one
+    this module knows, or two haems have the same plain name or one has none.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+value written = response x divisor of the unit (FIT_UNITS) x way-up sign
+(FIT_WAY_UP), to 15 significant digits: a value typed with fewer digits is written
+as typed, and any other moves by less than 1e-14 of itself. Rows blank in every
+haem are left out, so no leftover rows are written.
+
+---- Helpers ----
+haem_name_plainer
+```
+
 #### `fit_haem_selector`
 
 ```text
@@ -16562,19 +16943,24 @@ Main function to import a haem spectral fit CSV, checked and on the standard sca
 
 ---- Inputs ----
 filename : Path
-    CSV with (wavelength, response) column pairs, one pair per haem; the header of
-    each wavelength column names the haem. The haems may have different lengths.
+    CSV with (wavelength, response) column pairs, one pair per haem, the haem's
+    name over its wavelength column; the haems may have different lengths. Either
+    in the layout with heading lines (first cell FIT_FILE_MARK, then a Unit line;
+    see DATA_FORMAT.md, "fit csv"), or the older layout whose first row is the haem
+    names.
 
 ---- Globals read ----
-None.
+FIT_FILE_MARK (module constant).
 
 ---- Outputs ----
 Dict[str, Any]
     {'haem_list': haem names in file order, 'data': the cleaned table
-    (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the responses
-    of the file were divided by (1 or 1 000 000), 'notes': sentences for the user
-    about rows left out and the scale}. Raises ValueError, with a message for the
-    user, when the file cannot be read as a fit.
+    (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the values
+    of the file were divided by (1, 1 000 or 1 000 000), 'notes': sentences for
+    the user about rows left out and the scale}. A file with heading lines gives
+    its names in figure form (haem_name_typesetter); an older file gives them as
+    written. Raises ValueError, with a message for the user, when the file cannot
+    be read as a fit.
 
 ---- Globals mutated ----
 None. Reads the file (side effect).
@@ -16584,6 +16970,7 @@ None.
 
 ---- Helpers ----
 _fit_table_cleaner
+_headed_fit_reader
 fit_scale_standardiser
 ```
 
@@ -16647,6 +17034,67 @@ None.
 peak = largest |response| in the table. Standard: low <= peak <= high
 (FIT_PEAK_BAND). Large: low x 1e6 <= peak <= high x 1e6, then response = response
 / 1e6. The mOD and % values do not depend on the scale; the raw amounts do.
+
+---- Helpers ----
+None.
+```
+
+#### `haem_name_plainer`
+
+```text
+---- Summary ----
+Main function to write a haem name in plain words, without the plotting codes of
+its figure form: 'Cyt $b_{557}$' becomes 'Cyt b557'. The reverse of
+haem_name_typesetter for the names it makes.
+
+---- Inputs ----
+name : str
+    Haem name, in figure form or plain.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The name with each $...$ part written without its $, _, { and } signs; a
+    name without such a part is returned as it is.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `haem_name_typesetter`
+
+```text
+---- Summary ----
+Main function to put a plain haem name in the form the figures draw: the haem
+letters in italics and a capital letter or number after them below the line, so
+'Cyt bH' becomes 'Cyt $b_H$', 'Cyt a605' 'Cyt $a_{605}$' and 'Cyt cc' 'Cyt $cc$'.
+
+---- Inputs ----
+name : str
+    Plain haem name, words separated by spaces.
+
+---- Globals read ----
+HAEM_NAME_WORD (module constant).
+
+---- Outputs ----
+str
+    The name with each haem word (HAEM_NAME_WORD: one to three of the letters a,
+    b, c, d, o, then a capital letter or a number) in figure form; other words,
+    such as 'Cyt', 'PC1' or 'a-like', as written.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
