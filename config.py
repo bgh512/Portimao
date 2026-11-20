@@ -93,7 +93,6 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ho_pub_height': 0.75,
                    'ho_size_mode': 'default',
                    }
-TRANSMISSION_MODE = 'fraction'  # "fraction", "percentage" or "absorbance"
 DEGREE_OF_SCATTER = 1
 HAEM_FACTOR = 1_000_000
 # points in a row whose median is a reference level: the 0 of delta A, the 0 % and the

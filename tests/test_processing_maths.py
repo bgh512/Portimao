@@ -127,7 +127,7 @@ def test_attenuation_from_known_ratios() -> None:
     """
     ---- Summary ----
     Main function to check that light cut to a tenth and a hundredth gives 1 and 2,
-    whether it is given as a fraction, as counts against a reference or as a percentage.
+    whether it is given as a fraction or as counts against a reference.
 
     ---- Inputs ----
     None.
@@ -153,13 +153,7 @@ def test_attenuation_from_known_ratios() -> None:
     assert np.allclose(attenuation_converter([1.0, 0.1, 0.01]), expected, atol=1e-12)
     counts, reference = np.array([1000.0, 100.0, 10.0]), 1000.0
     assert np.allclose(attenuation_converter(counts / reference), expected, atol=1e-12)
-    assert np.allclose(attenuation_converter([100.0, 10.0, 1.0], mode='percentage'),
-                       expected,
-                       atol=1e-12,
-                       )
     assert np.allclose(attenuation_converter([0.5]), [0.30103], atol=1e-6)
-    already = np.array([0.3, -0.2])
-    assert np.array_equal(attenuation_converter(already, mode='absorbance'), already)
 
 
 # ---- test_attenuation_of_impossible_values -------------------------------------------
@@ -167,7 +161,7 @@ def test_attenuation_of_impossible_values() -> None:
     """
     ---- Summary ----
     Main function to check that a transmission with no logarithm (zero, negative or
-    missing) becomes a blank, and that an unknown kind of input is refused.
+    missing) becomes a blank.
 
     ---- Inputs ----
     None.
@@ -191,8 +185,6 @@ def test_attenuation_of_impossible_values() -> None:
     result = attenuation_converter([0.0, -0.5, np.nan, np.inf, 0.1])
     assert np.all(np.isnan(result[:4]))
     assert np.isclose(result[4], 1.0)
-    with pytest.raises(ValueError):
-        attenuation_converter([0.5], mode='counts')
 
 
 # ---- test_attenuation_added_to_an_experiment -----------------------------------------
@@ -234,6 +226,69 @@ def test_attenuation_added_to_an_experiment() -> None:
                        [[0.0, 1.0, 2.0], [-1.0, -2.0, 0.0]],
                        atol=1e-12,
                        )
+
+
+# ---- test_blank_warning_counts_the_fitted_range --------------------------------------
+def test_blank_warning_counts_the_fitted_range(capsys: pytest.CaptureFixture) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the warning about blank transmission values counts
+    only the wavelengths of the fit when a range is given, every wavelength when none
+    is, and is not printed when the only blanks are outside the range.
+
+    ---- Inputs ----
+    capsys : pytest.CaptureFixture
+        What the program printed (pytest).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Three spectra at 500, 550, 600 and 650 nm. Spectrum 1 has a zero at 500 nm,
+    spectrum 2 a zero at 550 nm and a missing value at 650 nm, spectrum 3 none. Every
+    wavelength: 3 blanks in 2 spectra. Between 540 and 610 nm: 1 blank in 1 spectrum.
+    Between 590 and 610 nm: none.
+
+    ---- Helpers ----
+    None.
+    """
+
+    transmission = np.array([[0.0, 0.5, 0.5, 0.5],
+                             [0.5, 0.0, 0.5, np.nan],
+                             [0.5, 0.5, 0.5, 0.5],
+                             ],
+                            )
+    experiment = {'experiment_name': 'blanks',
+                  'raw_spectra': {'Cyt': {'transmission': transmission,
+                                          'wavelengths': np.array([500.0,
+                                                                   550.0,
+                                                                   600.0,
+                                                                   650.0,
+                                                                   ],
+                                                                  ),
+                                          },
+                                  },
+                  }
+    experiment_attenuation_adder(experiment)
+    printed = capsys.readouterr().out
+    assert '3 transmission values were' in printed
+    assert '(2 spectra affected)' in printed
+    experiment_attenuation_adder(experiment, checked_range_nm=(540.0, 610.0))
+    printed = capsys.readouterr().out
+    assert '1 transmission values between 540 and 610 nm' in printed
+    assert '(1 spectra affected)' in printed
+    experiment_attenuation_adder(experiment, checked_range_nm=(590.0, 610.0))
+    assert capsys.readouterr().out == ''
+    # the blanks themselves are kept whatever the range
+    assert np.count_nonzero(np.isnan(experiment['raw_spectra']['Cyt']['attenuation'],
+                                     ),
+                            ) == 3
 
 
 # ---- test_normalising_by_od_volume_and_dilution --------------------------------------
@@ -278,6 +333,52 @@ def test_normalising_by_od_volume_and_dilution() -> None:
     assert np.allclose(experiment['VoO2_OD'][VO2_COLUMN], [1.0, 2.0, 5.0])
     assert np.allclose(experiment['VoO2_OD'][TIME_COLUMN], [0.0, 1.0, 2.0])
     assert np.allclose(experiment['VoO2'][VO2_COLUMN], [12.0, 24.0, 60.0])
+
+
+# ---- test_unreadable_numbers_stop_both_scalings --------------------------------------
+def test_unreadable_numbers_stop_both_scalings() -> None:
+    """
+    ---- Summary ----
+    Main function to check that a value that is not a number stops the OD scaling and
+    the % scaling alike, with the same plain message, and that an empty cell stays
+    empty in both.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    TIME_COLUMN, VO2_COLUMN (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Values 2, 2, empty, 6, 6 with one point in a row: OD 2, volume 3 and dilution 2
+    divide by 12, so 2 -> 1/6 and 6 -> 0.5; on the % scale 2 -> 0 and 6 -> 100. The
+    empty cell stays empty in both.
+
+    ---- Helpers ----
+    None.
+    """
+
+    times = np.arange(5) * 0.1
+    bad = pd.DataFrame({TIME_COLUMN: times, VO2_COLUMN: [2.0, 2.0, 'n/a', 6.0, 6.0]})
+    with pytest.raises(ValueError, match='not a number'):
+        percent_scaler(bad, window_points=1, label='bad file')
+    with pytest.raises(ValueError, match='not a number'):
+        data_normaliser(bad[[VO2_COLUMN]], 2.0, 3.0, 2.0, label='bad file')
+    with pytest.raises(ValueError, match='not a number'):
+        data_normaliser(bad[VO2_COLUMN], 2.0, 3.0, 2.0, label='bad file')
+    gap = pd.DataFrame({TIME_COLUMN: times, VO2_COLUMN: [2.0, 2.0, None, 6.0, 6.0]})
+    percent = percent_scaler(gap, window_points=1)[VO2_COLUMN].to_numpy(dtype=float)
+    assert np.allclose(percent[[0, 1, 3, 4]], [0.0, 0.0, 100.0, 100.0])
+    assert np.isnan(percent[2])
+    scaled = data_normaliser(gap[VO2_COLUMN], 2.0, 3.0, 2.0).to_numpy(dtype=float)
+    assert np.allclose(scaled[[0, 1, 3, 4]], [1 / 6, 1 / 6, 0.5, 0.5])
+    assert np.isnan(scaled[2])
 
 
 # ---- test_percent_of_a_trace_with_plateaus -------------------------------------------
@@ -499,6 +600,7 @@ def test_averages_around_the_additions() -> None:
                                                 window_minutes=2.0,
                                                 gap_minutes=0.5,
                                                 final_window_gap_minutes=0.5,
+                                                baseline_minimum_seconds=10.0,
                                                 vo2_source='raw',
                                                 haem_source=None,
                                                 )
@@ -551,6 +653,7 @@ def test_average_that_does_not_fit() -> None:
                                                 window_minutes=4.0,
                                                 gap_minutes=0.5,
                                                 final_window_gap_minutes=0.5,
+                                                baseline_minimum_seconds=10.0,
                                                 vo2_source='raw',
                                                 haem_source=None,
                                                 )

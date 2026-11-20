@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.paf_reader import experiment_paf_loader, MARK, PafFile, token_reader
 from utils_shared.spectral_decomposer import experiment_decomposer, fit_importer
@@ -169,7 +170,16 @@ def _haem_trace_loader() -> dict:
 
     experiment = experiment_paf_loader(PAF_FILE, spectral_datasets=('Cyt',))
     experiment_attenuation_adder(experiment)
-    experiment_decomposer(experiment, fit_importer(FIT_FILE))
+    # the program's own standard settings, so the amounts are those a user gets
+    answers = settings.DEFAULT_ANSWERS
+    experiment_decomposer(experiment,
+                          fit_importer(FIT_FILE),
+                          dataset_name=answers['decomposition_dataset'],
+                          degree_of_scatter=settings.DEGREE_OF_SCATTER,
+                          haemfactor=settings.HAEM_FACTOR,
+                          delta_exclude_first_minutes=answers['ignore_first_minutes'],
+                          delta_window_points=settings.REFERENCE_WINDOW_POINTS,
+                          )
     amounts = experiment['haem_conc']
     ours = {name: amounts[name].to_numpy(dtype=float) for name in HAEM_TRACES}
     del experiment  # the spectra are not needed once the amounts are known

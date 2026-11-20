@@ -85,10 +85,10 @@ def _baseline_change_adder(window_stats: Dict[str, Dict[str, float]],
 def experiment_averages_calculator(experiment: dict,
                                    window_minutes: float,
                                    gap_minutes: float,
-                                   final_window_gap_minutes: float = 0.5,
+                                   final_window_gap_minutes: float,
+                                   baseline_minimum_seconds: float,
                                    vo2_source: Optional[str] = 'od',
                                    haem_source: Optional[str] = 'abs',
-                                   baseline_minimum_seconds: float = 10.0,
                                    ) -> dict:
     """
     ---- Summary ----
@@ -105,13 +105,13 @@ def experiment_averages_calculator(experiment: dict,
     final_window_gap_minutes : float
         How long before the end of the recording the last window ends, in minutes (>=
         0).
+    baseline_minimum_seconds : float
+        Least time the data inside the baseline window (average0) must span, in
+        seconds (>= 0).
     vo2_source : Optional[str]
         VoO2 source key (e.g. 'od', 'raw', 'percent'); None leaves VoO2 out.
     haem_source : Optional[str]
         Haem source key (e.g. 'abs', 'delta_abs_od'); None leaves the haems out.
-    baseline_minimum_seconds : float
-        Least time the data inside the baseline window (average0) must span, in
-        seconds (>= 0).
 
     ---- Globals read ----
     schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES.

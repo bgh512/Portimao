@@ -579,10 +579,7 @@ def pca_spectra_gatherer(session: ViewerSession,
                                        start_time=info['trim_start'],
                                        end_time=info['trim_end'],
                                        )
-                experiment_attenuation_adder(experiment,
-                                             mode=settings.TRANSMISSION_MODE,
-                                             datasets=(dataset,),
-                                             )
+                experiment_attenuation_adder(experiment, datasets=(dataset,))
             data = experiment['raw_spectra'][dataset]
             times = np.asarray(data['time'], dtype=float)
             duration = float(experiment['CcO2'].iloc[-1, 0])

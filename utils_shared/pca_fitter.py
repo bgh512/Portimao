@@ -741,6 +741,9 @@ def fit_table_builder(result: dict, names: Optional[List[str]] = None) -> dict:
         largest peak of +1) brought to the standard scale of the fit files, so the
         raw amounts are the same whether the components are used at once or saved and
         read back: the spectra they come from and the fit files have the same sign.
+        Raises ValueError, with a message for the user, when the names are not one
+        per component, or one is empty, holds a comma or is used twice: such a fit
+        could not be read back once saved.
 
     ---- Globals mutated ----
     None.
@@ -753,7 +756,21 @@ def fit_table_builder(result: dict, names: Optional[List[str]] = None) -> dict:
     """
 
     count = result['components'].shape[1]
-    names = list(names) if names else [f'PC{i + 1}' for i in range(count)]
+    names = ([str(name).strip() for name in names]
+             if names
+             else [f'PC{i + 1}' for i in range(count)]
+             )
+    if len(names) != count:
+        raise ValueError(f'{count} components were found but {len(names)} names were '
+                         'given. Give one name for each component.',
+                         )
+    if (any(not name or ',' in name for name in names)
+        or len(set(names)) != len(names)
+        ):
+        raise ValueError('Every component needs its own name, not empty and without '
+                         f"commas (the names given: {'; '.join(names)}). Name the "
+                         'components again.',
+                         )
     columns = {}
     for i, name in enumerate(names):
         columns[name] = result['wavelengths']

@@ -30,7 +30,7 @@ def _frame_normaliser(df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
     df : pd.DataFrame
         Data frame with a time column and measurement columns.
     **kwargs : Any
-        optical_density, volume and dilution_factor, passed to data_normaliser.
+        optical_density, volume, dilution_factor and label, passed to data_normaliser.
 
     ---- Globals read ----
     None.
@@ -57,6 +57,49 @@ def _frame_normaliser(df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
     return result
 
 
+# ---- _number_reader ------------------------------------------------------------------
+def _number_reader(column: pd.Series, label: str) -> pd.Series:
+    """
+    ---- Summary ----
+    Helper function to read one column as numbers, by the one rule of the scalings: an
+    empty cell stays empty, anything else that is not a number stops the scaling.
+
+    ---- Inputs ----
+    column : pd.Series
+        The column as it is in the table.
+    label : str
+        Name of the experiment or data, used in the message.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    pd.Series
+        The column as float64, NaN where the cell is empty. Raises ValueError, with a
+        message for the user, when a cell holds something that is not a number.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    numbers = pd.to_numeric(column, errors='coerce').astype(float)
+    unreadable = numbers.isna() & column.notna()
+    if unreadable.any():
+        example = column[unreadable].iloc[0]
+        raise ValueError(f'{label}: the {column.name} values hold something that is '
+                         f'not a number ({str(example)[:20]!r}), so they cannot be '
+                         'scaled. The file may be damaged; save it again from the '
+                         'instrument software.',
+                         )
+    return numbers
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -65,6 +108,7 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     optical_density: float,
                     volume: float,
                     dilution_factor: float,
+                    label: str = 'data',
                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     ---- Summary ----
@@ -79,14 +123,17 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         Volume of the sample (> 0).
     dilution_factor : float
         Dilution factor (> 0).
+    label : str
+        Name used in error messages.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     Union[pd.DataFrame, pd.Series, np.ndarray]
-        Scaled data of the same kind as the input. Raises ValueError if the denominator
-        is not positive and finite.
+        Scaled data of the same kind as the input; empty cells stay empty. Raises
+        ValueError, with a message for the user, if the denominator is not positive
+        and finite or a cell holds something that is not a number.
 
     ---- Globals mutated ----
     None.
@@ -95,7 +142,7 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     scaled = data / (dilution_factor x optical_density x volume).
 
     ---- Helpers ----
-    None.
+    _number_reader
     """
 
     denominator = float(dilution_factor) * float(optical_density) * float(volume)
@@ -104,11 +151,16 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                          '0. Correct them where the program asks for the OD.',
                          )
     if isinstance(data, pd.DataFrame):
-        return data.apply(lambda column: pd.to_numeric(column, errors='raise'),
-                          ) / denominator
+        return data.apply(lambda column: _number_reader(column, label)) / denominator
     if isinstance(data, pd.Series):
-        return pd.to_numeric(data, errors='raise') / denominator
-    return np.asarray(data, dtype=float) / denominator
+        return _number_reader(data, label) / denominator
+    try:
+        return np.asarray(data, dtype=float) / denominator
+    except (TypeError, ValueError):
+        raise ValueError(f'{label}: the values hold something that is not a number, '
+                         'so they cannot be scaled. The file may be damaged; save it '
+                         'again from the instrument software.',
+                         ) from None
 
 
 # ---- experiment_normaliser -----------------------------------------------------------
@@ -158,6 +210,7 @@ def experiment_normaliser(experiment: dict) -> dict:
     kwargs = {'optical_density': metadata['OD'],
               'volume': metadata['volume'],
               'dilution_factor': metadata['dilution_factor'],
+              'label': experiment['experiment_name'],
               }
     if not measurement_column_finder(experiment['VoO2']):
         raise ValueError(f"{experiment['experiment_name']}: the file has no oxygen "
@@ -230,10 +283,10 @@ def percent_converter(experiment: dict,
 
 # ---- percent_scaler ------------------------------------------------------------------
 def percent_scaler(df: pd.DataFrame,
+                   window_points: int,
                    label: str = 'data',
                    exclude_first_minutes: float = 0.0,
                    exclude_last_minutes: float = 0.0,
-                   window_points: int = 50,
                    ) -> pd.DataFrame:
     """
     ---- Summary ----
@@ -243,14 +296,14 @@ def percent_scaler(df: pd.DataFrame,
     ---- Inputs ----
     df : pd.DataFrame
         Data frame with a time column (minutes) and measurement columns.
+    window_points : int
+        Number of points in a row that make a reference window (>= 1).
     label : str
         Name used in error messages.
     exclude_first_minutes : float
         Minutes after the first measurement that are ignored at the start.
     exclude_last_minutes : float
         Minutes before the last measurement that are ignored at the end.
-    window_points : int
-        Number of points in a row that make a reference window (>= 1).
 
     ---- Globals read ----
     None.
@@ -262,8 +315,8 @@ def percent_scaler(df: pd.DataFrame,
         (reference_level_finder), 'zero_percent_level', 'hundred_percent_level': their
         medians, 'window_seconds': the length of such a window}. A constant column
         becomes NaN. Raises ValueError, with a message for the user, for invalid
-        settings or when fewer than window_points values are left after the ignored
-        parts.
+        settings, when a cell holds something that is not a number, or when fewer
+        than window_points values are left after the ignored parts.
 
     ---- Globals mutated ----
     None.
@@ -274,6 +327,7 @@ def percent_scaler(df: pd.DataFrame,
     outside the range are kept.
 
     ---- Helpers ----
+    _number_reader
     measurement_column_finder
     reference_level_finder
     time_getter
@@ -304,7 +358,7 @@ def percent_scaler(df: pd.DataFrame,
     result = df.copy()
     scaling_info = {}
     for column in columns:
-        values = pd.to_numeric(df[column], errors='coerce').to_numpy(dtype=float)
+        values = _number_reader(df[column], label).to_numpy(dtype=float)
         lowest = reference_level_finder(times,
                                         values,
                                         start,

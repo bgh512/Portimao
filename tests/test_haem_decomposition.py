@@ -17,6 +17,7 @@ from utils_shared.pca_fitter import (component_builder,
                                      component_count_suggester,
                                      component_finder,
                                      decomposition_example_finder,
+                                     fit_table_builder,
                                      )
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
 from utils_shared.spectral_decomposer import (delta_abs_calculator,
@@ -228,6 +229,8 @@ def _series_decomposer(fit: dict) -> dict:
                   }
     return experiment_decomposer(experiment,
                                  fit,
+                                 dataset_name='Cyt',
+                                 degree_of_scatter=1,
                                  haemfactor=HAEM_FACTOR,
                                  delta_exclude_first_minutes=0.0,
                                  delta_window_points=1,
@@ -649,6 +652,8 @@ def test_a_series_gives_its_amounts_back() -> None:
     fit = fit_importer(FIT_FILE)
     experiment_decomposer(experiment,
                           fit,
+                          dataset_name='Cyt',
+                          degree_of_scatter=1,
                           haemfactor=HAEM_FACTOR,
                           delta_exclude_first_minutes=0.0,
                           delta_window_points=1,
@@ -721,6 +726,8 @@ def test_the_three_routes_give_the_same_amounts() -> None:
                   }
     experiment_decomposer(experiment,
                           fit,
+                          dataset_name='Cyt',
+                          degree_of_scatter=1,
                           haemfactor=HAEM_FACTOR,
                           delta_exclude_first_minutes=0.0,
                           delta_window_points=1,
@@ -824,8 +831,11 @@ def test_a_failed_decomposition_leaves_nothing() -> None:
     with pytest.raises(ValueError, match='Ignore less'):
         experiment_decomposer(experiment,
                               fit_importer(FIT_FILE),
+                              dataset_name='Cyt',
+                              degree_of_scatter=1,
                               haemfactor=HAEM_FACTOR,
                               delta_exclude_first_minutes=10.0,
+                              delta_window_points=50,
                               )
     for key in ('haem_conc', 'haem_abs', 'haem_delta_abs'):
         assert key not in experiment
@@ -916,6 +926,46 @@ def test_two_mixed_shapes_give_two_components() -> None:
     result = component_builder(analysis, 2)
     assert np.sum(result['explained']) > 0.9999
     assert result['residual_rms'] < 2e-4
+
+
+# ---- test_component_names_must_differ ------------------------------------------------
+def test_component_names_must_differ() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the components found cannot be turned into a fit under
+    names that would break it once saved (the same name twice, an empty name, a comma,
+    too few names), and that proper names and no names both give a fit.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _mixed_spectra_builder
+    """
+
+    _, _, files = _mixed_spectra_builder()
+    result = component_builder(component_finder(files, (500.0, 650.0)), 2)
+    for names in (['b-like', 'b-like'], ['b-like', ' '], ['b,like', 'c-like']):
+        with pytest.raises(ValueError, match='its own name'):
+            fit_table_builder(result, names)
+    with pytest.raises(ValueError, match='one name for each'):
+        fit_table_builder(result, ['b-like'])
+    assert fit_table_builder(result, ['b-like', 'c-like'])['haem_list'] == ['b-like',
+                                                                            'c-like',
+                                                                            ]
+    assert fit_table_builder(result)['haem_list'] == ['PC1', 'PC2']
 
 
 # ---- test_the_two_shapes_are_found_again ---------------------------------------------

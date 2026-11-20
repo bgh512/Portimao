@@ -252,18 +252,10 @@ def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.nd
     None.
 
     ---- Helpers ----
-    _haem_shape_getter
+    fit_range_finder
     """
 
-    ranges = [_haem_shape_getter(fit_data, i)[0]
-              for i in range(fit_data.shape[1] // 2)
-              ]
-    if not ranges or any(x.size == 0 for x in ranges):
-        raise ValueError('One of the haems of the fit has no values, so the amounts '
-                         'cannot be worked out. Choose another fit file.',
-                         )
-    wmax = min(float(x.max()) for x in ranges)
-    wmin = max(float(x.min()) for x in ranges)
+    wmin, wmax = fit_range_finder(fit_data)
     return (wavelengths >= wmin) & (wavelengths <= wmax)
 
 
@@ -413,8 +405,8 @@ def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.n
 
 # ---- delta_abs_calculator ------------------------------------------------------------
 def delta_abs_calculator(haem_abs: pd.DataFrame,
-                         exclude_first_minutes: float = 5.0,
-                         window_points: int = 50,
+                         exclude_first_minutes: float,
+                         window_points: int,
                          label: str = 'haem_abs',
                          exclude_last_minutes: float = 0.0,
                          ) -> pd.DataFrame:
@@ -512,12 +504,12 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
 # ---- experiment_decomposer -----------------------------------------------------------
 def experiment_decomposer(experiment: dict,
                           fit: dict,
-                          dataset_name: str = 'Cyt',
+                          dataset_name: str,
+                          degree_of_scatter: int,
+                          haemfactor: float,
+                          delta_exclude_first_minutes: float,
+                          delta_window_points: int,
                           spectrum_type: str = 'attenuation',
-                          degree_of_scatter: int = 1,
-                          haemfactor: float = 1000000,
-                          delta_exclude_first_minutes: float = 5.0,
-                          delta_window_points: int = 50,
                           delta_exclude_last_minutes: float = 0.0,
                           ) -> dict:
     """
@@ -532,8 +524,6 @@ def experiment_decomposer(experiment: dict,
         Fit dictionary from fit_importer.
     dataset_name : str
         Spectral dataset to decompose.
-    spectrum_type : str
-        Field of the dataset to decompose, e.g. 'attenuation'.
     degree_of_scatter : int
         Number of scatter terms.
     haemfactor : float
@@ -543,6 +533,8 @@ def experiment_decomposer(experiment: dict,
         absorbance reference.
     delta_window_points : int
         Number of spectra in a row that make the delta absorbance reference window.
+    spectrum_type : str
+        Field of the dataset to decompose, e.g. 'attenuation'.
     delta_exclude_last_minutes : float
         Minutes before the last spectrum that are ignored when finding the delta
         absorbance reference.
@@ -711,6 +703,49 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
             }
 
 
+# ---- fit_range_finder ----------------------------------------------------------------
+def fit_range_finder(fit_data: pd.DataFrame) -> Tuple[float, float]:
+    """
+    ---- Summary ----
+    Main function to find the wavelength range shared by all the haems of a fit: the
+    only part of a spectrum the decomposition uses.
+
+    ---- Inputs ----
+    fit_data : pd.DataFrame
+        Fit table from fit_importer.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[float, float]
+        (lowest, highest) wavelength of the shared range (nm). Raises ValueError, with
+        a message for the user, when a haem of the fit has no rows.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    lowest = the highest of the haems' first wavelengths; highest = the lowest of
+    their last wavelengths.
+
+    ---- Helpers ----
+    _haem_shape_getter
+    """
+
+    ranges = [_haem_shape_getter(fit_data, i)[0]
+              for i in range(fit_data.shape[1] // 2)
+              ]
+    if not ranges or any(x.size == 0 for x in ranges):
+        raise ValueError('One of the haems of the fit has no values, so the amounts '
+                         'cannot be worked out. Choose another fit file.',
+                         )
+    return (max(float(x.min()) for x in ranges), min(float(x.max()) for x in ranges))
+
+
+# ---- fit_scale_standardiser----------------------------------------------------------
+
+
 # ---- fit_scale_standardiser ----------------------------------------------------------
 def fit_scale_standardiser(data: pd.DataFrame,
                            label: str,
@@ -771,8 +806,8 @@ def fit_scale_standardiser(data: pd.DataFrame,
 # ---- s_array_generator ---------------------------------------------------------------
 def s_array_generator(experimental_data: np.ndarray,
                       fit_data: pd.DataFrame,
-                      degree_of_scatter: int = 1,
-                      haemfactor: float = 1000000,
+                      degree_of_scatter: int,
+                      haemfactor: float,
                       ) -> np.ndarray:
     """
     ---- Summary ----
@@ -828,8 +863,8 @@ def s_array_generator(experimental_data: np.ndarray,
 # ---- spectrum_decomposer -------------------------------------------------------------
 def spectrum_decomposer(experimental_data: np.ndarray,
                         fit_data: pd.DataFrame,
-                        degree_of_scatter: int = 1,
-                        haemfactor: float = 1000000,
+                        degree_of_scatter: int,
+                        haemfactor: float,
                         ) -> Tuple[np.ndarray,
                                    np.ndarray,
                                    np.ndarray,

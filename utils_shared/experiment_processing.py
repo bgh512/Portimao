@@ -11,7 +11,7 @@ from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.averaging import experiment_averages_calculator
 from utils_shared.normalisation import experiment_normaliser, percent_converter
 from utils_shared.paf_reader import experiment_paf_loader, PafError
-from utils_shared.spectral_decomposer import experiment_decomposer
+from utils_shared.spectral_decomposer import experiment_decomposer, fit_range_finder
 from utils_shared.trimming import experiment_trimmer
 
 
@@ -138,8 +138,8 @@ def experiment_data_processor(info: dict,
         so the file is not read again). It is processed in place. None reads the file.
 
     ---- Globals read ----
-    settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
-    settings.REFERENCE_WINDOW_POINTS, settings.BASELINE_MINIMUM_SECONDS.
+    settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
+    settings.BASELINE_MINIMUM_SECONDS.
 
     ---- Outputs ----
     dict
@@ -161,6 +161,7 @@ def experiment_data_processor(info: dict,
     experiment_normaliser
     experiment_paf_loader
     experiment_trimmer
+    fit_range_finder
     percent_converter
     percent_need_checker
     source_chooser
@@ -223,9 +224,14 @@ def experiment_data_processor(info: dict,
                                     if a['export_spectra']
                                     else (a['decomposition_dataset'],)
                                     )
+            if fit is None or 'data' not in fit:
+                raise ValueError('No fit file was loaded, so the haems cannot be '
+                                 'worked out. Choose a fit file when the program asks '
+                                 'for one.',
+                                 )
             experiment_attenuation_adder(experiment,
-                                         mode=settings.TRANSMISSION_MODE,
                                          datasets=attenuation_datasets,
+                                         checked_range_nm=fit_range_finder(fit['data']),
                                          )
             print('  Decomposing ...')
             experiment_decomposer(experiment,
@@ -252,7 +258,7 @@ def experiment_data_processor(info: dict,
         except (KeyError, ValueError, PafError) as exc:
             _skip_reporter('the decomposition into haems', exc)
     elif a['export_spectra']:
-        experiment_attenuation_adder(experiment, mode=settings.TRANSMISSION_MODE)
+        experiment_attenuation_adder(experiment)
 
     # ---- 4.3 Normalise by OD ---------------------------------------------------------
     # OD scaling and relative (%) scaling.

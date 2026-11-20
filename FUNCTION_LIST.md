@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.13
+- **Version:** V1.15
 - **Date:** 20/11/2026
 
 ## Contents
@@ -49,6 +49,7 @@
     - [`test_a_failed_decomposition_leaves_nothing`](#test_a_failed_decomposition_leaves_nothing)
     - [`test_delta_a_zero_is_the_median_of_the_highest_points`](#test_delta_a_zero_is_the_median_of_the_highest_points)
     - [`test_two_mixed_shapes_give_two_components`](#test_two_mixed_shapes_give_two_components)
+    - [`test_component_names_must_differ`](#test_component_names_must_differ)
     - [`test_the_two_shapes_are_found_again`](#test_the_two_shapes_are_found_again)
 - [`tests/test_haem_direction.py`](#teststest_haem_directionpy)
     - [`_instrument_fit_reader`](#_instrument_fit_reader)
@@ -57,6 +58,14 @@
     - [`test_haem_amounts_fall_when_reduced`](#test_haem_amounts_fall_when_reduced)
     - [`test_haem_shapes_are_those_of_the_instrument`](#test_haem_shapes_are_those_of_the_instrument)
     - [`test_instrument_traces_fall_when_reduced`](#test_instrument_traces_fall_when_reduced)
+- [`tests/test_label_tidier.py`](#teststest_label_tidierpy)
+    - [`test_exponent_after_a_caret_is_raised`](#test_exponent_after_a_caret_is_raised)
+    - [`test_exponent_after_a_unit_is_raised`](#test_exponent_after_a_unit_is_raised)
+    - [`test_micro_is_written_with_its_sign`](#test_micro_is_written_with_its_sign)
+    - [`test_names_and_formulas_are_left_alone`](#test_names_and_formulas_are_left_alone)
+    - [`test_number_and_unit_get_a_space`](#test_number_and_unit_get_a_space)
+    - [`test_symbols_can_be_drawn_in_the_figures`](#test_symbols_can_be_drawn_in_the_figures)
+    - [`test_tidy_label_stays_as_it_is`](#test_tidy_label_stays_as_it_is)
 - [`tests/test_paf_reader_parts.py`](#teststest_paf_reader_partspy)
     - [`test_additions_copies_are_joined`](#test_additions_copies_are_joined)
     - [`test_additions_under_one_name_are_all_kept`](#test_additions_under_one_name_are_all_kept)
@@ -92,7 +101,9 @@
     - [`test_attenuation_from_known_ratios`](#test_attenuation_from_known_ratios)
     - [`test_attenuation_of_impossible_values`](#test_attenuation_of_impossible_values)
     - [`test_attenuation_added_to_an_experiment`](#test_attenuation_added_to_an_experiment)
+    - [`test_blank_warning_counts_the_fitted_range`](#test_blank_warning_counts_the_fitted_range)
     - [`test_normalising_by_od_volume_and_dilution`](#test_normalising_by_od_volume_and_dilution)
+    - [`test_unreadable_numbers_stop_both_scalings`](#test_unreadable_numbers_stop_both_scalings)
     - [`test_percent_of_a_trace_with_plateaus`](#test_percent_of_a_trace_with_plateaus)
     - [`test_percent_of_a_flat_trace`](#test_percent_of_a_flat_trace)
     - [`test_reference_level_from_points_in_a_row`](#test_reference_level_from_points_in_a_row)
@@ -128,6 +139,11 @@
     - [`test_pointed_time_on_a_scaled_picture`](#test_pointed_time_on_a_scaled_picture)
     - [`test_question_wanting_a_time_tells_the_window`](#test_question_wanting_a_time_tells_the_window)
     - [`test_time_axis_of_a_figure`](#test_time_axis_of_a_figure)
+- [`tests/test_window_parts.py`](#teststest_window_partspy)
+    - [`test_cell_of_the_od_table`](#test_cell_of_the_od_table)
+    - [`test_height_typed_in_the_strip`](#test_height_typed_in_the_strip)
+    - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
+    - [`test_widths_of_each_journal`](#test_widths_of_each_journal)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
     - [`exemplar_config_builder`](#exemplar_config_builder)
     - [`haem_labeller`](#haem_labeller)
@@ -362,6 +378,7 @@
     - [`watermark_style_builder`](#watermark_style_builder)
 - [`utils_shared/normalisation.py`](#utils_sharednormalisationpy)
     - [`_frame_normaliser`](#_frame_normaliser)
+    - [`_number_reader`](#_number_reader)
     - [`data_normaliser`](#data_normaliser)
     - [`experiment_normaliser`](#experiment_normaliser)
     - [`percent_converter`](#percent_converter)
@@ -457,6 +474,7 @@
     - [`delta_abs_calculator`](#delta_abs_calculator)
     - [`experiment_decomposer`](#experiment_decomposer)
     - [`fit_importer`](#fit_importer)
+    - [`fit_range_finder`](#fit_range_finder)
     - [`fit_scale_standardiser`](#fit_scale_standardiser)
     - [`s_array_generator`](#s_array_generator)
     - [`spectrum_decomposer`](#spectrum_decomposer)
@@ -474,6 +492,7 @@
     - [`_minutes_recaller`](#_minutes_recaller)
     - [`_natural_sorter`](#_natural_sorter)
     - [`_subscript_stripper`](#_subscript_stripper)
+    - [`_tidy_labels_offerer`](#_tidy_labels_offerer)
     - [`analysis_asker`](#analysis_asker)
     - [`averaging_asker`](#averaging_asker)
     - [`data_folder_lister`](#data_folder_lister)
@@ -489,6 +508,7 @@
     - [`haem_name_sorter`](#haem_name_sorter)
     - [`haem_scaling_asker`](#haem_scaling_asker)
     - [`label_angle_asker`](#label_angle_asker)
+    - [`label_tidier`](#label_tidier)
     - [`multi_experiment_asker`](#multi_experiment_asker)
     - [`ocr_option_builder`](#ocr_option_builder)
     - [`od_asker`](#od_asker)
@@ -510,6 +530,9 @@
     - [`_kept_builder`](#_kept_builder)
     - [`_pictures_builder`](#_pictures_builder)
     - [`multi_figure_checker_builder`](#multi_figure_checker_builder)
+- [`utils_viewer/viewer_od_table.py`](#utils_viewerviewer_od_tablepy)
+    - [`ODTable`](#odtable)
+    - [`cell_reader`](#cell_reader)
 - [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
     - [`PreviewSpec`](#previewspec)
     - [`TimeAxis`](#timeaxis)
@@ -543,10 +566,18 @@
     - [`_standard_fit_loader`](#_standard_fit_loader)
     - [`analysis_stage_runner`](#analysis_stage_runner)
     - [`browser_stage_runner`](#browser_stage_runner)
+    - [`details_stage_runner`](#details_stage_runner)
     - [`pca_stage_runner`](#pca_stage_runner)
     - [`plots_stage_runner`](#plots_stage_runner)
     - [`trim_stage_runner`](#trim_stage_runner)
     - [`viewer_asker`](#viewer_asker)
+- [`utils_viewer/viewer_strip.py`](#utils_viewerviewer_strippy)
+    - [`SettingsStrip`](#settingsstrip)
+    - [`_number_reader`](#_number_reader)
+    - [`_page_journal_finder`](#_page_journal_finder)
+    - [`height_checker`](#height_checker)
+    - [`strip_values_checker`](#strip_values_checker)
+    - [`width_choices_lister`](#width_choices_lister)
 - [`utils_viewer/viewer_terminal.py`](#utils_viewerviewer_terminalpy)
     - [`OutputRouter`](#outputrouter)
     - [`ansi_colour_getter`](#ansi_colour_getter)
@@ -1864,6 +1895,33 @@ third component must hold less than a ten-thousandth of the variance of the seco
 _mixed_spectra_builder
 ```
 
+#### `test_component_names_must_differ`
+
+```text
+---- Summary ----
+Main function to check that the components found cannot be turned into a fit under
+names that would break it once saved (the same name twice, an empty name, a comma,
+too few names), and that proper names and no names both give a fit.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_mixed_spectra_builder
+```
+
 #### `test_the_two_shapes_are_found_again`
 
 ```text
@@ -2091,6 +2149,193 @@ None.
 ---- Equations ----
 median of the last 2 min of the run (after the dithionite) - median of the 2 min
 before the first addition < 0.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_label_tidier.py`
+
+Tests of the tidy form of an event label, and that the figures can draw its symbols.
+
+### MAIN FUNCTIONS
+
+#### `test_exponent_after_a_caret_is_raised`
+
+```text
+---- Summary ----
+Main function to check that anything typed after ^ is raised, with or without a
+sign.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_exponent_after_a_unit_is_raised`
+
+```text
+---- Summary ----
+Main function to check that -1 written straight after a unit is raised, and that a
+litre becomes a capital L.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_micro_is_written_with_its_sign`
+
+```text
+---- Summary ----
+Main function to check that u in front of a unit becomes the micro sign.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_names_and_formulas_are_left_alone`
+
+```text
+---- Summary ----
+Main function to check that a name with numbers in it, a chemical formula, the word
+'ignore' and ordinary words are not changed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_number_and_unit_get_a_space`
+
+```text
+---- Summary ----
+Main function to check that a number written against its unit gets a space.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_symbols_can_be_drawn_in_the_figures`
+
+```text
+---- Summary ----
+Main function to check that every symbol of the Symbols row of the window and every
+character a tidy label can hold is in at least one of the fonts the figures use on
+this computer, so that none is drawn as an empty box.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FALLBACK_FONTS (module constant); settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Reads the font files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_tidy_label_stays_as_it_is`
+
+```text
+---- Summary ----
+Main function to check that a label that is already tidy is not changed, so its
+tidy form is not offered twice.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
@@ -2924,7 +3169,7 @@ None.
 ```text
 ---- Summary ----
 Main function to check that light cut to a tenth and a hundredth gives 1 and 2,
-whether it is given as a fraction, as counts against a reference or as a percentage.
+whether it is given as a fraction or as counts against a reference.
 
 ---- Inputs ----
 None.
@@ -2951,7 +3196,7 @@ None.
 ```text
 ---- Summary ----
 Main function to check that a transmission with no logarithm (zero, negative or
-missing) becomes a blank, and that an unknown kind of input is refused.
+missing) becomes a blank.
 
 ---- Inputs ----
 None.
@@ -2998,6 +3243,37 @@ attenuation = -log10(T).
 None.
 ```
 
+#### `test_blank_warning_counts_the_fitted_range`
+
+```text
+---- Summary ----
+Main function to check that the warning about blank transmission values counts
+only the wavelengths of the fit when a range is given, every wavelength when none
+is, and is not printed when the only blanks are outside the range.
+
+---- Inputs ----
+capsys : pytest.CaptureFixture
+    What the program printed (pytest).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Three spectra at 500, 550, 600 and 650 nm. Spectrum 1 has a zero at 500 nm,
+spectrum 2 a zero at 550 nm and a missing value at 650 nm, spectrum 3 none. Every
+wavelength: 3 blanks in 2 spectra. Between 540 and 610 nm: 1 blank in 1 spectrum.
+Between 590 and 610 nm: none.
+
+---- Helpers ----
+None.
+```
+
 #### `test_normalising_by_od_volume_and_dilution`
 
 ```text
@@ -3019,6 +3295,35 @@ None.
 
 ---- Equations ----
 With OD 2, volume 3 and dilution 2 the divisor is 12: 12 -> 1, 24 -> 2, 60 -> 5.
+
+---- Helpers ----
+None.
+```
+
+#### `test_unreadable_numbers_stop_both_scalings`
+
+```text
+---- Summary ----
+Main function to check that a value that is not a number stops the OD scaling and
+the % scaling alike, with the same plain message, and that an empty cell stays
+empty in both.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, VO2_COLUMN (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Values 2, 2, empty, 6, 6 with one point in a row: OD 2, volume 3 and dilution 2
+divide by 12, so 2 -> 1/6 and 6 -> 0.5; on the % scale 2 -> 0 and 6 -> 100. The
+empty cell stays empty in both.
 
 ---- Helpers ----
 None.
@@ -3960,6 +4265,125 @@ None.
 ---- Equations ----
 Two panels from 0.2 to 0.9 of the width, the lower from 0.1 and the upper to 0.9
 of the height, showing 0 to 45 min; a small panel with its own x axis is left out.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_window_parts.py`
+
+Tests of the parts of the settings strip and the OD table that need no window: the
+
+### MAIN FUNCTIONS
+
+#### `test_cell_of_the_od_table`
+
+```text
+---- Summary ----
+Main function to check that a cell gives its number (with a point or a comma), that
+an empty cell is "not filled in" and not wrong, and that words, zero, negative
+numbers and numbers that are not finite are wrong.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_height_typed_in_the_strip`
+
+```text
+---- Summary ----
+Main function to check that a height between 0 and 1 is taken and written in
+millimetres on the page of the journal, and that 0, a height over a page and words
+are refused with a reason.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A Nature page is 170 mm: 0.5 of it is 85 mm and the whole is 170 mm. A Science
+page is 230 mm: 0.25 of it is 57.5 mm. "None" uses the Nature page.
+
+---- Helpers ----
+None.
+```
+
+#### `test_values_meant_for_the_strip`
+
+```text
+---- Summary ----
+Main function to check that values the strip can show pass, and that an unknown
+name, an unknown journal, a width the journal does not allow and a height over a
+page are each refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_widths_of_each_journal`
+
+```text
+---- Summary ----
+Main function to check that the widths offered are those of the journal in the
+settings, in their order and with their millimetres, and that "None" offers the
+widths of the standard journal.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Nature allows 1 column (89 mm), 1.5 columns (120 mm) and 2 columns (183 mm).
 
 ---- Helpers ----
 None.
@@ -9415,10 +9839,7 @@ transmittance), as the instrument exports it.
 
 ---- Inputs ----
 transmission : Union[Sequence[float], np.ndarray]
-    Transmission values, any shape.
-mode : str
-    Meaning of the input: 'fraction' (0-1), 'percentage' (0-100) or 'absorbance'
-    (already converted, returned as is).
+    Transmission as a fraction (0-1), as the .paf files hold it; any shape.
 
 ---- Globals read ----
 None.
@@ -9426,7 +9847,7 @@ None.
 ---- Outputs ----
 np.ndarray
     Attenuation with the shape of the input. Zero, negative or non-finite
-    transmission becomes NaN. Raises ValueError for an unknown mode.
+    transmission becomes NaN.
 
 ---- Globals mutated ----
 None.
@@ -9449,11 +9870,12 @@ Main function to add an attenuation array to the spectral datasets of an experim
 ---- Inputs ----
 experiment : dict
     Experiment dictionary, as defined in DATA_FORMAT.md.
-mode : str
-    Transmission mode passed to attenuation_converter ('fraction', 'percentage' or
-    'absorbance').
 datasets : Optional[Sequence[str]]
     Dataset names to convert; None converts all of them.
+checked_range_nm : Optional[Tuple[float, float]]
+    (lowest, highest) wavelength (nm) in which blank values are counted for the
+    warning: the range of the fit when the spectra are decomposed, since a blank
+    outside it changes no haem amount. None counts every wavelength.
 
 ---- Globals read ----
 None.
@@ -9465,8 +9887,8 @@ dict
 
 ---- Globals mutated ----
 experiment: adds raw_spectra[dataset]["attenuation"] (n_spectra x n_wavelengths) for
-each converted dataset; prints a warning with the number of blank values (side
-effect).
+each converted dataset; prints a warning with the number of blank values inside
+checked_range_nm (side effect).
 
 ---- Equations ----
 None.
@@ -9534,13 +9956,13 @@ gap_minutes : float
 final_window_gap_minutes : float
     How long before the end of the recording the last window ends, in minutes (>=
     0).
+baseline_minimum_seconds : float
+    Least time the data inside the baseline window (average0) must span, in
+    seconds (>= 0).
 vo2_source : Optional[str]
     VoO2 source key (e.g. 'od', 'raw', 'percent'); None leaves VoO2 out.
 haem_source : Optional[str]
     Haem source key (e.g. 'abs', 'delta_abs_od'); None leaves the haems out.
-baseline_minimum_seconds : float
-    Least time the data inside the baseline window (average0) must span, in
-    seconds (>= 0).
 
 ---- Globals read ----
 schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES.
@@ -9953,8 +10375,8 @@ experiment : Optional[dict]
     so the file is not read again). It is processed in place. None reads the file.
 
 ---- Globals read ----
-settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
-settings.REFERENCE_WINDOW_POINTS, settings.BASELINE_MINIMUM_SECONDS.
+settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
+settings.BASELINE_MINIMUM_SECONDS.
 
 ---- Outputs ----
 dict
@@ -9976,6 +10398,7 @@ experiment_decomposer
 experiment_normaliser
 experiment_paf_loader
 experiment_trimmer
+fit_range_finder
 percent_converter
 percent_need_checker
 source_chooser
@@ -11441,7 +11864,7 @@ time and index columns untouched.
 df : pd.DataFrame
     Data frame with a time column and measurement columns.
 **kwargs : Any
-    optical_density, volume and dilution_factor, passed to data_normaliser.
+    optical_density, volume, dilution_factor and label, passed to data_normaliser.
 
 ---- Globals read ----
 None.
@@ -11461,6 +11884,37 @@ data_normaliser
 measurement_column_finder
 ```
 
+#### `_number_reader`
+
+```text
+---- Summary ----
+Helper function to read one column as numbers, by the one rule of the scalings: an
+empty cell stays empty, anything else that is not a number stops the scaling.
+
+---- Inputs ----
+column : pd.Series
+    The column as it is in the table.
+label : str
+    Name of the experiment or data, used in the message.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+pd.Series
+    The column as float64, NaN where the cell is empty. Raises ValueError, with a
+    message for the user, when a cell holds something that is not a number.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `data_normaliser`
@@ -11478,14 +11932,17 @@ volume : float
     Volume of the sample (> 0).
 dilution_factor : float
     Dilution factor (> 0).
+label : str
+    Name used in error messages.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 Union[pd.DataFrame, pd.Series, np.ndarray]
-    Scaled data of the same kind as the input. Raises ValueError if the denominator
-    is not positive and finite.
+    Scaled data of the same kind as the input; empty cells stay empty. Raises
+    ValueError, with a message for the user, if the denominator is not positive
+    and finite or a cell holds something that is not a number.
 
 ---- Globals mutated ----
 None.
@@ -11494,7 +11951,7 @@ None.
 scaled = data / (dilution_factor x optical_density x volume).
 
 ---- Helpers ----
-None.
+_number_reader
 ```
 
 #### `experiment_normaliser`
@@ -11576,14 +12033,14 @@ range.
 ---- Inputs ----
 df : pd.DataFrame
     Data frame with a time column (minutes) and measurement columns.
+window_points : int
+    Number of points in a row that make a reference window (>= 1).
 label : str
     Name used in error messages.
 exclude_first_minutes : float
     Minutes after the first measurement that are ignored at the start.
 exclude_last_minutes : float
     Minutes before the last measurement that are ignored at the end.
-window_points : int
-    Number of points in a row that make a reference window (>= 1).
 
 ---- Globals read ----
 None.
@@ -11595,8 +12052,8 @@ pd.DataFrame
     (reference_level_finder), 'zero_percent_level', 'hundred_percent_level': their
     medians, 'window_seconds': the length of such a window}. A constant column
     becomes NaN. Raises ValueError, with a message for the user, for invalid
-    settings or when fewer than window_points values are left after the ignored
-    parts.
+    settings, when a cell holds something that is not a number, or when fewer
+    than window_points values are left after the ignored parts.
 
 ---- Globals mutated ----
 None.
@@ -11607,6 +12064,7 @@ the lowest and of the highest points in a row (reference_level_finder). Values
 outside the range are kept.
 
 ---- Helpers ----
+_number_reader
 measurement_column_finder
 reference_level_finder
 time_getter
@@ -13177,6 +13635,9 @@ dict
     largest peak of +1) brought to the standard scale of the fit files, so the
     raw amounts are the same whether the components are used at once or saved and
     read back: the spectra they come from and the fit files have the same sign.
+    Raises ValueError, with a message for the user, when the names are not one
+    per component, or one is empty, holds a comma or is used twice: such a fit
+    could not be read back once saved.
 
 ---- Globals mutated ----
 None.
@@ -14713,7 +15174,7 @@ None.
 None.
 
 ---- Helpers ----
-_haem_shape_getter
+fit_range_finder
 ```
 
 ### MAIN FUNCTIONS
@@ -14883,8 +15344,6 @@ fit : dict
     Fit dictionary from fit_importer.
 dataset_name : str
     Spectral dataset to decompose.
-spectrum_type : str
-    Field of the dataset to decompose, e.g. 'attenuation'.
 degree_of_scatter : int
     Number of scatter terms.
 haemfactor : float
@@ -14894,6 +15353,8 @@ delta_exclude_first_minutes : float
     absorbance reference.
 delta_window_points : int
     Number of spectra in a row that make the delta absorbance reference window.
+spectrum_type : str
+    Field of the dataset to decompose, e.g. 'attenuation'.
 delta_exclude_last_minutes : float
     Minutes before the last spectrum that are ignored when finding the delta
     absorbance reference.
@@ -14956,6 +15417,36 @@ None.
 ---- Helpers ----
 _fit_table_cleaner
 fit_scale_standardiser
+```
+
+#### `fit_range_finder`
+
+```text
+---- Summary ----
+Main function to find the wavelength range shared by all the haems of a fit: the
+only part of a spectrum the decomposition uses.
+
+---- Inputs ----
+fit_data : pd.DataFrame
+    Fit table from fit_importer.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[float, float]
+    (lowest, highest) wavelength of the shared range (nm). Raises ValueError, with
+    a message for the user, when a haem of the fit has no rows.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+lowest = the highest of the haems' first wavelengths; highest = the lowest of
+their last wavelengths.
+
+---- Helpers ----
+_haem_shape_getter
 ```
 
 #### `fit_scale_standardiser`
@@ -15489,14 +15980,49 @@ None.
 None.
 ```
 
+#### `_tidy_labels_offerer`
+
+```text
+---- Summary ----
+Helper function to list the current event labels that could be written more tidily
+(8 ug ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use
+them all. Asks nothing when every label is tidy already.
+
+---- Inputs ----
+with_events : List[dict]
+    File summaries (DATA_FORMAT.md) of the files that have events.
+result : Dict[str, List[dict]]
+    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
+    labels are replaced by their tidy forms when the user agrees.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the labels in ``result`` and reads from and prints to the terminal
+(side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+label_tidier
+yes_no_asker
+```
+
 ### MAIN FUNCTIONS
 
 #### `analysis_asker`
 
 ```text
 ---- Summary ----
-Main function to ask section 3: haem decomposition, OD scaling, event averaging
-and the event labels.
+Main function to ask the OD values and the event labels of the import, then the
+haem decomposition and the event averaging.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -15680,7 +16206,9 @@ yes_no_asker
 ```text
 ---- Summary ----
 Main function to ask whether to change the event labels, concentrations and which
-events to ignore, file by file.
+events to ignore, file by file. A label that could be written more tidily (8 ug
+ml-1 as 8 µg mL⁻¹) is offered in its tidy form: the labels the files hold all at
+once, then each label as it is typed or kept.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -15688,8 +16216,9 @@ summaries : List[dict]
 saved : dict
     {file name: values read from its workbook} (read_saved_settings).
 again : bool
-    True when the user asked to change the labels again: the yes/no question is
-    skipped and the runs are listed straight away.
+    True when the user asked to change the labels again: the tidy forms of the
+    current labels and the yes/no question are skipped and the runs are listed
+    straight away.
 
 ---- Globals read ----
 None.
@@ -15708,7 +16237,9 @@ None.
 ---- Helpers ----
 _event_line_builder
 _file_focuser
+_tidy_labels_offerer
 info_printer
+label_tidier
 number_asker
 numbering_setter
 numbers_asker
@@ -15993,6 +16524,37 @@ None.
 
 ---- Helpers ----
 number_asker
+```
+
+#### `label_tidier`
+
+```text
+---- Summary ----
+Main function to write the units of an event label the tidy way: u as µ, l as L, a
+space between a number and its unit, and exponents raised. Only units are changed;
+a name with numbers in it (nd-011992, Q203) and a chemical formula (H2O2) are left
+as they are, since the two cannot be told apart.
+
+---- Inputs ----
+text : str
+    The label as typed or as written in the file.
+
+---- Globals read ----
+SUPERSCRIPT_TABLE, UNIT_PATTERN (module constants).
+
+---- Outputs ----
+str
+    The tidy label, for example '8 µg mL⁻¹ rifampicin' for '8ug ml-1 rifampicin';
+    the same text when nothing can be tidied.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `multi_experiment_asker`
@@ -16417,6 +16979,7 @@ _picture_shower
 _pointer_mover
 _resizer
 _step_taker
+_strip_change_teller
 _symbol_inserter
 _time_clicker
 _time_line_drawer
@@ -16426,11 +16989,18 @@ extra_publisher
 figure_shower
 file_focuser
 input_reader
+od_table_hider
+od_table_reader
+od_table_shower
 output_capturer
 pictures_publisher
 run
 session_attacher
 spec_publisher
+strip_fits_setter
+strip_listener_setter
+strip_reader
+strip_setter
 text_sender
 time_wanted_setter
 window_closer
@@ -16617,7 +17187,8 @@ Method to carry out one message from the other threads, on the window thread.
 ---- Inputs ----
 event : tuple
     (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-    'extra', 'image', 'time', 'closed' or 'finished'.
+    'extra', 'image', 'time', 'strip', 'strip_fits', 'od_show', 'od_hide',
+    'closed' or 'finished'.
 
 ---- Globals read ----
 None.
@@ -17049,6 +17620,36 @@ None.
 _navigator
 ```
 
+##### `_strip_change_teller`
+
+```text
+---- Summary ----
+Method to pass a change the user made in the settings strip to the function
+the program registered, if any.
+
+---- Inputs ----
+name : str
+    Name of the strip value that changed.
+value : Any
+    Its new value.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the registered function (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_symbol_inserter`
 
 ```text
@@ -17139,7 +17740,9 @@ pointed_time_finder
 
 ```text
 ---- Summary ----
-Method to build the terminal, the answer box, the plot and its file controls.
+Method to build the terminal, the answer box and the OD table (hidden until it
+is asked for) on the left, and the plot, its file controls and the settings
+strip on the right.
 
 ---- Inputs ----
 None.
@@ -17167,8 +17770,11 @@ _navigator
 _pointer_mover
 _resizer
 _step_taker
+_strip_change_teller
 _symbol_inserter
 _time_clicker
+ODTable
+SettingsStrip
 ```
 
 ##### `_window_raiser`
@@ -17310,6 +17916,92 @@ str
 
 ---- Globals mutated ----
 None. Waits for the user (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `od_table_hider`
+
+```text
+---- Summary ----
+Method to take the OD table away again. What was typed can still be read
+with od_table_reader.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `od_table_reader`
+
+```text
+---- Summary ----
+Method to give what the OD table holds. It is meant to be called once the
+user has answered the question asked after od_table_shower, which is when the
+table is sure to hold the rows that were sent.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[Dict[str, Dict[str, Optional[float]]], List[str]]
+    ({file name: {'OD', 'volume', 'dilution_factor'}}, with None for a cell
+    that is empty or wrong (DATA_FORMAT.md); the wrong cells as 'file name:
+    column heading').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `od_table_shower`
+
+```text
+---- Summary ----
+Method to bring up the OD table above the answer box, with one row per file.
+
+---- Inputs ----
+rows : Dict[str, Dict[str, Optional[float]]]
+    {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the
+    rows; a value that is None or missing leaves its cell empty
+    (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the rows for the window (side effect).
 
 ---- Equations ----
 None.
@@ -17462,6 +18154,116 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+##### `strip_fits_setter`
+
+```text
+---- Summary ----
+Method to give the settings strip the fits listed in its drop-down.
+
+---- Inputs ----
+names : List[str]
+    File names of the fits.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the list for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_listener_setter`
+
+```text
+---- Summary ----
+Method to register the function that is told what the user changes in the
+settings strip, or None to stop listening.
+
+---- Inputs ----
+listener : Optional[Callable[[str, Any], None]]
+    Called with (name, value) at each change, on the window thread: it must
+    return at once (for example by queueing the change).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the function on the instance (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_reader`
+
+```text
+---- Summary ----
+Method to give the values the settings strip shows now.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Any]
+    The strip values (DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_setter`
+
+```text
+---- Summary ----
+Method to show values in the settings strip. The listener is not told, as the
+program made the change itself.
+
+---- Inputs ----
+values : Dict[str, Any]
+    Some or all of the strip values (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing. Raises ValueError for a value the strip cannot show.
+
+---- Globals mutated ----
+None. Queues the values for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+strip_values_checker
 ```
 
 ##### `text_sender`
@@ -17770,6 +18572,344 @@ _pictures_builder
 active_gui_getter
 choice_asker
 info_printer
+```
+
+## `utils_viewer/viewer_od_table.py`
+
+The OD table of the window: one row per file with its OD, volume and dilution.
+
+### CLASSES
+
+#### `ODTable`
+
+```text
+---- Summary ----
+The table for the OD values: one row per file with a cell each for the OD, the
+volume and the dilution. A cell is clicked and typed in; Tab moves across, Enter
+and the arrows move down and up. A cell that is not a number above 0 turns red.
+It tells nothing by itself: the program reads the table when the user says it is
+filled in. Every method runs on the window thread, except rows_reader and
+problems_lister.
+
+---- Attributes ----
+frame : Any
+    The Tk frame holding the table, for the window to place.
+
+---- Globals read ----
+COLUMNS, CELL_WIDTH, MAXIMUM_HEIGHT_PX, ERROR_BACKGROUND, HEADING_TEXT.
+
+---- Methods ----
+__init__
+_cell_checker
+_cell_mover
+_cell_revealer
+_size_follower
+_wheel_scroller
+problems_lister
+rows_reader
+rows_setter
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the empty table; rows_setter fills it.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+ttk : Any
+    The tkinter.ttk module.
+parent : Any
+    The widget the table is built in.
+font : Tuple[str, int]
+    (family, size) of the text.
+colours : Dict[str, str]
+    {'background', 'text', 'cell', 'edge'}: the colours of the table, its
+    text, its cells and the edge of the cell being typed in.
+on_finish : Callable[[], None]
+    Called when Enter is pressed in the last row.
+
+---- Globals read ----
+MAXIMUM_HEIGHT_PX.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_follower
+_wheel_scroller
+```
+
+##### `_cell_checker`
+
+```text
+---- Summary ----
+Method to keep what was typed in one cell and to turn the cell red when it
+is not a number above 0.
+
+---- Inputs ----
+row : int
+    Row of the cell, from 0.
+key : str
+    Name of its value ('OD', 'volume' or 'dilution_factor').
+
+---- Globals read ----
+ERROR_BACKGROUND.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the text and colours the cell (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+cell_reader
+```
+
+##### `_cell_mover`
+
+```text
+---- Summary ----
+Method to move to the same cell of the row below or above. Past the last row
+the table is left, for the answer box.
+
+---- Inputs ----
+row : int
+    Row of the cell being typed in, from 0.
+key : str
+    Name of its value.
+step : int
+    +1 for the row below, -1 for the row above.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'break', so Tk does nothing more with the key.
+
+---- Globals mutated ----
+None. Moves the typing cursor (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_cell_revealer`
+
+```text
+---- Summary ----
+Method to scroll a long table so the row being typed in can be seen.
+
+---- Inputs ----
+row : int
+    Row of the cell that was entered, from 0.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Scrolls the table (side effect).
+
+---- Equations ----
+The table is moved so the row sits one row height under the top:
+share = (top of the row - its height) / height of the whole table.
+
+---- Helpers ----
+None.
+```
+
+##### `_size_follower`
+
+```text
+---- Summary ----
+Method to give the table the height of its rows, up to the height at which
+it scrolls.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+MAXIMUM_HEIGHT_PX.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Resizes the table (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_wheel_scroller`
+
+```text
+---- Summary ----
+Method to scroll a long table with the mouse wheel.
+
+---- Inputs ----
+event : Any
+    The Tk mouse wheel event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Scrolls the table (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `problems_lister`
+
+```text
+---- Summary ----
+Method to list the cells that hold something that is not a number above 0.
+It can be called from any thread.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+COLUMNS.
+
+---- Outputs ----
+List[str]
+    One 'file name: column heading' per wrong cell; empty when there is none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+cell_reader
+```
+
+##### `rows_reader`
+
+```text
+---- Summary ----
+Method to give the values typed in the table. It can be called from any
+thread.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+COLUMNS.
+
+---- Outputs ----
+Dict[str, Dict[str, Optional[float]]]
+    {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the
+    rows; None for a cell that is empty or wrong (DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+cell_reader
+```
+
+##### `rows_setter`
+
+```text
+---- Summary ----
+Method to fill the table: one row per file, in the order given, with the
+values the program already has.
+
+---- Inputs ----
+rows : Dict[str, Dict[str, Optional[float]]]
+    {file name: {'OD', 'volume', 'dilution_factor'}}; a value that is None
+    or missing leaves its cell empty (DATA_FORMAT.md).
+
+---- Globals read ----
+COLUMNS, CELL_WIDTH, HEADING_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Rebuilds the rows of the table (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_cell_checker
+_cell_mover
+_cell_revealer
+_wheel_scroller
+```
+
+### MAIN FUNCTIONS
+
+#### `cell_reader`
+
+```text
+---- Summary ----
+Main function to read what was typed in one cell of the OD table: a number above
+0, with a point or a comma as the decimal sign, or nothing yet.
+
+---- Inputs ----
+text : str
+    What the cell holds.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[Optional[float], bool]
+    (value, is_valid): (the number, True) for a number above 0; (None, True) for
+    an empty cell; (None, False) for anything else.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_viewer/viewer_preview.py`
@@ -18912,10 +20052,8 @@ info_printer
 
 ```text
 ---- Summary ----
-Main function to ask the analysis questions (haem decomposition, OD values, event
-averaging and event labels) one at a time. The plot is redrawn after each, except
-the OD values, which are only checked: the data is scaled by OD in the individual
-plots.
+Main function to ask the analysis questions (haem decomposition and event
+averaging) one at a time. The plot is redrawn after each.
 
 ---- Inputs ----
 session : ViewerSession
@@ -18928,16 +20066,16 @@ limits : Dict[str, dict]
     Trim and ignore limits of every file (trim_asker).
 fits_folder : Path
     Folder holding the fit .csv files.
-details_before : Optional[Dict[str, dict]]
-    OD values and events from an earlier pass, offered as defaults when the step is
-    asked again.
+details : Dict[str, dict]
+    OD values and events of every file (details_stage_runner); the averaging
+    windows are drawn around the events not ignored there.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-Tuple[Optional[dict], Dict[str, dict]]
-    (fit, details) exactly as analysis_asker returns them.
+Optional[dict]
+    The fit, or None when the haems are not decomposed.
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers`` (side effect).
@@ -18947,16 +20085,12 @@ None.
 
 ---- Helpers ----
 _answers_previewer
-_od_lister
 _review_asker
 _skipped_lister
 averaging_asker
 decomposition_asker
-event_asker
-od_scaling_asker
 pca_stage_runner
 preview_drawer
-saved_values_reader
 ```
 
 #### `browser_stage_runner`
@@ -18997,6 +20131,54 @@ _file_chooser
 choice_asker
 info_printer
 preview_drawer
+```
+
+#### `details_stage_runner`
+
+```text
+---- Summary ----
+Main function to ask the last questions of the import, on the standard plot cut to
+the limits: the OD values, then the event labels. The OD values are only checked:
+the data is scaled by OD in the individual plots. The plot is redrawn with the
+labels once they are entered.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file (trim_asker).
+fit : Optional[dict]
+    Fit the haems are shown with, or None for the oxygen and the OCR only.
+details_before : Optional[Dict[str, dict]]
+    OD values and events from an earlier pass, offered as defaults when the step is
+    asked again.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {'OD', 'volume', 'dilution_factor', 'events'}}; the OD entries are
+    only present when scaling by OD.
+
+---- Globals mutated ----
+None. Stores normalise_od in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_od_lister
+_review_asker
+event_asker
+od_scaling_asker
+preview_drawer
+saved_values_reader
 ```
 
 #### `pca_stage_runner`
@@ -19161,7 +20343,8 @@ trim_asker
 ```text
 ---- Summary ----
 Main function to ask the questions of the experiment browser: the file browser,
-trimming and ignoring, the analysis and the individual figures. The standard plot
+trimming and ignoring, the OD values and the event labels (which end the import),
+the analysis and the individual figures. The standard plot
 of every file (oxygen, OCR and the haems of the dataset's fit) is shown first, with
 no question asked. The plot window is redrawn after each answer, and at the end any
 step can be gone back to.
@@ -19201,6 +20384,7 @@ active_gui_getter
 analysis_stage_runner
 browser_stage_runner
 choice_asker
+details_stage_runner
 file_focus_setter
 heading_printer
 info_printer
@@ -19209,6 +20393,517 @@ numbering_setter
 plots_stage_runner
 section_starter
 trim_stage_runner
+```
+
+## `utils_viewer/viewer_strip.py`
+
+The settings strip under the plot: the haems, the fit, the journal and the figure size.
+
+### CLASSES
+
+#### `SettingsStrip`
+
+```text
+---- Summary ----
+The strip under the plot that always shows the current choices: a tick box for the
+haems, a drop-down of the fits, a drop-down of the journal, a drop-down of the
+widths that journal allows and a typing box for the height. It tells the window
+what the user changed and can be set by the program; it changes nothing by itself.
+Every method runs on the window thread, except values_reader.
+
+---- Attributes ----
+frame : Any
+    The Tk frame holding the strip, for the window to place.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS, JOURNAL_NAMES and the module
+constants.
+
+---- Methods ----
+__init__
+_change_reporter
+_fit_handler
+_haems_handler
+_height_handler
+_journal_handler
+_size_refresher
+_width_handler
+fits_setter
+values_reader
+values_setter
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the strip with the standard settings in it.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+ttk : Any
+    The tkinter.ttk module.
+parent : Any
+    The widget the strip is built in.
+background : str
+    Background colour of the strip.
+on_change : Callable[[str, Any], None]
+    Called with (name, value) each time the user changes a value; the names
+    are those of VALUE_NAMES.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS, JOURNAL_NAMES, NO_JOURNAL, NO_JOURNAL_TEXT,
+NOTE_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_fit_handler
+_haems_handler
+_height_handler
+_journal_handler
+_size_refresher
+_width_handler
+```
+
+##### `_change_reporter`
+
+```text
+---- Summary ----
+Method to tell the window each value that differs from what it was.
+
+---- Inputs ----
+before : Dict[str, Any]
+    The values before the user's change.
+
+---- Globals read ----
+VALUE_NAMES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the function given as on_change (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_fit_handler`
+
+```text
+---- Summary ----
+Method to take the fit picked in the drop-down.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+```
+
+##### `_haems_handler`
+
+```text
+---- Summary ----
+Method to take the tick box of the haems.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+```
+
+##### `_height_handler`
+
+```text
+---- Summary ----
+Method to take the height typed in the box, when Enter is pressed or the box
+is left. A height that cannot be used turns the box red, with the reason
+beside it, and is not passed on.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+ERROR_BACKGROUND, ERROR_TEXT, NO_JOURNAL.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+height_checker
+```
+
+##### `_journal_handler`
+
+```text
+---- Summary ----
+Method to take the journal picked in the drop-down. "None" gives the standard
+size; a journal gives back the size last chosen for a journal, with the first
+width of the journal when it does not allow the one chosen.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+NO_JOURNAL.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the values and reports the changes (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+width_choices_lister
+```
+
+##### `_size_refresher`
+
+```text
+---- Summary ----
+Method to show the kept values in every part of the strip: the widths offered
+follow the journal, and the width and the height are greyed for "None".
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+NO_JOURNAL, NOTE_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+height_checker
+width_choices_lister
+```
+
+##### `_width_handler`
+
+```text
+---- Summary ----
+Method to take the width picked in the drop-down.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+```
+
+##### `fits_setter`
+
+```text
+---- Summary ----
+Method to give the drop-down of the fits its list. The fit shown stays.
+
+---- Inputs ----
+names : List[str]
+    File names of the fits, as they are to be listed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the drop-down (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `values_reader`
+
+```text
+---- Summary ----
+Method to give the values the strip shows now. It can be called from any
+thread.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Any]
+    A copy of the strip values (DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `values_setter`
+
+```text
+---- Summary ----
+Method to show the values the program gives. Nothing is reported back, as the
+program made the change itself.
+
+---- Inputs ----
+values : Dict[str, Any]
+    Some or all of the strip values (DATA_FORMAT.md), already checked by
+    strip_values_checker.
+
+---- Globals read ----
+NO_JOURNAL.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the values and changes the widgets (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_refresher
+```
+
+### HELPERS
+
+#### `_number_reader`
+
+```text
+---- Summary ----
+Helper function to read a typed number, with a point or a comma as the decimal
+sign.
+
+---- Inputs ----
+text : str
+    What was typed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    The number, or None when the text is not one.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_page_journal_finder`
+
+```text
+---- Summary ----
+Helper function to give the journal whose page a strip journal is drawn on: the
+journal itself, or the standard journal for "None".
+
+---- Inputs ----
+journal : str
+    NO_JOURNAL or a key of settings.JOURNAL_SPECS.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS, NO_JOURNAL.
+
+---- Outputs ----
+str
+    A key of settings.JOURNAL_SPECS. Raises ValueError for an unknown journal.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `height_checker`
+
+```text
+---- Summary ----
+Main function to check a height typed as a share of a page, and to say what it is
+in millimetres on the page of the journal.
+
+---- Inputs ----
+text : str
+    What was typed, e.g. '0.5' or '0,5'.
+journal : str
+    NO_JOURNAL or a key of settings.JOURNAL_SPECS.
+
+---- Globals read ----
+settings.JOURNAL_SPECS, HEIGHT_HELP.
+
+---- Outputs ----
+Tuple[Optional[float], str]
+    (height, 'of a page (85 mm)') for a height above 0 and up to 1, or (None, why
+    it cannot be used).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+height in mm = height * page height of the journal in mm.
+
+---- Helpers ----
+_number_reader
+_page_journal_finder
+```
+
+#### `strip_values_checker`
+
+```text
+---- Summary ----
+Main function to check values meant for the strip before they are shown: the
+names, the journal, a width the journal allows and a height the page allows. The
+width and the height are checked against the journal given with them.
+
+---- Inputs ----
+values : Dict[str, Any]
+    Some or all of the strip values (DATA_FORMAT.md).
+
+---- Globals read ----
+VALUE_NAMES, HEIGHT_HELP.
+
+---- Outputs ----
+None
+    Nothing. Raises ValueError, in plain words, for a value the strip cannot
+    show.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_journal_finder
+width_choices_lister
+```
+
+#### `width_choices_lister`
+
+```text
+---- Summary ----
+Main function to list the widths a journal allows, each with the text shown in
+the drop-down.
+
+---- Inputs ----
+journal : str
+    NO_JOURNAL or a key of settings.JOURNAL_SPECS.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+List[Tuple[float, str]]
+    [(columns, '1 column (89 mm)'), ...] in the order of the settings.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_journal_finder
 ```
 
 ## `utils_viewer/viewer_terminal.py`
