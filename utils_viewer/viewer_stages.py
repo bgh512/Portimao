@@ -68,6 +68,7 @@ PCA_EXAMPLES_TITLE = 'PCA examples (smallest and largest residual)'
 DEFAULT_SMOOTHING_NM = 4.0  # offered width of the smoothing of the PCA components
 STAGE_TITLES = {'browser': 'Experiment browser',
                 'trim': 'Trimming and ignoring',
+                'details': 'OD values and event labels',
                 'analysis': 'Analysis',
                 'plots': 'Individual experiment plots',
                 }
@@ -776,14 +777,12 @@ def analysis_stage_runner(session: ViewerSession,
                           defaults: dict,
                           limits: Dict[str, dict],
                           fits_folder: Path,
-                          details_before: Optional[Dict[str, dict]] = None,
-                          ) -> Tuple[Optional[dict], Dict[str, dict]]:
+                          details: Dict[str, dict],
+                          ) -> Optional[dict]:
     """
     ---- Summary ----
-    Main function to ask the analysis questions (haem decomposition, OD values, event
-    averaging and event labels) one at a time. The plot is redrawn after each, except
-    the OD values, which are only checked: the data is scaled by OD in the individual
-    plots.
+    Main function to ask the analysis questions (haem decomposition and event
+    averaging) one at a time. The plot is redrawn after each.
 
     ---- Inputs ----
     session : ViewerSession
@@ -796,16 +795,16 @@ def analysis_stage_runner(session: ViewerSession,
         Trim and ignore limits of every file (trim_asker).
     fits_folder : Path
         Folder holding the fit .csv files.
-    details_before : Optional[Dict[str, dict]]
-        OD values and events from an earlier pass, offered as defaults when the step is
-        asked again.
+    details : Dict[str, dict]
+        OD values and events of every file (details_stage_runner); the averaging
+        windows are drawn around the events not ignored there.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    Tuple[Optional[dict], Dict[str, dict]]
-        (fit, details) exactly as analysis_asker returns them.
+    Optional[dict]
+        The fit, or None when the haems are not decomposed.
 
     ---- Globals mutated ----
     None. Stores the answers in ``answers`` (side effect).
@@ -815,25 +814,17 @@ def analysis_stage_runner(session: ViewerSession,
 
     ---- Helpers ----
     _answers_previewer
-    _od_lister
     _review_asker
     _skipped_lister
     averaging_asker
     decomposition_asker
-    event_asker
-    od_scaling_asker
     pca_stage_runner
     preview_drawer
-    saved_values_reader
     """
 
     summaries = session.summaries
-    details: Dict[str, dict] = {s['name']: {} for s in summaries}
     fit: Optional[dict] = None
-    saved = saved_values_reader(summaries, session.export_root)
-    for name, values in (details_before or {}).items():
-        saved[name] = dict(saved.get(name) or {}, **values)
-    answers.update({'decompose': False, 'normalise_od': False, 'averaging': False})
+    answers.update({'decompose': False, 'averaging': False})
     def redraw() -> bool:
         return preview_drawer(session,
                               _answers_previewer(answers, fit, 'analysis'),
@@ -873,24 +864,7 @@ def analysis_stage_runner(session: ViewerSession,
             break
         defaults = dict(defaults, decompose=True, fit_file=answers['fit_file'])
 
-    # ---- 2 OD values -----------------------------------------------------------------
-    # Only checked here; the data is scaled by OD in the individual plots
-    while True:
-        details = od_scaling_asker(summaries, answers, defaults, saved)
-        if not answers['normalise_od']:
-            break
-        _od_lister(details)
-        if _review_asker(session,
-                         'Do you accept these OD values?',
-                         'No, enter the OD values again',
-                         lambda: True,
-                         ):
-            break
-        defaults = dict(defaults, normalise_od=True)
-        for name, values in details.items():
-            saved[name] = dict(saved.get(name) or {}, **values)
-
-    # ---- 3 Averaging -----------------------------------------------------------------
+    # ---- 2 Averaging -----------------------------------------------------------------
     while True:
         averaging_asker(answers, defaults)
         if not answers['averaging']:
@@ -905,22 +879,7 @@ def analysis_stage_runner(session: ViewerSession,
             break
         defaults = dict(defaults, averaging=True)
         defaults.update({k: answers[k] for k in ('window_minutes', 'gap_minutes')})
-
-    # ---- 4 Event labels --------------------------------------------------------------
-    is_again = False
-    while True:
-        for name, events in event_asker(summaries, saved, is_again).items():
-            details[name]['events'] = events
-            saved[name] = dict(saved.get(name) or {}, events=events)
-        redraw()
-        if _review_asker(session,
-                         'Do you accept these event labels?',
-                         'No, change the labels again',
-                         redraw,
-                         ):
-            break
-        is_again = True
-    return fit, details
+    return fit
 
 
 # ---- browser_stage_runner ------------------------------------------------------------
@@ -1005,6 +964,108 @@ def browser_stage_runner(session: ViewerSession,
             session.current -= 1
         else:
             info_printer('There is no file in that direction.')
+
+
+# ---- details_stage_runner ------------------------------------------------------------
+def details_stage_runner(session: ViewerSession,
+                         answers: dict,
+                         defaults: dict,
+                         limits: Dict[str, dict],
+                         fit: Optional[dict],
+                         details_before: Optional[Dict[str, dict]] = None,
+                         ) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Main function to ask the last questions of the import, on the standard plot cut to
+    the limits: the OD values, then the event labels. The OD values are only checked:
+    the data is scaled by OD in the individual plots. The plot is redrawn with the
+    labels once they are entered.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    answers : dict
+        Answers dictionary the values are stored in.
+    defaults : dict
+        Default answers offered by the questions.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file (trim_asker).
+    fit : Optional[dict]
+        Fit the haems are shown with, or None for the oxygen and the OCR only.
+    details_before : Optional[Dict[str, dict]]
+        OD values and events from an earlier pass, offered as defaults when the step is
+        asked again.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: {'OD', 'volume', 'dilution_factor', 'events'}}; the OD entries are
+        only present when scaling by OD.
+
+    ---- Globals mutated ----
+    None. Stores normalise_od in ``answers`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _answers_previewer
+    _od_lister
+    _review_asker
+    event_asker
+    od_scaling_asker
+    preview_drawer
+    saved_values_reader
+    """
+
+    # ---- 1 Read the values of earlier runs -------------------------------------------
+    summaries = session.summaries
+    details: Dict[str, dict] = {s['name']: {} for s in summaries}
+    saved = saved_values_reader(summaries, session.export_root)
+    for name, values in (details_before or {}).items():
+        saved[name] = dict(saved.get(name) or {}, **values)
+    def redraw() -> bool:
+        return preview_drawer(session,
+                              _answers_previewer(answers, fit, 'standard'),
+                              limits,
+                              fit,
+                              details,
+                              )
+
+    # ---- 2 OD values -----------------------------------------------------------------
+    # Only checked here; the data is scaled by OD in the individual plots
+    while True:
+        details = od_scaling_asker(summaries, answers, defaults, saved)
+        if not answers['normalise_od']:
+            break
+        _od_lister(details)
+        if _review_asker(session,
+                         'Do you accept these OD values?',
+                         'No, enter the OD values again',
+                         lambda: True,
+                         ):
+            break
+        defaults = dict(defaults, normalise_od=True)
+        for name, values in details.items():
+            saved[name] = dict(saved.get(name) or {}, **values)
+
+    # ---- 3 Event labels --------------------------------------------------------------
+    is_again = False
+    while True:
+        for name, events in event_asker(summaries, saved, is_again).items():
+            details[name]['events'] = events
+            saved[name] = dict(saved.get(name) or {}, events=events)
+        redraw()
+        if _review_asker(session,
+                         'Do you accept these event labels?',
+                         'No, change the labels again',
+                         redraw,
+                         ):
+            break
+        is_again = True
+    return details
 
 
 # ---- pca_stage_runner ----------------------------------------------------------------
@@ -1489,7 +1550,8 @@ def viewer_asker(summaries: List[dict],
     """
     ---- Summary ----
     Main function to ask the questions of the experiment browser: the file browser,
-    trimming and ignoring, the analysis and the individual figures. The standard plot
+    trimming and ignoring, the OD values and the event labels (which end the import),
+    the analysis and the individual figures. The standard plot
     of every file (oxygen, OCR and the haems of the dataset's fit) is shown first, with
     no question asked. The plot window is redrawn after each answer, and at the end any
     step can be gone back to.
@@ -1529,6 +1591,7 @@ def viewer_asker(summaries: List[dict],
     analysis_stage_runner
     browser_stage_runner
     choice_asker
+    details_stage_runner
     file_focus_setter
     heading_printer
     info_printer
@@ -1574,15 +1637,24 @@ def viewer_asker(summaries: List[dict],
         answers['ignore_last_minutes'] = max(v['ignore_end']
                                              for v in state['limits'].values()
                                              )
+    def run_details() -> None:
+        old_defaults = dict(answers) if state.get('details') else defaults
+        state['details'] = details_stage_runner(session,
+                                                answers,
+                                                old_defaults,
+                                                state['limits'],
+                                                shown_fit(),
+                                                state.get('details'),
+                                                )
     def run_analysis() -> None:
         old_defaults = dict(answers) if state.get('fit_asked') else defaults
-        state['fit'], state['details'] = analysis_stage_runner(session,
-                                                               answers,
-                                                               old_defaults,
-                                                               state['limits'],
-                                                               fits_folder,
-                                                               state.get('details'),
-                                                               )
+        state['fit'] = analysis_stage_runner(session,
+                                             answers,
+                                             old_defaults,
+                                             state['limits'],
+                                             fits_folder,
+                                             state['details'],
+                                             )
         state['fit_asked'] = True
     def run_plots() -> None:
         old_defaults = dict(answers) if state.get('plots_asked') else defaults
@@ -1596,6 +1668,7 @@ def viewer_asker(summaries: List[dict],
         state['plots_asked'] = True
     steps = [('browser', run_browser),
              ('trim', run_trim),
+             ('details', run_details),
              ('analysis', run_analysis),
              ('plots', run_plots),
              ]

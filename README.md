@@ -167,11 +167,12 @@ Windows and macOS may show a "do you trust this software" warning the first time
 
 1. **Your files:** the `.paf` folder and the results folder. The plots of the files then appear on the right.
 2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. The four questions (trim start, trim end, ignore start, ignore end) all work the same way: yes/no, how many minutes for ALL the data, then optionally how many minutes for each specific file. Ignore times count from the new 0 after trimming. Once the limits are accepted you can export all the data now, cut to them (a workbook per file in `<results>/all_data/`, optionally with the spectra), to plot it yourself.
-3. **Analysis:** decompose the haems (which fit, or components found from your own data, section 2.7), enter the OD values (they are only checked here), average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
-4. **Individual experiment plots:** how the figure saved for each file looks, one choice at a time: oxygen and OCR, the haems and their order, how the haems are shown and whether they are scaled by OD, the event labels, then the journal and size.
-5. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
-6. **Experiment summaries:** time response (waterfall time points to skip, two kinetic traces, three decomposition plots), OCR and haem response (OCR, haem form, haems and order).
-7. **Data export**, then a summary and the start question.
+3. **OD values and event labels:** enter the OD values (they are only checked here), then change the event labels. Write `ignore` as an event's label to ignore an event that was not an addition. A label whose units could be written more tidily (`8 ug ml-1` as `8 µg mL⁻¹`) is offered in its tidy form: the labels in the files all at once, then each label as you type or keep it. This ends the import.
+4. **Analysis:** decompose the haems (which fit, or components found from your own data, section 2.7) and average around the events (window, gap).
+5. **Individual experiment plots:** how the figure saved for each file looks, one choice at a time: oxygen and OCR, the haems and their order, how the haems are shown and whether they are scaled by OD, the event labels, then the journal and size.
+6. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
+7. **Experiment summaries:** time response (waterfall time points to skip, two kinetic traces, three decomposition plots), OCR and haem response (OCR, haem form, haems and order).
+8. **Data export**, then a summary and the start question.
 
 Every figure asks for its own journal. Answering `None` uses Nature with the default size.
 
@@ -182,7 +183,8 @@ The program runs in one window. The left side is a text terminal that asks the q
 Under the answer box is a row of **Symbols** (µ, superscript and subscript digits such as ⁻¹ and ₂, ±, °, Δ, Greek letters and more): click one to type it at the cursor, for example for event labels like `8 µg ml⁻¹`. The plot stays usable while a question waits. You can flick through every file at any time without answering, and the accept questions wait while you look. All files are drawn in the background with the latest answers, so flicking between them is quick. The plot is for looking: it cannot be clicked to change anything.
 
 - **Trimming and ignoring:** the plot shows the raw data, and after every answer the TRIMMED part (grey, hatched) or IGNORED part (amber) is added, so the shading builds up as you answer; for a specific file the plot switches to that file. If you choose *No, enter the limits again*, the limits you entered before stay on the plot as red dashed lines while you enter the new ones. Answer *Yes, accept* or *No, enter the limits again* (your answers are offered as the defaults).
-- **Analysis:** the decomposition, averaging windows and event labels are each drawn for every file and accepted or asked again in the same way. An averaging window that does not fit between two additions (or after the last one) is skipped: it is drawn in red with a warning sign, and the terminal lists the files and windows affected so you can check it is OK. The OD values are listed and checked, but the data is not scaled by OD yet; that is chosen in the individual plots. Questions about one file (OD values, event labels) show that file.
+- **OD values and event labels:** the OD values are listed and checked, but the data is not scaled by OD yet; that is chosen in the individual plots. The event labels are drawn for every file and accepted or asked again. Questions about one file (OD values, event labels) show that file.
+- **Analysis:** the decomposition and the averaging windows are each drawn for every file and accepted or asked again in the same way. An averaging window that does not fit between two additions (or after the last one) is skipped: it is drawn in red with a warning sign, and the terminal lists the files and windows affected so you can check it is OK.
 - **Individual experiment plots:** the figure is built up choice by choice. After each of these the plot is redrawn and you accept it or choose again: oxygen and OCR (and which OCR), the haems and their order, how the haems are shown (and whether they are scaled by OD), the event labels, and the journal and size.
 - **Multi-experiment plots and summaries:** the drop-down lists the individual experiment plots, marked `[locked]` (with a padlock drawn on the plot) because they are final, followed by the figure being built. The time response is built panel by panel: first which time points the waterfalls skip, with the other panels shown as empty boxes ("Kinetic trace 1", "Decomposition 2" ...), then each kinetic trace and decomposition plot as you choose it, each with its own accept question. The haem and OCR response starts with the OCR and the baseline plots, then adds all the haems when you choose how to show them, then redraws as you choose which haems and in what order. The side by side and 2x2 figures are drawn once their questions are answered. Every figure ends with a final accept question. This reads the files again, so it can take a moment. Nothing is written to the results folder until the run starts.
 - **Going back:** after the individual plots you can go back to any earlier step. Its questions are asked again with your answers as the defaults, and your answers to the later steps are kept.
@@ -258,6 +260,8 @@ Portimao/
     utils_viewer/           the experiment browser (window with the questions and the plots)
         __init__.py
         viewer_gui.py       the browser window: terminal, plot, file selector and arrows
+        viewer_strip.py     the settings strip under the plot: haems, fit, journal and size
+        viewer_od_table.py  the OD table of the window: OD, volume and dilution per file
         viewer_terminal.py  colour codes and the output streams that feed the terminal
         viewer_renderer.py  the thread that draws the previews of every file
         viewer_window.py    the preview picture used when the window cannot open

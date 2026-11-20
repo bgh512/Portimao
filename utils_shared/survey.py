@@ -43,6 +43,10 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'percent': 'OCR (% of the range)',
               }
 PCA_CHOICE = '__pca__'
+# raised form of the characters of an exponent typed as -1 or ^2
+SUPERSCRIPT_TABLE = str.maketrans('-+0123456789', '⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹')
+# the units a label is tidied around; a name with numbers (nd-011992) is none of them
+UNIT_PATTERN = r'(?:[mµnpk]?(?:M|L|g|mol)|min|s|h|OD)'
 
 
 # ---- SURVEY HELPERS ------------------------------------------------------------------
@@ -608,6 +612,62 @@ def _subscript_stripper(match: 're.Match') -> str:
     return match.group(1) if match.group(1) is not None else match.group(2)
 
 
+# ---- _tidy_labels_offerer ------------------------------------------------------------
+def _tidy_labels_offerer(with_events: List[dict],
+                         result: Dict[str, List[dict]],
+                         ) -> None:
+    """
+    ---- Summary ----
+    Helper function to list the current event labels that could be written more tidily
+    (8 ug ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use
+    them all. Asks nothing when every label is tidy already.
+
+    ---- Inputs ----
+    with_events : List[dict]
+        File summaries (DATA_FORMAT.md) of the files that have events.
+    result : Dict[str, List[dict]]
+        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
+        labels are replaced by their tidy forms when the user agrees.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Changes the labels in ``result`` and reads from and prints to the terminal
+    (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    label_tidier
+    yes_no_asker
+    """
+
+    # ---- 1 Find the labels that could be tidier --------------------------------------
+    found = []
+    for summary in with_events:
+        for event, entry in zip(summary['events'], result[summary['name']]):
+            tidy = label_tidier(entry['label'])
+            if not entry['ignored'] and tidy != entry['label']:
+                found.append((summary['name'], event['time'], entry, tidy))
+    if not found:
+        return
+
+    # ---- 2 List them and ask once ----------------------------------------------------
+    info_printer('These labels can be written more tidily:')
+    for name, time, entry, tidy in found:
+        info_printer(f"  {name}, {time:.2f} min: {entry['label']} -> {tidy}", depth=2)
+    if yes_no_asker('Do you want to use these tidy forms?', True):
+        for _, _, entry, tidy in found:
+            entry['label'] = tidy
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -620,8 +680,8 @@ def analysis_asker(summaries: List[dict],
                    ) -> tuple:
     """
     ---- Summary ----
-    Main function to ask section 3: haem decomposition, OD scaling, event averaging
-    and the event labels.
+    Main function to ask the OD values and the event labels of the import, then the
+    haem decomposition and the event averaging.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -657,23 +717,23 @@ def analysis_asker(summaries: List[dict],
     saved_values_reader
     """
 
-    # ---- 1 Decomposition -------------------------------------------------------------
+    # ---- 1 OD scaling ----------------------------------------------------------------
+    saved = saved_values_reader(summaries, export_root)
+    details = od_scaling_asker(summaries, answers, defaults, saved)
+
+    # ---- 2 Event labels --------------------------------------------------------------
+    for name, events in event_asker(summaries, saved).items():
+        details[name]['events'] = events
+
+    # ---- 3 Decomposition -------------------------------------------------------------
     (answers['decompose'],
      answers['fit_file'],
      fit,
      answers['decomposition_dataset'],
      ) = decomposition_asker(summaries, defaults, fits_folder)
 
-    # ---- 2 OD scaling ----------------------------------------------------------------
-    saved = saved_values_reader(summaries, export_root)
-    details = od_scaling_asker(summaries, answers, defaults, saved)
-
-    # ---- 3 Averaging -----------------------------------------------------------------
+    # ---- 4 Averaging -----------------------------------------------------------------
     averaging_asker(answers, defaults)
-
-    # ---- 4 Event labels --------------------------------------------------------------
-    for name, events in event_asker(summaries, saved).items():
-        details[name]['events'] = events
     return fit, details
 
 
@@ -963,7 +1023,9 @@ def event_asker(summaries: List[dict],
     """
     ---- Summary ----
     Main function to ask whether to change the event labels, concentrations and which
-    events to ignore, file by file.
+    events to ignore, file by file. A label that could be written more tidily (8 ug
+    ml-1 as 8 µg mL⁻¹) is offered in its tidy form: the labels the files hold all at
+    once, then each label as it is typed or kept.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -971,8 +1033,9 @@ def event_asker(summaries: List[dict],
     saved : dict
         {file name: values read from its workbook} (read_saved_settings).
     again : bool
-        True when the user asked to change the labels again: the yes/no question is
-        skipped and the runs are listed straight away.
+        True when the user asked to change the labels again: the tidy forms of the
+        current labels and the yes/no question are skipped and the runs are listed
+        straight away.
 
     ---- Globals read ----
     None.
@@ -991,7 +1054,9 @@ def event_asker(summaries: List[dict],
     ---- Helpers ----
     _event_line_builder
     _file_focuser
+    _tidy_labels_offerer
     info_printer
+    label_tidier
     number_asker
     numbering_setter
     numbers_asker
@@ -1028,8 +1093,10 @@ def event_asker(summaries: List[dict],
         info_printer(f"{number}) {summary['name']}:")
         for event, entry in zip(summary['events'], result[summary['name']]):
             info_printer(_event_line_builder(event, entry), depth=2)
-    if not again and not yes_no_asker('Do you want to change any event labels?', False):
-        return result
+    if not again:
+        _tidy_labels_offerer(with_events, result)
+        if not yes_no_asker('Do you want to change any event labels?', False):
+            return result
     chosen = numbers_asker('Which run(s) do you want to change?',
                            len(with_events),
                            depth=2,
@@ -1051,7 +1118,14 @@ def event_asker(summaries: List[dict],
                                entry['label'],
                                depth=3,
                                )
-            entry['label'] = label or entry['label']
+            label = label or entry['label']
+            tidy = label_tidier(label)
+            if tidy != label and yes_no_asker(f"Do you want to write this as '{tidy}'?",
+                                              True,
+                                              depth=3,
+                                              ):
+                label = tidy
+            entry['label'] = label
             entry['ignored'] = entry['label'].strip().lower() == 'ignore'
             if entry['ignored']:
                 continue
@@ -1475,6 +1549,58 @@ def label_angle_asker(answers: dict, defaults: dict) -> None:
                                                 minimum=0,
                                                 maximum=90,
                                                 )
+
+
+# ---- label_tidier --------------------------------------------------------------------
+def label_tidier(text: str) -> str:
+    """
+    ---- Summary ----
+    Main function to write the units of an event label the tidy way: u as µ, l as L, a
+    space between a number and its unit, and exponents raised. Only units are changed;
+    a name with numbers in it (nd-011992, Q203) and a chemical formula (H2O2) are left
+    as they are, since the two cannot be told apart.
+
+    ---- Inputs ----
+    text : str
+        The label as typed or as written in the file.
+
+    ---- Globals read ----
+    SUPERSCRIPT_TABLE, UNIT_PATTERN (module constants).
+
+    ---- Outputs ----
+    str
+        The tidy label, for example '8 µg mL⁻¹ rifampicin' for '8ug ml-1 rifampicin';
+        the same text when nothing can be tidied.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Micro and litre -----------------------------------------------------------
+    text = re.sub(r'(?<![A-Za-z])u(?=(?:M|L|l|g|mol)(?![A-Za-z]))', 'µ', text)
+    text = re.sub(r'(?<![A-Za-zµ])([mµn])l(?![A-Za-z])', r'\1L', text)
+    # a litre by itself only where it cannot be a word: after a slash or with an exponent
+    text = re.sub(r'(?<=/)l(?![A-Za-z])|(?<![A-Za-z0-9µ])l(?=\^?-\d)', 'L', text)
+
+    # ---- 2 A space between a number and its unit -------------------------------------
+    text = re.sub(rf'(\d)(?={UNIT_PATTERN}(?![A-Za-z]))', r'\1 ', text)
+
+    # ---- 3 Raised exponents: -1 after a unit, anything after ^ -----------------------
+    text = re.sub(rf'(?<![A-Za-z0-9µ])({UNIT_PATTERN})\^?(-\d)(?![\dA-Za-z])',
+                  lambda match: match.group(1) + match.group(2).translate(SUPERSCRIPT_TABLE,
+                                                                          ),
+                  text,
+                  )
+    return re.sub(r'\^([-+]?\d+)',
+                  lambda match: match.group(1).translate(SUPERSCRIPT_TABLE),
+                  text,
+                  )
 
 
 # ---- multi_experiment_asker ----------------------------------------------------------
