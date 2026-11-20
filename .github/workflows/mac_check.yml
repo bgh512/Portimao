@@ -1,7 +1,8 @@
 # GitHub's own Macs run the tests and start Portimao at every push to dev, so problems
-# on a Mac show without a Mac. It can also be started by hand from the Actions page
-# ("Run workflow"). The logs, and a picture of the window when the Mac allows it, are
-# kept on the run's page.
+# on a Mac show without a Mac. Each Mac then builds the Mac app (Python, Tk and every
+# package inside) and starts it too. It can also be started by hand from the Actions
+# page ("Run workflow"). The logs, a picture of each window when the Mac allows it, and
+# the app of each kind of Mac as a zip, are kept on the run's page.
 name: Mac check
 
 on:
@@ -16,7 +17,7 @@ jobs:
   mac:
     name: ${{ matrix.mac }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       # One Mac failing still shows how the other one does.
       fail-fast: false
@@ -24,8 +25,10 @@ jobs:
         include:
           - mac: Apple Silicon Mac
             runner: macos-15
+            app_zip: Portimao-mac-apple-silicon
           - mac: Intel Mac
             runner: macos-15-intel
+            app_zip: Portimao-mac-intel
     env:
       PYTHON: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12
     steps:
@@ -96,6 +99,69 @@ jobs:
             sleep 1
           done
           wait "$program"
+
+      # The recipe is launchers/mac_app_builder.py: dist/Portimao.app for this kind of
+      # Mac, signed ad hoc.
+      - name: Build the Mac app
+        run: |
+          .venv_unix/bin/python -m pip install --quiet --disable-pip-version-check \
+            'pyinstaller>=6.10,<7'
+          .venv_unix/bin/python launchers/mac_app_builder.py
+
+      # For information: the newest macOS any part of the app asks for is the oldest
+      # macOS the app runs on.
+      - name: Say which macOS the app needs at least
+        run: |
+          oldest="$(find dist/Portimao.app -type f \( -perm -u+x -o -name '*.so' -o -name '*.dylib' \) -print0 \
+            | xargs -0 -n 1 vtool -show-build 2>/dev/null \
+            | awk '$1 == "minos" {print $2}' | sort -t. -k1,1n -k2,2n | tail -n 1 || true)"
+          echo "The app needs macOS ${oldest:-(not found)} or newer."
+
+      # The app is copied away from the program folder and started from there, so it can
+      # only use what is inside it. Its own folder is ~/Portimao, so its log is
+      # ~/Portimao/logs/self_test.log (the same words are waited for as above).
+      - name: Start the app with the check switch
+        timeout-minutes: 10
+        env:
+          PORTIMAO_SELF_TEST: '1'
+        run: |
+          app_logs="$HOME/Portimao/logs"
+          mkdir -p "$RUNNER_TEMP/app" logs/app
+          ditto dist/Portimao.app "$RUNNER_TEMP/app/Portimao.app"
+          rm -f "$app_logs/self_test.log"
+          cd "$RUNNER_TEMP/app"
+          ./Portimao.app/Contents/MacOS/Portimao &
+          program=$!
+          for second in $(seq 1 300); do
+            if grep -q 'The made-up preview is on show' "$app_logs/self_test.log" 2>/dev/null; then
+              perl -e 'alarm 20; exec @ARGV' screencapture -x "$GITHUB_WORKSPACE/logs/app/self_test_window.png" \
+                || echo 'No picture of the window: the Mac did not allow it.'
+              break
+            fi
+            kill -0 "$program" 2>/dev/null || break
+            sleep 1
+          done
+          code=0
+          wait "$program" || code=$?
+          cat "$app_logs/self_test.log" || echo 'The app wrote no self-test log.'
+          exit "$code"
+
+      # ditto keeps the app's links and signature, which a plain zip would break.
+      - name: Zip the app
+        run: ditto -c -k --sequesterRsrc --keepParent dist/Portimao.app "${{ matrix.app_zip }}.zip"
+
+      - name: Keep the app on the run's page
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.app_zip }}
+          path: ${{ matrix.app_zip }}.zip
+          if-no-files-found: error
+
+      - name: Copy the app's logs
+        if: always()
+        run: |
+          mkdir -p logs/app
+          cp -R "$HOME/Portimao/logs/." logs/app/ 2>/dev/null || echo 'The app made no logs.'
 
       - name: Keep the logs on the run's page
         if: always()

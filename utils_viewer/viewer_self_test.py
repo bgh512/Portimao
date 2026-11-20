@@ -23,6 +23,7 @@ import pandas as pd
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.schema import TIME_COLUMN
+from utils_shared.user_places import UserPlaces
 from utils_viewer.viewer_gui import (active_gui_getter,
                                      GuiUnavailableError,
                                      ViewerGui,
@@ -284,19 +285,20 @@ def _preview_shower(report: Callable[[str], None], log_folder: Path) -> int:
 
 
 # ---- self_test_runner ----------------------------------------------------------------
-def self_test_runner(title: str, program_root: Path) -> int:
+def self_test_runner(title: str, places: UserPlaces) -> int:
     """
     ---- Summary ----
     Main function to check that the program works on this computer: it opens the
     window, shows one made-up preview, closes the window by itself after a few seconds
-    and says the result. Everything is written to logs/self_test.log as well as to the
-    terminal.
+    and says the result. Everything is written to self_test.log in the logs folder as
+    well as to the terminal.
 
     ---- Inputs ----
     title : str
         Program name, branch and version (program_title_builder).
-    program_root : Path
-        Program folder; the log goes to its logs folder.
+    places : UserPlaces
+        Where the user's things are kept (user_places_finder); the log goes to its logs
+        folder, which is the program folder's logs folder when run from source.
 
     ---- Globals read ----
     CLOSE_AFTER_S, LOG_NAME (module constants).
@@ -319,7 +321,7 @@ def self_test_runner(title: str, program_root: Path) -> int:
     """
 
     # ---- 1 Start the log -------------------------------------------------------------
-    log_folder = program_root / 'logs'
+    log_folder = places.logs_folder
     log_folder.mkdir(parents=True, exist_ok=True)
     console = sys.stdout
     with (log_folder / LOG_NAME).open('w', encoding='utf-8') as log:
@@ -332,6 +334,9 @@ def self_test_runner(title: str, program_root: Path) -> int:
             log.flush()
 
         report(f'{title}: self-test, {datetime.now():%Y-%m-%d %H:%M:%S}')
+        report(f"Running {'as the Mac app' if places.is_app else 'from source'}; the "
+               f"user's own folder is {places.own_folder}",
+               )
         for line in _computer_describer():
             report(line)
 

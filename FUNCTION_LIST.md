@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.1.1
+- **Version:** V2.2
 - **Date:** 20/11/2026
 
 ## Contents
@@ -10,6 +10,11 @@
     - [`Config`](#config)
     - [`haem_colour_mapper`](#haem_colour_mapper)
     - [`pca_colour_mapper`](#pca_colour_mapper)
+- [`launchers/mac_app_builder.py`](#launchersmac_app_builderpy)
+    - [`_ad_hoc_signer`](#_ad_hoc_signer)
+    - [`_arguments_builder`](#_arguments_builder)
+    - [`_info_plist_writer`](#_info_plist_writer)
+    - [`main`](#main)
 - [`launchers/make_icons.py`](#launchersmake_iconspy)
     - [`main`](#main)
 - [`main.py`](#mainpy)
@@ -79,6 +84,11 @@
     - [`test_number_and_unit_get_a_space`](#test_number_and_unit_get_a_space)
     - [`test_symbols_can_be_drawn_in_the_figures`](#test_symbols_can_be_drawn_in_the_figures)
     - [`test_tidy_label_stays_as_it_is`](#test_tidy_label_stays_as_it_is)
+- [`tests/test_mac_app_builder.py`](#teststest_mac_app_builderpy)
+    - [`_plist_maker`](#_plist_maker)
+    - [`test_app_carries_program_files`](#test_app_carries_program_files)
+    - [`test_plist_gets_version_and_keeps_keys`](#test_plist_gets_version_and_keeps_keys)
+    - [`test_plist_refuses_unknown_version`](#test_plist_refuses_unknown_version)
 - [`tests/test_mac_report.py`](#teststest_mac_reportpy)
     - [`_folder_maker`](#_folder_maker)
     - [`_report_runner`](#_report_runner)
@@ -180,6 +190,12 @@
     - [`test_pointed_time_on_a_scaled_picture`](#test_pointed_time_on_a_scaled_picture)
     - [`test_question_wanting_a_time_tells_the_window`](#test_question_wanting_a_time_tells_the_window)
     - [`test_time_axis_of_a_figure`](#test_time_axis_of_a_figure)
+- [`tests/test_user_places.py`](#teststest_user_placespy)
+    - [`_app_places_maker`](#_app_places_maker)
+    - [`test_app_keeps_things_in_home_folder`](#test_app_keeps_things_in_home_folder)
+    - [`test_app_never_overwrites_a_fit`](#test_app_never_overwrites_a_fit)
+    - [`test_source_keeps_things_in_program_folder`](#test_source_keeps_things_in_program_folder)
+    - [`test_source_program_folder_is_found`](#test_source_program_folder_is_found)
 - [`tests/test_window_parts.py`](#teststest_window_partspy)
     - [`test_cell_of_the_od_table`](#test_cell_of_the_od_table)
     - [`test_height_typed_in_the_strip`](#test_height_typed_in_the_strip)
@@ -583,6 +599,11 @@
     - [`trim_asker`](#trim_asker)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
+- [`utils_shared/user_places.py`](#utils_shareduser_placespy)
+    - [`UserPlaces`](#userplaces)
+    - [`app_output_logger`](#app_output_logger)
+    - [`user_folder_preparer`](#user_folder_preparer)
+    - [`user_places_finder`](#user_places_finder)
 - [`utils_viewer/viewer_gui.py`](#utils_viewerviewer_guipy)
     - [`GuiUnavailableError`](#guiunavailableerror)
     - [`ViewerGui`](#viewergui)
@@ -895,6 +916,138 @@ None.
 None.
 ```
 
+## `launchers/mac_app_builder.py`
+
+Builds the Mac app (Portimao.app) with PyInstaller and signs it ad hoc; run on a Mac.
+
+### BUILD HELPERS
+
+#### `_ad_hoc_signer`
+
+```text
+---- Summary ----
+Helper function to sign the app ad hoc (no Apple certificate), as Apple Silicon
+Macs need every program to be signed, then to check the signature.
+
+---- Inputs ----
+app : Path
+    The .app folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing. Raises RuntimeError, with codesign's own words, when the signing or
+    the check fails.
+
+---- Globals mutated ----
+None. Signs the files of the app (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_arguments_builder`
+
+```text
+---- Summary ----
+Helper function to build PyInstaller's arguments: a windowed Mac app made from
+main.py, with its icon, the program's own files and the details of each package.
+
+---- Inputs ----
+packages : Sequence[str]
+    Names of the packages whose details (version) the app must carry; the
+    self-test lists their versions.
+
+---- Globals read ----
+APP_NAME, BUNDLE_ID, DIST_FOLDER, ICON, INSIDE, ROOT, WORK_FOLDER (module
+constants).
+
+---- Outputs ----
+List[str]
+    The arguments, as typed after `pyinstaller`.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_info_plist_writer`
+
+```text
+---- Summary ----
+Helper function to write the program's version, its name and the reasons macOS
+shows when the app asks for a guarded folder into the app's Info.plist, keeping
+every other key PyInstaller wrote.
+
+---- Inputs ----
+plist_path : Path
+    The app's Contents/Info.plist.
+version : str
+    Program version, for example "2.2" (program_version_reader).
+
+---- Globals read ----
+PLIST_VALUES, VERSION_PATTERN (module constants).
+
+---- Outputs ----
+None
+    Nothing. Raises ValueError when the version is not made of numbers and dots.
+
+---- Globals mutated ----
+None. Rewrites the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `main`
+
+```text
+---- Summary ----
+Main function to build dist/Portimao.app on this Mac, for its own kind of chip: the
+program with Python, Tk and every package inside, the release's version in its
+Info.plist, signed ad hoc. Run it with the program's environment, with PyInstaller
+installed in it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+APP_PATH, ROOT (module constants).
+
+---- Outputs ----
+int
+    0 when the app was built and its signature checks, 1 otherwise (the reason is
+    printed).
+
+---- Globals mutated ----
+None. Puts the program folder first on sys.path; writes build/ and dist/ (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_ad_hoc_signer
+_arguments_builder
+_info_plist_writer
+program_version_reader
+```
+
 ## `launchers/make_icons.py`
 
 Makes every icon file from assets/icon.png (square, 512 x 512 pixels or larger).
@@ -982,7 +1135,7 @@ information.
 None.
 
 ---- Globals read ----
-FITS_FOLDER, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
+PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
 
 ---- Outputs ----
 Tuple[dict, Path, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
@@ -1066,7 +1219,7 @@ Main function to read which data folder was used in the last run.
 None.
 
 ---- Globals read ----
-LAST_ANSWERS_FILE (module constant).
+PLACES (module constant; its last_answers_file).
 
 ---- Outputs ----
 dict
@@ -1095,7 +1248,7 @@ values : dict
     Content to write to last_answers.json: {data_folder}.
 
 ---- Globals read ----
-LAST_ANSWERS_FILE (module constant).
+PLACES (module constant; its last_answers_file).
 
 ---- Outputs ----
 None
@@ -1119,29 +1272,35 @@ None.
 Main function of the program: run it in the experiment browser window (terminal on
 the left, plots on the right), or in the terminal when the window cannot open. With
 the check switch (PORTIMAO_SELF_TEST set to any value) it only checks that the
-window opens and shows a made-up preview, then closes by itself.
+window opens and shows a made-up preview, then closes by itself. The Mac app first
+makes its own folder and sends what it prints to its log.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-HERE, PROGRAM_TITLE (shown in the window title); os.environ['PORTIMAO_SELF_TEST'].
+PLACES, PROGRAM_TITLE (shown in the window title);
+os.environ['PORTIMAO_SELF_TEST'].
 
 ---- Outputs ----
 int
-    0 when every file finished, 1 when the run was cancelled or a file failed.
-    With the check switch: 0 when the check passed, 1 when it failed.
+    0 when every file finished, 1 when the run was cancelled, a file failed or the
+    app's own folder could not be made. With the check switch: 0 when the check
+    passed, 1 when it failed.
 
 ---- Globals mutated ----
-None. Opens the window or runs in the terminal (side effects).
+None. Opens the window or runs in the terminal; the app makes its own folder and
+replaces sys.stdout and sys.stderr by its log (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+app_output_logger
 gui_runner
 program_runner
 self_test_runner
+user_folder_preparer
 ```
 
 #### `program_runner`
@@ -2820,6 +2979,124 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_mac_app_builder.py`
+
+Tests the part of the Mac app's build recipe that runs anywhere: the version written
+
+### HELPERS
+
+#### `_plist_maker`
+
+```text
+---- Summary ----
+Helper function to write a made-up Info.plist, as PyInstaller leaves it.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+PYINSTALLER_KEYS (module constant).
+
+---- Outputs ----
+Path
+    The file.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_app_carries_program_files`
+
+```text
+---- Summary ----
+Main function to check that the build puts the fits, the window's icon and the
+question list (which gives the version) inside the app, and the details of each
+package asked for.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_arguments_builder
+```
+
+#### `test_plist_gets_version_and_keeps_keys`
+
+```text
+---- Summary ----
+Main function to check that the version and the folder reasons are written into
+Info.plist, and that PyInstaller's other keys are kept.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_info_plist_writer
+_plist_maker
+```
+
+#### `test_plist_refuses_unknown_version`
+
+```text
+---- Summary ----
+Main function to check that a version that is not numbers and dots (the program
+gives "unknown" when it finds none) stops the build and leaves the file as it was.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+PYINSTALLER_KEYS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_info_plist_writer
+_plist_maker
 ```
 
 ## `tests/test_mac_report.py`
@@ -5471,6 +5748,152 @@ of the height, showing 0 to 45 min; a small panel with its own x axis is left ou
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_user_places.py`
+
+Tests that the user's own things are kept in the program folder from source and in the
+
+### HELPERS
+
+#### `_app_places_maker`
+
+```text
+---- Summary ----
+Helper function to make a pretend app (its program folder holding two fits) and a
+pretend home folder, and give the app's places.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+SHIPPED_FITS (module constant).
+
+---- Outputs ----
+UserPlaces
+    The places of the app, with its own folder in the pretend home folder.
+
+---- Globals mutated ----
+None. Writes the folders and fits (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+user_places_finder
+```
+
+### MAIN FUNCTIONS
+
+#### `test_app_keeps_things_in_home_folder`
+
+```text
+---- Summary ----
+Main function to check that the app keeps the fits, the folder used last and the
+logs in a Portimao folder in the home folder, and reads its own files from inside
+the app.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_places_maker
+```
+
+#### `test_app_never_overwrites_a_fit`
+
+```text
+---- Summary ----
+Main function to check that the app makes its folders, copies in the fit that is
+missing, and leaves a fit the user changed as it is, also when it starts again.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_places_maker
+user_folder_preparer
+```
+
+#### `test_source_keeps_things_in_program_folder`
+
+```text
+---- Summary ----
+Main function to check that, run from source, everything stays in the program
+folder, as before the app, and that preparing the places changes nothing there.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+user_folder_preparer
+user_places_finder
+```
+
+#### `test_source_program_folder_is_found`
+
+```text
+---- Summary ----
+Main function to check that, run from source with nothing given, the program
+folder found is the one holding main.py.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+user_places_finder
 ```
 
 ## `tests/test_window_parts.py`
@@ -18052,7 +18475,7 @@ so they can be offered by number.
 
 ---- Inputs ----
 root : Path
-    Folder to look in (the program folder).
+    Folder to look in (the user's own folder, UserPlaces.own_folder).
 
 ---- Globals read ----
 None.
@@ -18229,12 +18652,16 @@ None.
 ```text
 ---- Summary ----
 Main function to ask for the folder of .paf files (1.1), offering the data folders
-found in the program folder, and the results folder (1.2), and to read a summary of
-every file and the settings saved with the dataset.
+found in the user's own folder, and the results folder (1.2), and to read a summary
+of every file and the settings saved with the dataset.
 
 ---- Inputs ----
 last : dict
     Contents of last_answers.json; uses data_folder (the folder used last).
+own_folder : Path
+    Folder whose data folders are offered by number (UserPlaces.own_folder): the
+    program folder from source, the Portimao folder in the home folder in the Mac
+    app.
 
 ---- Globals read ----
 None.
@@ -18939,6 +19366,121 @@ metadata trimmed_before_minutes / trimmed_after_minutes in place (side effects).
 
 ---- Equations ----
 t_new = t - start_time; rows kept where start_time <= t <= end_time.
+
+---- Helpers ----
+None.
+```
+
+## `utils_shared/user_places.py`
+
+Where the program keeps the user's own things: the program folder from source, a folder
+
+### CLASSES
+
+#### `UserPlaces`
+
+```text
+---- Summary ----
+Where the program's own files are, and where the user's own things are kept: the
+fits, the folder used last, the logs and the data folders offered by number.
+Detailed structure can be found in DATA_FORMAT.md.
+```
+
+### MAIN FUNCTIONS
+
+#### `app_output_logger`
+
+```text
+---- Summary ----
+Main function to send everything the Mac app prints to logs/launch.log in its own
+folder, as the launcher does for a program run from source. The app has no launcher
+and no terminal, so without this its messages would be lost. Run from source,
+nothing changes.
+
+---- Inputs ----
+places : UserPlaces
+    Where the user's things are kept (user_places_finder); the logs folder must
+    exist (user_folder_preparer).
+
+---- Globals read ----
+LAUNCH_LOG_NAME (module constant).
+
+---- Outputs ----
+None
+    Nothing. A log that cannot be opened leaves the output where it was.
+
+---- Globals mutated ----
+_app_log (module state); sys.stdout and sys.stderr are replaced by the log file.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `user_folder_preparer`
+
+```text
+---- Summary ----
+Main function to make the Mac app's own folder, with its fits and logs folders, and
+to copy in each fit that comes with the program and is not there yet. A fit already
+there is never overwritten, so the user's changes are kept. Run from source,
+nothing is done: everything stays in the program folder.
+
+---- Inputs ----
+places : UserPlaces
+    Where the user's things are kept (user_places_finder).
+
+---- Globals read ----
+FITS_FOLDER_NAME (module constant).
+
+---- Outputs ----
+None
+    Nothing. Raises OSError when the folders cannot be made; a fit that cannot be
+    copied is left out.
+
+---- Globals mutated ----
+None. Makes folders and copies files (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `user_places_finder`
+
+```text
+---- Summary ----
+Main function to give the places the program uses. Run from source (Windows, Linux,
+developers), everything is in the program folder, as it always was. Run as the Mac
+app, the program's own files are inside the app, which is never written to, and the
+user's things are in a Portimao folder in the home folder.
+
+---- Inputs ----
+is_app : Optional[bool]
+    True when running as the app; None to find out (the app sets sys.frozen).
+home : Optional[Path]
+    Home folder; None for the user's own.
+program_folder : Optional[Path]
+    Folder with the program's own files (fits, assets, QUESTION_FLOW.md); None to
+    find it (inside the app, or the folder above utils_shared).
+
+---- Globals read ----
+FITS_FOLDER_NAME, LAST_ANSWERS_NAME, LOGS_FOLDER_NAME, OWN_FOLDER_NAME (module
+constants); sys.frozen and sys._MEIPASS (set by the app).
+
+---- Outputs ----
+UserPlaces
+    The places. Nothing is checked or made (user_folder_preparer does that).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
@@ -22120,14 +22662,15 @@ preview_figure_builder
 ---- Summary ----
 Main function to check that the program works on this computer: it opens the
 window, shows one made-up preview, closes the window by itself after a few seconds
-and says the result. Everything is written to logs/self_test.log as well as to the
-terminal.
+and says the result. Everything is written to self_test.log in the logs folder as
+well as to the terminal.
 
 ---- Inputs ----
 title : str
     Program name, branch and version (program_title_builder).
-program_root : Path
-    Program folder; the log goes to its logs folder.
+places : UserPlaces
+    Where the user's things are kept (user_places_finder); the log goes to its logs
+    folder, which is the program folder's logs folder when run from source.
 
 ---- Globals read ----
 CLOSE_AFTER_S, LOG_NAME (module constants).

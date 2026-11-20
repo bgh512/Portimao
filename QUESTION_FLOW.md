@@ -1,4 +1,4 @@
-# Portimao question flow (V2.2)
+# Portimao question flow (V2.3)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -24,7 +24,7 @@ Every question in the order it is asked, with where each answer leads. The quest
 
 | # | Question | Answer leads to |
 |---|---|---|
-| 1.1 | What is the directory with the .paf files? | The folders in the program folder that hold `.paf` files are listed first, numbered, with how many files each holds. Answer with a number or a name from that list, or type (or drag in) the path of another folder; Enter gives the folder used last time. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused and the question is asked again. Otherwise every file is read and listed, then **1.2**. |
+| 1.1 | What is the directory with the .paf files? | The folders in the program folder (in the Mac app, in the Portimao folder in your home folder) that hold `.paf` files are listed first, numbered, with how many files each holds. Answer with a number or a name from that list, or type (or drag in) the path of another folder; Enter gives the folder used last time. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused and the question is asked again. Otherwise every file is read and listed, then **1.2**. |
 | 1.2 | To which directory would you like the results to be saved? `[the export folder inside the data folder]` If the dataset was run before, a message says its saved settings are offered as the defaults, and its last results folder is offered here. | the standard plot is drawn **(plot)**, then **2.1** |
 
 The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. The haems are worked out with the standard fit (`bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit file is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
