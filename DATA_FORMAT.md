@@ -687,6 +687,25 @@ Written only by the Mac app: at each start by its update (`update_installer`), a
 
 The Mac report shows its last 30 lines.
 
+#### `move log`
+
+| Property | Value |
+|---|---|
+| File type | text |
+| Encoding | UTF-8 |
+| Location and name | `logs/move_to_app.log` in the folder of an old launcher install on a Mac (usually `~/Portimao`, which becomes the Mac app's own folder); added to at each try, never cut |
+
+Written by the launcher on a Mac (`launchers/mac_app_mover.py`), when it moves a git clone on main to the Mac app. One line per step, each starting with the date and time (`YYYY-MM-DD HH:MM:SS`):
+
+- the folder being moved and the macOS version;
+- each line `install_mac.sh` printed while it installed the app;
+- why the app was not installed and the program started the old way, when it was not;
+- how many old program files and folders were taken away, and any that could not be;
+- when the folder is not `~/Portimao`, what was copied into it (fits and last answers);
+- the Desktop link pointed at the app, and the app opening.
+
+A move that stops in a way the mover did not foresee adds `The move stopped:` and the traceback. The Mac report of the app shows its last 30 lines.
+
 #### Figure files
 
 | Property | Value |

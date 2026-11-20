@@ -8,9 +8,45 @@ Made by Beatrixette.
 
 ## 1. Installation
 
-### 1.1 Using GitHub (recommended)
+### 1.1 On a Mac: the app
 
-Git and Python 3.9 or newer must be installed first. If they are not, follow the requirements in section 1.2, then return here.
+Portimao for the Mac is an app that carries everything it needs (there is no Python to install) and updates itself each time it starts. It needs macOS 14 (Sonoma) or newer.
+
+1. Open Terminal: press Cmd + Space, type `Terminal` and press Enter.
+2. Paste this line and press Enter:
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/bgh512/Portimao/main/install_mac.sh | bash
+    ```
+
+The line picks the app for your Mac's chip (Apple Silicon or Intel), puts Portimao in your own Applications folder and opens it. No password is asked, and macOS shows no warning. From then on, open Portimao from Launchpad, or with Spotlight (Cmd + Space, type `Portimao`); drag it to the Dock to keep it there. Pasting the line again puts the newest version in place of the one there.
+
+**By hand**, without Terminal:
+
+1. Find your Mac's chip: Apple menu > About This Mac. *Chip: Apple M1* (or M2, M3 ...) is Apple Silicon; *Processor: ... Intel* is Intel.
+2. On the [Releases page](https://github.com/bgh512/Portimao/releases/latest), download `Portimao-mac-apple-silicon.zip` or `Portimao-mac-intel.zip`.
+3. Double-click the zip in Downloads, then drag Portimao into the Applications folder (in Finder: Go > Applications).
+4. Open Portimao from the Applications folder. The first time, macOS says it cannot check it: click *Open Anyway* as section 2.3, entry 1, says. This is needed only once.
+
+**Where your things are kept.** The app keeps your own things in the Portimao folder in your home folder (in Finder: Go > Home, then Portimao):
+
+- `fits/`: the haem fits. Your own fit goes here (its layout is in `DATA_FORMAT.md`, under "fit csv").
+- Your data folders: a folder of `.paf` files put here is offered by number at the first question. Any other folder can be typed or dragged in.
+- `logs/`: what the app did, which the Mac report shows.
+- `last_answers.json`: the folder used last.
+
+**If you used Portimao before it was an app** (installed with git and opened with `Portimao.app` in the Portimao folder), it moves itself to the app at its next start, without asking.
+
+- It installs the app in your Applications folder, takes away the old program files and opens the app.
+- From then on, the link on your Desktop opens the app.
+- Your fits, data folders, logs and last answers stay in the Portimao folder, which is where the app looks for them. If your folder was somewhere else, its fits and last answers are also copied into the Portimao folder in your home folder.
+- A note beside the app says where everything is.
+
+A Mac older than macOS 14 cannot run the app: it goes on starting the old way, from the *Portimao* file on the Desktop (section 2.3, entry 7). A copy installed from a zip file does not update itself: install the app with the line above, then move your own fits and data folders into the Portimao folder in your home folder.
+
+### 1.2 Windows and Linux, using GitHub (recommended)
+
+Git and Python 3.9 or newer must be installed first. If they are not, follow the requirements in section 1.3, then return here.
 
 #### Windows
 
@@ -37,32 +73,6 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
     ```
 
     If PowerShell refuses to run the activation script, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and try again. The launcher `run.bat` does this step itself, so it can be skipped if only the launcher is used.
-
-#### macOS
-
-1. Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/) (the `python3` that comes with macOS has an old Tk that draws a blank window). Then open Terminal: press Cmd + Space, type `Terminal` and press Enter. If git is missing, run `xcode-select --install` first.
-2. Go to your home folder, where the project will be installed. Not Documents, Desktop or Downloads: macOS guards those, and the launcher cannot open them (section 2.3, entry 3).
-
-    ```bash
-    cd ~
-    ```
-
-3. Download the project and enter its folder:
-
-    ```bash
-    git clone https://github.com/bgh512/Portimao.git
-    cd Portimao
-    ```
-
-4. Create and activate a Python environment, then install the dependencies:
-
-    ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate
-    python -m pip install -r requirements.txt
-    ```
-
-    The launchers `Portimao.app` and `run.sh` set up their own environment (`.venv_unix`), so this step can be skipped if only a launcher is used.
 
 #### Linux
 
@@ -93,7 +103,9 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
     python -m pip install -r requirements.txt
     ```
 
-### 1.2 Manual install
+    The launcher `run.sh` sets up its own environment (`.venv_unix`), so this step can be skipped if only the launcher is used.
+
+### 1.3 Windows and Linux, manual install
 
 No git is needed.
 
@@ -104,11 +116,8 @@ No git is needed.
 #### Install from the .zip
 
 1. On the project's GitHub page, click **Code**, then **Download ZIP**.
-2. Extract the .zip to the desired location. On a Mac, move the extracted folder into your home folder (in Finder: Go > Home), not Documents, Desktop or Downloads (section 2.3, entry 3).
-3. Open a terminal in the extracted folder:
-    - Windows: right-click inside the folder and choose **Open in Terminal**.
-    - macOS: right-click the folder and choose **New Terminal at Folder**.
-    - Linux: right-click inside the folder and choose **Open in Terminal**.
+2. Extract the .zip to the desired location.
+3. Open a terminal in the extracted folder: right-click inside the folder and choose **Open in Terminal**.
 4. Create and activate a Python environment, then install the dependencies:
 
     Windows (PowerShell):
@@ -119,7 +128,7 @@ No git is needed.
     python -m pip install -r requirements.txt
     ```
 
-    macOS and Linux:
+    Linux:
 
     ```bash
     python3 -m venv .venv
@@ -127,12 +136,25 @@ No git is needed.
     python -m pip install -r requirements.txt
     ```
 
-### 1.3 Following the dev branch (optional)
+### 1.4 Following the dev branch (optional)
 
 The steps above install `main`, the stable version. `dev` has newer changes that are not yet fully tested.
 
 - Installed with git: from inside the project folder run `git checkout dev`, then `git pull`. To go back to the stable version run `git checkout main`.
-- Manual install: on the project's GitHub page choose `dev` in the branch drop-down, click **Code**, then **Download ZIP**, and install as in section 1.2.
+- Manual install: on the project's GitHub page choose `dev` in the branch drop-down, click **Code**, then **Download ZIP**, and install as in section 1.3.
+
+### 1.5 From source on a Mac (developers)
+
+For working on the program; everyone else uses the app (section 1.1). Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/) first: the `python3` that comes with macOS has an old Tk, which draws a blank window. If git is missing, run `xcode-select --install`. Keep the folder out of Documents, Desktop and Downloads, which macOS guards.
+
+```bash
+git clone https://github.com/bgh512/Portimao.git
+cd Portimao
+git checkout dev
+sh run.sh
+```
+
+`run.sh` sets up its own environment (`.venv_unix`) and starts the launcher; `python main.py` in an environment of your own works too. Use `dev`: a copy on `main` started with `run.sh` is taken for an install of the old launcher, and is moved to the app (section 1.1).
 
 ## 2. Running
 
@@ -151,34 +173,39 @@ The program has no command-line options. It asks numbered questions in the termi
 The launchers open Portimao without leaving a terminal window open.
 
 - Windows: double-click `Portimao.pyw` (or `run.bat`, whose window closes at once). The first time it also puts a Portimao icon on your Desktop and in the Start menu; use that from then on.
-- macOS: double-click `Portimao.app` (the first time it also puts a link to it on your Desktop).
+- macOS: open the Portimao app from Launchpad, Spotlight (Cmd + Space, type `Portimao`) or the Applications folder. Each start looks for a newer version on the Releases page; when there is one, a small "Updating Portimao" window shows it being downloaded (a few seconds to a minute), then the new version opens. Without internet it starts as it is. If Portimao does not start, see section 2.3.
 - Linux: run `./run.sh`; the first time it adds Portimao to the applications menu and the Desktop.
 
-**macOS:** use Python 3.12 or newer from python.org; the Python that comes with macOS draws a blank window. Keep the Portimao folder in your home folder. If Portimao does not start, see section 2.3.
+On Windows and Linux, a small "Starting Portimao" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way; the Mac app writes it to `logs/launch.log` in the Portimao folder in your home folder.
 
-A small "Starting Portimao" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details (on macOS, a launcher that does not start at all writes to `logs/launcher_errors.log`). Everything the program prints goes to that file when it is started this way.
-
-Windows and macOS may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. On Windows right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. On macOS see section 2.3, entries 1 and 2.
+Windows may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. Right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. For the Mac, see section 2.3, entry 1.
 
 ### 2.3 If Portimao does not start on a Mac
 
 Find what you see below and do what its entry says. If nothing here helps, run the Mac report (entry 8) and send it, as under **Feedback** at the top.
 
-Several entries use Terminal: press Cmd + Space, type `Terminal` and press Enter. Instead of typing where a file or folder is, you drag it from Finder onto the Terminal window, and macOS types its place for you, followed by a space.
+1. **"Portimao" Not Opened, or "Apple could not verify Portimao is free of malware".** Only after installing by hand: the line never asks this. Click Done, open System Settings > Privacy & Security, scroll down to the message about Portimao, click *Open Anyway* and confirm with your password, then open Portimao again. On macOS 14 (Sonoma) you can instead right-click (or Control-click) Portimao in the Applications folder, choose Open, then Open again. Needed only once.
+2. **"Portimao is damaged and can't be opened".** The download was cut short, or the zip was unpacked by a program other than Finder. Move Portimao to the Bin and install it with the line (section 1.1).
+3. **"Portimao V... is out, but this copy could not update itself".** Portimao starts as it is; the reason is in brackets:
+    - *macOS opened it from a temporary copy*: Portimao was opened where it was downloaded. Drag it into the Applications folder and open it from there.
+    - *its folder cannot be written to*: Portimao is in a folder you cannot change, often the main Applications folder of a Mac you are not an administrator of. Install it with the line, which puts it in your own Applications folder, then move the old one to the Bin.
+    - *the download did not finish*: check the internet connection; the next start tries again.
+4. **"Portimao needs macOS 14 or newer", or Portimao does not open on an older Mac.** Apple menu > About This Mac shows the macOS version. Update macOS if the Mac can take it (System Settings > General > Software Update), then install Portimao again. A Mac that cannot have macOS 14 runs Portimao the old way (entry 7).
+5. **macOS asks whether Portimao may open Documents, Desktop or Downloads (or a network or external drive).** Click Allow: Portimao reads your `.paf` files and saves the results there. If you clicked Don't Allow, open System Settings > Privacy & Security > Files and Folders, switch the folder on under Portimao, then open Portimao again.
+6. **"Portimao could not start", "Portimao's window could not open" or "Portimao stopped because of a problem".** Click *Copy details*: the Mac report is copied and the **Mac problem** form opens on the Issues page. Paste the report there (Cmd + V) and send it.
+7. **A Mac older than macOS 14 (the old way).** Portimao starts from its folder, from the *Portimao* file on the Desktop (a Terminal window opens while it starts). It needs Python 3.12 or newer from [python.org](https://www.python.org/downloads/): the Python that comes with macOS draws a blank window. After installing a newer Python, delete the hidden folder `.venv_unix` in the Portimao folder (in Finder, Cmd + Shift + . shows hidden files) and open Portimao again. The first start downloads the packages Portimao needs; when it says they could not be installed, check the internet connection or try another network. A box asking to install the "command line developer tools" can be answered Install (Portimao uses them to update itself) or Not Now.
+8. **Nothing happens at all, or nothing above helps: the Mac report.** Open Terminal (Cmd + Space, type `Terminal`, press Enter), paste this line and press Enter:
 
-1. **"Portimao" Not Opened, or "Apple cannot check it for malicious software".** macOS 15 (Sequoia) or newer: click Done, open System Settings > Privacy & Security, scroll down to the message about Portimao, click *Open Anyway* and confirm with your password, then open Portimao again. Older macOS: right-click (or Control-click) `Portimao.app`, choose Open, then Open again. Needed only once.
-2. **"Portimao is damaged and can't be opened", or "macOS opened Portimao from a temporary copy".** The folder still carries macOS's download flag. In Terminal, type `xattr -dr com.apple.quarantine` and a space, drag the Portimao folder onto the Terminal window, press Enter, then open Portimao again.
-3. **The icon jumps in the Dock and vanishes, or a message (or `logs/launcher_errors.log`) says "Operation not permitted".** macOS guards Documents, Desktop and Downloads (and iCloud Drive and external drives), and `Portimao.app` cannot ask to open them. Move the Portimao folder into your home folder (in Finder: Go > Home) and open `Portimao.app` from there; the link on the Desktop is made again. Your data folders are guarded in the same way: if they are in Documents, Desktop or Downloads, move them out too, or start Portimao from Terminal instead. To start it from Terminal, type `sh` and a space, drag the file `run.sh` from the Portimao folder onto the Terminal window and press Enter. When macOS asks whether Terminal may open a folder, click Allow.
-4. **"Python 3.9 or newer was not found".** Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/) (the macOS installer), then open Portimao again.
-5. **A blank window, or "Portimao needs a newer Python".** The Python that comes with macOS has an old Tk, which draws blank windows. Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/), then delete the hidden folder `.venv_unix` inside the Portimao folder (in Finder, Cmd + Shift + . shows hidden files) and open Portimao again.
-6. **A box asks to install the "command line developer tools".** Click Install (a few minutes): Portimao uses them to update itself when it was installed with git. Or click Not Now: Portimao still starts.
-7. **"The packages could not be installed".** The first start downloads what Portimao needs. Check the internet connection, or try another network (some networks block the download), then open Portimao again.
-8. **Nothing happens at all, or nothing above helps: the Mac report.** In Terminal, type `sh` and a space, open the Portimao folder and then its `launchers` folder, drag the file `mac_report.sh` onto the Terminal window and press Enter. If macOS asks whether Terminal may open the folder, click Allow. The report is printed and copied by itself: paste it (Cmd + V) into the **Mac problem** form on the [Issues page](https://github.com/bgh512/Portimao/issues). The report only reads; it changes nothing on the Mac. It shows where the Portimao folder is, which includes your Mac user name; change it before sending if you prefer.
+    ```bash
+    sh ~/Applications/Portimao.app/Contents/Resources/launchers/mac_report.sh
+    ```
+
+    If you put Portimao in the main Applications folder by hand, leave out the `~` at the start of the line. On a Mac older than macOS 14 the line is `sh ~/Portimao/launchers/mac_report.sh`. The report is printed and copied by itself: paste it (Cmd + V) into the **Mac problem** form on the [Issues page](https://github.com/bgh512/Portimao/issues). The report only reads; it changes nothing on the Mac. It shows where Portimao is, which includes your Mac user name; change it before sending if you prefer.
 
 ### 2.4 Changing the icon
 
 1. Replace `assets/icon.png` with the new icon (a square PNG, ideally 1024 x 1024 pixels).
-2. Run `python launchers/make_icons.py` (inside the program's environment, for example `.venv\Scripts\python launchers\make_icons.py` on Windows or `.venv_unix/bin/python launchers/make_icons.py` on Mac and Linux). It makes `assets/icon.ico` (window, taskbar and Windows shortcut) and the Mac icon inside `Portimao.app`.
+2. Run `python launchers/make_icons.py` (inside the program's environment, for example `.venv\Scripts\python launchers\make_icons.py` on Windows or `.venv_unix/bin/python launchers/make_icons.py` on Linux). It makes `assets/icon.ico` (window, taskbar and Windows shortcut). The Mac app's icon is made from `assets/icon.png` when the app is built.
 3. Delete the file `.portimao_shortcut`, then start Portimao once, so the Desktop and Start menu shortcuts are made again with the new icon.
 
 
@@ -266,10 +293,11 @@ What to keep in mind:
 Portimao/
     main.py                 entry point
     config.py               defaults, journal sizes and colours
-    Portimao.pyw, Portimao.app, run.bat, run.sh   launchers (no terminal window)
-    launchers/              the launcher program, shortcut and icon scripts, the Mac report (mac_report.sh), the Mac app's build recipe (mac_app_builder.py), its start (mac_app_starter.py) and its swap for updates (mac_app_swapper.sh)
+    Portimao.pyw, run.bat, run.sh   launchers (no terminal window)
+    install_mac.sh          the Mac install line's script: downloads the Mac app into your own Applications folder
+    launchers/              the launcher program, shortcut and icon scripts, the Mac report (mac_report.sh), the Mac app's build recipe (mac_app_builder.py), its start (mac_app_starter.py), its swap for updates (mac_app_swapper.sh) and the move of an old launcher install to the app (mac_app_mover.py)
     .github/ISSUE_TEMPLATE/ the "Mac problem" form of the Issues page
-    .github/workflows/      the Mac check: GitHub's Macs run the tests, start Portimao, then build the Mac app and start it; at each release the apps go on the Releases page and the release before is checked to update itself
+    .github/workflows/      the Mac check: GitHub's Macs run the tests, start Portimao, then build the Mac app and start it; at each release the apps go on the Releases page and the release before is checked to update itself; the newest release is installed as users do (an old launcher install moved, then the install line)
     assets/                 icons
     fits/                   haem fit CSVs (your own fit goes here; layout in DATA_FORMAT.md, "fit csv")
     utils_shared/           reading, processing, plotting and export of single experiments
