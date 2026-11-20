@@ -2,7 +2,8 @@
 .venv_unix/
 build/
 logs/
-*_data/
+/data_*/
+all_data/
 last_answers.json
 .shortcut_made
 .portimao_shortcut
