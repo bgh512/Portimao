@@ -140,7 +140,7 @@ Activate the environment first (see section 1), then run:
 python main.py
 ```
 
-The program has no command-line options. It asks numbered questions in the terminal (Enter accepts the default in square brackets); the answers are remembered for the next run in `last_answers.json`.
+The program has no command-line options. It asks numbered questions in the terminal (Enter accepts the default in square brackets); the answers are saved with each dataset, in `portimao_settings.json` inside its data folder, and offered the next time that dataset is opened (a dataset never run starts from the standard settings in `config.py`); `last_answers.json` remembers only the folder used last.
 
 ### 2.2 Using the launcher
 

@@ -10,6 +10,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_custom.run_namer import run_name_lister
+from utils_shared.dataset_settings import dataset_settings_reader
 from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_exporter import saved_settings_reader
 from utils_shared.paf_reader import experiment_summary_reader, PafError
@@ -743,6 +744,89 @@ def averaging_asker(answers: dict,
     answers['window_asked'] = True
 
 
+# ---- data_folder_lister --------------------------------------------------------------
+def data_folder_lister(root: Path) -> List[Path]:
+    """
+    ---- Summary ----
+    Main function to list the folders directly inside a folder that hold .paf files,
+    so they can be offered by number.
+
+    ---- Inputs ----
+    root : Path
+        Folder to look in (the program folder).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Path]
+        The folders with at least one .paf file directly inside, in natural name
+        order. Folders whose name starts with a dot or an underscore, and folders that
+        cannot be read, are left out.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _natural_sorter
+    paf_finder
+    """
+
+    found = []
+    for path in Path(root).iterdir():
+        if not path.is_dir() or path.name.startswith(('.', '_')):
+            continue
+        try:
+            if paf_finder(path):
+                found.append(path)
+        except OSError:  # a folder that cannot be read holds no data for us
+            continue
+    return sorted(found, key=lambda p: _natural_sorter(p.name))
+
+
+# ---- data_folder_resolver ------------------------------------------------------------
+def data_folder_resolver(text: str, listed: List[Path]) -> Path:
+    """
+    ---- Summary ----
+    Main function to turn the answer to the folder question into a folder: a number or
+    a name from the list of data folders, or any other path.
+
+    ---- Inputs ----
+    text : str
+        The answer as typed (or dragged in).
+    listed : List[Path]
+        The data folders offered, in the order they were numbered from 1.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Path
+        The listed folder of that number or name (capitals do not matter), otherwise
+        the answer as a path. It is not checked to exist.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    path_cleaner
+    """
+
+    cleaned = path_cleaner(text)
+    if cleaned.isdigit() and 1 <= int(cleaned) <= len(listed):
+        return listed[int(cleaned) - 1]
+    for folder in listed:
+        if folder.name.lower() == cleaned.lower():
+            return folder
+    return Path(cleaned).expanduser()
+
+
 # ---- decomposition_asker -------------------------------------------------------------
 def decomposition_asker(summaries: List[dict],
                         defaults: dict,
@@ -1016,23 +1100,26 @@ def file_focus_setter(hook: Optional[Callable[[str], None]]) -> None:
 
 
 # ---- files_asker ---------------------------------------------------------------------
-def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
+def files_asker(last: dict) -> Tuple[Path, List[dict], Path, dict]:
     """
     ---- Summary ----
-    Main function to ask for the folder of .paf files (1.1) and the results folder
-    (1.2), and to read a summary of every file.
+    Main function to ask for the folder of .paf files (1.1), offering the data folders
+    found in the program folder, and the results folder (1.2), and to read a summary of
+    every file and the settings saved with the dataset.
 
     ---- Inputs ----
     last : dict
-        Remembered answers (last_answers.json); uses data_folder and export_folder.
+        Contents of last_answers.json; uses data_folder (the folder used last).
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    Tuple[Path, List[dict], Path]
-        (data folder, summary of each readable file, results folder). Each summary
-        has name, path, duration_min, events and datasets (DATA_FORMAT.md).
+    Tuple[Path, List[dict], Path, dict]
+        (data folder, summary of each readable file, results folder, settings saved
+        with the dataset). Each summary has name, path, duration_min, events and
+        datasets; the settings are those of dataset_settings_reader, empty for a
+        dataset never saved (DATA_FORMAT.md).
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect).
@@ -1041,6 +1128,9 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
     None.
 
     ---- Helpers ----
+    data_folder_lister
+    data_folder_resolver
+    dataset_settings_reader
     experiment_summary_reader
     info_printer
     paf_finder
@@ -1051,14 +1141,17 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
     """
 
     # ---- 1 Ask for the .paf folder ---------------------------------------------------
-    # A hint only: folders ending _data in the program folder are listed, never chosen.
     root = Path(__file__).resolve().parents[1]
-    data_folders = sorted(p.name for p in root.iterdir()
-                          if p.is_dir() and p.name.endswith('_data')
-                          )
-    if data_folders:
-        info_printer('_data folders found in ' + str(root) + ': '
-                     + ', '.join(data_folders),
+    listed = data_folder_lister(root)
+    if listed:
+        info_printer(f'Data folders found in {root}:')
+        for number, found in enumerate(listed, start=1):
+            count = len(paf_finder(found))
+            info_printer(f"  {number}) {found.name} ({count} file"
+                         f"{'' if count == 1 else 's'})",
+                         )
+        info_printer('Type a number or a name from this list, or the path of another '
+                     'folder.',
                      )
     while True:
         text = text_asker('What is the directory with the .paf files?',
@@ -1067,7 +1160,7 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
         if not text:
             info_printer('Please type or drag in a folder.')
             continue
-        folder = Path(path_cleaner(text)).expanduser()
+        folder = data_folder_resolver(text, listed)
         if not folder.is_dir():
             info_printer('That folder does not exist.')
             continue
@@ -1100,12 +1193,15 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
                      )
 
     # ---- 3 Ask for the results folder ------------------------------------------------
-    same_folder = last.get('data_folder') == str(folder)
-    default = last.get('export_folder') if same_folder else str(folder / 'export')
+    saved = dataset_settings_reader(folder)
+    if saved:
+        info_printer('This dataset was opened before: the settings saved in its folder '
+                     'are offered as the defaults.',
+                     )
     text = text_asker('To which directory would you like the results to be saved?',
-                      default,
+                      str(saved.get('export_folder') or folder / 'export'),
                       )
-    return folder, summaries, Path(path_cleaner(text)).expanduser()
+    return folder, summaries, Path(path_cleaner(text)).expanduser(), saved
 
 
 # ---- haem_choice_asker ---------------------------------------------------------------

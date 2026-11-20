@@ -14,11 +14,15 @@ from utils_shared.helpers import name_simplifier
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+# The standard settings: a dataset never opened before starts from them, and a dataset
+# opened before from the settings kept in its own folder (utils_shared.dataset_settings).
+# The standard fit is the file in fits/ used for the haems of the standard plot.
+STANDARD_FIT = 'bswitch_no2_mycobl_b557.csv'
 DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ranges
                    # the same at the end of the recording
                    'ignore_last_minutes': 0.0,
-                   'decompose': False,
-                   'fit_file': None,
+                   'decompose': True,
+                   'fit_file': STANDARD_FIT,
                    'decomposition_dataset': 'Cyt',
                    'normalise_od': False,
                    'averaging': False,
@@ -42,6 +46,7 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    # height (fraction of a page).
                    # The *_size_mode answer is "default" (the journal question was
                    # answered None: Nature and the size below) or "custom".
+                   # The standard figure: Nature, 1 column wide, 0.5 of a page tall.
                    'journal': 'nature',
                    'columns': 1,
                    'height': 0.5,

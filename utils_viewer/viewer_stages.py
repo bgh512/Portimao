@@ -32,6 +32,7 @@ from utils_shared.questions import (choice_asker,
                                     text_colourer,
                                     yes_no_asker,
                                     )
+from utils_shared.spectral_decomposer import fit_importer
 from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
                                  event_asker,
@@ -150,9 +151,11 @@ def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
     fit : Optional[dict]
         Fit dictionary, used to list the haems to show.
     kind : str
-        'raw' (O2 and the raw OCR only), 'analysis' (also the haems, still without OD
-        scaling), 'plots' (the choices made so far for the individual figures, in a
-        wide preview) or 'final' (exactly as the figure will be).
+        'raw' (O2 and the raw OCR only), 'standard' (the standard plot: O2, the raw OCR
+        and, when a fit is given, every haem of it as the change from the start),
+        'analysis' (also the haems, still without OD scaling), 'plots' (the choices
+        made so far for the individual figures, in a wide preview) or 'final' (exactly
+        as the figure will be).
 
     ---- Globals read ----
     BROWSING_ANSWERS (module constant).
@@ -178,19 +181,29 @@ def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
     if kind == 'plots':
         return result
     result.update({'plot_o2': True, 'plot_ocr': True, 'plot_haems': False})
-    if kind == 'raw':
+    if kind in ('raw', 'standard'):
         result.update({'decompose': False,
                        'normalise_od': False,
                        'averaging': False,
                        'ocr_mode': 'raw',
-                       })
+                       },
+                      )
+        if kind == 'standard' and fit is not None:
+            result.update({'decompose': True,
+                           'plot_haems': True,
+                           'haems': list(fit['haem_list']),
+                           'haem_mode': 'delta',
+                           'haem_per_od': False,
+                           },
+                          )
         return result
     result.update({'normalise_od': False, 'ocr_mode': 'raw', 'haem_per_od': False})
     if result['decompose'] and fit is not None:
         result.update({'plot_haems': True,
                        'haems': list(fit['haem_list']),
                        'haem_mode': 'delta',
-                       })
+                       },
+                      )
     return result
 
 
@@ -680,6 +693,80 @@ def _skipped_lister(session: ViewerSession,
         info_printer(f"  {name}: {', '.join(windows)}")
 
 
+# ---- _standard_fit_loader ------------------------------------------------------------
+def _standard_fit_loader(summaries: List[dict],
+                         defaults: dict,
+                         fits_folder: Path,
+                         ) -> Tuple[Optional[dict], Optional[str]]:
+    """
+    ---- Summary ----
+    Helper function to load the fit the standard plot shows the haems with, before any
+    question about the haems is asked: the fit last saved for the dataset, or the
+    standard fit for a dataset never saved. When the haems cannot be shown, one line
+    says why and the plot keeps to the oxygen and the OCR.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md); the spectrometers in common are used.
+    defaults : dict
+        Default answers (decompose, fit_file, decomposition_dataset).
+    fits_folder : Path
+        Folder holding the fit .csv files.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[Optional[dict], Optional[str]]
+        (fit, spectrometer the haems are read from), or (None, None) when the haems
+        are not shown: the dataset was saved without haems, the fit file is missing or
+        unreadable, or the files share no spectrometer the fit can be used on.
+
+    ---- Globals mutated ----
+    None. Prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    fit_importer
+    info_printer
+    """
+
+    # ---- 1 Find the fit file ---------------------------------------------------------
+    if not defaults['decompose']:  # the dataset was saved without haems
+        return None, None
+    name = defaults.get('fit_file')
+    if not name or not (fits_folder / name).is_file():
+        info_printer(f'The haems are not shown yet: the fit file {name} is not in '
+                     f'{fits_folder}. You can choose a fit in the analysis.',
+                     )
+        return None, None
+
+    # ---- 2 Find the spectrometer every file has --------------------------------------
+    common = set(summaries[0]['datasets'])
+    for summary in summaries[1:]:
+        common &= set(summary['datasets'])
+    dataset = defaults['decomposition_dataset']
+    if dataset not in common:
+        if len(common) != 1:
+            info_printer('The haems are not shown yet: the files do not all have the '
+                         f'{dataset} spectrometer. You can choose one in the '
+                         'analysis.',
+                         )
+            return None, None
+        dataset = next(iter(common))
+
+    # ---- 3 Read the fit --------------------------------------------------------------
+    try:
+        return fit_importer(fits_folder / name), dataset
+    except (OSError, ValueError) as exc:
+        info_printer(f'The haems are not shown yet: the fit file {name} could not be '
+                     f'read ({exc}). You can choose another fit in the analysis.',
+                     )
+        return None, None
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -837,11 +924,15 @@ def analysis_stage_runner(session: ViewerSession,
 
 
 # ---- browser_stage_runner ------------------------------------------------------------
-def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
+def browser_stage_runner(session: ViewerSession,
+                         answers: dict,
+                         fit: Optional[dict],
+                         ) -> None:
     """
     ---- Summary ----
-    Main function to show the files in the plot window (the set and measured O2 and the
-    OCR, with the events) before any question is asked about them. In the browser window
+    Main function to show the standard plot of the files in the plot window (the set
+    and measured O2, the OCR and, when a fit is given, the haems, with the events as
+    written in the file) before any question is asked about them. In the browser window
     the user can look through them while answering, so the questions carry straight on;
     with the picture fallback a small menu steps through the files.
 
@@ -850,6 +941,8 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
         The browser session; its current file is changed.
     answers : dict
         Answers so far, used for the figure style of the preview.
+    fit : Optional[dict]
+        Fit the haems are shown with, or None for the oxygen and the OCR only.
 
     ---- Globals read ----
     None.
@@ -876,9 +969,9 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
     total = len(session.summaries)
     if session.window.is_interactive:
         preview_drawer(session,
-                       _answers_previewer(answers, None, 'raw'),
+                       _answers_previewer(answers, fit, 'standard'),
                        {},
-                       None,
+                       fit,
                        {},
                        show_ignored=False,
                        )
@@ -891,9 +984,9 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
     while True:
         summary = session.summaries[session.current]
         preview_drawer(session,
-                       _answers_previewer(answers, None, 'raw'),
+                       _answers_previewer(answers, fit, 'standard'),
                        {},
-                       None,
+                       fit,
                        {},
                        show_ignored=False,
                        )
@@ -1146,7 +1239,8 @@ def pca_stage_runner(session: ViewerSession,
                     'pca_rotate': rotate,
                     'pca_count': count,
                     'pca_smoothing_nm': smoothing,
-                    })
+                    },
+                   )
     return (saved or f'PCA, {count} components, {start:g}-{end:g} nm (not saved)'), fit
 
 
@@ -1231,10 +1325,12 @@ def plots_stage_runner(session: ViewerSession,
                          redraw,
                          ):
             break
-        defaults = dict(defaults, **{key: answers[key]
-                                     for key in ('plot_o2', 'plot_ocr', 'ocr_mode')
-                                     if key in answers
-                                     })
+        defaults = dict(defaults,
+                        **{key: answers[key]
+                           for key in ('plot_o2', 'plot_ocr', 'ocr_mode')
+                           if key in answers
+                           },
+                        )
 
     # ---- 3 Haems and their order -----------------------------------------------------
     while True:
@@ -1310,13 +1406,15 @@ def plots_stage_runner(session: ViewerSession,
 def trim_stage_runner(session: ViewerSession,
                       answers: dict,
                       remembered: Dict[str, dict],
+                      fit: Optional[dict] = None,
                       ) -> Dict[str, dict]:
     """
     ---- Summary ----
-    Main function to ask the trim and ignore questions, adding the shaded trimmed and
-    ignored parts to the plot window after every answer, and ask whether to accept them.
-    When the limits are asked again, the earlier ones stay on the plot as dashed lines.
-    After they are accepted, it offers to export all the data cut to them.
+    Main function to ask the trim and ignore questions on the standard plot, adding the
+    shaded trimmed and ignored parts to the plot window after every answer, and ask
+    whether to accept them. When the limits are asked again, the earlier ones stay on
+    the plot as dashed lines. After they are accepted, it offers to export all the data
+    cut to them.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1326,6 +1424,8 @@ def trim_stage_runner(session: ViewerSession,
     remembered : Dict[str, dict]
         {file name: {trim_start, trim_end, ignore_start, ignore_end}} offered as the
         defaults (from the last run, or from the previous attempt).
+    fit : Optional[dict]
+        Fit the haems are shown with, or None for the oxygen and the OCR only.
 
     ---- Globals read ----
     None.
@@ -1354,9 +1454,9 @@ def trim_stage_runner(session: ViewerSession,
     previous: Dict[str, dict] = {}
     def draw(limits: Dict[str, dict]) -> bool:
         return preview_drawer(session,
-                              _answers_previewer(answers, None, 'raw'),
+                              _answers_previewer(answers, fit, 'standard'),
                               limits,
-                              None,
+                              fit,
                               {},
                               show_trim=True,
                               previous_limits=previous,
@@ -1389,8 +1489,10 @@ def viewer_asker(summaries: List[dict],
     """
     ---- Summary ----
     Main function to ask the questions of the experiment browser: the file browser,
-    trimming and ignoring, the analysis and the individual figures. The plot window is
-    redrawn after each answer, and at the end any step can be gone back to.
+    trimming and ignoring, the analysis and the individual figures. The standard plot
+    of every file (oxygen, OCR and the haems of the dataset's fit) is shown first, with
+    no question asked. The plot window is redrawn after each answer, and at the end any
+    step can be gone back to.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1422,6 +1524,7 @@ def viewer_asker(summaries: List[dict],
     None.
 
     ---- Helpers ----
+    _standard_fit_loader
     active_gui_getter
     analysis_stage_runner
     browser_stage_runner
@@ -1446,12 +1549,25 @@ def viewer_asker(summaries: List[dict],
     file_focus_setter(focus)
     state: dict = {}
 
+    # ---- 1 Load the fit of the standard plot -----------------------------------------
+    standard_fit, standard_dataset = _standard_fit_loader(summaries,
+                                                          defaults,
+                                                          fits_folder,
+                                                          )
+    if standard_fit is not None:
+        answers['decomposition_dataset'] = standard_dataset
+    def shown_fit() -> Optional[dict]:
+        # once the haems were asked about, the plot follows that answer
+        if state.get('fit_asked'):
+            return state['fit'] if answers['decompose'] else None
+        return standard_fit
+
     # ---- run_browser -----------------------------------------------------------------
     def run_browser() -> None:
-        browser_stage_runner(session, answers)
+        browser_stage_runner(session, answers, shown_fit())
     def run_trim() -> None:
         old = state.get('limits') or remembered
-        state['limits'] = trim_stage_runner(session, answers, old)
+        state['limits'] = trim_stage_runner(session, answers, old, shown_fit())
         answers['ignore_first_minutes'] = max(v['ignore_start']
                                               for v in state['limits'].values()
                                               )

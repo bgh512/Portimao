@@ -26,6 +26,7 @@ from utils_custom.custom_runner import (exemplar_runner,
                                         time_response_runner,
                                         )
 from utils_shared.comparison_plotter import comparison_figure_plotter
+from utils_shared.dataset_settings import dataset_settings_saver
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
@@ -165,7 +166,8 @@ def everything_asker() -> Tuple[dict,
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal; writes last_answers.json through
-    last_answers_saver (side effects).
+    last_answers_saver and the settings file of the dataset through
+    dataset_settings_saver (side effects).
 
     ---- Equations ----
     None.
@@ -173,6 +175,7 @@ def everything_asker() -> Tuple[dict,
     ---- Helpers ----
     active_gui_getter
     comparison_maker
+    dataset_settings_saver
     files_asker
     haem_name_formatter
     last_answers_loader
@@ -186,25 +189,24 @@ def everything_asker() -> Tuple[dict,
     yes_no_asker
     """
 
-    # ---- 1 Load the remembered answers -----------------------------------------------
-    last = last_answers_loader()
-    defaults = dict(settings.DEFAULT_ANSWERS, **last.get('answers', {}))
-    answers = dict(defaults)
-    remembered = last.get('files', {})
-
-    # ---- 2 Print the banner ----------------------------------------------------------
+    # ---- 1 Print the banner ----------------------------------------------------------
     print(PROGRAM_TITLE)
     if active_gui_getter() is None:  # the window explains this itself
         print('Questions are in colour and numbered. Type your answer on the line '
               'below each question; Enter accepts the value shown in [brackets].',
               )
 
-    # ---- 3 Ask the questions ---------------------------------------------------------
-    # ---- 3.1 Files -------------------------------------------------------------------
+    # ---- 2 Ask for the files and load the settings of the dataset --------------------
+    # A dataset never saved starts from the standard settings (config.py); a dataset
+    # saved before starts from the settings kept in its own folder.
     section_starter('Your files')
-    folder, summaries, export_root = files_asker(last)
+    folder, summaries, export_root, saved = files_asker(last_answers_loader())
     names = [s['name'] for s in summaries]
+    defaults = dict(settings.DEFAULT_ANSWERS, **saved.get('answers', {}))
+    answers = dict(defaults)
+    remembered = saved.get('files', {})
 
+    # ---- 3 Ask the questions ---------------------------------------------------------
     # ---- 3.2 Trimming and ignoring, analysis and individual plots --------------------
     limits, fit, details, plotted = viewer_asker(summaries,
                                                  answers,
@@ -368,15 +370,19 @@ def everything_asker() -> Tuple[dict,
     # ---- 7 Remember the answers ------------------------------------------------------
     files = dict(remembered)
     files.update({name: dict(v) for name, v in limits.items()})
-    last_answers_saver({'data_folder': str(folder),
-                        'export_folder': str(export_root),
-                        'files': files,
-                        'answers': {k: v
-                                    for k, v in answers.items()
-                                    if k not in ('haems', 'ho_haems') or v
-                                    },
-                        },
-                       )
+    last_answers_saver({'data_folder': str(folder.resolve())})
+    if not dataset_settings_saver(folder,
+                                  export_root,
+                                  files,
+                                  {k: v
+                                   for k, v in answers.items()
+                                   if k not in ('haems', 'ho_haems') or v
+                                   },
+                                  ):
+        print(f'  The settings could not be saved in {folder} (the folder cannot be '
+              f'written to), so this dataset will start from the standard settings '
+              f'next time.',
+              )
     return answers, export_root, experiments, fit, comparison, exemplar_names
 
 
@@ -493,7 +499,7 @@ def experiment_processor(info: dict,
 def last_answers_loader() -> dict:
     """
     ---- Summary ----
-    Main function to read the answers remembered from the last run.
+    Main function to read which data folder was used in the last run.
 
     ---- Inputs ----
     None.
@@ -503,8 +509,9 @@ def last_answers_loader() -> dict:
 
     ---- Outputs ----
     dict
-        Contents of last_answers.json (data_folder, export_folder, answers, files); an
-        empty dict when the file is missing or unreadable.
+        Contents of last_answers.json ({data_folder}); an empty dict when the file is
+        missing or unreadable. The answers themselves are kept with each dataset
+        (utils_shared.dataset_settings).
 
     ---- Globals mutated ----
     None.
@@ -526,12 +533,11 @@ def last_answers_loader() -> dict:
 def last_answers_saver(values: dict) -> None:
     """
     ---- Summary ----
-    Main function to remember the answers of this run for the next one.
+    Main function to remember the data folder of this run for the next one.
 
     ---- Inputs ----
     values : dict
-        Content to write to last_answers.json: data_folder, export_folder, files and
-        answers.
+        Content to write to last_answers.json: {data_folder}.
 
     ---- Globals read ----
     LAST_ANSWERS_FILE (module constant).
