@@ -17,6 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DIST_FOLDER = ROOT / 'dist'  # where the app is made (git-ignored)
 WORK_FOLDER = ROOT / 'build'  # PyInstaller's working files (git-ignored)
 APP_PATH = DIST_FOLDER / f'{APP_NAME}.app'
+# the app starts here: it updates itself, then runs main.py
+ENTRY = ROOT / 'launchers' / 'mac_app_starter.py'
 # the icon is made from this picture by PyInstaller (with Pillow) until the icon
 # masters exist
 ICON = ROOT / 'assets' / 'icon.png'
@@ -25,6 +27,8 @@ BUNDLE_ID = 'io.github.bgh512.portimao'
 INSIDE = ((ROOT / 'fits', 'fits'),
           (ROOT / 'assets' / 'icon.png', 'assets'),
           (ROOT / 'QUESTION_FLOW.md', '.'),  # its title gives the version
+          (ROOT / 'launchers' / 'mac_report.sh', 'launchers'),  # for Copy details
+          (ROOT / 'launchers' / 'mac_app_swapper.sh', 'launchers'),  # for updates
           )
 VERSION_PATTERN = re.compile(r'\d+(?:\.\d+)*')
 # shown by macOS when the app first opens one of these places
@@ -92,7 +96,8 @@ def _arguments_builder(packages: Sequence[str]) -> List[str]:
     """
     ---- Summary ----
     Helper function to build PyInstaller's arguments: a windowed Mac app made from
-    main.py, with its icon, the program's own files and the details of each package.
+    the app's start (launchers/mac_app_starter.py, which runs main.py), with its icon,
+    the program's own files and the details of each package.
 
     ---- Inputs ----
     packages : Sequence[str]
@@ -100,7 +105,7 @@ def _arguments_builder(packages: Sequence[str]) -> List[str]:
         self-test lists their versions.
 
     ---- Globals read ----
-    APP_NAME, BUNDLE_ID, DIST_FOLDER, ICON, INSIDE, ROOT, WORK_FOLDER (module
+    APP_NAME, BUNDLE_ID, DIST_FOLDER, ENTRY, ICON, INSIDE, ROOT, WORK_FOLDER (module
     constants).
 
     ---- Outputs ----
@@ -117,7 +122,7 @@ def _arguments_builder(packages: Sequence[str]) -> List[str]:
     None.
     """
 
-    arguments = [str(ROOT / 'main.py'),
+    arguments = [str(ENTRY),
                  '--name',
                  APP_NAME,
                  '--windowed',
@@ -197,8 +202,8 @@ def main() -> int:
     """
     ---- Summary ----
     Main function to build dist/Portimao.app on this Mac, for its own kind of chip: the
-    program with Python, Tk and every package inside, the release's version in its
-    Info.plist, signed ad hoc. Run it with the program's environment, with PyInstaller
+    program with Python, Tk and every package inside, its update and the Mac report,
+    the release's version in its Info.plist, signed ad hoc. Run it with the program's environment, with PyInstaller
     installed in it.
 
     ---- Inputs ----

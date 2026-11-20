@@ -1,6 +1,6 @@
 """
-Tests the part of the Mac app's build recipe that runs anywhere: the version written
-into Info.plist.
+Tests the parts of the Mac app's build recipe that run anywhere: what goes inside the
+app and the version written into Info.plist.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -65,9 +65,10 @@ def _plist_maker(tmp_path: Path) -> Path:
 def test_app_carries_program_files() -> None:
     """
     ---- Summary ----
-    Main function to check that the build puts the fits, the window's icon and the
-    question list (which gives the version) inside the app, and the details of each
-    package asked for.
+    Main function to check that the app starts from the app's start (which updates it),
+    and that the build puts the fits, the window's icon, the question list (which gives
+    the version), the Mac report and the swap script inside the app, and the details of
+    each package asked for.
 
     ---- Inputs ----
     None.
@@ -89,6 +90,8 @@ def test_app_carries_program_files() -> None:
     """
 
     arguments = _arguments_builder(['numpy', 'pillow'])
+    assert Path(arguments[0]).name == 'mac_app_starter.py'
+    assert Path(arguments[0]).exists()
     added = [arguments[i + 1]
              for i, word in enumerate(arguments)
              if word == '--add-data'
@@ -96,7 +99,12 @@ def test_app_carries_program_files() -> None:
     targets = {Path(entry.rsplit(':', 1)[0]).name: entry.rsplit(':', 1)[1]
                for entry in added
                }
-    assert targets == {'fits': 'fits', 'icon.png': 'assets', 'QUESTION_FLOW.md': '.'}
+    assert targets == {'fits': 'fits',
+                       'icon.png': 'assets',
+                       'QUESTION_FLOW.md': '.',
+                       'mac_report.sh': 'launchers',
+                       'mac_app_swapper.sh': 'launchers',
+                       }
     for entry in added:
         assert Path(entry.rsplit(':', 1)[0]).exists()
     copied = [arguments[i + 1]

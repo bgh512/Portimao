@@ -376,7 +376,7 @@ Defined in `utils_shared/user_places.py`. Created by `user_places_finder` when `
 | `own_folder` | Path | | | | The user's own folder; the data folders directly inside it are offered by number at question 1.1. The program folder, or `~/Portimao` in the app |
 | `fits_folder` | Path | | | | `<own_folder>/fits`: the fits offered, and where fits saved from the components go. In the app, each fit of the program that is missing is copied in at every start; one already there is never overwritten |
 | `last_answers_file` | Path | | | | `<own_folder>/last_answers.json` (`last_answers`) |
-| `logs_folder` | Path | | | | `<own_folder>/logs`: the self-test log and, in the app, the launch log |
+| `logs_folder` | Path | | | | `<own_folder>/logs`: the self-test log and, in the app, the launch log and the update log |
 | `is_app` | bool | | | | True when running as the Mac app |
 
 #### `TimeAxis`
@@ -667,7 +667,25 @@ The line starting `The made-up preview is on show` tells the Mac check (`.github
 | Encoding | UTF-8 |
 | Location and name | `logs/launch.log`: next to `main.py` when the launcher starts the program (not committed), or in `~/Portimao` in the Mac app; overwritten at each start |
 
-Everything the program prints from its start, written by the launcher (`launchers/bootstrap.pyw`) or, in the Mac app, which has no launcher, by `app_output_logger`. When the launcher itself fails, it writes its error there instead.
+Everything the program prints from its start, written by the launcher (`launchers/bootstrap.pyw`) or, in the Mac app, which has no launcher, by `app_output_logger`. When the launcher itself fails, it writes its error there instead. When the Mac app stops while starting, or its update stops, the app's start (`launchers/mac_app_starter.py`) adds a line saying which, with the date and time and the error's traceback.
+
+#### `update log`
+
+| Property | Value |
+|---|---|
+| File type | text |
+| Encoding | UTF-8 |
+| Location and name | `logs/update.log` in `~/Portimao`, the Mac app's own folder; added to at each start, after cutting it to its last 200 lines |
+
+Written only by the Mac app: at each start by its update (`update_installer`), and during a swap by `launchers/mac_app_swapper.sh`. One line per step, each starting with the date and time (`YYYY-MM-DD HH:MM:SS`):
+
+- the app's version and where it is;
+- what GitHub's newest release is, or that GitHub did not answer;
+- the zip this Mac needs, or why the app cannot update itself;
+- why a download did not finish, when it did not;
+- from the swap: `The new app is in place.`, or why the old app was kept.
+
+The Mac report shows its last 30 lines.
 
 #### Figure files
 

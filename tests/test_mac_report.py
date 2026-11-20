@@ -1,5 +1,6 @@
 """
-Tests that the Mac report runs to the end, finds where the folder is and changes nothing.
+Tests that the Mac report runs to the end, finds where the folder or the app is and
+changes nothing.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -30,6 +31,46 @@ HIDDEN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 
 
 # ---- HELPERS -------------------------------------------------------------------------
+
+
+# ---- _app_maker ----------------------------------------------------------------------
+def _app_maker(home: Path) -> Path:
+    """
+    ---- Summary ----
+    Helper function to make a small Portimao app in Applications, holding the report
+    and a question list with a made-up version as the build puts them, and the app's
+    own folder in the home folder with a launch log and an update log.
+
+    ---- Inputs ----
+    home : Path
+        Stand-in home folder.
+
+    ---- Globals read ----
+    REPORT (module constant).
+
+    ---- Outputs ----
+    Path
+        The folder inside the app that holds the report's launchers folder.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    inside = home / 'Applications' / 'Portimao.app' / 'Contents' / 'Resources'
+    (inside / 'launchers').mkdir(parents=True)
+    shutil.copy(REPORT, inside / 'launchers' / REPORT.name)
+    (inside / 'QUESTION_FLOW.md').write_bytes(b'# Portimao question flow (V9.9)\n\n')
+    logs = home / 'Portimao' / 'logs'
+    logs.mkdir(parents=True)
+    (logs / 'launch.log').write_bytes(b'launch line\n')
+    (logs / 'update.log').write_bytes(b'update line\n')
+    return inside
 
 
 # ---- _folder_maker -------------------------------------------------------------------
@@ -240,3 +281,47 @@ def test_report_in_home_folder_is_not_guarded(tmp_path: Path) -> None:
 
     folder = _folder_maker(tmp_path, '')
     assert 'In a folder macOS guards: no' in _report_runner(folder, tmp_path)
+
+
+# ---- test_report_inside_app_describes_it ---------------------------------------------
+def test_report_inside_app_describes_it(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the report run from inside the app (as Copy details
+    does) describes the app and reads the logs of the app's own folder, leaves out the
+    launcher's parts, prints only the report on its output and changes nothing.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest, used as the home folder.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _app_maker
+    _report_runner
+    _snapshot_taker
+    """
+
+    inside = _app_maker(tmp_path)
+    before = _snapshot_taker(tmp_path)
+    report = _report_runner(inside, tmp_path)
+    assert '== Portimao app ==' in report
+    assert 'Portimao.app' in report.split('Where: ', 1)[1].splitlines()[0]
+    assert 'Opened from a temporary copy macOS made: no' in report
+    assert 'Version: V9.9' in report
+    assert 'there, can be written to' in report
+    assert 'launch line' in report and 'update line' in report
+    assert '== Pythons' not in report and '== Portimao folder ==' not in report
+    assert 'Mac problem' not in report  # the help lines are not copied
+    assert _snapshot_taker(tmp_path) == before

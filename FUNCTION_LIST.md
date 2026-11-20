@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.2
+- **Version:** V2.3
 - **Date:** 20/11/2026
 
 ## Contents
@@ -15,6 +15,9 @@
     - [`_arguments_builder`](#_arguments_builder)
     - [`_info_plist_writer`](#_info_plist_writer)
     - [`main`](#main)
+- [`launchers/mac_app_starter.py`](#launchersmac_app_starterpy)
+    - [`_problem_logger`](#_problem_logger)
+    - [`main`](#main)
 - [`launchers/make_icons.py`](#launchersmake_iconspy)
     - [`main`](#main)
 - [`main.py`](#mainpy)
@@ -26,6 +29,19 @@
     - [`main`](#main)
     - [`program_runner`](#program_runner)
     - [`special_figures_maker`](#special_figures_maker)
+- [`tests/test_app_updater.py`](#teststest_app_updaterpy)
+    - [`_app_maker`](#_app_maker)
+    - [`_closed_pid_giver`](#_closed_pid_giver)
+    - [`_release_writer`](#_release_writer)
+    - [`_swap_folder_maker`](#_swap_folder_maker)
+    - [`test_app_only_waits_for_a_newer_release`](#test_app_only_waits_for_a_newer_release)
+    - [`test_failed_swap_keeps_the_app`](#test_failed_swap_keeps_the_app)
+    - [`test_newer_release_is_found`](#test_newer_release_is_found)
+    - [`test_release_answer_is_read`](#test_release_answer_is_read)
+    - [`test_swap_puts_the_new_app_in_place`](#test_swap_puts_the_new_app_in_place)
+    - [`test_swap_waits_for_the_app_to_close`](#test_swap_waits_for_the_app_to_close)
+    - [`test_temporary_copy_cannot_update`](#test_temporary_copy_cannot_update)
+    - [`test_update_from_made_up_zip`](#test_update_from_made_up_zip)
 - [`tests/test_dataset_settings.py`](#teststest_dataset_settingspy)
     - [`_program_folder_maker`](#_program_folder_maker)
     - [`test_broken_settings_file_gives_nothing`](#test_broken_settings_file_gives_nothing)
@@ -90,11 +106,13 @@
     - [`test_plist_gets_version_and_keeps_keys`](#test_plist_gets_version_and_keeps_keys)
     - [`test_plist_refuses_unknown_version`](#test_plist_refuses_unknown_version)
 - [`tests/test_mac_report.py`](#teststest_mac_reportpy)
+    - [`_app_maker`](#_app_maker)
     - [`_folder_maker`](#_folder_maker)
     - [`_report_runner`](#_report_runner)
     - [`_snapshot_taker`](#_snapshot_taker)
     - [`test_report_in_downloads_names_it`](#test_report_in_downloads_names_it)
     - [`test_report_in_home_folder_is_not_guarded`](#test_report_in_home_folder_is_not_guarded)
+    - [`test_report_inside_app_describes_it`](#test_report_inside_app_describes_it)
 - [`tests/test_ocr_checking.py`](#teststest_ocr_checkingpy)
     - [`_instrument_maker`](#_instrument_maker)
     - [`test_steady_fall_is_its_slope`](#test_steady_fall_is_its_slope)
@@ -370,6 +388,32 @@
     - [`formula_writer`](#formula_writer)
     - [`number_writer`](#number_writer)
     - [`workbook_formats_builder`](#workbook_formats_builder)
+- [`utils_shared/app_messages.py`](#utils_sharedapp_messagespy)
+    - [`_applescript_quoter`](#_applescript_quoter)
+    - [`_dialog_script_maker`](#_dialog_script_maker)
+    - [`_report_copier`](#_report_copier)
+    - [`start_problem_shower`](#start_problem_shower)
+    - [`update_notice_shower`](#update_notice_shower)
+- [`utils_shared/app_updater.py`](#utils_sharedapp_updaterpy)
+    - [`_app_finder`](#_app_finder)
+    - [`_app_unpacker`](#_app_unpacker)
+    - [`_blocker_finder`](#_blocker_finder)
+    - [`_leftover_cleaner`](#_leftover_cleaner)
+    - [`_log_opener`](#_log_opener)
+    - [`_new_app_checker`](#_new_app_checker)
+    - [`_new_app_fetcher`](#_new_app_fetcher)
+    - [`_newer_checker`](#_newer_checker)
+    - [`_own_version_reader`](#_own_version_reader)
+    - [`_release_asker`](#_release_asker)
+    - [`_release_reader`](#_release_reader)
+    - [`_start_command_maker`](#_start_command_maker)
+    - [`_status_window_maker`](#_status_window_maker)
+    - [`_translation_checker`](#_translation_checker)
+    - [`_version_splitter`](#_version_splitter)
+    - [`_zip_downloader`](#_zip_downloader)
+    - [`_zip_namer`](#_zip_namer)
+    - [`swap_starter`](#swap_starter)
+    - [`update_installer`](#update_installer)
 - [`utils_shared/attenuation.py`](#utils_sharedattenuationpy)
     - [`attenuation_converter`](#attenuation_converter)
     - [`experiment_attenuation_adder`](#experiment_attenuation_adder)
@@ -956,7 +1000,8 @@ None.
 ```text
 ---- Summary ----
 Helper function to build PyInstaller's arguments: a windowed Mac app made from
-main.py, with its icon, the program's own files and the details of each package.
+the app's start (launchers/mac_app_starter.py, which runs main.py), with its icon,
+the program's own files and the details of each package.
 
 ---- Inputs ----
 packages : Sequence[str]
@@ -964,7 +1009,7 @@ packages : Sequence[str]
     self-test lists their versions.
 
 ---- Globals read ----
-APP_NAME, BUNDLE_ID, DIST_FOLDER, ICON, INSIDE, ROOT, WORK_FOLDER (module
+APP_NAME, BUNDLE_ID, DIST_FOLDER, ENTRY, ICON, INSIDE, ROOT, WORK_FOLDER (module
 constants).
 
 ---- Outputs ----
@@ -1019,8 +1064,8 @@ None.
 ```text
 ---- Summary ----
 Main function to build dist/Portimao.app on this Mac, for its own kind of chip: the
-program with Python, Tk and every package inside, the release's version in its
-Info.plist, signed ad hoc. Run it with the program's environment, with PyInstaller
+program with Python, Tk and every package inside, its update and the Mac report,
+the release's version in its Info.plist, signed ad hoc. Run it with the program's environment, with PyInstaller
 installed in it.
 
 ---- Inputs ----
@@ -1046,6 +1091,77 @@ _ad_hoc_signer
 _arguments_builder
 _info_plist_writer
 program_version_reader
+```
+
+## `launchers/mac_app_starter.py`
+
+The Mac app's start: updates the app, then runs the program, and says what to do when
+
+### START HELPERS
+
+#### `_problem_logger`
+
+```text
+---- Summary ----
+Helper function to add the error being handled, with its traceback, to the app's
+launch log, which the Mac report shows.
+
+---- Inputs ----
+places : UserPlaces
+    Where the logs folder is.
+heading : str
+    What was going on when the error came.
+
+---- Globals read ----
+LAUNCH_LOG_NAME (imported constant).
+
+---- Outputs ----
+None
+    Nothing. A log that cannot be written is left as it is.
+
+---- Globals mutated ----
+None. Writes the log (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `main`
+
+```text
+---- Summary ----
+Main function of the Mac app (PyInstaller builds it from this file): it updates the
+app from GitHub's newest release first, then runs the program (main.py). Anything
+that stops the program is written to the launch log and shown in a message with a
+Copy details button.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+STOPPED_SENTENCE (module constant).
+
+---- Outputs ----
+int
+    0 when the new version opens in place of this one, otherwise the program's exit
+    code (1 when it stopped because of a problem).
+
+---- Globals mutated ----
+None. May replace the app, runs the program and shows messages (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_problem_logger
+start_problem_shower
+update_installer
+user_places_finder
 ```
 
 ## `launchers/make_icons.py`
@@ -1273,7 +1389,9 @@ Main function of the program: run it in the experiment browser window (terminal 
 the left, plots on the right), or in the terminal when the window cannot open. With
 the check switch (PORTIMAO_SELF_TEST set to any value) it only checks that the
 window opens and shows a made-up preview, then closes by itself. The Mac app first
-makes its own folder and sends what it prints to its log.
+makes its own folder and sends what it prints to its log; it has no terminal, so
+when its folder cannot be made or the window cannot open, a message says what to
+do.
 
 ---- Inputs ----
 None.
@@ -1284,13 +1402,14 @@ os.environ['PORTIMAO_SELF_TEST'].
 
 ---- Outputs ----
 int
-    0 when every file finished, 1 when the run was cancelled, a file failed or the
-    app's own folder could not be made. With the check switch: 0 when the check
-    passed, 1 when it failed.
+    0 when every file finished, 1 when the run was cancelled, a file failed, the
+    app's own folder could not be made or the app's window could not open. With the
+    check switch: 0 when the check passed, 1 when it failed.
 
 ---- Globals mutated ----
 None. Opens the window or runs in the terminal; the app makes its own folder and
-replaces sys.stdout and sys.stderr by its log (side effects).
+replaces sys.stdout and sys.stderr by its log; the app may show a message (side
+effects).
 
 ---- Equations ----
 None.
@@ -1300,6 +1419,7 @@ app_output_logger
 gui_runner
 program_runner
 self_test_runner
+start_problem_shower
 user_folder_preparer
 ```
 
@@ -1378,6 +1498,361 @@ None.
 exemplar_runner
 ocr_and_haem_response_runner
 time_response_runner
+```
+
+## `tests/test_app_updater.py`
+
+Tests the Mac app's update: the newest release, the zip for each Mac and the swap with a
+
+### HELPERS
+
+#### `_app_maker`
+
+```text
+---- Summary ----
+Helper function to make a made-up app: an Info.plist with its version, a stand-in
+program, and a file that names the version.
+
+---- Inputs ----
+app : Path
+    The .app folder to make.
+version : str
+    Its version, for example "1.0".
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The stand-in program inside the app (Contents/MacOS/Portimao).
+
+---- Globals mutated ----
+None. Writes the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_closed_pid_giver`
+
+```text
+---- Summary ----
+Helper function to give the process id of a program that has already closed, as
+the app has by the time the swap goes on.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+HIDDEN (module constant).
+
+---- Outputs ----
+int
+    The process id.
+
+---- Globals mutated ----
+None. Runs a short program (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_release_writer`
+
+```text
+---- Summary ----
+Helper function to write a made-up answer of GitHub about its newest release, with
+both zips pointing at one made-up zip.
+
+---- Inputs ----
+folder : Path
+    Folder to write the answer in.
+tag : str
+    The release's tag, for example "V99.0".
+zip_path : Path
+    The made-up zip; it may not exist when nothing is downloaded.
+
+---- Globals read ----
+APPLE_SILICON_ZIP, INTEL_ZIP (imported constants).
+
+---- Outputs ----
+str
+    The file:// address of the answer.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_swap_folder_maker`
+
+```text
+---- Summary ----
+Helper function to make an old app in a stand-in Applications folder and a new one
+in the update folder beside it, as the update leaves them before the swap.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+UPDATE_FOLDER_NAME (imported constant).
+
+---- Outputs ----
+Tuple[Path, Path, Path, Path]
+    (the app, the new app, the update log, the file the stand-in open command
+    makes).
+
+---- Globals mutated ----
+None. Writes the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_maker
+```
+
+### MAIN FUNCTIONS
+
+#### `test_app_only_waits_for_a_newer_release`
+
+```text
+---- Summary ----
+Main function to check that an app as new as the newest release starts as it is,
+leaves itself alone and says so in its update log, and that a program run from
+source never asks.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_maker
+_release_writer
+update_installer
+user_places_finder
+```
+
+#### `test_failed_swap_keeps_the_app`
+
+```text
+---- Summary ----
+Main function to check that when the new app cannot be moved in (here it is
+missing), the old app is kept, still opened and the log says why.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+SWAP_WAIT_S, SWAPPER_TEXT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_closed_pid_giver
+_swap_folder_maker
+swap_starter
+```
+
+#### `test_newer_release_is_found`
+
+```text
+---- Summary ----
+Main function to check that versions are compared number by number, and that an
+app whose version cannot be read never updates.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_newer_checker
+```
+
+#### `test_release_answer_is_read`
+
+```text
+---- Summary ----
+Main function to check that the version and the zips are read from GitHub's answer,
+and that an answer of any other form is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+APPLE_SILICON_ZIP (imported constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_release_reader
+```
+
+#### `test_swap_puts_the_new_app_in_place`
+
+```text
+---- Summary ----
+Main function to check that the swap puts the new app in place of the old one,
+deletes the old one, opens the app and writes it in the log.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+SWAP_WAIT_S, SWAPPER_TEXT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_closed_pid_giver
+_swap_folder_maker
+swap_starter
+```
+
+#### `test_swap_waits_for_the_app_to_close`
+
+```text
+---- Summary ----
+Main function to check that the swap leaves the app alone while it is still open,
+and swaps it once it has closed.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+SWAP_WAIT_S, SWAPPER_TEXT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_swap_folder_maker
+swap_starter
+```
+
+#### `test_temporary_copy_cannot_update`
+
+```text
+---- Summary ----
+Main function to check that an app macOS runs from a temporary copy says it cannot
+replace itself, and that an app in a folder that can be written to can.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_maker
+_blocker_finder
+```
+
+#### `test_update_from_made_up_zip`
+
+```text
+---- Summary ----
+Main function to check the whole update on a Mac: a made-up app V1.0 finds a
+made-up release V99.0, downloads and unpacks its zip, and the swap puts V99.0 in
+its place and opens it.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+SWAP_WAIT_S (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_maker
+_closed_pid_giver
+_release_writer
+update_installer
+user_places_finder
 ```
 
 ## `tests/test_dataset_settings.py`
@@ -2983,7 +3458,7 @@ None.
 
 ## `tests/test_mac_app_builder.py`
 
-Tests the part of the Mac app's build recipe that runs anywhere: the version written
+Tests the parts of the Mac app's build recipe that run anywhere: what goes inside the
 
 ### HELPERS
 
@@ -3020,9 +3495,10 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check that the build puts the fits, the window's icon and the
-question list (which gives the version) inside the app, and the details of each
-package asked for.
+Main function to check that the app starts from the app's start (which updates it),
+and that the build puts the fits, the window's icon, the question list (which gives
+the version), the Mac report and the swap script inside the app, and the details of
+each package asked for.
 
 ---- Inputs ----
 None.
@@ -3101,9 +3577,38 @@ _plist_maker
 
 ## `tests/test_mac_report.py`
 
-Tests that the Mac report runs to the end, finds where the folder is and changes nothing.
+Tests that the Mac report runs to the end, finds where the folder or the app is and
 
 ### HELPERS
+
+#### `_app_maker`
+
+```text
+---- Summary ----
+Helper function to make a small Portimao app in Applications, holding the report
+and a question list with a made-up version as the build puts them, and the app's
+own folder in the home folder with a launch log and an update log.
+
+---- Inputs ----
+home : Path
+    Stand-in home folder.
+
+---- Globals read ----
+REPORT (module constant).
+
+---- Outputs ----
+Path
+    The folder inside the app that holds the report's launchers folder.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
 
 #### `_folder_maker`
 
@@ -3250,6 +3755,36 @@ None.
 ---- Helpers ----
 _folder_maker
 _report_runner
+```
+
+#### `test_report_inside_app_describes_it`
+
+```text
+---- Summary ----
+Main function to check that the report run from inside the app (as Copy details
+does) describes the app and reads the logs of the app's own folder, leaves out the
+launcher's parts, prints only the report on its output and changes nothing.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_maker
+_report_runner
+_snapshot_taker
 ```
 
 ## `tests/test_ocr_checking.py`
@@ -11477,6 +12012,786 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `utils_shared/app_messages.py`
+
+The Mac app's own messages: why it could not start, with the Mac report to copy, and
+
+### MESSAGE HELPERS
+
+#### `_applescript_quoter`
+
+```text
+---- Summary ----
+Helper function to write a text as an AppleScript string, so quotes and backslashes
+in it (a folder name, for example) cannot end the string early.
+
+---- Inputs ----
+text : str
+    Any text.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The text between double quotes, with backslashes and double quotes escaped.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_dialog_script_maker`
+
+```text
+---- Summary ----
+Helper function to write the AppleScript of a macOS message with buttons, the last
+button being the one Enter presses.
+
+---- Inputs ----
+text : str
+    The message.
+title : str
+    Title of the message window.
+buttons : Sequence[str]
+    Button names, left to right.
+icon : str
+    'caution' for a problem, 'note' for news.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    One AppleScript statement; osascript prints "button returned:<name>".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_applescript_quoter
+```
+
+#### `_report_copier`
+
+```text
+---- Summary ----
+Helper function to run the Mac report that comes inside the app and copy what it
+prints to the clipboard.
+
+---- Inputs ----
+places : UserPlaces
+    Where the program's own files are (the report is in its launchers folder).
+
+---- Globals read ----
+REPORT_SCRIPT, REPORT_TIMEOUT_S (module constants).
+
+---- Outputs ----
+bool
+    True when the report was copied; False when it could not be run or copied.
+
+---- Globals mutated ----
+None. Runs the report and fills the clipboard (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `start_problem_shower`
+
+```text
+---- Summary ----
+Main function to say why Portimao could not start. The sentence is always printed
+(to the terminal, or to the app's launch log). In the Mac app, which has no
+terminal, a macOS message also shows it, with a Copy details button that copies the
+Mac report and opens the Mac problem form to paste it into.
+
+---- Inputs ----
+sentence : str
+    One sentence that says what went wrong and what to do.
+places : UserPlaces
+    Where the program's files are, and whether this is the app.
+
+---- Globals read ----
+COPY_BUTTON, FORM_LINK (module constants).
+
+---- Outputs ----
+None
+    Nothing. Waits until the message is closed. A message that cannot be shown
+    leaves only the printed sentence.
+
+---- Globals mutated ----
+None. Prints, shows a message, may fill the clipboard and open the form in the
+browser (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_dialog_script_maker
+_report_copier
+```
+
+#### `update_notice_shower`
+
+```text
+---- Summary ----
+Main function to say, in a macOS message that does not hold up the start, that a
+newer Portimao is out but this copy could not update itself, with a button that
+opens the download page.
+
+---- Inputs ----
+version : str
+    The newer version, for example "2.5".
+reason : str
+    Why this copy could not update itself, in plain words.
+
+---- Globals read ----
+DOWNLOAD_BUTTON, RELEASES_LINK (module constants).
+
+---- Outputs ----
+None
+    Nothing. Returns at once; the message stays until it is closed.
+
+---- Globals mutated ----
+None. Shows a message, and opens the page in the browser when asked (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_applescript_quoter
+_dialog_script_maker
+```
+
+## `utils_shared/app_updater.py`
+
+The Mac app's own update at each start: asks GitHub for the newest release and, when it
+
+### UPDATE HELPERS
+
+#### `_app_finder`
+
+```text
+---- Summary ----
+Helper function to find the .app folder the running program is in.
+
+---- Inputs ----
+executable : str
+    Path of the running program, <app>.app/Contents/MacOS/<name> in the app.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Path]
+    The .app folder, or None when the program is not inside one.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_app_unpacker`
+
+```text
+---- Summary ----
+Helper function to unpack the downloaded zip with macOS's ditto, which keeps the
+app's links and signature (Python's zip module would break them).
+
+---- Inputs ----
+zip_path : Path
+    The downloaded zip.
+folder : Path
+    Folder to unpack into.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Path]
+    The one .app folder unpacked, or None when unpacking failed.
+
+---- Globals mutated ----
+None. Writes the app into the folder (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_blocker_finder`
+
+```text
+---- Summary ----
+Helper function to find what stops the app from replacing itself where it is.
+
+---- Inputs ----
+app : Path
+    The .app folder.
+
+---- Globals read ----
+TEMPORARY_COPY_MARK (module constant).
+
+---- Outputs ----
+Optional[str]
+    Why it cannot replace itself, in plain words, or None when it can.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_leftover_cleaner`
+
+```text
+---- Summary ----
+Helper function to delete what an earlier update left beside the app: the update
+folder, with a download that did not finish or the old app.
+
+---- Inputs ----
+app : Path
+    The .app folder.
+
+---- Globals read ----
+UPDATE_FOLDER_NAME (module constant).
+
+---- Outputs ----
+None
+    Nothing. Whatever cannot be deleted is left for the next start.
+
+---- Globals mutated ----
+None. Deletes files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_log_opener`
+
+```text
+---- Summary ----
+Helper function to open the update log: keeps its last lines and gives a function
+that adds a line with the date and time.
+
+---- Inputs ----
+logs_folder : Path
+    The user's logs folder; made when missing.
+
+---- Globals read ----
+LOG_KEPT_LINES, LOG_NAME (module constants).
+
+---- Outputs ----
+Tuple[Path, Callable[[str], None]]
+    (the log's path, the function that adds a line). A log that cannot be written
+    just loses its lines; the update goes on.
+
+---- Globals mutated ----
+None. Writes the log (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_new_app_checker`
+
+```text
+---- Summary ----
+Helper function to check that the unpacked app is the version offered and has its
+program inside.
+
+---- Inputs ----
+new_app : Path
+    The unpacked .app folder.
+version : str
+    The version offered, for example "2.5".
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the app's Info.plist gives that version and its program is there.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_version_splitter
+```
+
+#### `_new_app_fetcher`
+
+```text
+---- Summary ----
+Helper function to download the zip of the new app, unpack it and check it.
+
+---- Inputs ----
+url : str
+    Where the zip is.
+size_bytes : int
+    Size of the zip as GitHub gives it; 0 when not known.
+version : str
+    The version offered.
+folder : Path
+    The update folder beside the app; made here.
+show : Callable[[str], None]
+    Shows a line of progress.
+log : Callable[[str], None]
+    Adds a line to the update log.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Path]
+    The new .app folder, ready to be moved in, or None when any step failed (the
+    reason is in the log).
+
+---- Globals mutated ----
+None. Writes into the update folder (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_unpacker
+_new_app_checker
+_zip_downloader
+```
+
+#### `_newer_checker`
+
+```text
+---- Summary ----
+Helper function to say whether the version offered is newer than the app's own.
+
+---- Inputs ----
+own : Optional[str]
+    The app's version, for example "2.9"; None when it could not be read.
+offered : str
+    The version offered, with or without its V, for example "V2.10".
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True only when both versions can be read and the one offered is newer.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Versions are compared number by number from the left: 2.10 > 2.9, 2.3.1 > 2.3,
+2.3.0 = 2.3.
+
+---- Helpers ----
+_version_splitter
+```
+
+#### `_own_version_reader`
+
+```text
+---- Summary ----
+Helper function to read the app's version from its Info.plist, where the build
+writes it.
+
+---- Inputs ----
+app : Path
+    The .app folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    The version, for example "2.4", or None when it cannot be read.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_release_asker`
+
+```text
+---- Summary ----
+Helper function to ask GitHub for its newest release with macOS's own curl, which
+uses the Mac's certificates (the app's Python cannot find any).
+
+---- Inputs ----
+url : str
+    The address of GitHub's answer (a file:// address in the tests).
+
+---- Globals read ----
+ASK_TIMEOUT_S, HIDDEN (module constants).
+
+---- Outputs ----
+Optional[str]
+    GitHub's answer (JSON text), or None when it did not answer in time.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_release_reader`
+
+```text
+---- Summary ----
+Helper function to read the version and the zips from GitHub's answer about its
+newest release.
+
+---- Inputs ----
+text : str
+    GitHub's answer: JSON with "tag_name" (V<version>) and "assets", each with
+    "name", "browser_download_url" and "size".
+
+---- Globals read ----
+VERSION_PATTERN (module constant).
+
+---- Outputs ----
+Optional[Tuple[str, Dict[str, Tuple[str, int]]]]
+    (the version without its V, {zip name: (address, size in bytes)}), or None
+    when the answer is not of that form.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_start_command_maker`
+
+```text
+---- Summary ----
+Helper function to give the command that opens the app once it is swapped: macOS's
+open, as a click does, passing on the check switch when it is set.
+
+---- Inputs ----
+app : Path
+    The .app folder.
+
+---- Globals read ----
+SELF_TEST_SWITCH (module constant); os.environ['PORTIMAO_SELF_TEST'].
+
+---- Outputs ----
+List[str]
+    The command and its arguments.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_status_window_maker`
+
+```text
+---- Summary ----
+Helper function to open a small window that shows how the update is going. The
+caller runs it with the returned function's ``mainloop`` attribute.
+
+---- Inputs ----
+version : str
+    The version being installed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Callable[[str], None]]
+    Function that shows a line of text in the window (safe from any thread), with
+    the attributes ``mainloop`` and ``close``; None when no window can open.
+
+---- Globals mutated ----
+None. Opens a window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_translation_checker`
+
+```text
+---- Summary ----
+Helper function to say whether the app runs under Rosetta (an Intel app on an Apple
+Silicon Mac).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True under Rosetta.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_version_splitter`
+
+```text
+---- Summary ----
+Helper function to turn a version into its numbers, for comparing.
+
+---- Inputs ----
+text : str
+    A version such as "2.3.1" or "V2.3.1".
+
+---- Globals read ----
+VERSION_PATTERN (module constant).
+
+---- Outputs ----
+Optional[Tuple[int, ...]]
+    The numbers without trailing zeros, so 2.3.0 and 2.3 are equal; None when the
+    text is not a version.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_zip_downloader`
+
+```text
+---- Summary ----
+Helper function to download the zip with macOS's own curl, showing how much has
+come.
+
+---- Inputs ----
+url : str
+    Where the zip is.
+target : Path
+    File to write.
+size_bytes : int
+    Size of the zip as GitHub gives it; 0 when not known.
+version : str
+    The version being installed, for the progress line.
+show : Callable[[str], None]
+    Shows a line of progress.
+
+---- Globals read ----
+CONNECT_TIMEOUT_S, HIDDEN, PROGRESS_STEP_S, STALL_BYTES_PER_S, STALL_S (module
+constants).
+
+---- Outputs ----
+Optional[str]
+    None when the whole zip came; otherwise what went wrong.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_zip_namer`
+
+```text
+---- Summary ----
+Helper function to name the zip for this kind of Mac.
+
+---- Inputs ----
+machine : str
+    The chip the app runs on, as platform.machine() gives it ('arm64' or 'x86_64').
+is_translated : bool
+    True when an Intel app runs under Rosetta on an Apple Silicon Mac.
+
+---- Globals read ----
+APPLE_SILICON_ZIP, INTEL_ZIP (module constants).
+
+---- Outputs ----
+str
+    The zip's name: Apple Silicon also under Rosetta, so the Mac moves to the app
+    made for it; Intel otherwise.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `swap_starter`
+
+```text
+---- Summary ----
+Main function to start the swap on its own (launchers/mac_app_swapper.sh), so it
+goes on once the app has closed: it waits for the app to close, moves the new app
+into its place and opens it.
+
+---- Inputs ----
+swapper_text : str
+    The text of the swap script; run with sh -c, so nothing is read from the app
+    being replaced.
+closing_pid : int
+    Process id of the app that closes first.
+app : Path
+    The .app folder to replace.
+new_app : Path
+    The new .app folder, in the update folder beside it.
+log_path : Path
+    The update log, which the swap adds its lines to.
+start_command : Sequence[str]
+    The command that opens the app afterwards.
+
+---- Globals read ----
+HIDDEN (module constant).
+
+---- Outputs ----
+subprocess.Popen
+    The swap, running on its own.
+
+---- Globals mutated ----
+None. Starts a process (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `update_installer`
+
+```text
+---- Summary ----
+Main function to update the Mac app at its start. It asks GitHub for the newest
+release (a few seconds at most) and, when it is newer, downloads the zip for this
+kind of Mac with a small "Updating Portimao" window, and starts the swap, which puts
+it in place once this app has closed and opens it. With no internet it starts as it
+is and says nothing; when it cannot replace itself, or the download fails, it starts
+as it is with a message saying where to download the new one. Run from source,
+nothing is done. Every step is written to logs/update.log.
+
+---- Inputs ----
+places : UserPlaces
+    Where the user's things are kept, and whether this is the app.
+executable : Optional[str]
+    Path of the running program; None for this one (sys.executable).
+release_url : str
+    Where GitHub's answer about its newest release is (a file:// address in the
+    tests).
+closing_pid : Optional[int]
+    Process id the swap waits for; None for this program.
+start_command : Optional[Sequence[str]]
+    Command that opens the app after the swap; None for macOS's open.
+shows_messages : bool
+    False to show no window and no message (for the tests).
+
+---- Globals read ----
+RELEASE_URL, SWAPPER, UPDATE_FOLDER_NAME (module constants).
+
+---- Outputs ----
+bool
+    True when the swap has started, so the app must close now; False when the app
+    starts as it is.
+
+---- Globals mutated ----
+None. Writes the update log, downloads into the update folder beside the app,
+shows a window or a message and starts the swap (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_finder
+_blocker_finder
+_leftover_cleaner
+_log_opener
+_new_app_fetcher
+_newer_checker
+_own_version_reader
+_release_asker
+_release_reader
+_start_command_maker
+_status_window_maker
+_translation_checker
+_zip_namer
+swap_starter
+update_notice_shower
 ```
 
 ## `utils_shared/attenuation.py`

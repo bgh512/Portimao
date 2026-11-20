@@ -26,6 +26,7 @@ from utils_custom.custom_runner import (exemplar_runner,
                                         ocr_and_haem_response_runner,
                                         time_response_runner,
                                         )
+from utils_shared.app_messages import SEND_DETAILS, start_problem_shower
 from utils_shared.comparison_plotter import comparison_figure_plotter
 from utils_shared.dataset_settings import dataset_settings_saver
 from utils_shared.experiment_processing import experiment_data_processor
@@ -582,7 +583,9 @@ def main() -> int:
     the left, plots on the right), or in the terminal when the window cannot open. With
     the check switch (PORTIMAO_SELF_TEST set to any value) it only checks that the
     window opens and shows a made-up preview, then closes by itself. The Mac app first
-    makes its own folder and sends what it prints to its log.
+    makes its own folder and sends what it prints to its log; it has no terminal, so
+    when its folder cannot be made or the window cannot open, a message says what to
+    do.
 
     ---- Inputs ----
     None.
@@ -593,13 +596,14 @@ def main() -> int:
 
     ---- Outputs ----
     int
-        0 when every file finished, 1 when the run was cancelled, a file failed or the
-        app's own folder could not be made. With the check switch: 0 when the check
-        passed, 1 when it failed.
+        0 when every file finished, 1 when the run was cancelled, a file failed, the
+        app's own folder could not be made or the app's window could not open. With the
+        check switch: 0 when the check passed, 1 when it failed.
 
     ---- Globals mutated ----
     None. Opens the window or runs in the terminal; the app makes its own folder and
-    replaces sys.stdout and sys.stderr by its log (side effects).
+    replaces sys.stdout and sys.stderr by its log; the app may show a message (side
+    effects).
 
     ---- Equations ----
     None.
@@ -609,15 +613,18 @@ def main() -> int:
     gui_runner
     program_runner
     self_test_runner
+    start_problem_shower
     user_folder_preparer
     """
 
     try:
         user_folder_preparer(PLACES)
     except OSError:
-        print(f'Portimao could not make its folder {PLACES.own_folder}: check that '
-              f'your home folder can be written to, then open Portimao again.',
-              )
+        start_problem_shower(f'Portimao could not make its folder {PLACES.own_folder}: '
+                             f'check that your home folder can be written to, then '
+                             f'open Portimao again.',
+                             PLACES,
+                             )
         return 1
     app_output_logger(PLACES)
     if os.environ.get('PORTIMAO_SELF_TEST'):
@@ -625,6 +632,11 @@ def main() -> int:
         from utils_viewer.viewer_self_test import self_test_runner
         return self_test_runner(PROGRAM_TITLE, PLACES)
     code = gui_runner(program_runner, PROGRAM_TITLE)
+    if code is None and PLACES.is_app:  # the app has no terminal to ask the questions in
+        start_problem_shower(f"Portimao's window could not open: {SEND_DETAILS}.",
+                             PLACES,
+                             )
+        return 1
     if code is None:
         code = program_runner()
     return code

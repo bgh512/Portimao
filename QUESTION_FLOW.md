@@ -1,4 +1,4 @@
-# Portimao question flow (V2.3)
+# Portimao question flow (V2.3.1)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -388,7 +388,7 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 
 ## If the window cannot open (terminal mode)
 
-The questions and their order are the same, apart from the OD values and what the strip does in the window. These differ:
+The Mac app has no terminal: when its window cannot open, a message says so, with a **Copy details** button to send the details with the Mac problem form, and nothing is asked. Started any other way, the questions and their order are the same, apart from the OD values and what the strip does in the window. These differ:
 
 - In **2** to **5** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer. Nothing can be clicked or dragged on it: every number is typed.
 - In **3.A** there is no table. The values stored for some files are listed, the OD values are asked one file at a time, and then accepted, so the event label questions are numbered one higher on screen (3.3 to 3.6):
