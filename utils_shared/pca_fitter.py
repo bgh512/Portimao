@@ -11,6 +11,12 @@ import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.spectral_decomposer import (basis_solver,
+                                              fit_scale_standardiser,
+                                              scatter_background_builder,
+                                              )
+
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 ENOUGH_VARIANCE = 0.99
@@ -81,9 +87,9 @@ def _nuisance_basis_builder(wavelengths: np.ndarray,
                             ) -> np.ndarray:
     """
     ---- Summary ----
-    Helper function to build the offset and scatter terms that the haem decomposition
-    fits alongside the haems, as an orthonormal basis, so they can be taken out of the
-    spectra before the components are searched for.
+    Helper function to build the offset and scatter terms (one of the scatter
+    backgrounds of the haem decomposition) as an orthonormal basis, so they can be
+    taken out of the spectra before the components are searched for.
 
     ---- Inputs ----
     wavelengths : np.ndarray
@@ -103,19 +109,14 @@ def _nuisance_basis_builder(wavelengths: np.ndarray,
     None.
 
     ---- Equations ----
-    The columns are 1 and (1/wl^k - min) / (max - min) as in s_array_generator,
-    orthonormalised by QR.
+    The columns of scatter_background_builder (the haem decomposition's scatter
+    backgrounds), orthonormalised by QR.
 
     ---- Helpers ----
-    None.
+    scatter_background_builder
     """
 
-    columns = [np.ones_like(wavelengths)]
-    for k in range(1, degree_of_scatter + 1):
-        scatter = 1 / wavelengths ** k
-        shifted = scatter - np.amin(scatter)
-        columns.append(shifted / np.amax(shifted))
-    q, _ = np.linalg.qr(np.column_stack(columns))
+    q, _ = np.linalg.qr(scatter_background_builder(wavelengths, degree_of_scatter))
     return q
 
 
@@ -615,12 +616,14 @@ def decomposition_example_finder(spectra_sets: List[dict],
     None.
 
     ---- Equations ----
-    B = [components, offset and scatter terms]; c = B^+ a (least squares) for each
-    spectrum a; fitted = B c; residual = a - fitted; RMS = sqrt(mean(residual^2)).
+    B = [components, offset and scatter terms]; c = the least-squares amounts of B in
+    each spectrum a (basis_solver, the solver of the haem decomposition); fitted = B c;
+    residual = a - fitted; RMS = sqrt(mean(residual^2)).
 
     ---- Helpers ----
     _nuisance_basis_builder
     _spectra_gridder
+    basis_solver
     """
 
     # ---- 1 Build the basis -----------------------------------------------------------
@@ -629,7 +632,6 @@ def decomposition_example_finder(spectra_sets: List[dict],
     count = components.shape[1]
     nuisance = _nuisance_basis_builder(grid, degree_of_scatter)
     basis = np.column_stack((components, nuisance))
-    solver = np.linalg.pinv(basis)
 
     # ---- 2 Find the residual of every spectrum ---------------------------------------
     rows, labels, rms_parts = [], [], []
@@ -643,7 +645,7 @@ def decomposition_example_finder(spectra_sets: List[dict],
         data, times = data[finite], times[finite]
         if not len(data):
             continue
-        residuals = data - (data @ solver.T) @ basis.T
+        residuals = data - basis_solver(basis, data) @ basis.T
         rms_parts.append(np.sqrt(np.mean(residuals ** 2, axis=1)))
         rows.append(data)
         labels += [(entry['name'], float(t)) for t in times]
@@ -654,7 +656,7 @@ def decomposition_example_finder(spectra_sets: List[dict],
 
     # ---- example ---------------------------------------------------------------------
     def example(index: int) -> dict:
-        coefficients = solver @ spectra[index]
+        coefficients = basis_solver(basis, spectra[index])
         fitted = basis @ coefficients
         return {'name': labels[index][0],
                 'time_min': labels[index][1],
@@ -734,24 +736,46 @@ def fit_table_builder(result: dict, names: Optional[List[str]] = None) -> dict:
 
     ---- Outputs ----
     dict
-        {'haem_list': names, 'data': table of (wavelength, response) column pairs}.
-        The responses are the negated components (a peak of -1), as in the fit files,
-        because the decomposition negates the fit again.
+        {'haem_list': names, 'data': table of (wavelength, response) column pairs,
+        'scale_divisor', 'notes'}. The responses are the components as found (a
+        largest peak of +1) brought to the standard scale of the fit files, so the
+        raw amounts are the same whether the components are used at once or saved and
+        read back: the spectra they come from and the fit files have the same sign.
+        Raises ValueError, with a message for the user, when the names are not one
+        per component, or one is empty, holds a comma or is used twice: such a fit
+        could not be read back once saved.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    response = -component.
+    response = component / 1 000 000 (fit_scale_standardiser).
 
     ---- Helpers ----
-    None.
+    fit_scale_standardiser
     """
 
     count = result['components'].shape[1]
-    names = list(names) if names else [f'PC{i + 1}' for i in range(count)]
+    names = ([str(name).strip() for name in names]
+             if names
+             else [f'PC{i + 1}' for i in range(count)]
+             )
+    if len(names) != count:
+        raise ValueError(f'{count} components were found but {len(names)} names were '
+                         'given. Give one name for each component.',
+                         )
+    if (any(not name or ',' in name for name in names)
+        or len(set(names)) != len(names)
+        ):
+        raise ValueError('Every component needs its own name, not empty and without '
+                         f"commas (the names given: {'; '.join(names)}). Name the "
+                         'components again.',
+                         )
     columns = {}
     for i, name in enumerate(names):
         columns[name] = result['wavelengths']
-        columns[f'Unnamed: {2 * i + 1}'] = -result['components'][:, i]
-    return {'haem_list': names, 'data': pd.DataFrame(columns)}
+        columns[f'Unnamed: {2 * i + 1}'] = result['components'][:, i]
+    data, divisor, notes = fit_scale_standardiser(pd.DataFrame(columns),
+                                                  'The components found',
+                                                  )
+    return {'haem_list': names, 'data': data, 'scale_divisor': divisor, 'notes': notes}

@@ -4,13 +4,16 @@ Spectral fit loading and haem decomposition routines.
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
 import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.reference_level import (reference_level_finder,
+                                          window_seconds_calculator,
+                                          )
 from utils_shared.schema import (measurement_column_finder,
                                  SPECTRUM_INDEX_COLUMN,
                                  TIME_COLUMN,
@@ -19,68 +22,253 @@ from utils_shared.schema import (measurement_column_finder,
                                  )
 
 
+# ---- CONSTANTS -----------------------------------------------------------------------
+# The standard scale of a fit: the highest point of its shapes (largest |response| in
+# the file) lies inside this band. The bswitch fits, at about 2e-5 to 3e-5, set it.
+FIT_PEAK_BAND = (1e-7, 1e-3)
+# Some fit files hold the same shapes a million times larger; they are divided by this.
+FIT_LARGE_SCALE = 1_000_000.0
+# The backgrounds a decomposition can fit under the haems, by name, with the words the
+# messages use; HAEM_BACKGROUND in config.py names the standard one. The Valencia one is
+# the shape of the instrument's own fit file, which follows 1/wavelength^2 exactly.
+BACKGROUND_LABELS = {'scatter_1': 'flat + 1/wavelength',
+                     'scatter_2': 'flat + 1/wavelength + 1/wavelength²',
+                     'linear': 'flat + straight line',
+                     'quadratic': 'flat + straight line + curve',
+                     'valencia': 'flat + 1/wavelength² (Valencia)',
+                     }
+
+
 # ---- SPECTRAL DECOMPOSER HELPERS -----------------------------------------------------
 
 
-# ---- _best_window_finder -------------------------------------------------------------
-def _best_window_finder(times: np.ndarray,
-                        values: np.ndarray,
-                        start: float,
-                        stop: float,
-                        width: float,
-                        ) -> Optional[Tuple[float, float, float]]:
+# ---- _fit_table_cleaner --------------------------------------------------------------
+def _fit_table_cleaner(data: pd.DataFrame,
+                       label: str,
+                       ) -> Tuple[pd.DataFrame, List[str]]:
     """
     ---- Summary ----
-    Helper function to find the window of a given length with the highest average.
+    Helper function to check the table of a fit file and to give every haem clean rows:
+    numbers only, no blank rows, wavelengths going upwards.
 
     ---- Inputs ----
-    times : np.ndarray
-        Time of each spectrum in minutes.
-    values : np.ndarray
-        Value at each spectrum.
-    start : float
-        Earliest time that may be used.
-    stop : float
-        Latest time that may be used.
-    width : float
-        Window length in minutes.
+    data : pd.DataFrame
+        The fit file as read: (wavelength, response) column pairs, one pair per haem;
+        the header of each wavelength column names the haem. Row i of the table is row
+        i + 2 of the file.
+    label : str
+        Name of the fit file, used in the messages.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    Optional[Tuple[float, float, float]]
-        (highest average, time of its first spectrum, time of its last spectrum), or
-        None when there is no finite value between start and stop. When the usable
-        part is shorter than the window, all of it is one window.
+    Tuple[pd.DataFrame, List[str]]
+        (the table with the same headers, each haem's rows at the top and blanks below
+        the shorter haems; the notes for the user, one sentence per haem whose leftover
+        rows were left out). Raises ValueError, with a message for the user, when the
+        columns are not in pairs, a haem has no name, a cell is not a number, a row
+        holds only one of wavelength and response, or a haem has fewer than two rows.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    Window average = (running sum at the window end - running sum at its start) /
-    number of spectra in the window.
+    A haem whose wavelengths all go downwards is turned round. Where the wavelengths
+    of a haem jump backwards, the rows before the jump are kept and the rest left out:
+    such rows are leftovers of another column, not data.
+
+    ---- Helpers ----
+    _number_column_reader
+    """
+
+    # ---- 1 Check the columns come in pairs -------------------------------------------
+    if (data.shape[1] % 2
+        and str(data.columns[-1]).startswith('Unnamed')
+        and data.iloc[:, -1].isna().all()
+        ):
+        data = data.iloc[:, :-1]  # an empty last column, as a spreadsheet may add
+    if data.shape[1] == 0 or data.shape[1] % 2:
+        raise ValueError(f'{label} has {data.shape[1]} columns, but a fit file needs '
+                         'two columns per haem (wavelength, then response). Correct '
+                         'the file, or choose another fit file.',
+                         )
+
+    # ---- 2 Clean each haem -----------------------------------------------------------
+    notes: List[str] = []
+    shapes: List[Tuple[np.ndarray, np.ndarray]] = []
+    for i in range(data.shape[1] // 2):
+        haem = str(data.columns[2 * i])
+        if haem.startswith('Unnamed'):
+            raise ValueError(f'{label}: columns {2 * i + 1} and {2 * i + 2} have no '
+                             'haem name in the first row. Write the name of the haem '
+                             'above its wavelength column, or delete the columns if '
+                             'they are empty.',
+                             )
+        x = _number_column_reader(data.iloc[:, 2 * i], haem, 'wavelength', label)
+        y = _number_column_reader(data.iloc[:, 2 * i + 1], haem, 'response', label)
+        half = np.isnan(x) != np.isnan(y)
+        if half.any():
+            row = int(np.nonzero(half)[0][0]) + 2
+            raise ValueError(f'{label}: row {row} of {haem} has a wavelength without '
+                             'a response, or a response without a wavelength. Fill in '
+                             'or empty both cells, or choose another fit file.',
+                             )
+        filled = ~np.isnan(x)
+        x, y = x[filled], y[filled]
+        steps = np.diff(x)
+        if steps.size and np.all(steps <= 0) and np.any(steps < 0):
+            x, y = x[::-1], y[::-1]
+            steps = np.diff(x)
+        backwards = np.nonzero(steps < 0)[0]
+        if backwards.size:
+            kept = int(backwards[0]) + 1
+            notes.append(f'{label}: the rows of {haem} after {x[kept - 1]:.2f} nm go '
+                         'backwards in wavelength and were left out, so it is used '
+                         f'from {x[0]:.2f} to {x[kept - 1]:.2f} nm.',
+                         )
+            x, y = x[:kept], y[:kept]
+        if len(x) < 2:
+            raise ValueError(f'{label}: {haem} has fewer than two rows of numbers, too '
+                             'few to make a shape. Fill in its columns, or choose '
+                             'another fit file.',
+                             )
+        shapes.append((x, y))
+
+    # ---- 3 Rebuild the table ---------------------------------------------------------
+    n_rows = max(len(x) for x, _ in shapes)
+    values = np.full((n_rows, data.shape[1]), np.nan)
+    for i, (x, y) in enumerate(shapes):
+        values[:len(x), 2 * i] = x
+        values[:len(y), 2 * i + 1] = y
+    return pd.DataFrame(values, columns=data.columns), notes
+
+
+# ---- _haem_shape_getter --------------------------------------------------------------
+def _haem_shape_getter(fit_data: pd.DataFrame,
+                       index: int,
+                       ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    ---- Summary ----
+    Helper function to give the filled rows of one haem of a fit table, so that the
+    blanks below a shorter haem never reach a calculation.
+
+    ---- Inputs ----
+    fit_data : pd.DataFrame
+        Fit table from fit_importer.
+    index : int
+        Number of the haem in the table, from 0.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[np.ndarray, np.ndarray]
+        (wavelengths in nm, responses) of that haem, each of shape (n_rows of the
+        haem).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
 
     ---- Helpers ----
     None.
     """
 
-    order = np.argsort(times)
-    times, values = times[order], values[order]
-    usable = (np.isfinite(times) & np.isfinite(values)
-              & (times >= start) & (times <= stop))
-    times, values = times[usable], values[usable]
-    if times.size == 0:
-        return None
-    firsts = np.arange(times.size)
-    ends = np.searchsorted(times, times + width, side='right')
-    running = np.concatenate(([0.0], np.cumsum(values)))
-    means = (running[ends] - running[firsts]) / (ends - firsts)
-    fits = times + width <= stop + 1e-9
-    if fits.any():
-        means = np.where(fits, means, -np.inf)
-    best = int(np.argmax(means))
-    return float(means[best]), float(times[best]), float(times[ends[best] - 1])
+    x = fit_data.iloc[:, 2 * index].to_numpy(dtype=float)
+    y = fit_data.iloc[:, 2 * index + 1].to_numpy(dtype=float)
+    filled = np.isfinite(x) & np.isfinite(y)
+    return x[filled], y[filled]
+
+
+# ---- _number_column_reader -----------------------------------------------------------
+def _number_column_reader(column: pd.Series,
+                          haem: str,
+                          kind: str,
+                          label: str,
+                          ) -> np.ndarray:
+    """
+    ---- Summary ----
+    Helper function to read one column of a fit file as numbers.
+
+    ---- Inputs ----
+    column : pd.Series
+        The column as read from the file; row i is row i + 2 of the file.
+    haem : str
+        Name of the haem the column belongs to, used in the message.
+    kind : str
+        'wavelength' or 'response', used in the message.
+    label : str
+        Name of the fit file, used in the message.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    np.ndarray
+        The numbers, shape (n_rows), NaN where the cell is empty. Raises ValueError,
+        with a message for the user, for a cell that holds anything but a number.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    blank = (column.isna() | column.astype(str).str.strip().eq('')).to_numpy()
+    numbers = np.array(pd.to_numeric(column, errors='coerce'), dtype=float)
+    numbers[blank] = np.nan
+    unreadable = ~blank & ~np.isfinite(numbers)
+    if unreadable.any():
+        row = int(np.nonzero(unreadable)[0][0])
+        raise ValueError(f'{label}: the {kind} of {haem} in row {row + 2} is not a '
+                         f'number ("{column.iloc[row]}"). Correct the cell, or choose '
+                         'another fit file.',
+                         )
+    return numbers
+
+
+# ---- _unit_scaler --------------------------------------------------------------------
+def _unit_scaler(values: np.ndarray) -> np.ndarray:
+    """
+    ---- Summary ----
+    Helper function to scale one background shape to run from 0 to 1.
+
+    ---- Inputs ----
+    values : np.ndarray
+        The shape at each wavelength, shape (n_wavelengths).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    np.ndarray
+        The scaled shape, same shape; all 0 when the values do not change (one
+        wavelength), and empty when there are none, so that the solver can say there
+        are too few wavelengths.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    scaled = (values - min) / (max - min).
+
+    ---- Helpers ----
+    None.
+    """
+
+    values = np.asarray(values, dtype=float)
+    if values.size == 0:
+        return values
+    shifted = values - values.min()
+    spread = shifted.max()
+    return shifted / spread if spread > 0 else shifted
 
 
 # ---- _wavelength_masker --------------------------------------------------------------
@@ -100,7 +288,8 @@ def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.nd
 
     ---- Outputs ----
     np.ndarray
-        Boolean mask, True inside the shared range.
+        Boolean mask, True inside the shared range. Raises ValueError, with a message
+        for the user, when a haem of the fit has no rows.
 
     ---- Globals mutated ----
     None.
@@ -109,16 +298,136 @@ def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.nd
     None.
 
     ---- Helpers ----
-    None.
+    fit_range_finder
     """
 
-    fit_wavelength = fit_data.iloc[:, ::2]
-    wmax = min(np.nanmax(fit_wavelength, axis=0))
-    wmin = max(np.nanmin(fit_wavelength, axis=0))
+    wmin, wmax = fit_range_finder(fit_data)
     return (wavelengths >= wmin) & (wavelengths <= wmax)
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- background_builder --------------------------------------------------------------
+def background_builder(wavelengths: np.ndarray, background: str) -> np.ndarray:
+    """
+    ---- Summary ----
+    Main function to build the background terms that a haem decomposition fits beside
+    its shapes: a flat level and the shapes of the chosen background.
+
+    ---- Inputs ----
+    wavelengths : np.ndarray
+        Wavelengths of the spectra (nm), shape (n_wavelengths).
+    background : str
+        Name of the background, a key of BACKGROUND_LABELS.
+
+    ---- Globals read ----
+    BACKGROUND_LABELS (module constant).
+
+    ---- Outputs ----
+    np.ndarray
+        The terms as columns, shape (n_wavelengths, n_terms): the flat 1 first, then
+        the shapes, each running from 0 to 1 over the wavelengths. Raises ValueError,
+        with a message for the user, for a background the program does not know.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    scatter_1: 1, 1/wl; scatter_2: 1, 1/wl, 1/wl^2 (scatter_background_builder);
+    linear: 1, wl; quadratic: 1, wl, (wl - centre)^2 with the centre in the middle of
+    the wavelengths; valencia: 1, 1/wl^2. Scaling a shape to run from 0 to 1 changes
+    only the size of its amount, not the fit.
+
+    ---- Helpers ----
+    _unit_scaler
+    scatter_background_builder
+    """
+
+    # ---- 1 Check the name ------------------------------------------------------------
+    if background not in BACKGROUND_LABELS:
+        choices = '; '.join(f'{name} ({label})'
+                            for name, label in BACKGROUND_LABELS.items()
+                            )
+        raise ValueError(f'The program has no background called "{background}". '
+                         f'Choose one of: {choices}.',
+                         )
+    wavelengths = np.asarray(wavelengths, dtype=float)
+
+    # ---- 2 Build the terms -----------------------------------------------------------
+    if background in ('scatter_1', 'scatter_2'):
+        return scatter_background_builder(wavelengths, int(background[-1]))
+    line = _unit_scaler(wavelengths)
+    shapes = {'linear': [line],
+              'quadratic': [line, _unit_scaler((line - 0.5) ** 2)],
+              'valencia': [_unit_scaler(1 / wavelengths ** 2)],
+              }[background]
+    return np.column_stack([np.ones_like(wavelengths)] + shapes)
+
+
+# ---- basis_solver --------------------------------------------------------------------
+def basis_solver(basis: np.ndarray, spectra: np.ndarray) -> np.ndarray:
+    """
+    ---- Summary ----
+    Main function to find how much of each column of a basis (the shapes and the
+    background terms) is in one spectrum, or in each spectrum of a run. It is the one
+    solver of every decomposition in the program.
+
+    ---- Inputs ----
+    basis : np.ndarray
+        The shapes to fit as columns, shape (n_wavelengths, n_components).
+    spectra : np.ndarray
+        One spectrum, shape (n_wavelengths), or a run of them, shape (n_spectra,
+        n_wavelengths), on the wavelengths of the basis.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    np.ndarray
+        The amounts, shape (n_components) for one spectrum or (n_spectra,
+        n_components) for a run. A spectrum holding a blank value gives blank amounts
+        for that spectrum only. Raises ValueError, with a message for the user, when
+        there are fewer wavelengths than components or when the columns cannot be told
+        apart.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Least squares: the c that makes |B c - a| smallest. Each column of B is first
+    divided by its length (root of its summed squares), so shapes on very different
+    scales are solved equally well; B_scaled = U S V^T (singular value decomposition);
+    c = V S^-1 U^T a / column length. S^T S is never inverted, as that squares the
+    rounding errors.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Check the basis -----------------------------------------------------------
+    basis = np.asarray(basis, dtype=float)
+    values = np.asarray(spectra, dtype=float)
+    n_wavelengths, n_components = basis.shape
+    if n_wavelengths < n_components:
+        raise ValueError(
+            f'The spectra and the shapes to fit share only {n_wavelengths}'
+            f' wavelengths, too few to work out {n_components} amounts. '
+            'Choose a fit file that covers the wavelengths of the spectra.',
+            )
+    unusable = ('Two of the shapes to fit cannot be told apart over these wavelengths '
+                '(they are the same, or one of them is empty), so the amounts cannot '
+                'be worked out. Choose another fit file.'
+                )
+    lengths = np.linalg.norm(basis, axis=0)
+    if not np.all(np.isfinite(lengths)) or np.any(lengths == 0):
+        raise ValueError(unusable)
+
+    # ---- 2 Solve ---------------------------------------------------------------------
+    u, s, vt = np.linalg.svd(basis / lengths, full_matrices=False)
+    if s[-1] <= s[0] * max(basis.shape) * np.finfo(float).eps:
+        raise ValueError(unusable)
+    return ((values @ u) / s) @ vt / lengths
 
 
 # ---- data_filterer -------------------------------------------------------------------
@@ -135,7 +444,7 @@ def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.n
         Fit table from fit_importer.
 
     ---- Globals read ----
-    None. Calls _wavelength_masker.
+    None.
 
     ---- Outputs ----
     np.ndarray
@@ -156,67 +465,72 @@ def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.n
 
 # ---- delta_abs_calculator ------------------------------------------------------------
 def delta_abs_calculator(haem_abs: pd.DataFrame,
-                         exclude_first_minutes: float = 5.0,
-                         window_seconds: float = 30.0,
+                         exclude_first_minutes: float,
+                         window_points: int,
                          label: str = 'haem_abs',
                          exclude_last_minutes: float = 0.0,
                          ) -> pd.DataFrame:
     """
     ---- Summary ----
     Main function to shift each haem absorbance so that its reference level is 0, giving
-    a change in absorbance (mOD). The reference level of each haem is the average of its
-    highest window (for example the fully oxidised point), wherever it occurs in the
-    run outside the ignored start and end.
+    a change in absorbance (mOD). The reference level of each haem is the median of its
+    highest points in a row (for example the fully oxidised point), wherever they occur
+    in the run outside the ignored start and end.
 
     ---- Inputs ----
     haem_abs : pd.DataFrame
         Haem absorbance table in mOD (time, spectrum index and one column per haem).
     exclude_first_minutes : float
         Minutes after the first measurement that are ignored at the start.
-    window_seconds : float
-        Length of the reference window, in seconds (> 0).
+    window_points : int
+        Number of spectra in a row that make the reference window (>= 1).
     label : str
         Name used in error messages.
     exclude_last_minutes : float
         Minutes before the last measurement that are ignored at the end.
 
     ---- Globals read ----
-    schema.get_times, get_values, measurement_columns.
+    None.
 
     ---- Outputs ----
     pd.DataFrame
-        Shifted copy; the means and the window of each haem are stored in
-        result.attrs["delta_abs_baseline"]. Raises ValueError for invalid settings or
-        when no spectra are left after the ignored parts.
+        Shifted copy; result.attrs["delta_abs_baseline"] holds {'level_by_haem': the
+        level subtracted from each haem (mOD), 'window_by_haem': the (first, last)
+        time of each haem's window (min), 'window_points', 'window_seconds': the
+        length of such a window}. Raises ValueError, with a message for the user, for
+        invalid settings or when fewer than window_points spectra are left after the
+        ignored parts.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    delta_abs = abs - max over windows of mean(abs inside the window), per haem. The
-    windows start at each spectrum and last window_seconds. Only a constant is
-    subtracted, so differences between points are unchanged.
+    delta_abs = abs - max over windows of median(abs inside the window), per haem
+    (reference_level_finder). Only a constant is subtracted, so differences between
+    points are unchanged.
 
     ---- Helpers ----
-    _best_window_finder
     measurement_column_finder
+    reference_level_finder
     time_getter
     value_getter
+    window_seconds_calculator
     """
 
     # ---- 1 Validate the inputs -------------------------------------------------------
-    if window_seconds <= 0:
-        raise ValueError('window_seconds must be positive.')
     if exclude_first_minutes < 0 or exclude_last_minutes < 0:
-        raise ValueError('The ignored minutes cannot be negative.')
+        raise ValueError('The time ignored at the start or the end of the run cannot '
+                         'be negative. Correct it where the program asks for it.',
+                         )
 
     # ---- 2 Find the usable part of the run -------------------------------------------
     columns = measurement_column_finder(haem_abs)
     times = time_getter(haem_abs)
     finite_times = times[np.isfinite(times)]
     if not columns or finite_times.size == 0:
-        raise ValueError(f'{label}: no haem columns or finite times available for the '
-                         f'delta absorbance.',
+        raise ValueError(f'{label}: there are no haems, or no times, to find the zero '
+                         'of delta A from. Check that the fit file holds haems and '
+                         'that the file was read fully.',
                          )
     start = float(finite_times.min()) + exclude_first_minutes
     stop = float(finite_times.max()) - exclude_last_minutes
@@ -227,20 +541,22 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
     windows: Dict[str, Tuple[float, float]] = {}
     for column in columns:
         values = value_getter(haem_abs, column)
-        found = _best_window_finder(times, values, start, stop, window_seconds / 60.0)
+        found = reference_level_finder(times, values, start, stop, window_points)
         if found is None:
-            raise ValueError(f'{label}: no finite {column!r} values between '
-                             f'{start:.2f} and {stop:.2f} min for the delta '
-                             'absorbance reference. Reduce the ignored start or end.',
+            raise ValueError(f'{label}: fewer than {window_points} {column} values '
+                             f'are left between {start:.2f} and {stop:.2f} min, too '
+                             'few to find the zero of delta A (the median of the '
+                             f'highest {window_points} points in a row). Ignore less '
+                             'of the start or the end of the run.',
                              )
-        reference[str(column)], first, last = found
-        windows[str(column)] = (first, last)
-        result[column] = values - reference[str(column)]
-    spans = list(windows.values())
-    result.attrs['delta_abs_baseline'] = {'mean_by_haem': reference,
+        reference[str(column)] = found['level']
+        windows[str(column)] = (found['start_time'], found['end_time'])
+        result[column] = values - found['level']
+    window_seconds = window_seconds_calculator(times, window_points)
+    result.attrs['delta_abs_baseline'] = {'level_by_haem': reference,
                                           'window_by_haem': windows,
-                                          'start_time': min(w[0] for w in spans),
-                                          'end_time': max(w[1] for w in spans),
+                                          'window_points': int(window_points),
+                                          'window_seconds': window_seconds,
                                           }
     return result
 
@@ -248,13 +564,14 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
 # ---- experiment_decomposer -----------------------------------------------------------
 def experiment_decomposer(experiment: dict,
                           fit: dict,
-                          dataset_name: str = 'Cyt',
+                          dataset_name: str,
+                          background: str,
+                          haemfactor: float,
+                          delta_exclude_first_minutes: float,
+                          delta_window_points: int,
                           spectrum_type: str = 'attenuation',
-                          degree_of_scatter: int = 1,
-                          haemfactor: float = 1000000,
-                          delta_exclude_first_minutes: float = 5.0,
-                          delta_window_seconds: float = 30.0,
                           delta_exclude_last_minutes: float = 0.0,
+                          is_change_from_first: bool = False,
                           ) -> dict:
     """
     ---- Summary ----
@@ -265,62 +582,79 @@ def experiment_decomposer(experiment: dict,
     experiment : dict
         Experiment dictionary, as defined in DATA_FORMAT.md.
     fit : dict
-        Fit dictionary from fit_importer.
+        Fit dictionary from fit_importer (or fit_haem_selector).
     dataset_name : str
         Spectral dataset to decompose.
-    spectrum_type : str
-        Field of the dataset to decompose, e.g. 'attenuation'.
-    degree_of_scatter : int
-        Number of scatter terms.
+    background : str
+        Background fitted under the haems, a key of BACKGROUND_LABELS.
     haemfactor : float
         Scale factor applied to the haem basis spectra.
     delta_exclude_first_minutes : float
-        Start of the delta absorbance reference window, in minutes after the first
-        spectrum.
-    delta_window_seconds : float
-        Length of the delta absorbance reference window, in seconds.
+        Minutes after the first spectrum that are ignored when finding the delta
+        absorbance reference.
+    delta_window_points : int
+        Number of spectra in a row that make the delta absorbance reference window.
+    spectrum_type : str
+        Field of the dataset to decompose, e.g. 'attenuation'.
     delta_exclude_last_minutes : float
         Minutes before the last spectrum that are ignored when finding the delta
         absorbance reference.
+    is_change_from_first : bool
+        True fits the change of every spectrum from the first one (the first kept, in
+        a trimmed run), as the instrument does; False fits the spectra themselves.
 
     ---- Globals read ----
     schema.TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
 
     ---- Outputs ----
     dict
-        The same experiment dictionary. Raises ValueError for an invalid fit or dataset
-        or inconsistent array shapes.
+        The same experiment dictionary. Raises ValueError for an invalid fit, dataset
+        or background, inconsistent array shapes, or, for the change from the first
+        spectrum, a first spectrum with blank values inside the fitted wavelengths.
 
     ---- Globals mutated ----
     experiment: adds haem_conc (time, spectrum index, one column per haem), haem_abs
     (mOD, same layout; attrs["peak_amplitude_OD"]) and haem_delta_abs
-    (delta_abs_calculator).
+    (delta_abs_calculator). With is_change_from_first, haem_conc and haem_abs are the
+    changes from the first spectrum. The three are added together at the end; when
+    anything fails, the experiment holds none of them, not even those of an earlier
+    decomposition.
 
     ---- Equations ----
-    c = (S^T S)^-1 S^T a for every spectrum (projector built once); haem_abs = c x peak
-    amplitude of the haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs -
-    mean of the highest window.
+    a = each spectrum, or each spectrum - the first spectrum; c = the least-squares
+    amounts of the basis S in a (basis_solver); haem_abs = c x peak amplitude of the
+    haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs - median of the
+    highest points in a row. The fit is linear, so with the same basis the change
+    from the first spectrum gives each amount minus that of the first spectrum, and
+    the same haem_delta_abs.
 
     ---- Helpers ----
     _wavelength_masker
+    basis_solver
     delta_abs_calculator
     s_array_generator
     """
 
     # ---- 1 Validate the fit and dataset ----------------------------------------------
-    name = experiment.get('experiment_name', '<unknown>')
+    for key in ('haem_conc', 'haem_abs', 'haem_delta_abs'):
+        experiment.pop(key, None)  # a failure must not leave an older result behind
+    name = experiment.get('experiment_name', 'This file')
     if fit is None or 'data' not in fit or 'haem_list' not in fit:
-        raise ValueError('A valid fit returned by import_fit() is required.')
+        raise ValueError('No fit file was loaded, so the haems cannot be worked out. '
+                         'Choose a fit file when the program asks for one.',
+                         )
     raw_spectra = experiment.get('raw_spectra', {})
     if dataset_name not in raw_spectra:
-        raise ValueError(f'{name}: unknown spectral dataset {dataset_name!r}. '
-                         f"Available datasets: {', '.join(raw_spectra) or '<none>'}",
-                         )
+        raise ValueError(
+            f'{name}: the file has no {dataset_name} spectra to decompose '
+            f"(it has: {', '.join(raw_spectra) or 'none'}). Choose spectra "
+            'that the file holds.',
+            )
     dataset = raw_spectra[dataset_name]
     if spectrum_type not in dataset:
-        raise ValueError(f'{name}/{dataset_name}: spectral data type {spectrum_type!r}'
-                         f' not found. '
-                         f"Available fields: {', '.join(dataset)}",
+        raise ValueError(f'{name}: the {dataset_name} spectra were not converted to '
+                         f'{spectrum_type}, so they cannot be decomposed. This is a '
+                         'fault in the program; please report it.',
                          )
 
     # ---- 2 Read and check the spectra ------------------------------------------------
@@ -328,19 +662,24 @@ def experiment_decomposer(experiment: dict,
     spectra = np.asarray(dataset[spectrum_type], dtype=float)
     spectrum_indices = np.asarray(dataset['spectrum_indices'])
     times = np.asarray(dataset['time'], dtype=float)
+    damaged = (f'{name}: the {dataset_name} spectra cannot be decomposed, because '
+               'their wavelengths, spectra and times do not have matching lengths. '
+               'The file may be damaged; save it again from the instrument software.'
+               )
     if wavelengths.ndim != 1:
-        raise ValueError(f'{name}/{dataset_name}: wavelengths must be a 1D array.')
+        raise ValueError(damaged)
     if spectra.ndim != 2 or spectra.shape[1] != len(wavelengths):
-        raise ValueError(f'{name}/{dataset_name}: {spectrum_type!r} must be a (spectra'
-                         f' x wavelengths) array.',
-                         )
+        raise ValueError(damaged)
     if len(spectrum_indices) != len(spectra) or len(times) != len(spectra):
-        raise ValueError(f'{name}/{dataset_name}: spectrum index/time count does not '
-                         f'match spectra.',
-                         )
+        raise ValueError(damaged)
     if not np.all(np.isfinite(times)):
-        raise ValueError(f'{name}/{dataset_name}: spectrum times are unavailable '
-                         f'(spectra/CsO2 length mismatch).',
+        raise ValueError(f'{name}: the times of the {dataset_name} spectra are not '
+                         'known (the file holds a different number of spectra and of '
+                         'oxygen points), so the haems cannot be worked out.',
+                         )
+    if len(spectra) == 0:
+        raise ValueError(f'{name}: there are no {dataset_name} spectra left to '
+                         'decompose. Trim less of the run.',
                          )
 
     # ---- 3 Decompose the spectra -----------------------------------------------------
@@ -349,15 +688,22 @@ def experiment_decomposer(experiment: dict,
     mask = _wavelength_masker(wavelengths, fit_data)
     s_array = s_array_generator(np.column_stack((wavelengths, spectra[0])),
                                 fit_data,
-                                degree_of_scatter,
+                                background,
                                 haemfactor,
                                 )
-    projector = np.linalg.inv(s_array.T @ s_array) @ s_array.T
-    coefficients = spectra[:, mask] @ projector.T  # (n_spectra, n_components)
+    fitted = spectra[:, mask]
+    if is_change_from_first:
+        if not np.all(np.isfinite(fitted[0])):
+            raise ValueError(f'{name}: the first {dataset_name} spectrum has blank '
+                             'values inside the wavelengths of the fit, so the change '
+                             'from it cannot be worked out. Trim the start of the run '
+                             'past it, or fit the spectra themselves.',
+                             )
+        fitted = fitted - fitted[0]
+    coefficients = basis_solver(s_array, fitted)  # (n_spectra, n_components)
     haem_conc = pd.DataFrame(coefficients[:, :len(haem_names)], columns=haem_names)
     haem_conc.insert(0, SPECTRUM_INDEX_COLUMN, spectrum_indices)
     haem_conc.insert(0, TIME_COLUMN, times)
-    experiment['haem_conc'] = haem_conc
 
     # ---- 4 Calculate the absorbances -------------------------------------------------
     # Peak amplitude (OD per unit coefficient) of each haem's basis spectrum; x1000
@@ -366,68 +712,240 @@ def experiment_decomposer(experiment: dict,
     haem_abs = haem_conc.copy()
     haem_abs[haem_names] = coefficients[:, :len(haem_names)] * peak_amplitude * 1000.0
     haem_abs.attrs['peak_amplitude_OD'] = dict(zip(haem_names, peak_amplitude.tolist()))
-    experiment['haem_abs'] = haem_abs
-    experiment['haem_delta_abs'] = delta_abs_calculator(
+    haem_delta_abs = delta_abs_calculator(
         haem_abs,
         delta_exclude_first_minutes,
-        delta_window_seconds,
-        label=f'{name}/haem_abs',
+        delta_window_points,
+        label=name,
         exclude_last_minutes=delta_exclude_last_minutes,
         )
+
+    # ---- 5 Store the three tables together -------------------------------------------
+    experiment['haem_conc'] = haem_conc
+    experiment['haem_abs'] = haem_abs
+    experiment['haem_delta_abs'] = haem_delta_abs
     return experiment
 
 
-# ---- fit_importer --------------------------------------------------------------------
-def fit_importer(filename: Path) -> Dict[str, Any]:
+# ---- fit_haem_selector ---------------------------------------------------------------
+def fit_haem_selector(fit: Dict[str, Any], haems: List[str]) -> Dict[str, Any]:
     """
     ---- Summary ----
-    Main function to import a haem spectral fit CSV.
+    Main function to keep only some of the haems of a fit, so that a decomposition fits
+    those alone.
 
     ---- Inputs ----
-    filename : Path
-        CSV with (wavelength, response) column pairs, one pair per haem; the header of
-        each wavelength column names the haem.
+    fit : Dict[str, Any]
+        Fit dictionary from fit_importer.
+    haems : List[str]
+        Names of the haems to keep, as the fit names them; their order does not matter.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     Dict[str, Any]
-        {"haem_list": haem names in file order, "data": the table as a data frame}.
+        A new fit dictionary with the same keys: 'haem_list' and 'data' hold only the
+        kept haems, in the order of the file, without the rows that are blank in all of
+        them. The fit given is not changed. Raises ValueError, with a message for the
+        user, when no haem is named or a name is not in the fit.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    None.
+    None. The wavelengths a decomposition uses are those shared by the kept haems
+    (fit_range_finder), so leaving out a short haem can widen them.
 
     ---- Helpers ----
     None.
     """
 
-    data = pd.read_csv(filename, delimiter=',')
-    headers = data.columns
-    haem_names = [str(headers[i]) for i in range(len(headers)) if i % 2 == 0]
-    return {'haem_list': haem_names, 'data': data}
+    names = [str(name) for name in fit['haem_list']]
+    if not haems:
+        raise ValueError('No haem was chosen to fit. Choose at least one haem of the '
+                         'fit file.',
+                         )
+    unknown = [str(haem) for haem in haems if str(haem) not in names]
+    if unknown:
+        raise ValueError(f"{', '.join(unknown)}: not in the fit file, which holds "
+                         f"{', '.join(names)}. Choose haems the fit file holds.",
+                         )
+    kept = [i for i, name in enumerate(names) if name in {str(h) for h in haems}]
+    columns = [column for i in kept for column in (2 * i, 2 * i + 1)]
+    data = fit['data'].iloc[:, columns].dropna(how='all').reset_index(drop=True)
+    return dict(fit, haem_list=[names[i] for i in kept], data=data)
+
+
+# ---- fit_importer --------------------------------------------------------------------
+def fit_importer(filename: Path) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to import a haem spectral fit CSV, checked and on the standard scale.
+
+    ---- Inputs ----
+    filename : Path
+        CSV with (wavelength, response) column pairs, one pair per haem; the header of
+        each wavelength column names the haem. The haems may have different lengths.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, Any]
+        {'haem_list': haem names in file order, 'data': the cleaned table
+        (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the responses
+        of the file were divided by (1 or 1 000 000), 'notes': sentences for the user
+        about rows left out and the scale}. Raises ValueError, with a message for the
+        user, when the file cannot be read as a fit.
+
+    ---- Globals mutated ----
+    None. Reads the file (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _fit_table_cleaner
+    fit_scale_standardiser
+    """
+
+    label = Path(filename).name
+    try:
+        raw = pd.read_csv(filename, delimiter=',')
+    except (OSError,
+            UnicodeDecodeError,
+            pd.errors.EmptyDataError,
+            pd.errors.ParserError,
+            ):
+        raise ValueError(f'{label} could not be read as a table with commas between '
+                         'its columns. Open it to check it, or choose another fit '
+                         'file.',
+                         ) from None
+    cleaned, notes = _fit_table_cleaner(raw, label)
+    data, divisor, scale_notes = fit_scale_standardiser(cleaned, label)
+    return {'haem_list': [str(name) for name in data.columns[::2]],
+            'data': data,
+            'scale_divisor': divisor,
+            'notes': notes + scale_notes,
+            }
+
+
+# ---- fit_range_finder ----------------------------------------------------------------
+def fit_range_finder(fit_data: pd.DataFrame) -> Tuple[float, float]:
+    """
+    ---- Summary ----
+    Main function to find the wavelength range shared by all the haems of a fit: the
+    only part of a spectrum the decomposition uses.
+
+    ---- Inputs ----
+    fit_data : pd.DataFrame
+        Fit table from fit_importer.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[float, float]
+        (lowest, highest) wavelength of the shared range (nm). Raises ValueError, with
+        a message for the user, when a haem of the fit has no rows.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    lowest = the highest of the haems' first wavelengths; highest = the lowest of
+    their last wavelengths.
+
+    ---- Helpers ----
+    _haem_shape_getter
+    """
+
+    ranges = [_haem_shape_getter(fit_data, i)[0]
+              for i in range(fit_data.shape[1] // 2)
+              ]
+    if not ranges or any(x.size == 0 for x in ranges):
+        raise ValueError('One of the haems of the fit has no values, so the amounts '
+                         'cannot be worked out. Choose another fit file.',
+                         )
+    return (max(float(x.min()) for x in ranges), min(float(x.max()) for x in ranges))
+
+
+# ---- fit_scale_standardiser ----------------------------------------------------------
+def fit_scale_standardiser(data: pd.DataFrame,
+                           label: str,
+                           ) -> Tuple[pd.DataFrame, float, List[str]]:
+    """
+    ---- Summary ----
+    Main function to bring a fit table to the standard scale, so that the raw haem
+    amounts are on the same scale whichever fit is used.
+
+    ---- Inputs ----
+    data : pd.DataFrame
+        Fit table: (wavelength, response) column pairs, one pair per haem.
+    label : str
+        Name of the fit, used in the notes.
+
+    ---- Globals read ----
+    FIT_PEAK_BAND, FIT_LARGE_SCALE (module constants).
+
+    ---- Outputs ----
+    Tuple[pd.DataFrame, float, List[str]]
+        (the table on the standard scale, what its responses were divided by, the
+        notes for the user). A fit a million above the standard is divided by a
+        million, with a note; a fit on neither scale is returned unchanged, with a
+        warning.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    peak = largest |response| in the table. Standard: low <= peak <= high
+    (FIT_PEAK_BAND). Large: low x 1e6 <= peak <= high x 1e6, then response = response
+    / 1e6. The mOD and % values do not depend on the scale; the raw amounts do.
+
+    ---- Helpers ----
+    None.
+    """
+
+    responses = data.iloc[:, 1::2].to_numpy(dtype=float)
+    peak = float(np.nanmax(np.abs(responses))) if np.isfinite(responses).any() else 0.0
+    low, high = FIT_PEAK_BAND
+    if low <= peak <= high:
+        return data, 1.0, []
+    if low * FIT_LARGE_SCALE <= peak <= high * FIT_LARGE_SCALE:
+        scaled = data.copy()
+        scaled.iloc[:, 1::2] = responses / FIT_LARGE_SCALE
+        return scaled, FIT_LARGE_SCALE, [
+            f'{label}: its shapes are a million times larger than the standard scale, '
+            'so they were divided by 1 000 000. The raw haem amounts are then on the '
+            'same scale as with the other fits; mOD and % are the same on any scale.',
+            ]
+    return data, 1.0, [
+        f'Warning: {label}: the highest point of its shapes is {peak:.3g}, far from '
+        f'the standard scale ({low:g} to {high:g}), so the raw haem amounts will be '
+        'on another scale than with the other fits. mOD and % are not affected.',
+        ]
 
 
 # ---- s_array_generator ---------------------------------------------------------------
 def s_array_generator(experimental_data: np.ndarray,
                       fit_data: pd.DataFrame,
-                      degree_of_scatter: int = 1,
-                      haemfactor: float = 1000000,
+                      background: str,
+                      haemfactor: float,
                       ) -> np.ndarray:
     """
     ---- Summary ----
-    Main function to generate the haem and scatter basis components for one spectrum.
+    Main function to generate the haem and background basis components for one
+    spectrum.
 
     ---- Inputs ----
     experimental_data : np.ndarray
         Array of (wavelength, value) rows.
     fit_data : pd.DataFrame
         Fit table from fit_importer.
-    degree_of_scatter : int
-        Number of 1/wavelength^k scatter terms.
+    background : str
+        Background fitted under the haems, a key of BACKGROUND_LABELS.
     haemfactor : float
         Scale factor applied to the haem basis spectra.
 
@@ -436,46 +954,80 @@ def s_array_generator(experimental_data: np.ndarray,
 
     ---- Outputs ----
     np.ndarray
-        Basis matrix, shape (n_filtered_wavelengths, n_haems + degree_of_scatter + 1):
-        negated haem fits (interpolated, times haemfactor), a constant column, then the
-        normalised scatter terms.
+        Basis matrix, shape (n_filtered_wavelengths, n_haems + n_background_terms):
+        haem fits (interpolated, times haemfactor), then the terms of the background.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    haem column = -interp(fit) x haemfactor; scatter term k = (1/wl^k - min) / (max -
-    min) of 1/wl^k.
+    haem column = interp(fit) x haemfactor; the background terms are those of
+    background_builder.
 
     ---- Helpers ----
+    _haem_shape_getter
+    background_builder
     data_filterer
     """
 
-    # ---- 1 Prepare the array ---------------------------------------------------------
+    # ---- 1 Find the wavelengths ------------------------------------------------------
     filtered = data_filterer(experimental_data, fit_data)
-    no_haems = int(len(fit_data.columns) / 2)
-    s_array = np.zeros((len(filtered[:, 0]), no_haems + degree_of_scatter + 1))
+    wavelengths = filtered[:, 0]
 
-    # ---- 2 Fill the haem spectra -----------------------------------------------------
-    for i in range(no_haems):
-        fit_x = fit_data.iloc[:, 2 * i]
-        fit_y = fit_data.iloc[:, 2 * i + 1]
-        s_array[:, i] = -np.interp(filtered[:, 0], fit_x, fit_y) * haemfactor
+    # ---- 2 Stack the haem spectra and the background ---------------------------------
+    haems = [np.interp(wavelengths, *_haem_shape_getter(fit_data, i)) * haemfactor
+             for i in range(fit_data.shape[1] // 2)
+             ]
+    return np.column_stack(haems + [background_builder(wavelengths, background)])
 
-    # ---- 3 Add the scatter terms -----------------------------------------------------
-    s_array[:, no_haems] = 1.0
-    for i in range(degree_of_scatter):
-        scatter_function = 1 / filtered[:, 0] ** (i + 1)
-        shifted = scatter_function - np.amin(scatter_function)
-        s_array[:, no_haems + i + 1] = shifted / np.amax(shifted)
-    return s_array
+
+# ---- scatter_background_builder ------------------------------------------------------
+def scatter_background_builder(wavelengths: np.ndarray,
+                               degree_of_scatter: int,
+                               ) -> np.ndarray:
+    """
+    ---- Summary ----
+    Main function to build a flat level and the scatter terms 1/wavelength^k: the
+    scatter backgrounds of the haem decomposition, and what the component finder takes
+    out of the spectra.
+
+    ---- Inputs ----
+    wavelengths : np.ndarray
+        Wavelengths of the spectra (nm), shape (n_wavelengths).
+    degree_of_scatter : int
+        Number of 1/wavelength^k scatter terms (>= 0).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    np.ndarray
+        The terms as columns, shape (n_wavelengths, degree_of_scatter + 1): the
+        constant 1 first, then scatter term k = 1, 2, ... Each scatter term runs from 1
+        at the shortest wavelength to 0 at the longest.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    scatter term k = (1/wl^k - min) / (max - min) of 1/wl^k.
+
+    ---- Helpers ----
+    _unit_scaler
+    """
+
+    wavelengths = np.asarray(wavelengths, dtype=float)
+    columns = [np.ones_like(wavelengths)]
+    for k in range(1, degree_of_scatter + 1):
+        columns.append(_unit_scaler(1 / wavelengths ** k))
+    return np.column_stack(columns)
 
 
 # ---- spectrum_decomposer -------------------------------------------------------------
 def spectrum_decomposer(experimental_data: np.ndarray,
                         fit_data: pd.DataFrame,
-                        degree_of_scatter: int = 1,
-                        haemfactor: float = 1000000,
+                        background: str,
+                        haemfactor: float,
                         ) -> Tuple[np.ndarray,
                                    np.ndarray,
                                    np.ndarray,
@@ -487,15 +1039,15 @@ def spectrum_decomposer(experimental_data: np.ndarray,
     """
     ---- Summary ----
     Main function to decompose one experimental spectrum into haem contributions and
-    scatter.
+    background.
 
     ---- Inputs ----
     experimental_data : np.ndarray
         Array of (wavelength, value) rows.
     fit_data : pd.DataFrame
         Fit table from fit_importer.
-    degree_of_scatter : int
-        Number of scatter terms.
+    background : str
+        Background fitted under the haems, a key of BACKGROUND_LABELS.
     haemfactor : float
         Scale factor applied to the haem basis spectra.
 
@@ -505,18 +1057,22 @@ def spectrum_decomposer(experimental_data: np.ndarray,
     ---- Outputs ----
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
     List[np.ndarray], np.ndarray]
-        (c_array, filtered_data, scatter, background_subtracted, haems, haem_individual,
-        residual); the spectra are (wavelength, value) columns. Useful for inspecting
-        one fit; experiment_decomposer uses an equivalent, faster route.
+        (c_array, filtered_data, background, background_subtracted, haems,
+        haem_individual, residual); the spectra are (wavelength, value) columns.
+        c_array holds the haem amounts, then the amounts of the background terms.
+        Useful for inspecting one fit; experiment_decomposer uses an equivalent,
+        faster route.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    c = (S^T S)^-1 S^T a, where S is the basis matrix and a the spectrum; residual = a -
-    (haems + scatter).
+    c = the least-squares amounts of the basis S in the spectrum a (basis_solver);
+    background = the background columns of S x their amounts; residual = a - (haems +
+    background).
 
     ---- Helpers ----
+    basis_solver
     data_filterer
     s_array_generator
     """
@@ -528,24 +1084,11 @@ def spectrum_decomposer(experimental_data: np.ndarray,
     absorbances = filtered[:, 1]
 
     # ---- 2 Solve for the coefficients ------------------------------------------------
-    s_array = s_array_generator(experimental_data,
-                                fit_data,
-                                degree_of_scatter,
-                                haemfactor,
-                                )
-    c_array = np.matmul(np.matmul(np.linalg.inv(np.matmul(np.transpose(s_array),
-                                                          s_array,
-                                                          ),
-                                                ),
-                                  np.transpose(s_array),
-                                  ),
-                        absorbances,
-                        )
+    s_array = s_array_generator(experimental_data, fit_data, background, haemfactor)
+    c_array = basis_solver(s_array, absorbances)
 
     # ---- 3 Rebuild the components ----------------------------------------------------
-    scatter = np.zeros_like(absorbances)
-    for i in range(degree_of_scatter + 1):
-        scatter += s_array[:, -(i + 1)] * c_array[-(i + 1)]
+    scatter = s_array[:, no_haems:] @ c_array[no_haems:]
     haems = np.zeros_like(absorbances)
     haem_individual = []
     for i in range(no_haems):

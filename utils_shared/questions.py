@@ -19,6 +19,9 @@ MAX_DEPTH = 6
 _counters = [0] * MAX_DEPTH  # [section, question, sub question, ...]
 _colour_ready = False
 _tight_next = False  # True: the next question follows its heading line directly
+# What is told when a question can be answered with the mouse (the window, which then
+# takes clicks or drags on the plot); None in the terminal.
+_time_requester: Optional[Callable[[Optional[str], Optional[Callable]], None]] = None
 
 
 # ---- UserQuitError -------------------------------------------------------------------
@@ -154,6 +157,43 @@ def _question_printer(question: str, depth: int, hint: str = '') -> str:
     print(f"{'' if _tight_next else chr(10)}{indent}{text_colourer(line)}")
     _tight_next = False
     return indent
+
+
+# ---- _time_announcer -----------------------------------------------------------------
+def _time_announcer(kind: Optional[str], reader: Optional[Callable]) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the window, when there is one, that the question being
+    asked can be answered with the mouse (a click or a drag on the plot, turned into
+    the answer by ``reader``), or no longer can.
+
+    ---- Inputs ----
+    kind : Optional[str]
+        'point' (a click), 'span' (a drag), or None once the question has its answer.
+    reader : Optional[Callable]
+        Turns what the mouse gave into the answer: reader(file name, time_min) for a
+        click, reader(file name, start_min, end_min) for a drag; it returns None when
+        that file or place gives no answer. None with kind None.
+
+    ---- Globals read ----
+    _time_requester (module state).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Calls the registered function (side effect); nothing happens without one.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if _time_requester is not None:
+        _time_requester(kind, reader)
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -456,11 +496,17 @@ def number_asker(question: str,
                  allow_blank: bool = False,
                  depth: int = 1,
                  blank_label: str = 'none',
+                 time_reader: Optional[Callable[[str, float],
+                                                Optional[float]]] = None,
+                 span_reader: Optional[Callable[[str, float, float],
+                                                Optional[float]]] = None,
                  ) -> Optional[float]:
     """
     ---- Summary ----
     Main function to ask a question answered with a number, asking again until the value
-    is valid.
+    is valid. A question that can be answered with the mouse says so to the window,
+    where a click (``time_reader``) or a drag (``span_reader``) on the plot then writes
+    the answer it gives into the answer box; in the terminal nothing changes.
 
     ---- Inputs ----
     question : str
@@ -479,6 +525,12 @@ def number_asker(question: str,
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
     blank_label : str
         Word shown in [brackets] for an empty answer.
+    time_reader : Optional[Callable[[str, float], Optional[float]]]
+        Turns a click on the plot into the answer: (file shown, time clicked in min) ->
+        answer, or None when that click gives none. None when a click gives nothing.
+    span_reader : Optional[Callable[[str, float, float], Optional[float]]]
+        Turns a drag across the plot into the answer: (file shown, start min, end min)
+        -> answer, or None. Used only when there is no ``time_reader``.
 
     ---- Globals read ----
     None.
@@ -497,6 +549,7 @@ def number_asker(question: str,
     ---- Helpers ----
     _input_reader
     _question_printer
+    _time_announcer
     """
 
     # ---- 1 Format the default --------------------------------------------------------
@@ -509,31 +562,39 @@ def number_asker(question: str,
     indent = _question_printer(question, depth, hint)
 
     # ---- 3 Read and check the answer -------------------------------------------------
-    while True:
-        answer = _input_reader(question, indent).replace(',', '.')
-        if not answer:
-            if default is not None:
-                return default
-            if allow_blank:
-                return None
-            print(f'{indent}A number is needed here.')
-            continue
-        try:
-            value = float(answer)
-        except ValueError:
-            print(f'{indent}That is not a number.')
-            continue
-        if (minimum is not None and
-            (value <= minimum if exclusive_minimum else value < minimum)
-            ):
-            print(f'{indent}The value must be '
-                  f"{'above' if exclusive_minimum else 'at least'} {minimum:g}.",
-                  )
-            continue
-        if maximum is not None and value > maximum:
-            print(f'{indent}The value must be at most {maximum:g}.')
-            continue
-        return value
+    if time_reader is not None:
+        _time_announcer('point', time_reader)
+    elif span_reader is not None:
+        _time_announcer('span', span_reader)
+    try:
+        while True:
+            answer = _input_reader(question, indent).replace(',', '.')
+            if not answer:
+                if default is not None:
+                    return default
+                if allow_blank:
+                    return None
+                print(f'{indent}A number is needed here.')
+                continue
+            try:
+                value = float(answer)
+            except ValueError:
+                print(f'{indent}That is not a number.')
+                continue
+            if (minimum is not None and
+                (value <= minimum if exclusive_minimum else value < minimum)
+                ):
+                print(f'{indent}The value must be '
+                      f"{'above' if exclusive_minimum else 'at least'} {minimum:g}.",
+                      )
+                continue
+            if maximum is not None and value > maximum:
+                print(f'{indent}The value must be at most {maximum:g}.')
+                continue
+            return value
+    finally:
+        if time_reader is not None or span_reader is not None:
+            _time_announcer(None, None)
 
 
 # ---- numbering_getter ----------------------------------------------------------------
@@ -915,6 +976,46 @@ def text_italiser(text: str) -> str:
     """
 
     return f'{ITALIC}{text}{RESET}' if colour_checker() else text
+
+
+# ---- time_request_setter -------------------------------------------------------------
+def time_request_setter(requester: Optional[Callable[[Optional[str],
+                                                      Optional[Callable],
+                                                      ],
+                                                     None,
+                                                     ]],
+                        ) -> None:
+    """
+    ---- Summary ----
+    Main function to register what is told when a question can be answered with the
+    mouse: the window registers itself while it is open, so a click or a drag on its
+    plot can give the answer.
+
+    ---- Inputs ----
+    requester : Optional[Callable[[Optional[str], Optional[Callable]], None]]
+        Function called with ('point' or 'span', reader) when a question starts waiting
+        for an answer the mouse can give, and with (None, None) when it has its answer
+        (see _time_announcer); None to register nothing (the terminal).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    _time_requester (module state).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    global _time_requester
+    _time_requester = requester
 
 
 # ---- yes_no_asker --------------------------------------------------------------------

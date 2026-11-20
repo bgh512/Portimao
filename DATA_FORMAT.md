@@ -11,18 +11,18 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
 | `'experiment_name'` | str | | | File stem of the `.paf` file |
-| `'metadata'` | dict | | | `'OD'`, `'volume'`, `'dilution_factor'`, `'events'`, `'ignored_events'` and acquisition details |
-| `'CcO2'` | pd.DataFrame | (n_points, 2) | uM | Measured O2: `Time (min)` and the measurement column |
-| `'CsO2'` | pd.DataFrame | (n_points, 2) | uM | Set O2 |
-| `'VoO2'` | pd.DataFrame | (n_points, 2) | uM/min | Oxygen consumption rate (OCR) |
+| `'metadata'` | dict | | | What is known about the file and the run (see `metadata`) |
+| `'CcO2'` | pd.DataFrame | (n_points, 2) | µM | Measured O2: `Time (min)` and the measurement column, titled with the unit stored in the file (`Measured O2 (µM)`; `uM` when the file stores none). Missing when the file has no such trace (a warning is printed) |
+| `'CsO2'` | pd.DataFrame | (n_points, 2) | µM | Set O2, titled in the same way (`Set O2 (µM)`). Missing when the file has no such trace |
+| `'VoO2'` | pd.DataFrame | (n_ocr_points, 2) | µM/min | Oxygen consumption rate (OCR): `Time (min)` and `VoO2`. Always there: a file without it is refused. It has fewer rows than the oxygen tables, as the time points where the instrument has no OCR value (the start of a recording, and the end when the trace is shorter than the clock) are left out |
 | `'VoO2_OD'` | pd.DataFrame | (n_points, 2) | | Optional. OCR divided by dilution factor x OD x volume |
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
-| `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem |
-| `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum |
-| `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the mean of its highest 30 s window (outside the ignored start and end) is 0 |
+| `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem. Fitted beside the chosen background (`HAEM_BACKGROUND` in `config.py`; the choices are `BACKGROUND_LABELS` in `spectral_decomposer.py`). When the change from the first spectrum is fitted, these are the changes from the first spectrum (the first kept, in a trimmed run) |
+| `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum; a change from the first spectrum when `haem_conc` is |
+| `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the median of its highest 50 spectra in a row (outside the ignored start and end; `REFERENCE_WINDOW_POINTS` in `config.py`) is 0 |
 | `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. The matching tables divided by dilution factor x OD x volume |
 | `'haem_percent'` | pd.DataFrame | (n_spectra, 2 + n_haems) | % | Optional. `haem_conc` scaled to 0-100 % |
-| `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; dropped after the special figures are prepared |
+| `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; every spectrum has a time, and the transmission is NaN where it cannot be worked out (zero counts in the reference); dropped after the special figures are prepared |
 | `'averages'` | dict | | | Event-window statistics (see `averages`) |
 
 Example:
@@ -35,9 +35,40 @@ experiment = {'experiment_name': 'control_7hours',
               }
 ```
 
+#### `metadata`
+
+What is known about one experiment, stored as `experiment['metadata']`. The first four keys are set by `experiment_paf_loader`; the others are added while the experiment is processed and exist only from that step on.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'paf_file'` | str | | | Name of the `.paf` file, with its extension |
+| `'events'` | List[dict] | (n_events,) | | The additions in time order (see `event`); once the answers are merged, without the ignored ones |
+| `'acquisition'` | List[dict] | (n_datasets,) | | One entry per spectrometer: `'dataset'`, `'spectrometer'` (its name in the file), `'frames'`, `'wavelengths'` (their number), `'wavelength_range_nm'` (first and last) and, when the file gives them, `'centre_wavelength_nm'` and `'slit_um'` |
+| `'notes'` | str | | | The notes typed in the instrument software, as plain text; empty when there are none |
+| `'OD'`, `'volume'`, `'dilution_factor'` | float | | | Optional. As entered by the user, used for the OD scaling |
+| `'ignored_events'` | List[dict] | | | The additions the user chose to ignore; they are kept only for the workbook. After a start trim their times are counted from the new 0 like those of the other additions, so one made before the cut has a negative time |
+| `'trimmed_before_minutes'`, `'trimmed_after_minutes'` | float | | min | Optional. Where the recording was cut, on the original time |
+| `'ignore_first_minutes'`, `'ignore_last_minutes'` | float | | min | Start and end left out of the averages and references |
+| `'fit_file'` | str or None | | | Fit file of the decomposition; None when the haems were not decomposed |
+| `'processed'` | str | | | Date and time of the run, `YYYY-MM-DD HH:MM` |
+
+#### `event`
+
+One addition (a text event of the instrument software). Created by `experiment_paf_loader`, one per addition stored inside the recording; an addition stored outside it is left out, with a warning when the files are first read.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'datapoint'` | int | | | Spectrum number stored with the addition, counted from 1 |
+| `'text'` | str | | | What was typed in the instrument software, e.g. `1ul 8mm nd-011992`. The file holds no concentration |
+| `'label'` | str | | | Name shown in the figures: the text, until the user renames it |
+| `'concentration_uM'` | float or None | | µM | Final concentration entered by the user; None when none was given |
+| `'time'` | float | | min | Time of the addition; counted from the new 0 after a start trim |
+| `'row_index'` | int | | | Row of the time base, `datapoint` - 1; removed when the experiment is trimmed |
+| `'ignored'` | bool | | | Set when the answers are merged: True for an addition the user chose to ignore |
+
 #### `experiment_summary`
 
-Quick description of one `.paf` file, read before the questions are asked. Created by `experiment_summary_reader`.
+Quick description of one `.paf` file, read before the questions are asked. Created by `experiment_summary_reader`, which refuses a file that could not be processed later (one without an OCR trace, for example), so such a file is skipped before any question is asked.
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
@@ -45,8 +76,57 @@ Quick description of one `.paf` file, read before the questions are asked. Creat
 | `'duration_min'` | float | | min | Length of the recording |
 | `'frames'` | int | | | Number of time points |
 | `'datasets'` | List[str] | | | Spectral datasets in the file |
-| `'events'` | List[dict] | | | Events, each with `'time'` in minutes |
+| `'events'` | List[dict] | | | The additions stored inside the recording, in the order of their spectrum numbers, each with `'name'` (the software's name for it, `Event 1`), `'text'`, `'datapoint'`, `'time'` (min) and `'row_index'` as in `event`. They are the same additions, with the same times, as `experiment_paf_loader` gives |
 | `'traces'` | List[str] | | | Names of the recorded traces |
+| `'ocr_check'` | dict | | | The check of the instrument's OCR against ours (`ocr_check`); a warning is printed when it disagrees or cannot be done |
+
+#### `ocr_check`
+
+Result of checking the instrument's OCR against our own calculation from its traces. Created by `ocr_checker` (`utils_shared/ocr_checking.py`) once per file, in `experiment_summary_reader`, and turned into the warning by `ocr_check_describer`. How it is worked out is under "Our OCR check" below.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'is_checked'` | bool | | | True when the six traces and the permeability are there and the recording is long enough to compare (100 points) |
+| `'is_agreeing'` | bool | | | True when every part agrees; False when the file was not checked |
+| `'reason'` | str | | | Why the file was not checked, in plain words (`the file has no PtO2 trace`); empty when it was |
+| `'permeability'` | float or None | | µM/min/mmHg | Oxygen permeability of the chamber wall, from `ocr_settings`; None when the file does not store it |
+| `'pressure_factor'` | float or None | | mmHg/µM | `PcO2` / `CcO2` fitted over the run (the oxygen solubility the instrument used); None when not checked |
+| `'parts'` | dict | | | For `'sum'`, `'pressure'`, `'fall'`, `'fall_size'`, `'leak'` and `'leak_size'`: `'difference'`, `'margin'`, `'unit'` (µM/min, mmHg or %) and `'is_agreeing'` (difference at most the margin). Empty when not checked |
+
+##### Our OCR check
+
+The program uses the instrument's OCR (`VoO2`) as it is. The instrument does not say exactly how it smooths its rates, so each file is checked once, when its folder is read, against our own calculation from the same traces. A file that disagrees gets one warning that names the part. Below, Δt is the clock's step (s), Kp the permeability from `VoO2Math` and j a point of the clock.
+
+Our recipe (`ocr_calculator`):
+- fall[j] = -60 × Σ k × CcO2[j + k] / (Δt × Σ k²), for k = -14 … 14 (Σ k² = 2030): the slope of the least-squares straight line through the 29 points centred on j, in µM/min, positive when the oxygen falls; empty for the first and last 14 points
+- leak[j] = Kp × mean of (PtO2 - PcO2)[j - 39 … j]: the 40 points (20 s at 0.5 s) ending at j; empty for the first 39 points
+- our OCR = fall + leak
+
+What is compared (`ocr_checker`), part by part:
+
+| Part | Compared | Margin |
+|---|---|---|
+| `sum` | Largest difference between `VoO2` and `VrO2` + `DgO2` | 0.001 µM/min |
+| `pressure` | Largest difference between `PcO2` and α × `CcO2`, α = Σ CcO2 × PcO2 / Σ CcO2² | 0.001 mmHg |
+| `fall` | Median difference between `VrO2` and our fall | 3 µM/min |
+| `fall_size` | (f - 1) × 100, without its sign, f = Σ VrO2 × fall / Σ fall² | 35 % |
+| `leak` | Median difference between `DgO2` and our leak | 2 µM/min |
+| `leak_size` | (f - 1) × 100, without its sign, f = Σ DgO2 × leak / Σ leak² | 5 % |
+
+- The fall and leak parts use only the points where both have a value and that are more than 30 points (15 s) from every addition.
+- The two smoothings differ most where the oxygen changes fast: after an addition (up to 240 µM/min), or when the outside oxygen jumps with a new oxygen setting (up to 46 µM/min for tens of seconds). So these parts look at the typical difference and at the overall size, not at every point. They catch a wrong permeability, a wrong unit or sign, and maths broken over most of a run.
+- The margins are about three times the worst seen in the 33 sample files on 2026-11-20: 0.0001 for the sum and the pressure; 0.87 µM/min and 11 % for the fall; 0.55 µM/min and 1.6 % for the leak.
+- To change the recipe, for example once the instrument's developer gives the exact smoothing: change `FALL_POINTS`, `LEAK_POINTS` or the helpers in `utils_shared/ocr_checking.py`, then this section. Then rewrite the fixed values in `tests/test_paf_reading.py` (`FIXED_*`), which hold our results on the example run so the maths never changes by accident. `tests/test_ocr_checking.py` holds the cases worked out by hand.
+
+#### `ocr_settings`
+
+How the instrument works out its oxygen rates, read from the `VoO2Math` record by `PafFile.ocr_settings_reader`. None when the file has no such record or it is not laid out as expected.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'permeability'` | float | | µM/min/mmHg | Oxygen permeability of the chamber wall (0.050 to 0.264 in the files seen) |
+| `'fall_edge_points'` | int | | | Points without a `VrO2` value at each end of the recording (20); the three rates all lack this many at the end |
+| `'leak_start_points'` | int | | | Points without a `DgO2` or `VoO2` value at the start (60) |
 
 #### `averages`
 
@@ -54,9 +134,9 @@ Event-window statistics of one experiment. Created by `experiment_averages_calcu
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key` |
-| `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window, then `average1` ... one per event |
-| `'skipped'` | dict | | | `{window name: {start_time, end_time, reason}}` of the windows that do not fit between two additions (or after the last one); they have no record in `'windows'` and are drawn red in the previews |
+| `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key`, `baseline_minimum_seconds` |
+| `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window (it starts at the start of the recording when the recording starts later than the window would), then `average1` ... one per event |
+| `'skipped'` | dict | | | `{window name: {start_time, end_time, reason}}` of the windows that do not fit between two additions (or after the last one), and of `average0` when its data span less than `baseline_minimum_seconds` (the run then has no baseline); they have no record in `'windows'` and are drawn red in the previews |
 
 Window record:
 
@@ -73,8 +153,8 @@ Statistics of one measurement in one window:
 |---|---|---|---|---|
 | `'mean'` | float | | as the source | Mean over the window |
 | `'sd'` | float | | as the source | Sample standard deviation (n - 1) over the window |
-| `'delta'` | float | | as the source | Mean minus the mean of `average0` |
-| `'change'` | float | | % | Mean as a percentage of the mean of `average0` (NaN for delta sources or a zero baseline) |
+| `'delta'` | float | | as the source | Mean minus the mean of `average0` (NaN when the run has no baseline) |
+| `'change'` | float | | % | Mean as a percentage of the mean of `average0` (NaN for delta sources, a zero baseline or a run without a baseline) |
 
 #### `triplicate`
 
@@ -140,7 +220,9 @@ A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds th
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
 | `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names, in file order |
-| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the negated response as the basis spectrum |
+| `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD per unit | (wavelength, response) column pairs, one pair per haem. The decomposition uses the response as the basis spectrum; it has the sign of the attenuation, -log10(T). Each haem's rows are at the top, with wavelengths going upwards and blanks (NaN) below a shorter haem. The responses are on the standard scale: the highest point of the shapes lies between 1e-7 and 1e-3 |
+| `'scale_divisor'` | float | | | What the responses were divided by to reach the standard scale: 1, or 1 000 000 |
+| `'notes'` | List[str] | | | Sentences for the user: leftover rows left out of a haem, a fit divided by a million, a fit on neither scale |
 
 #### `pca_analysis`
 
@@ -211,14 +293,44 @@ Returned by `decomposition_example_finder`: every spectrum decomposed with the c
 
 #### `last_answers`
 
-Saved to `last_answers.json` next to `main.py` and offered as the defaults on the next run.
+Saved to `last_answers.json` next to `main.py`: the data folder offered on the next run. The answers themselves are kept with each dataset (`dataset_settings`).
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'data_folder'` | str | | | Folder of the `.paf` files |
-| `'export_folder'` | str | | | Results folder |
+| `'data_folder'` | str | | | Full path of the folder of the `.paf` files used last |
+
+#### `dataset_settings`
+
+The settings last saved for a dataset. Returned by `dataset_settings_reader` (`utils_shared/dataset_settings.py`), written by `dataset_settings_saver` to `portimao_settings.json` in the data folder, and laid over `config.DEFAULT_ANSWERS` (the standard settings) when the dataset is opened again. Empty for a dataset never saved.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`export`), otherwise the full path |
 | `'answers'` | dict | | | Terminal answers |
 | `'files'` | dict | | min | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}}`; trim times are on the original recording, ignore times count from the new 0 after trimming |
+
+#### `strip_values`
+
+What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/viewer_strip.py`). Built from the answers by `strip_values_builder`, given by `ViewerGui.strip_reader`, and taken in part or whole by `ViewerGui.strip_setter` (checked by `strip_values_checker`). Each change the user makes is told once, as a dict of the values it changed (a new journal can change the width and the height too), to the function registered with `ViewerGui.strip_listener_setter`. That function runs on the program thread while a question waits. `size_answers_builder` turns the journal, width and height back into answers. The names are those of the answers in `config.DEFAULT_ANSWERS`.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'plot_haems'` | bool | | | Whether the haems are worked out and shown (the answers `decompose` and `plot_haems` together) |
+| `'fit_file'` | str | | | File name of the fit, normally one of the list given with `ViewerGui.strip_fits_setter`; the description of components found from the data and not saved; `''` when none is named |
+| `'journal'` | str | | | `'none'` (the standard size, on the page of the standard journal) or a key of `config.JOURNAL_SPECS` |
+| `'columns'` | float | | columns | Width, one of the widths the journal allows (`'widths_mm'`) |
+| `'height'` | float | | fraction of a page | Height, above 0 and up to 1 |
+
+#### `od_rows`
+
+The rows of the OD table of the window (`ODTable`, `utils_viewer/viewer_od_table.py`), in the order shown: the same layout as the OD values the questions give. Taken by `ViewerGui.od_table_shower` and given back by `ViewerGui.od_table_reader`, together with the list of the wrong cells (`'file name: column heading'`).
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| *file name* | dict | | | `{'OD', 'volume', 'dilution_factor'}` of that file |
+| `'OD'` | Optional[float] | | OD | OD of the cells added; `None` for a cell that is empty or not a number above 0 |
+| `'volume'` | Optional[float] | | mL | Volume of cells spun down; `None` as above |
+| `'dilution_factor'` | Optional[float] | | | Dilution factor; `None` as above |
 
 ### 1.2 Dataclasses
 
@@ -236,11 +348,9 @@ Defined in `utils_shared/paf_reader.py`. Created by `spectra_parser`, used by `r
 | `wavelengths` | Optional[np.ndarray] | (npix,) | nm | `None` | Wavelength of each pixel |
 | `data_off` | int | | bytes | `0` | Position of the spectra block |
 | `data_end` | int | | bytes | `0` | End of the spectra block |
-| `log` | Optional[np.ndarray] | (nframes + 2, npix) | | `None` | Raw rows: dark row, reference row, then one row per spectrum |
+| `log` | Optional[np.ndarray] | (nframes + 2, npix) | | `None` | Raw rows, as log10 of the counts: a row of zeros, the reference row, then one row per spectrum (see `.paf file`) |
 | `rec_end` | int | | bytes | `0` | End of the record |
-| `ref` | Optional[np.ndarray] | (npix,) | | `None` | Reference spectrum |
 | `params` | dict | | | `{}` | Acquisition parameters found in the record |
-| `trailer` | list | | | `[]` | Text tokens after the data block |
 | `checks` | dict | | | `{}` | Warnings raised while parsing |
 
 #### `PreviewSpec`
@@ -256,9 +366,22 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every 
 | `show_trim` | bool | | | `False` | Draw the whole recording and shade the trimmed part |
 | `show_ignored` | bool | | | `True` | Shade the ignored start and end |
 
+#### `TimeAxis`
+
+Defined in `utils_viewer/viewer_preview.py`. Created by `time_axis_finder` from a drawn preview and passed to the window with its picture, so the mouse can point at a time. The fractions are measured from the bottom left corner of the picture.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `left` | float | | fraction of the width | | Left edge of the panels |
+| `right` | float | | fraction of the width | | Right edge of the panels |
+| `bottom` | float | | fraction of the height | | Bottom edge of the lowest panel |
+| `top` | float | | fraction of the height | | Top edge of the highest panel |
+| `start_min` | float | | min | | Time at the left edge |
+| `end_min` | float | | min | | Time at the right edge |
+
 #### `ViewerSession`
 
-Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by the stage runners, `preview_drawer` and the preview thread.
+Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by the stage runners, `preview_drawer`, the preview thread and the settings strip (`_strip_change_applier`).
 
 | Field | Type | Shape | Units | Default | Description |
 |---|---|---|---|---|---|
@@ -267,6 +390,9 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by 
 | `window` | ViewerGui or PictureWindow | | | | The browser window, or the preview picture file when no window can open |
 | `current` | int | | | `0` | Index of the file being looked at |
 | `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the last 3 files read; each preview works on a deep copy |
+| `fit` | Optional[dict] | | | `None` | The `fit` the haems are worked out with: the standard or saved fit at first, then the one chosen in the processing or the strip; `None` when the haems are left out |
+| `redraw` | Optional[Callable[[], bool]] | | | `None` | Draws the plot of the step being asked again (set by each stage runner), for a change in the strip |
+| `is_figure` | bool | | | `False` | True while the plot is the figure of each file at its saved size (section 5), so a new journal or size in the strip redraws it |
 
 ### 1.3 Arrays
 
@@ -283,6 +409,72 @@ Attenuation (or transmission, or intensity) of one spectral dataset.
 - **Units of the values:** OD for attenuation, fraction for transmission, counts for intensity
 
 ### 1.4 Files
+
+#### `.paf file`
+
+A recording of the instrument software, read by `utils_shared/paf_reader.py`. The format is not published: this is the layout as the reader understands it, checked against the instrument software's own export of one recording (the wavelengths, counts, transmission and traces agree at every point).
+
+| Property | Value |
+|---|---|
+| File type | Binary, little-endian |
+| Text | UTF-16, each string after the four bytes `02 00 00 00` and its number of characters (unsigned 32-bit) |
+| Location and name | `<data folder>/<experiment>.paf`; the file stem is the experiment name |
+
+The file is one record after another. Each record starts with the byte `06`, the word `Espana`, five zero bytes and a 16-byte identifier, followed by its strings: the kind of record, the vendor and a name. The reader uses the first four kinds; the others were found in the four recordings looked at (one from each sample folder and the example run) and are not read:
+
+| Kind of record | What it holds |
+|---|---|
+| `DataItem`, then `Measurement` | One trace (the clock `Time`, `CcO2`, `CsO2`, `VoO2` and others). The number of values is stored twice near the end of the `DataItem` (28 and 20 bytes before it); the `Measurement` ends with that many 32-bit floats and 8 closing bytes, and its strings give the quantity and the unit (the first unit named is the one used) |
+| `Spectra: CCD` | One spectrometer: the number of spectra and of wavelengths, a table numbering the spectra 1, 2, 3 and so on, a block of settings, the wavelengths (32-bit floats, nm), the rows of spectra, then the date, grating and light source as strings |
+| `Text Event` | One addition: its name (`Event 1`), the text typed, and its spectrum number (unsigned 32-bit, 20 bytes after the name) |
+| `PaneNote` | The notes of the experiment, as rich text |
+| `VoO2Math` | How the oxygen rates are worked out: the names of the traces used (`Time`, `CcO2`, `PcO2`, `PtO2`, `DgO2`, `VrO2`, `VoO2`), then, counting from the end of the last name, two empty strings, four zero bytes, the oxygen permeability (32-bit float at byte 20, µM/min/mmHg), a 32-bit float not known (byte 24), and the whole numbers 0, 20 and 60 (bytes 28, 32 and 36) |
+| `SpectraFitting`, `FIT: NIR` | The haem fit used: its name, the spectrometer, the names of its shapes, the path of its `.fit` file on the instrument computer, the fit range and number of shapes (32-bit floats 520 and 630 nm, then 9, in the files seen) and the kind of spectra fitted (`ΔAttenuation`). Each shape follows as a `Plot: Scatter` with its wavelengths (nm) and its values (`Specific Absorption`, OD/mM/cm named first). Other fits that were open in the software are kept as further `FIT: NIR` records |
+| `CellItem` | Cell culture data: four numbers (-1 when not filled in), three names (`Unknown` when not filled in) and a list of media. Not filled in, in the files seen |
+| `ExptPart` | The time step of the recording (s) and two 32-bit floats not known (the first is the length of the recording in three of the four files) |
+| `EspanaItem` | One of these is named after a date |
+| `TriggerItem`, `StreamInteger`, `StreamList`, `StreamArray`, `ExptItem` | Not known |
+| `ScrnList`, `ScrnItem`, `PaneList`, `PaneGraph`, `PanePage`, `PlotList`, `Plot: ...`, `AxisList`, `Axis`, `TickItem`, `FontItem`, `EspanaActive`, `FitList`, `Worksheet`, `ColStyle`, `RowStyle` | How the software shows the run (screens, graphs, axes, fonts); no data |
+
+- **Clock:** the `Time` trace, in seconds from the start (0.5 s steps in the recordings seen). When a file holds it twice, the longer one is used.
+- **Traces:** a trace is used when it has at least 90 % of the clock's length. A shorter trace is lined up with the clock from the start, so only its end is empty. A trace whose two stored lengths disagree, that holds no values or that does not fit in its record is not read; this is reported, with the reason, only for the traces the program uses.
+- **Spectra rows:** (number of spectra + 2) rows of 32-bit floats, one value per wavelength: a row of zeros, log10 of the reference spectrum, then log10 of the counts of each spectrum. So counts = 10^row, rounded to a whole number, and transmission = 10^(row - reference row). Spectrum 1 belongs to the first time point of the clock, and so on.
+- **Additions:** each addition is stored more than once; the first copy has the spectrum number 0 and the later ones the real number.
+- **Not read:** files whose spectra are not numbered 1, 2, 3 without gaps, or that have more spectra than time points, are refused with a message.
+- **Rate traces:** `VrO2` has no value for the first 20 and the last 20 points of the clock, `DgO2` and `VoO2` none for the first 60 and the last 20 (the 20 and 60 stored in `VoO2Math`), so these three are stored 20 values shorter than the clock. A rate trace short by just these 20 values is not reported as short.
+
+What the file holds, each item marked **recorded** (taken as true), **calculated by the instrument** (can be checked) or **not known**. Checked on four recordings: the example run, against the software's own export, and one from each sample folder.
+
+| What | Units | Kind | How we know | In every file seen |
+|---|---|---|---|---|
+| Clock (`Time`) | s | recorded | Agrees with the export | Yes; some files hold a second, shorter or unreadable copy |
+| Counts of each spectrum, per spectrometer (`Cytochromes`, `NADH`) | counts | recorded | Agree with the export at every point | Yes |
+| Reference spectrum (second stored row) | counts | recorded | Gives the export's transmission | Yes |
+| First stored row | | not known | Always zeros | Yes |
+| Wavelengths | nm | recorded | Agree with the export | Yes |
+| Centre wavelength and slit of each spectrometer | nm, µm | recorded | Read from the settings block; the slit agrees with the notes | Yes |
+| Other numbers of the settings block | | not known | One is 300 where the notes give a light source of 300 mA | Yes |
+| Date, grating and light source of each spectrometer (strings after the spectra) | | recorded | For example `600g/mm@500nm`, `4000K-90 Luxeon-CZ` | Yes |
+| Transmission and attenuation | fraction, OD | calculated (by this program; the software's export gives the same) | Agree with the export at every point | |
+| Lifetimes of the two oxygen sensors (`Tau-cO2`, `Tau-tO2`) | µs | recorded | The sensors' own readings; `CcO2` and `PtO2` follow them | Yes |
+| Measured oxygen (`CcO2`) | µM | calculated by the instrument from `Tau-cO2` | Follows 1 / `Tau-cO2` closely but not exactly: the sensor calibration is not stored in a form we can read, so it cannot be checked | Yes |
+| Oxygen pressure in the chamber (`PcO2`) | mmHg | calculated by the instrument: `CcO2` × 0.744 to 0.748 (an oxygen solubility set per run) | Exact to the last stored digit; checked on every file read (`ocr_check`) | Yes |
+| Oxygen pressure outside the chamber wall (`PtO2`) | mmHg | calculated by the instrument from `Tau-tO2` | Follows 1 / `Tau-tO2` loosely; cannot be checked, as for `CcO2` | Yes |
+| `FtO2` | % | not known | An oxygen percentage that follows `PtO2` closely (about `PtO2` / 7.7) | Yes |
+| Set oxygen (`CsO2`) | µM | recorded (set by the user) | A few steps | Yes |
+| Oxygen permeability of the chamber wall (`KpO2`) | µM/min/mmHg | recorded (a setting of the run: 0.050 to 0.264 in the files seen) | Stored in `VoO2Math`; the `KpO2` trace itself holds no values | Yes |
+| Second number of `VoO2Math` | | not known | 1.7 to 6.0 in the files seen | Yes |
+| Fall of the measured oxygen (`VrO2`) | µM/min | calculated by the instrument: the fall of `CcO2` per minute, smoothed over the 41 points around each point | Checked on every file read (`ocr_check`). In the 33 sample files our straight line through 29 points is within 0.01 to 0.87 µM/min for half the points and the same size within 11 %, but up to 240 µM/min off just after an addition: the smoothing is not known exactly | Yes |
+| Oxygen leaking in (`DgO2`) | µM/min | calculated by the instrument: the permeability × (`PtO2` - `PcO2`), smoothed | Checked on every file read. In the 33 sample files our 20 s mean is within 0.001 to 0.55 µM/min for half the points and the same size within 1.6 %, but up to 46 µM/min off for tens of seconds after the outside oxygen jumps: the smoothing is not known exactly | Yes |
+| Oxygen consumption rate, OCR (`VoO2`) | µM/min | calculated by the instrument: `VrO2` + `DgO2` | Exact to the last stored digit (within 0.0001 µM/min in the 33 sample files); checked on every file read | Yes |
+| Haem traces (`Cyt...`, named after the shapes of the fit) | µM | calculated by the instrument from the spectra with the fit stored in the file | Ours move the same way (`tests/test_haem_direction.py`); the amounts are not reproduced | Yes; their names and number change with the fit |
+| The fit used (`SpectraFitting`, `FIT: NIR`) | OD/mM/cm | recorded | | Yes |
+| `Expt Pt` | au | not known | Zero throughout | Yes |
+| Additions (`Text Event`) | spectrum number | recorded (typed by the user) | Agree with the export | Only in files with additions (`wt_1.paf` has none) |
+| Notes (`PaneNote`) | | recorded (typed by the user) | | Yes |
+| Cell culture data (`CellItem`) | | recorded | Not filled in | Yes |
+| A date (`EspanaItem`) | | not known | Probably the day of the recording | Yes |
+| Time step (`ExptPart`) | s | recorded | Agrees with the clock | Yes |
 
 #### `individual experiment workbook`
 
@@ -312,7 +504,9 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 | Column | Type | Units | Description |
 |---|---|---|---|
 | `<haem>` | float | nm | Wavelength column of one haem; the header names the haem (every second column, starting with the first) |
-| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of -1 (the decomposition negates the fit) |
+| `<haem> response` | float | | Response of that haem at those wavelengths; the header of this column is not used. Components from the principal component analysis have a largest peak of 1e-6 (the component divided by a million) |
+
+Rules, checked by `fit_importer`: the columns come in pairs and every wavelength column has a haem name; every cell is a number or empty; a row holds both a wavelength and a response, or neither; each haem has at least two rows. The haems may have different lengths, and empty rows are skipped wherever they are. Within a haem the wavelengths go upwards (a haem written wholly downwards is turned round); where they jump backwards, the rows from the jump on are left out and the user is told. Scale: the highest point of the shapes (largest |response| in the file) is between 1e-7 and 1e-3; a file a million above that (0.1 to 1000) is divided by a million when read, and a file on neither scale is used as it is with a warning.
 
 #### `spectral csv`
 
@@ -372,6 +566,16 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 
 Structure: see `last_answers` in section 1.1.
 
+#### `portimao_settings.json`
+
+| Property | Value |
+|---|---|
+| File type | JSON |
+| Encoding | UTF-8 |
+| Location and name | `portimao_settings.json` in the folder of the `.paf` files, so it travels with the dataset |
+
+Structure: see `dataset_settings` in section 1.1.
+
 #### `preview picture`
 
 | Property | Value |
@@ -408,8 +612,9 @@ Project-wide choices, written once. The tables above use these units and symbols
 |---|---|---|
 | Time | min | `(min)` in column names, `_min` in keys |
 | Wavelength | nm | none |
-| Oxygen concentration | uM | none |
-| Oxygen consumption rate | uM/min | none |
+| Oxygen concentration | µM | none |
+| Oxygen consumption rate | µM/min | none |
+| Concentration of an addition | µM | `_uM` in keys; written by `concentration_formatter` as µM, mM or M, and `? µM` when none was given |
 | Haem absorbance | mOD | none |
 | Fractions of a range or baseline | % | none |
 
@@ -429,6 +634,7 @@ float64 for all arrays unless stated otherwise in the tables above. The waveleng
 | Symbol | Meaning |
 |---|---|
 | `n_points` | Number of time points of a trace |
+| `n_ocr_points` | Number of time points with an OCR value (fewer than `n_points`) |
 | `n_spectra` | Number of spectra (frames) |
 | `n_wavelengths` | Number of wavelengths (pixels) |
 | `n_haems` | Number of haems in the fit |

@@ -20,8 +20,15 @@ from PIL import Image
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.output_capture import output_capturer
-from utils_viewer.viewer_preview import KEY_PREFIX, PreviewSpec, ViewerSession
+from utils_shared.questions import time_request_setter
+from utils_viewer.viewer_od_table import ODTable
+from utils_viewer.viewer_preview import (KEY_PREFIX,
+                                         PreviewSpec,
+                                         TimeAxis,
+                                         ViewerSession,
+                                         )
 from utils_viewer.viewer_renderer import PreviewRenderer
+from utils_viewer.viewer_strip import SettingsStrip, strip_values_checker
 from utils_viewer.viewer_terminal import (ansi_splitter,
                                           ansi_style_updater,
                                           OutputRouter,
@@ -37,6 +44,16 @@ ERROR_COLOUR = '#ff7b86'
 ICON_PATH = Path(__file__).resolve().parent.parent / 'assets' / 'icon.png'
 ANSWER_HINT = ('Type your answer and press Enter. If you type nothing, the value in '
                '[brackets] is used.')
+TIME_HINT = ('Click on the plot where the answer falls, or type it, then press Enter. '
+             'If you type nothing, the value in [brackets] is used.')
+SPAN_HINT = ('Drag across the plot to fill in the answer, or type it, then press Enter. '
+             'If you type nothing, the value in [brackets] is used.')
+TABLE_HINT = ('Click a cell of the table and type its value; Tab moves across, Enter '
+              'moves down. When the table is filled in, press Enter in the box below.')
+SIGN_BACKGROUND = '#ffd76a'
+SIGN_EDGE = '#e8a317'
+SIGN_TEXT = '#5a3d00'
+POINTER_COLOUR = '#0b62c4'
 FILES_HELP = ('Select a file using the drop-down, or use the arrows to browse the '
               'data.')
 FIGURES_HELP = ('Select a figure using the drop-down, or use the arrows to look at '
@@ -44,12 +61,33 @@ FIGURES_HELP = ('Select a figure using the drop-down, or use the arrows to look 
                 'being built is listed after them.')
 ENTRY_BACKGROUND = '#2b2b2b'
 MINIMUM_TK = 8.6  # Tk 8.5 (Apple's own Python) draws blank windows
-SYMBOL_FONTS = ('Segoe UI Symbol', 'Arial Unicode MS', 'Helvetica Neue', 'DejaVu Sans',
-               'Liberation Sans', 'Arial',
-               )
+SYMBOL_FONTS = ('Segoe UI Symbol',
+                'Arial Unicode MS',
+                'Helvetica Neue',
+                'DejaVu Sans',
+                'Liberation Sans',
+                'Arial',
+                )
 # Characters that are hard to type, for event labels and other text answers.
-SYMBOLS = ('µ', '⁻¹', '⁻²', '⁻³', '²', '³', '₂', '₃', '₄', '⁺', '±', '°', 'Δ', 'α', 'β',
-           'γ', 'λ', '×', '·',
+SYMBOLS = ('µ',
+           '⁻¹',
+           '⁻²',
+           '⁻³',
+           '²',
+           '³',
+           '₂',
+           '₃',
+           '₄',
+           '⁺',
+           '±',
+           '°',
+           'Δ',
+           'α',
+           'β',
+           'γ',
+           'λ',
+           '×',
+           '·',
            )
 PLOT_BACKGROUND = '#f2f2f2'
 _CLOSED = object()
@@ -96,9 +134,15 @@ class ViewerGui:
     ---- Methods ----
     __init__
     _answer_sender
+    _answer_writer
+    _axis_box_finder
+    _band_drawer
     _closing_handler
     _display_name_lister
+    _drag_ender
+    _dragger
     _drain_runner
+    _drawing_sign_drawer
     _event_handler
     _history_stepper
     _icon_setter
@@ -111,21 +155,36 @@ class ViewerGui:
     _navigator
     _pane_writer
     _picture_shower
+    _pointer_mover
     _resizer
     _step_taker
+    _strip_change_runner
+    _strip_change_teller
     _symbol_inserter
+    _time_clicker
+    _time_line_drawer
     _widgets_builder
     _window_raiser
+    drawing_sign_shower
     extra_publisher
     figure_shower
     file_focuser
     input_reader
+    od_table_hider
+    od_table_reader
+    od_table_shower
     output_capturer
     pictures_publisher
     run
     session_attacher
     spec_publisher
+    strip_fits_setter
+    strip_listener_setter
+    strip_reader
+    strip_setter
+    strip_state_setter
     text_sender
+    time_reader_setter
     window_closer
     """
 
@@ -187,6 +246,14 @@ class ViewerGui:
         self._previous: Dict[str, bytes] = {}
         self._notes: Dict[str, str] = {}
         self._failures: Dict[str, str] = {}
+        self._axes: Dict[str, Optional[TimeAxis]] = {}
+        self._previous_axes: Dict[str, Optional[TimeAxis]] = {}
+        self._shown_axis: Optional[TimeAxis] = None
+        self._picture_box: Optional[Tuple[float, float, int, int]] = None
+        self._pointer: Optional[Tuple[int, int]] = None
+        self._time_kind: Optional[str] = None
+        self._time_reader: Optional[Callable] = None
+        self._drag_start: Optional[Tuple[float, float]] = None
         self._photo: Any = None
         self._decoded: Any = None
         self._resize_job: Any = None
@@ -202,6 +269,9 @@ class ViewerGui:
         self._is_pictures = False
         self._file_count = 0
         self._help_base = ''
+        self._is_table_shown = False
+        self._is_busy = False
+        self._strip_listener: Optional[Callable[[Dict[str, Any]], None]] = None
         self._widgets_builder()
         self._icon_setter()
 
@@ -245,8 +315,142 @@ class ViewerGui:
         self._entry.delete(0, 'end')
         self._entry.configure(state='disabled')
         self._hint.configure(text='Working ...')
+        self._drag_start = None
+        self._canvas.delete('band')
         self._pane_writer(answer + '\n', 'answer')
         self._answers.put(answer)
+
+    # ---- _answer_writer --------------------------------------------------------------
+    def _answer_writer(self, value: Optional[float]) -> None:
+        """
+        ---- Summary ----
+        Method to write the answer the mouse gave into the answer box, in place of what
+        was there; nothing changes when the mouse gave no answer.
+
+        ---- Inputs ----
+        value : Optional[float]
+            The answer, or None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the text of the answer box (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if value is None:
+            return
+        self._entry.delete(0, 'end')
+        self._entry.insert(0, f'{round(value, 2):g}')
+        self._entry.focus_set()
+
+    # ---- _axis_box_finder ------------------------------------------------------------
+    def _axis_box_finder(self) -> Optional[Tuple[float, float, float, float]]:
+        """
+        ---- Summary ----
+        Method to find where the panels of the picture shown sit in the plot area.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Optional[Tuple[float, float, float, float]]
+            (left, right, top, bottom) of the panels in pixels from the top left of the
+            plot area, or None when the picture has no time axis.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        x = picture left + fraction across * picture width;
+        y = picture top + (1 - fraction up) * picture height.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self._picture_box is None or self._shown_axis is None:
+            return None
+        left, top, width, height = self._picture_box
+        axis = self._shown_axis
+        return (left + axis.left * width,
+                left + axis.right * width,
+                top + (1.0 - axis.top) * height,
+                top + (1.0 - axis.bottom) * height,
+                )
+
+    # ---- _band_drawer ----------------------------------------------------------------
+    def _band_drawer(self, x: float) -> None:
+        """
+        ---- Summary ----
+        Method to draw the band of a drag over the panels, from where the drag started
+        to ``x`` (kept within the time axis), with its length in seconds above it.
+
+        ---- Inputs ----
+        x : float
+            Where the mouse is, in pixels from the left of the plot area.
+
+        ---- Globals read ----
+        POINTER_COLOUR (module constant).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        Length (s) = |time at x - time at the start| x 60.
+
+        ---- Helpers ----
+        _axis_box_finder
+        pointed_time_finder
+        """
+
+        self._canvas.delete('band')
+        box = self._axis_box_finder()
+        if box is None or self._drag_start is None:
+            return
+        left, right, top, bottom = box
+        start_x, start_min = self._drag_start
+        x = min(max(x, left + 0.5), right - 0.5)  # inside the edges despite rounding
+        end_min = pointed_time_finder(x,
+                                      (top + bottom) / 2.0,
+                                      self._picture_box,
+                                      self._shown_axis,
+                                      )
+        if end_min is None:
+            return
+        self._canvas.create_rectangle(min(start_x, x),
+                                      top,
+                                      max(start_x, x),
+                                      bottom,
+                                      outline=POINTER_COLOUR,
+                                      width=2,
+                                      tags='band',
+                                      )
+        self._canvas.create_text((start_x + x) / 2.0,
+                                 top - 4,
+                                 text=f'{abs(end_min - start_min) * 60.0:.0f} s',
+                                 anchor='s',
+                                 fill=POINTER_COLOUR,
+                                 font=(self._family, 10, 'bold'),
+                                 tags='band',
+                                 )
 
     # ---- _closing_handler ------------------------------------------------------------
     def _closing_handler(self) -> None:
@@ -323,6 +527,90 @@ class ViewerGui:
                 for i, name in enumerate(self._names)
                 ]
 
+    # ---- _drag_ender -----------------------------------------------------------------
+    def _drag_ender(self, event: Any) -> None:
+        """
+        ---- Summary ----
+        Method to end a drag across the plot: the times where it started and ended
+        (kept within the time axis) are turned into the answer, which is written into
+        the answer box. The band stays until the answer is sent.
+
+        ---- Inputs ----
+        event : Any
+            The Tk release event.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the text of the answer box (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _answer_writer
+        _axis_box_finder
+        pointed_time_finder
+        """
+
+        start = self._drag_start
+        self._drag_start = None
+        box = self._axis_box_finder()
+        if start is None or box is None or not self._is_waiting:
+            return
+        left, right, top, bottom = box
+        end_min = pointed_time_finder(min(max(event.x, left + 0.5), right - 0.5),
+                                      (top + bottom) / 2.0,
+                                      self._picture_box,
+                                      self._shown_axis,
+                                      )
+        if end_min is None or end_min == start[1] or self._time_reader is None:
+            self._canvas.delete('band')
+            return
+        self._answer_writer(self._time_reader(self._names[self._index],
+                                              min(start[1], end_min),
+                                              max(start[1], end_min),
+                                              ),
+                            )
+
+    # ---- _dragger --------------------------------------------------------------------
+    def _dragger(self, event: Any) -> None:
+        """
+        ---- Summary ----
+        Method to follow the mouse while the button is held: the time line moves with
+        it and, during a drag, the band is drawn to it.
+
+        ---- Inputs ----
+        event : Any
+            The Tk motion event.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _band_drawer
+        _pointer_mover
+        """
+
+        self._pointer_mover(event)
+        if self._drag_start is not None:
+            self._band_drawer(event.x)
+
     # ---- _drain_runner ---------------------------------------------------------------
     def _drain_runner(self) -> None:
         """
@@ -376,6 +664,50 @@ class ViewerGui:
         flush()
         self._root.after(25, self._drain_runner)
 
+    # ---- _drawing_sign_drawer --------------------------------------------------------
+    def _drawing_sign_drawer(self) -> None:
+        """
+        ---- Summary ----
+        Method to draw the "Drawing ..." sign in the top left corner of the plot area,
+        to show that the picture for the latest settings is still being made.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT (module constants).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        text = self._canvas.create_text(22,
+                                        17,
+                                        text='Drawing ...',
+                                        anchor='nw',
+                                        fill=SIGN_TEXT,
+                                        font=(self._family, 11, 'bold'),
+                                        )
+        left, top, right, bottom = self._canvas.bbox(text)
+        back = self._canvas.create_rectangle(left - 9,
+                                             top - 6,
+                                             right + 9,
+                                             bottom + 6,
+                                             fill=SIGN_BACKGROUND,
+                                             outline=SIGN_EDGE,
+                                             )
+        self._canvas.tag_raise(text, back)
+
     # ---- _event_handler --------------------------------------------------------------
     def _event_handler(self, event: tuple) -> None:
         """
@@ -385,7 +717,9 @@ class ViewerGui:
         ---- Inputs ----
         event : tuple
             (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-            'extra', 'image', 'closed' or 'finished'.
+            'extra', 'image', 'time', 'strip', 'strip_fits', 'strip_state', 'busy',
+            'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..." sign of
+            'busy' stays until the next question, preview or picture shown.
 
         ---- Globals read ----
         None.
@@ -411,12 +745,45 @@ class ViewerGui:
         """
 
         kind = event[0]
+        if kind in ('prompt', 'pictures', 'spec') or (kind == 'extra' and event[3]):
+            was_busy, self._is_busy = self._is_busy, False
+            if was_busy and kind == 'prompt':
+                self._picture_shower()  # takes the sign away
         if kind == 'prompt':
             self._pane_writer(event[1])
             self._is_waiting = True
             self._entry.configure(state='normal')
             self._entry.focus_set()
-            self._hint.configure(text=ANSWER_HINT)
+            if self._is_table_shown:
+                self._hint.configure(text=TABLE_HINT)
+            else:
+                self._hint.configure(text=_hint_chooser(self._time_kind))
+        elif kind == 'strip':
+            self._strip.values_setter(event[1])
+        elif kind == 'strip_fits':
+            self._strip.fits_setter(event[1])
+        elif kind == 'strip_state':
+            self._strip.state_setter(event[1])
+        elif kind == 'busy':
+            self._is_busy = True
+            self._picture_shower()
+        elif kind == 'od_show':
+            # Above the answer box and under the text, which gives up the room.
+            self._od_table.rows_setter(event[1])
+            self._od_table.frame.pack(side='bottom', fill='x', after=self._bottom)
+            self._is_table_shown = True
+            if self._is_waiting:
+                self._hint.configure(text=TABLE_HINT)
+        elif kind == 'od_hide':
+            self._od_table.frame.pack_forget()
+            self._is_table_shown = False
+        elif kind == 'time':
+            self._time_kind, self._time_reader = event[1], event[2]
+            self._drag_start = None
+            self._canvas.delete('band')
+            self._canvas.configure(cursor='crosshair' if event[1] else '')
+            if self._is_waiting and not self._is_table_shown:
+                self._hint.configure(text=_hint_chooser(event[1]))
         elif kind == 'session':
             self._session = event[1]
             self._names = [s['name'] for s in self._session.summaries]
@@ -437,6 +804,7 @@ class ViewerGui:
             self._names = files + [title for title, _ in event[1]]
             kept = {name: png for name, png in self._images.items() if name in files}
             self._images = {**kept, **{title: png for title, png in event[1]}}
+            self._axes = {name: self._axes.get(name) for name in kept}
             for title, _ in event[1]:
                 self._failures.pop(title, None)
                 self._notes.pop(title, None)
@@ -453,6 +821,7 @@ class ViewerGui:
             if title not in self._names[self._file_count:]:
                 self._names = self._names + [title]
             self._images[title] = png
+            self._axes.pop(title, None)
             self._failures.pop(title, None)
             self._notes.pop(title, None)
             self._has_spec = True
@@ -470,7 +839,13 @@ class ViewerGui:
                 self._combo.configure(values=self._display_name_lister())
             self._version += 1
             self._previous = {**self._previous, **self._images}
+            self._previous_axes = {**self._previous_axes,
+                                   **{shown: self._axes.get(shown)
+                                      for shown in self._images
+                                      },
+                                   }
             self._images, self._notes, self._failures = {}, {}, {}
+            self._axes = {}
             self._has_spec = True
             if name in self._names:
                 self._index = self._names.index(name)
@@ -558,9 +933,11 @@ class ViewerGui:
             for size in (256, 64, 32):
                 buffer = io.BytesIO()
                 base.resize((size, size), resampling.LANCZOS).save(buffer, 'PNG')
-                self._icons.append(self._tk.PhotoImage(
-                    data=base64.b64encode(buffer.getvalue()).decode('ascii'),
-                ))
+                self._icons.append(
+                    self._tk.PhotoImage(
+                        data=base64.b64encode(buffer.getvalue()).decode('ascii'),
+                        ),
+                    )
             self._root.iconphoto(True, *self._icons)
         except Exception:  # no icon is better than no window
             return
@@ -578,6 +955,7 @@ class ViewerGui:
                          name: str,
                          png: Optional[bytes],
                          notes: str,
+                         time_axis: Optional[TimeAxis],
                          ) -> None:
         """
         ---- Summary ----
@@ -592,6 +970,8 @@ class ViewerGui:
             Picture, or None when it could not be drawn.
         notes : str
             Warnings, or the reason when there is no picture.
+        time_axis : Optional[TimeAxis]
+            Where the time axis sits in the picture, or None when it has none.
 
         ---- Globals read ----
         None.
@@ -610,7 +990,7 @@ class ViewerGui:
         None.
         """
 
-        self._events.put(('image', version, name, png, notes))
+        self._events.put(('image', version, name, png, notes, time_axis))
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -621,6 +1001,7 @@ class ViewerGui:
                         name: str,
                         png: Optional[bytes],
                         notes: str,
+                        time_axis: Optional[TimeAxis],
                         ) -> None:
         """
         ---- Summary ----
@@ -636,6 +1017,8 @@ class ViewerGui:
             Picture, or None when it could not be drawn.
         notes : str
             Warnings, or the reason when there is no picture.
+        time_axis : Optional[TimeAxis]
+            Where the time axis sits in the picture, or None when it has none.
 
         ---- Globals read ----
         None.
@@ -661,6 +1044,7 @@ class ViewerGui:
         else:
             self._images[name] = png
             self._notes[name] = notes
+            self._axes[name] = time_axis
         if self._names and name == self._names[self._index]:
             self._picture_shower()
 
@@ -694,13 +1078,27 @@ class ViewerGui:
         right = self._canvas.winfo_width() - 14
         top = 10
         colour = '#555555'
-        self._canvas.create_arc(right - 44, top, right - 28, top + 16, start=0,
-                                extent=180, style='arc', outline=colour, width=2,
+        self._canvas.create_arc(right - 44,
+                                top,
+                                right - 28,
+                                top + 16,
+                                start=0,
+                                extent=180,
+                                style='arc',
+                                outline=colour,
+                                width=2,
                                 )
-        self._canvas.create_rectangle(right - 48, top + 8, right - 24, top + 24,
-                                      fill=colour, outline=colour,
+        self._canvas.create_rectangle(right - 48,
+                                      top + 8,
+                                      right - 24,
+                                      top + 24,
+                                      fill=colour,
+                                      outline=colour,
                                       )
-        self._canvas.create_text(right - 54, top + 16, text='Locked', anchor='e',
+        self._canvas.create_text(right - 54,
+                                 top + 16,
+                                 text='Locked',
+                                 anchor='e',
                                  fill=colour,
                                  )
 
@@ -901,8 +1299,9 @@ class ViewerGui:
                 self._is_carriage = False
             value = ''.join(c if ord(c) <= 0xFFFF else '?' for c in value)
             colour = {'err': ERROR_COLOUR, 'answer': ANSWER_COLOUR}.get(
-                kind, self._style['fg'],
-            )
+                kind,
+                self._style['fg'],
+                )
             bold = self._style['bold'] or kind == 'answer'
             tag = f"{colour}|{bold}|{self._style['italic']}"
             if tag not in self._fonts:
@@ -928,7 +1327,10 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to show the picture of the current file, scaled to fit the plot area, or
-        say why there is none yet.
+        say why there is none yet. While the picture for the latest settings is still
+        being made, or the program is making pictures of its own (drawing_sign_shower),
+        the "Drawing ..." sign is on the plot (over the previous picture when there is
+        one).
 
         ---- Inputs ----
         None.
@@ -947,8 +1349,10 @@ class ViewerGui:
         scale = min(width / picture width, height / picture height), at most 1.5.
 
         ---- Helpers ----
+        _drawing_sign_drawer
         _lock_drawer
         _message_shower
+        _time_line_drawer
         """
 
         self._resize_job = None
@@ -963,7 +1367,11 @@ class ViewerGui:
             is_stale = png is not None
         if png is None:
             self._status.configure(text='')
+            self._picture_box = None
+            self._shown_axis = None
             self._message_shower(failure or f'Drawing {name} ...')
+            if failure is None:
+                self._drawing_sign_drawer()
             return
         key = (name, id(png))
         if self._decoded is None or self._decoded[0] != key:
@@ -979,21 +1387,59 @@ class ViewerGui:
         shown.save(buffer, format='PNG')
         self._photo = self._tk.PhotoImage(
             data=base64.b64encode(buffer.getvalue()).decode('ascii'),
-        )
+            )
         self._canvas.delete('all')
         self._canvas.create_image(self._canvas.winfo_width() // 2,
                                   self._canvas.winfo_height() // 2,
                                   image=self._photo,
                                   )
+        self._picture_box = (self._canvas.winfo_width() // 2 - size[0] / 2,
+                             self._canvas.winfo_height() // 2 - size[1] / 2,
+                             size[0],
+                             size[1],
+                             )
+        self._shown_axis = (self._previous_axes if is_stale else self._axes).get(name)
         if self._is_pictures and self._index < self._file_count:
             self._lock_drawer()
+        if is_stale or self._is_busy:
+            self._drawing_sign_drawer()
         lines = self._notes.get(name, '').splitlines()
         key = [line[len(KEY_PREFIX):] for line in lines if line.startswith(KEY_PREFIX)]
         note = '\n'.join(line for line in lines if not line.startswith(KEY_PREFIX))
-        if is_stale:
-            note = 'Redrawing ... (this is the previous picture)'
         self._status.configure(text=note)
         self._help.configure(text='\n'.join([self._help_base] + key))
+        self._time_line_drawer()
+
+    # ---- _pointer_mover --------------------------------------------------------------
+    def _pointer_mover(self, event: Any = None) -> None:
+        """
+        ---- Summary ----
+        Method to note where the mouse is over the plot area and move the time line
+        there; the line goes when the mouse leaves.
+
+        ---- Inputs ----
+        event : Any
+            The Tk motion event, or None when the mouse has left the plot area.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Redraws the time line (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _time_line_drawer
+        """
+
+        self._pointer = None if event is None else (event.x, event.y)
+        self._time_line_drawer()
 
     # ---- _resizer --------------------------------------------------------------------
     def _resizer(self, event: Any) -> None:
@@ -1058,6 +1504,79 @@ class ViewerGui:
             return
         self._navigator(self._index + step, True)
 
+    # ---- _strip_change_runner --------------------------------------------------------
+    def _strip_change_runner(self, changes: Dict[str, Any], prompt: Any) -> None:
+        """
+        ---- Summary ----
+        Method to hand a change made in the settings strip to the function the program
+        registered, on the program thread while a question waits. What it prints goes
+        on lines of its own, and the answer prompt is shown again under it.
+
+        ---- Inputs ----
+        changes : Dict[str, Any]
+            {name: new value} of the strip values that changed.
+        prompt : Any
+            The prompt of the question that waits, shown again after a message.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the registered function, prints and queues the prompt (side
+        effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        output_capturer
+        """
+
+        listener = self._strip_listener
+        if listener is None:
+            return
+        with output_capturer() as printed:
+            listener(changes)
+        text = printed.getvalue()
+        if text:
+            print(f'\n{text}', end='' if text.endswith('\n') else '\n')
+            self._events.put(('prompt', str(prompt)))
+
+    # ---- _strip_change_teller --------------------------------------------------------
+    def _strip_change_teller(self, changes: Dict[str, Any]) -> None:
+        """
+        ---- Summary ----
+        Method to pass a change the user made in the settings strip to the program
+        thread: it joins the typed answers, so a question that waits takes it at once
+        (input_reader).
+
+        ---- Inputs ----
+        changes : Dict[str, Any]
+            {name: new value} of the strip values that changed.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._answers.put(('strip', dict(changes)))
+
     # ---- _symbol_inserter ------------------------------------------------------------
     def _symbol_inserter(self, symbol: str) -> None:
         """
@@ -1090,11 +1609,139 @@ class ViewerGui:
             self._entry.insert('insert', symbol)
         self._entry.focus_set()
 
+    # ---- _time_clicker ---------------------------------------------------------------
+    def _time_clicker(self, event: Any) -> None:
+        """
+        ---- Summary ----
+        Method to act on a click on the plot of a file while the question waiting can
+        be answered with the mouse: for a click question, the answer the time gives
+        is written into the answer box; for a drag question, the drag starts here. The
+        answer replaces what was in the box, can still be edited, and is accepted with
+        Enter.
+
+        ---- Inputs ----
+        event : Any
+            The Tk click event.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the text of the answer box or starts a drag (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _answer_writer
+        _band_drawer
+        pointed_time_finder
+        """
+
+        self._drag_start = None
+        if not (self._time_kind and self._is_waiting):
+            return
+        if (self._picture_box is None
+            or self._shown_axis is None
+            or self._index >= self._file_count
+            ):
+            return  # only the plot of a file has the times the answer is read from
+        time_min = pointed_time_finder(event.x,
+                                       event.y,
+                                       self._picture_box,
+                                       self._shown_axis,
+                                       )
+        if time_min is None:
+            return
+        if self._time_kind == 'span':
+            self._drag_start = (float(event.x), time_min)
+            self._band_drawer(event.x)
+            return
+        self._answer_writer(self._time_reader(self._names[self._index], time_min))
+
+    # ---- _time_line_drawer -----------------------------------------------------------
+    def _time_line_drawer(self) -> None:
+        """
+        ---- Summary ----
+        Method to draw a vertical line over the panels where the mouse is, with the
+        time it points at beside it. Nothing is drawn when the mouse is off the time
+        axis or the picture has none.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        POINTER_COLOUR (module constant).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        The line runs from the top of the first panel to the bottom of the last:
+        y = picture top + (1 - fraction from the bottom) * picture height.
+
+        ---- Helpers ----
+        pointed_time_finder
+        """
+
+        self._canvas.delete('pointer')
+        if (self._pointer is None
+            or self._picture_box is None
+            or self._shown_axis is None
+            ):
+            return
+        x, y = self._pointer
+        axis = self._shown_axis
+        time_min = pointed_time_finder(x, y, self._picture_box, axis)
+        if time_min is None:
+            return
+        _, top, _, height = self._picture_box
+        line_top = top + (1.0 - axis.top) * height
+        line_bottom = top + (1.0 - axis.bottom) * height
+        self._canvas.create_line(x,
+                                 line_top,
+                                 x,
+                                 line_bottom,
+                                 fill=POINTER_COLOUR,
+                                 width=1,
+                                 tags='pointer',
+                                 )
+        # the label sits right of the line, or left of it near the right edge
+        is_near_edge = x + 90 > self._canvas.winfo_width()
+        text = self._canvas.create_text(x - 6 if is_near_edge else x + 6,
+                                        line_top + 4,
+                                        text=f'{time_min:.2f} min',
+                                        anchor='ne' if is_near_edge else 'nw',
+                                        fill=POINTER_COLOUR,
+                                        font=(self._family, 10, 'bold'),
+                                        tags='pointer',
+                                        )
+        left, upper, right, lower = self._canvas.bbox(text)
+        back = self._canvas.create_rectangle(left - 3,
+                                             upper - 1,
+                                             right + 3,
+                                             lower + 1,
+                                             fill='white',
+                                             outline=POINTER_COLOUR,
+                                             tags='pointer',
+                                             )
+        self._canvas.tag_raise(text, back)
+
     # ---- _widgets_builder ------------------------------------------------------------
     def _widgets_builder(self) -> None:
         """
         ---- Summary ----
-        Method to build the terminal, the answer box, the plot and its file controls.
+        Method to build the terminal, the answer box and the OD table (hidden until it
+        is asked for) on the left, and the plot, its file controls and the settings
+        strip on the right.
 
         ---- Inputs ----
         None.
@@ -1119,9 +1766,14 @@ class ViewerGui:
         _message_shower
         _nav_state_setter
         _navigator
+        _pointer_mover
         _resizer
         _step_taker
+        _strip_change_teller
         _symbol_inserter
+        _time_clicker
+        ODTable
+        SettingsStrip
         """
 
         tk = self._tk
@@ -1208,6 +1860,18 @@ class ViewerGui:
         self._entry.pack(side='left', fill='x', expand=True, padx=(0, 10), ipady=5)
         row.pack(fill='x', pady=(2, 10))
         bottom.pack(side='bottom', fill='x')
+        self._bottom = bottom
+        self._od_table = ODTable(tk,
+                                 ttk,
+                                 left,
+                                 (self._family, self._size),
+                                 {'background': TERMINAL_BACKGROUND,
+                                  'text': TERMINAL_TEXT,
+                                  'cell': ENTRY_BACKGROUND,
+                                  'edge': ANSWER_COLOUR,
+                                  },
+                                 self._entry.focus_set,
+                                 )
         scroll.pack(side='right', fill='y')
         self._text.pack(side='left', fill='both', expand=True)
         panes.add(left, weight=1)
@@ -1217,8 +1881,15 @@ class ViewerGui:
 
         # ---- 2 The plot on the right -------------------------------------------------
         right = tk.Frame(panes, bg=PLOT_BACKGROUND)
+        self._strip = SettingsStrip(tk,
+                                    ttk,
+                                    right,
+                                    PLOT_BACKGROUND,
+                                    self._strip_change_teller,
+                                    )
+        self._strip.frame.pack(side='bottom', pady=(2, 8))
         controls = tk.Frame(right, bg=PLOT_BACKGROUND)
-        controls.pack(side='bottom', pady=(4, 8))
+        controls.pack(side='bottom', pady=(4, 6))
         self._help = tk.Label(right,
                               text='',
                               bg=PLOT_BACKGROUND,
@@ -1261,6 +1932,11 @@ class ViewerGui:
                          lambda e: self._navigator(self._combo.current(), True),
                          )
         self._canvas.bind('<Configure>', self._resizer)
+        self._canvas.bind('<Motion>', self._pointer_mover)
+        self._canvas.bind('<Leave>', lambda e: self._pointer_mover(None))
+        self._canvas.bind('<Button-1>', self._time_clicker)
+        self._canvas.bind('<B1-Motion>', self._dragger)
+        self._canvas.bind('<ButtonRelease-1>', self._drag_ender)
         root.bind_all('<Prior>', lambda e: self._step_taker(-1))
         root.bind_all('<Next>', lambda e: self._step_taker(1))
         root.protocol('WM_DELETE_WINDOW', self._closing_handler)
@@ -1309,6 +1985,37 @@ class ViewerGui:
             pass
 
     # ---- MAIN METHODS ----------------------------------------------------------------
+
+    # ---- drawing_sign_shower ---------------------------------------------------------
+    def drawing_sign_shower(self) -> None:
+        """
+        ---- Summary ----
+        Method to put the "Drawing ..." sign on the plot while the program makes
+        pictures of its own (the combined figures, the components found from the
+        data). The sign goes when the next picture or preview is shown, or the next
+        question is asked.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the sign for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('busy',))
 
     # ---- extra_publisher -------------------------------------------------------------
     def extra_publisher(self, title: str, png: bytes, is_shown: bool = True) -> None:
@@ -1409,8 +2116,9 @@ class ViewerGui:
         """
         ---- Summary ----
         Method that replaces the built-in input while the window is open: it shows the
-        prompt in the terminal and waits for the answer typed in the answer box. Other
-        threads still use the real input.
+        prompt in the terminal and waits for the answer typed in the answer box. A
+        change made in the settings strip meanwhile is handed to the program's listener
+        and the question goes on waiting. Other threads still use the real input.
 
         ---- Inputs ----
         prompt : Any
@@ -1424,7 +2132,45 @@ class ViewerGui:
             The typed answer. Raises EOFError when the window is closed.
 
         ---- Globals mutated ----
-        None. Waits for the user (side effect).
+        None. Waits for the user and runs the strip listener (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _strip_change_runner
+        """
+
+        if threading.current_thread() is not self.logic_thread:
+            return self._real_input(prompt)
+        self._events.put(('prompt', str(prompt)))
+        while True:
+            answer = self._answers.get()
+            if answer is _CLOSED:
+                raise EOFError
+            if isinstance(answer, str):
+                return answer
+            self._strip_change_runner(answer[1], prompt)
+
+    # ---- od_table_hider --------------------------------------------------------------
+    def od_table_hider(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the OD table away again. What was typed can still be read
+        with od_table_reader.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
 
         ---- Equations ----
         None.
@@ -1433,13 +2179,73 @@ class ViewerGui:
         None.
         """
 
-        if threading.current_thread() is not self.logic_thread:
-            return self._real_input(prompt)
-        self._events.put(('prompt', str(prompt)))
-        answer = self._answers.get()
-        if answer is _CLOSED:
-            raise EOFError
-        return answer
+        self._events.put(('od_hide',))
+
+    # ---- od_table_reader -------------------------------------------------------------
+    def od_table_reader(self,
+                        ) -> Tuple[Dict[str, Dict[str, Optional[float]]], List[str]]:
+        """
+        ---- Summary ----
+        Method to give what the OD table holds. It is meant to be called once the
+        user has answered the question asked after od_table_shower, which is when the
+        table is sure to hold the rows that were sent.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Tuple[Dict[str, Dict[str, Optional[float]]], List[str]]
+            ({file name: {'OD', 'volume', 'dilution_factor'}}, with None for a cell
+            that is empty or wrong (DATA_FORMAT.md); the wrong cells as 'file name:
+            column heading').
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return self._od_table.rows_reader(), self._od_table.problems_lister()
+
+    # ---- od_table_shower -------------------------------------------------------------
+    def od_table_shower(self, rows: Dict[str, Dict[str, Optional[float]]]) -> None:
+        """
+        ---- Summary ----
+        Method to bring up the OD table above the answer box, with one row per file.
+
+        ---- Inputs ----
+        rows : Dict[str, Dict[str, Optional[float]]]
+            {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the
+            rows; a value that is None or missing leaves its cell empty
+            (DATA_FORMAT.md).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the rows for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(
+            ('od_show', {name: dict(values) for name, values in rows.items()}),
+            )
 
     # ---- output_capturer -------------------------------------------------------------
     @contextmanager
@@ -1522,7 +2328,8 @@ class ViewerGui:
 
         ---- Globals mutated ----
         None. Replaces sys.stdout, sys.stderr and the built-in input while the window
-        runs, and restores them afterwards (side effects).
+        runs, registers the window with the questions that want a time, and restores
+        them all afterwards (side effects).
 
         ---- Equations ----
         None.
@@ -1543,6 +2350,7 @@ class ViewerGui:
         sys.stdout = OutputRouter(original[0], self.text_sender, 'out', owner)
         sys.stderr = OutputRouter(original[1], self.text_sender, 'err', owner)
         builtins.input = self.input_reader
+        time_request_setter(self.time_reader_setter)
         _active_gui = self
         self.logic_thread = threading.Thread(target=self._logic_runner,
                                              name='program',
@@ -1561,6 +2369,7 @@ class ViewerGui:
         finally:
             sys.stdout, sys.stderr = original
             builtins.input = self._real_input
+            time_request_setter(None)
             _active_gui = None
         return self.exit_code
 
@@ -1625,6 +2434,159 @@ class ViewerGui:
 
         self._events.put(('spec', spec, name))
 
+    # ---- strip_fits_setter -----------------------------------------------------------
+    def strip_fits_setter(self, names: List[str]) -> None:
+        """
+        ---- Summary ----
+        Method to give the settings strip the fits listed in its drop-down.
+
+        ---- Inputs ----
+        names : List[str]
+            File names of the fits.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the list for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('strip_fits', list(names)))
+
+    # ---- strip_listener_setter -------------------------------------------------------
+    def strip_listener_setter(self,
+                              listener: Optional[Callable[[Dict[str, Any]], None]],
+                              ) -> None:
+        """
+        ---- Summary ----
+        Method to register the function that is told what the user changes in the
+        settings strip, or None to stop listening.
+
+        ---- Inputs ----
+        listener : Optional[Callable[[Dict[str, Any]], None]]
+            Called with {name: new value} of the values changed at once, on the
+            program thread while a question waits (a change made while the program is
+            busy is taken when the next question is asked). What it prints shows under
+            the question, which then goes on waiting.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the function on the instance (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._strip_listener = listener
+
+    # ---- strip_reader ----------------------------------------------------------------
+    def strip_reader(self) -> Dict[str, Any]:
+        """
+        ---- Summary ----
+        Method to give the values the settings strip shows now.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Dict[str, Any]
+            The strip values (DATA_FORMAT.md).
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return self._strip.values_reader()
+
+    # ---- strip_setter ----------------------------------------------------------------
+    def strip_setter(self, values: Dict[str, Any]) -> None:
+        """
+        ---- Summary ----
+        Method to show values in the settings strip. The listener is not told, as the
+        program made the change itself.
+
+        ---- Inputs ----
+        values : Dict[str, Any]
+            Some or all of the strip values (DATA_FORMAT.md).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing. Raises ValueError for a value the strip cannot show.
+
+        ---- Globals mutated ----
+        None. Queues the values for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        strip_values_checker
+        """
+
+        strip_values_checker(values)
+        self._events.put(('strip', dict(values)))
+
+    # ---- strip_state_setter ----------------------------------------------------------
+    def strip_state_setter(self, is_enabled: bool) -> None:
+        """
+        ---- Summary ----
+        Method to let the user change the settings strip, or grey it out while what it
+        shows is not being used. It starts greyed out.
+
+        ---- Inputs ----
+        is_enabled : bool
+            True to let the user change it, False to grey it out.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('strip_state', bool(is_enabled)))
+
     # ---- text_sender -----------------------------------------------------------------
     def text_sender(self, text: str, kind: str) -> None:
         """
@@ -1655,6 +2617,45 @@ class ViewerGui:
         """
 
         self._events.put(('text', text, kind))
+
+    # ---- time_reader_setter ----------------------------------------------------------
+    def time_reader_setter(self,
+                           kind: Optional[str],
+                           reader: Optional[Callable],
+                           ) -> None:
+        """
+        ---- Summary ----
+        Method to say that the question being asked can be answered with the mouse, so
+        a click (or a drag) on the plot of a file writes the answer it gives into the
+        answer box, or that it no longer can. It is called from the question thread.
+
+        ---- Inputs ----
+        kind : Optional[str]
+            'point' (a click), 'span' (a drag), or None once the question has its
+            answer.
+        reader : Optional[Callable]
+            Turns what the mouse gave into the answer: reader(file name, time_min) for a
+            click, reader(file name, start_min, end_min) for a drag; None with kind
+            None. It is called on the window thread.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('time', kind, reader))
 
     # ---- window_closer ---------------------------------------------------------------
     def window_closer(self) -> None:
@@ -1687,6 +2688,44 @@ class ViewerGui:
         if self._renderer is not None:
             self._renderer.stopper()
         self._events.put(('closed',))
+
+
+# ---- GUI HELPERS ---------------------------------------------------------------------
+
+
+# ---- _hint_chooser -------------------------------------------------------------------
+def _hint_chooser(time_kind: Optional[str]) -> str:
+    """
+    ---- Summary ----
+    Helper function to choose the hint shown under the answer box: what the mouse can
+    do for the question waiting, if anything.
+
+    ---- Inputs ----
+    time_kind : Optional[str]
+        'point' (a click gives the answer), 'span' (a drag gives it) or None.
+
+    ---- Globals read ----
+    ANSWER_HINT, SPAN_HINT, TIME_HINT (module constants).
+
+    ---- Outputs ----
+    str
+        The hint.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if time_kind == 'point':
+        return TIME_HINT
+    if time_kind == 'span':
+        return SPAN_HINT
+    return ANSWER_HINT
 
 
 # ---- active_gui_getter ---------------------------------------------------------------
@@ -1770,7 +2809,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
                 # own taskbar group, so the taskbar shows our icon, not Python's
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
                     'Portimao.ExperimentBrowser',
-                )
+                    )
             except Exception:
                 pass
         if tk.TkVersion < MINIMUM_TK:
@@ -1788,3 +2827,55 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
               )
         return None
     return ViewerGui(tk, root, program, title).run()
+
+
+# ---- pointed_time_finder -------------------------------------------------------------
+def pointed_time_finder(x: float,
+                        y: float,
+                        picture_box: Tuple[float, float, float, float],
+                        time_axis: TimeAxis,
+                        ) -> Optional[float]:
+    """
+    ---- Summary ----
+    Main function to turn a point of the plot area into the time it points at on the
+    time axis of the picture shown there.
+
+    ---- Inputs ----
+    x : float
+        Distance of the point from the left edge of the plot area, in pixels.
+    y : float
+        Distance of the point from the top edge of the plot area, in pixels.
+    picture_box : Tuple[float, float, float, float]
+        (left, top, width, height) of the picture in the plot area, in pixels.
+    time_axis : TimeAxis
+        Where the time axis sits in the picture, and the times at its ends.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[float]
+        The time in minutes, or None when the point is not over the panels.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    across = (x - left) / width; up = 1 - (y - top) / height;
+    time = start + (across - axis left) / (axis right - axis left) * (end - start).
+
+    ---- Helpers ----
+    None.
+    """
+
+    left, top, width, height = picture_box
+    if width <= 0 or height <= 0 or time_axis.right <= time_axis.left:
+        return None
+    across = (x - left) / width
+    up = 1.0 - (y - top) / height
+    if not (time_axis.left <= across <= time_axis.right
+            and time_axis.bottom <= up <= time_axis.top
+            ):
+        return None
+    share = (across - time_axis.left) / (time_axis.right - time_axis.left)
+    return time_axis.start_min + share * (time_axis.end_min - time_axis.start_min)

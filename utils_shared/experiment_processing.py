@@ -11,8 +11,56 @@ from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.averaging import experiment_averages_calculator
 from utils_shared.normalisation import experiment_normaliser, percent_converter
 from utils_shared.paf_reader import experiment_paf_loader, PafError
-from utils_shared.spectral_decomposer import experiment_decomposer
+from utils_shared.spectral_decomposer import (BACKGROUND_LABELS,
+                                              experiment_decomposer,
+                                              fit_range_finder,
+                                              )
 from utils_shared.trimming import experiment_trimmer
+
+
+# ---- EXPERIMENT PROCESSING HELPERS ---------------------------------------------------
+
+
+# ---- _skip_reporter ------------------------------------------------------------------
+def _skip_reporter(step: str, error: Exception) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the user in plain words that a step was skipped for this
+    file, why, and what to do.
+
+    ---- Inputs ----
+    step : str
+        The step in plain words, to complete "Warning: ... was skipped".
+    error : Exception
+        The error that stopped the step. The ValueError and PafError messages of the
+        processing steps are written for the user and are shown as they are; a
+        KeyError or TypeError is a fault in the program, whose raw text is not shown.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None. Prints the warning (side effect).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if isinstance(error, (KeyError, TypeError)):
+        reason = ('A fault in the program stopped this step; please report it, with '
+                  'this file.'
+                  )
+    else:
+        reason = str(error)
+    print(f'  Warning: {step} was skipped for this file; the rest carries on without '
+          f'it. {reason}',
+          )
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -93,8 +141,8 @@ def experiment_data_processor(info: dict,
         so the file is not read again). It is processed in place. None reads the file.
 
     ---- Globals read ----
-    settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
-    settings.DELTA_ABS_WINDOW_SECONDS, settings.PERCENT_AVERAGE_WINDOW_SECONDS.
+    settings.HAEM_BACKGROUND, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
+    settings.BASELINE_MINIMUM_SECONDS; BACKGROUND_LABELS.
 
     ---- Outputs ----
     dict
@@ -108,6 +156,7 @@ def experiment_data_processor(info: dict,
     None.
 
     ---- Helpers ----
+    _skip_reporter
     event_settings_merger
     experiment_attenuation_adder
     experiment_averages_calculator
@@ -115,6 +164,7 @@ def experiment_data_processor(info: dict,
     experiment_normaliser
     experiment_paf_loader
     experiment_trimmer
+    fit_range_finder
     percent_converter
     percent_need_checker
     source_chooser
@@ -123,6 +173,7 @@ def experiment_data_processor(info: dict,
     # ---- 1 Set up the run ------------------------------------------------------------
     a = cfg.answers
     ignore_first, ignore_last = info['ignore_start'], info['ignore_end']
+    window_points = settings.REFERENCE_WINDOW_POINTS
 
     # ---- 2 Read the file -------------------------------------------------------------
     if experiment is None:
@@ -176,31 +227,42 @@ def experiment_data_processor(info: dict,
                                     if a['export_spectra']
                                     else (a['decomposition_dataset'],)
                                     )
+            if fit is None or 'data' not in fit:
+                raise ValueError('No fit file was loaded, so the haems cannot be '
+                                 'worked out. Choose a fit file when the program asks '
+                                 'for one.',
+                                 )
             experiment_attenuation_adder(experiment,
-                                         mode=settings.TRANSMISSION_MODE,
                                          datasets=attenuation_datasets,
+                                         checked_range_nm=fit_range_finder(fit['data']),
                                          )
             print('  Decomposing ...')
-            delta_window_seconds = settings.DELTA_ABS_WINDOW_SECONDS
             experiment_decomposer(experiment,
                                   fit,
                                   dataset_name=a['decomposition_dataset'],
                                   spectrum_type='attenuation',
-                                  degree_of_scatter=settings.DEGREE_OF_SCATTER,
+                                  background=settings.HAEM_BACKGROUND,
                                   haemfactor=settings.HAEM_FACTOR,
                                   delta_exclude_first_minutes=ignore_first,
-                                  delta_window_seconds=delta_window_seconds,
+                                  delta_window_points=window_points,
                                   delta_exclude_last_minutes=ignore_last,
                                   )
             reference = experiment['haem_delta_abs'].attrs['delta_abs_baseline']
-            print(f"  Decomposed with {a['fit_file']}; delta A zero is the highest "
-                  f'{delta_window_seconds:g} s average of each haem '
-                  f"({reference['start_time']:.2f}-{reference['end_time']:.2f} min)",
+            spans = ', '.join(f'{haem} {first:.2f}-{last:.2f} min'
+                              for haem, (first, last)
+                              in reference['window_by_haem'].items()
+                              )
+            print(f"  Decomposed with {a['fit_file']} and a "
+                  f'{BACKGROUND_LABELS[settings.HAEM_BACKGROUND]} background; delta A '
+                  f'zero is the median of the highest {window_points} points in a row '
+                  f"({reference['window_seconds']:.3g} s) of each haem: {spans}",
                   )
+            for note in fit.get('notes', []):
+                print(f'  {note}')
         except (KeyError, ValueError, PafError) as exc:
-            print(f'  Decomposition skipped: {exc}')
+            _skip_reporter('the decomposition into haems', exc)
     elif a['export_spectra']:
-        experiment_attenuation_adder(experiment, mode=settings.TRANSMISSION_MODE)
+        experiment_attenuation_adder(experiment)
 
     # ---- 4.3 Normalise by OD ---------------------------------------------------------
     # OD scaling and relative (%) scaling.
@@ -212,14 +274,14 @@ def experiment_data_processor(info: dict,
                   )
         except (KeyError, ValueError) as exc:
             od_available = False
-            print(f'  OD scaling skipped: {exc}')
+            _skip_reporter('the scaling by OD', exc)
 
     # ---- 4.4 Convert to percentages --------------------------------------------------
     percent_vo2, percent_haem = cfg.percent_need_checker()
-    percent_window_seconds = settings.PERCENT_AVERAGE_WINDOW_SECONDS
-    for needed, source_key, target_key in ((percent_haem, 'haem_conc', 'haem_percent'),
-                                           (percent_vo2, 'VoO2', 'VoO2_percent'),
-                                           ):
+    for needed, source_key, target_key, what in (
+        (percent_haem, 'haem_conc', 'haem_percent', 'the haems'),
+        (percent_vo2, 'VoO2', 'VoO2_percent', 'the oxygen consumption'),
+        ):
         if needed and source_key in experiment:
             try:
                 percent_converter(experiment,
@@ -227,10 +289,10 @@ def experiment_data_processor(info: dict,
                                   target_key,
                                   exclude_first_minutes=ignore_first,
                                   exclude_last_minutes=ignore_last,
-                                  window_seconds=percent_window_seconds,
+                                  window_points=window_points,
                                   )
             except (KeyError, ValueError, TypeError) as exc:
-                print(f'  {target_key} skipped: {exc}')
+                _skip_reporter(f'the % scale of {what}', exc)
 
     # ---- 5 Choose the sources and average --------------------------------------------
     vo2_source, haem_source = cfg.source_chooser(od_available)
@@ -247,23 +309,32 @@ def experiment_data_processor(info: dict,
                                        else None
                                        )
                 final_gap = a['final_gap_minutes']
+                minimum_seconds = settings.BASELINE_MINIMUM_SECONDS
                 experiment_averages_calculator(experiment,
                                                window_minutes=a['window_minutes'],
                                                gap_minutes=a['gap_minutes'],
                                                final_window_gap_minutes=final_gap,
                                                vo2_source=vo2_source,
                                                haem_source=average_haem_source,
+                                               baseline_minimum_seconds=minimum_seconds,
                                                )
                 print(f"  Calculated {len(experiment['averages']['windows'])} event "
                       f'averages',
                       )
-                skipped = experiment['averages']['skipped']
+                skipped = dict(experiment['averages']['skipped'])
+                if skipped.pop('average0', None):
+                    print(f'  Warning: there is less than {minimum_seconds:g} s of '
+                          'data before the first addition, so this run has no '
+                          'baseline and its changes from baseline are left empty. '
+                          'Trim less of the start, or shorten the gap before the '
+                          'additions.',
+                          )
                 if skipped:
                     print(f"  Warning: averaging skipped for {', '.join(skipped)} "
                           '(not enough time for the window and gap)',
                           )
             except (KeyError, ValueError, TypeError) as exc:
-                print(f'  Averaging skipped: {exc}')
+                _skip_reporter('the averaging around the additions', exc)
 
     # ---- 6 Return the processed experiment -------------------------------------------
     return {'experiment': experiment,

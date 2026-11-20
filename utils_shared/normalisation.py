@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.reference_level import (reference_level_finder,
+                                          window_seconds_calculator,
+                                          )
 from utils_shared.schema import measurement_column_finder, time_getter
 
 
@@ -27,7 +30,7 @@ def _frame_normaliser(df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
     df : pd.DataFrame
         Data frame with a time column and measurement columns.
     **kwargs : Any
-        optical_density, volume and dilution_factor, passed to data_normaliser.
+        optical_density, volume, dilution_factor and label, passed to data_normaliser.
 
     ---- Globals read ----
     None.
@@ -54,6 +57,49 @@ def _frame_normaliser(df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
     return result
 
 
+# ---- _number_reader ------------------------------------------------------------------
+def _number_reader(column: pd.Series, label: str) -> pd.Series:
+    """
+    ---- Summary ----
+    Helper function to read one column as numbers, by the one rule of the scalings: an
+    empty cell stays empty, anything else that is not a number stops the scaling.
+
+    ---- Inputs ----
+    column : pd.Series
+        The column as it is in the table.
+    label : str
+        Name of the experiment or data, used in the message.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    pd.Series
+        The column as float64, NaN where the cell is empty. Raises ValueError, with a
+        message for the user, when a cell holds something that is not a number.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    numbers = pd.to_numeric(column, errors='coerce').astype(float)
+    unreadable = numbers.isna() & column.notna()
+    if unreadable.any():
+        example = column[unreadable].iloc[0]
+        raise ValueError(f'{label}: the {column.name} values hold something that is '
+                         f'not a number ({str(example)[:20]!r}), so they cannot be '
+                         'scaled. The file may be damaged; save it again from the '
+                         'instrument software.',
+                         )
+    return numbers
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -62,6 +108,7 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     optical_density: float,
                     volume: float,
                     dilution_factor: float,
+                    label: str = 'data',
                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     ---- Summary ----
@@ -76,14 +123,17 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         Volume of the sample (> 0).
     dilution_factor : float
         Dilution factor (> 0).
+    label : str
+        Name used in error messages.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     Union[pd.DataFrame, pd.Series, np.ndarray]
-        Scaled data of the same kind as the input. Raises ValueError if the denominator
-        is not positive and finite.
+        Scaled data of the same kind as the input; empty cells stay empty. Raises
+        ValueError, with a message for the user, if the denominator is not positive
+        and finite or a cell holds something that is not a number.
 
     ---- Globals mutated ----
     None.
@@ -92,18 +142,25 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     scaled = data / (dilution_factor x optical_density x volume).
 
     ---- Helpers ----
-    None.
+    _number_reader
     """
 
     denominator = float(dilution_factor) * float(optical_density) * float(volume)
     if not np.isfinite(denominator) or denominator <= 0:
-        raise ValueError('Dilution factor x OD x volume must be positive and finite.')
+        raise ValueError('The OD, the volume and the dilution factor must all be above '
+                         '0. Correct them where the program asks for the OD.',
+                         )
     if isinstance(data, pd.DataFrame):
-        return data.apply(lambda column: pd.to_numeric(column, errors='raise'),
-                          ) / denominator
+        return data.apply(lambda column: _number_reader(column, label)) / denominator
     if isinstance(data, pd.Series):
-        return pd.to_numeric(data, errors='raise') / denominator
-    return np.asarray(data, dtype=float) / denominator
+        return _number_reader(data, label) / denominator
+    try:
+        return np.asarray(data, dtype=float) / denominator
+    except (TypeError, ValueError):
+        raise ValueError(f'{label}: the values hold something that is not a number, '
+                         'so they cannot be scaled. The file may be damaged; save it '
+                         'again from the instrument software.',
+                         ) from None
 
 
 # ---- experiment_normaliser -----------------------------------------------------------
@@ -122,8 +179,9 @@ def experiment_normaliser(experiment: dict) -> dict:
 
     ---- Outputs ----
     dict
-        The same experiment dictionary. Raises KeyError if dilution_factor, OD or volume
-        is missing from the metadata, and ValueError if VoO2 has no measurement columns.
+        The same experiment dictionary. Raises ValueError, with a message for the user,
+        if dilution_factor, OD or volume is missing from the metadata, or if VoO2 has no
+        measurement columns.
 
     ---- Globals mutated ----
     experiment: adds VoO2_OD and, for each of haem_conc, haem_abs and haem_delta_abs
@@ -143,18 +201,20 @@ def experiment_normaliser(experiment: dict) -> dict:
     missing = [key for key in ('dilution_factor', 'OD', 'volume') if key not in metadata
                ]
     if missing:
-        raise KeyError(f"{experiment['experiment_name']}: missing OD-normalisation "
-                       f'metadata {missing}',
-                       )
+        raise ValueError(f"{experiment['experiment_name']}: the OD, the volume or the "
+                         'dilution factor is missing, so the values cannot be scaled '
+                         'by OD. Enter them where the program asks for the OD.',
+                         )
 
     # ---- 2 Normalise the data --------------------------------------------------------
     kwargs = {'optical_density': metadata['OD'],
               'volume': metadata['volume'],
               'dilution_factor': metadata['dilution_factor'],
+              'label': experiment['experiment_name'],
               }
     if not measurement_column_finder(experiment['VoO2']):
-        raise ValueError(f"{experiment['experiment_name']}: no VoO2 measurement "
-                         f'columns found',
+        raise ValueError(f"{experiment['experiment_name']}: the file has no oxygen "
+                         'consumption (VO2) values to scale by OD.',
                          )
     experiment['VoO2_OD'] = _frame_normaliser(experiment['VoO2'], **kwargs)
     for source_key, target_key in (('haem_conc', 'haem_OD'),
@@ -185,7 +245,7 @@ def percent_converter(experiment: dict,
     target_key : str
         Key the scaled table is stored under, e.g. 'haem_percent'.
     **scaling_kwargs : Any
-        exclude_first_minutes, exclude_last_minutes and window_seconds, passed to
+        exclude_first_minutes, exclude_last_minutes and window_points, passed to
         percent_scaler.
 
     ---- Globals read ----
@@ -209,14 +269,13 @@ def percent_converter(experiment: dict,
     # ---- 1 Check the source ----------------------------------------------------------
     source = experiment.get(source_key)
     if not isinstance(source, pd.DataFrame):
-        raise ValueError(f"{experiment['experiment_name']}: {source_key} is "
-                         f'unavailable, cannot scale to percent.',
+        raise ValueError(f"{experiment['experiment_name']}: the values to put on the % "
+                         'scale are missing (an earlier step was skipped).',
                          )
 
     # ---- 2 Convert to percentages ----------------------------------------------------
     experiment[target_key] = percent_scaler(source,
-                                            label=f"{experiment['experiment_name']}/"
-                                            f'{source_key}',
+                                            label=experiment['experiment_name'],
                                             **scaling_kwargs,
                                             )
     return experiment
@@ -224,10 +283,10 @@ def percent_converter(experiment: dict,
 
 # ---- percent_scaler ------------------------------------------------------------------
 def percent_scaler(df: pd.DataFrame,
+                   window_points: int,
                    label: str = 'data',
                    exclude_first_minutes: float = 0.0,
                    exclude_last_minutes: float = 0.0,
-                   window_seconds: float = 30.0,
                    ) -> pd.DataFrame:
     """
     ---- Summary ----
@@ -237,95 +296,85 @@ def percent_scaler(df: pd.DataFrame,
     ---- Inputs ----
     df : pd.DataFrame
         Data frame with a time column (minutes) and measurement columns.
+    window_points : int
+        Number of points in a row that make a reference window (>= 1).
     label : str
         Name used in error messages.
     exclude_first_minutes : float
-        Windows must start at least this long after the first measurement.
+        Minutes after the first measurement that are ignored at the start.
     exclude_last_minutes : float
-        Windows must finish at least this long before the last measurement.
-    window_seconds : float
-        Length of each averaging window, in seconds (> 0).
+        Minutes before the last measurement that are ignored at the end.
 
     ---- Globals read ----
-    schema.get_times, measurement_columns.
+    None.
 
     ---- Outputs ----
     pd.DataFrame
-        Scaled copy; the windows used are stored in result.attrs["percent_scaling"]. A
-        constant column becomes NaN. Raises ValueError for invalid settings or when no
-        complete window remains.
+        Scaled copy; result.attrs["percent_scaling"] holds, per column,
+        {'zero_percent_window', 'hundred_percent_window': the windows found
+        (reference_level_finder), 'zero_percent_level', 'hundred_percent_level': their
+        medians, 'window_seconds': the length of such a window}. A constant column
+        becomes NaN. Raises ValueError, with a message for the user, for invalid
+        settings, when a cell holds something that is not a number, or when fewer
+        than window_points values are left after the ignored parts.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    percent = (value - low) / (high - low) x 100, where low and high are the lowest and
-    highest window means (windows must contain data spanning at least 80 % of their
-    length). Values outside the range are kept.
+    percent = (value - low) / (high - low) x 100, where low and high are the medians of
+    the lowest and of the highest points in a row (reference_level_finder). Values
+    outside the range are kept.
 
     ---- Helpers ----
+    _number_reader
     measurement_column_finder
+    reference_level_finder
     time_getter
+    window_seconds_calculator
     """
 
     # ---- 1 Validate the inputs -------------------------------------------------------
-    if window_seconds <= 0:
-        raise ValueError('window_seconds must be positive.')
     if exclude_first_minutes < 0 or exclude_last_minutes < 0:
-        raise ValueError('Excluded periods cannot be negative.')
+        raise ValueError('The time ignored at the start or the end of the run cannot '
+                         'be negative. Correct it where the program asks for it.',
+                         )
 
-    # ---- 2 Find the allowed windows --------------------------------------------------
+    # ---- 2 Find the usable part of the run -------------------------------------------
     columns = measurement_column_finder(df)
     if not columns:
-        raise ValueError(f'{label}: no measurement columns were found.')
+        raise ValueError(f'{label}: there are no values to put on the % scale.')
     times = time_getter(df)
     finite_times = times[np.isfinite(times)]
     if finite_times.size == 0:
-        raise ValueError(f'{label}: no finite measurement times are available.')
-    window_minutes = window_seconds / 60.0
-    first_allowed = finite_times.min() + exclude_first_minutes
-    last_allowed = finite_times.max() - exclude_last_minutes
-    # Candidate windows must start after the excluded period and fit before the end.
-    after_start = times >= first_allowed
-    before_end = times + window_minutes <= last_allowed + 1e-12
-    allowed = np.isfinite(times) & after_start & before_end
-    candidate_starts = np.unique(times[allowed])
-    if candidate_starts.size == 0:
-        raise ValueError(f'{label}: no complete {window_seconds:g}-second windows '
-                         f'remain after excluding the '
-                         'initial/final periods. Reduce the exclusion or window '
-                         'duration.',
+        raise ValueError(f'{label}: the times of the values could not be read, so '
+                         'the % scale cannot be found.',
                          )
+    start = float(finite_times.min()) + exclude_first_minutes
+    stop = float(finite_times.max()) - exclude_last_minutes
+    window_seconds = window_seconds_calculator(times, window_points)
 
     # ---- 3 Scale each column ---------------------------------------------------------
     result = df.copy()
     scaling_info = {}
     for column in columns:
-        values = pd.to_numeric(df[column], errors='coerce').to_numpy(dtype=float)
-        lowest = highest = None
-        for start in candidate_starts:
-            in_window = (times >= start) & (times <= start + window_minutes)
-            mask = np.isfinite(times) & np.isfinite(values) & in_window
-            window_times, window_values = times[mask], values[mask]
-            # Require measurements to span at least 80 % of the window.
-            if (window_times.size < 2 or
-                window_times.max() - window_times.min() < window_minutes * 0.8
-                ):
-                continue
-            info = {'mean': float(np.mean(window_values)),
-                    'start_time': float(window_times.min()),
-                    'end_time': float(window_times.max()),
-                    'n_points': int(window_values.size),
-                    }
-            if lowest is None or info['mean'] < lowest['mean']:
-                lowest = info
-            if highest is None or info['mean'] > highest['mean']:
-                highest = info
+        values = _number_reader(df[column], label).to_numpy(dtype=float)
+        lowest = reference_level_finder(times,
+                                        values,
+                                        start,
+                                        stop,
+                                        window_points,
+                                        is_highest=False,
+                                        )
+        highest = reference_level_finder(times, values, start, stop, window_points)
         if lowest is None or highest is None:
-            raise ValueError(f'{label}: insufficient data to find valid '
-                             f'{window_seconds:g}-second windows for {column!r}.',
+            raise ValueError(f'{label}: fewer than {window_points} {column} values '
+                             'are left after the ignored start and end, too few to '
+                             'find the 0 % and the 100 % (the medians of the lowest '
+                             f'and of the highest {window_points} points in a row). '
+                             'Ignore less of the start or the end of the run.',
                              )
-        low, span = lowest['mean'], highest['mean'] - lowest['mean']
+        low, span = lowest['level'], highest['level'] - lowest['level']
         # A constant signal has no measurable relative range.
         result[column] = (np.nan
                           if np.isclose(span, 0.0)
@@ -333,8 +382,9 @@ def percent_scaler(df: pd.DataFrame,
                           )
         scaling_info[column] = {'zero_percent_window': lowest,
                                 'hundred_percent_window': highest,
-                                'minimum_mean': low,
-                                'maximum_mean': highest['mean'],
+                                'zero_percent_level': low,
+                                'hundred_percent_level': highest['level'],
+                                'window_seconds': window_seconds,
                                 }
     result.attrs['percent_scaling'] = scaling_info
     return result

@@ -9,7 +9,7 @@ import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib.pyplot as plt
@@ -63,13 +63,31 @@ class PreviewSpec:
     previous_limits: dict = field(default_factory=dict)
 
 
+# ---- TimeAxis ------------------------------------------------------------------------
+@dataclass
+class TimeAxis:
+    """
+    ---- Summary ----
+    Where the time axis shared by the panels sits in a preview picture, and the times at
+    its two ends, so a point of the picture can be turned into a time.
+    Detailed structure can be found in DATA_FORMAT.md.
+    """
+
+    left: float
+    right: float
+    bottom: float
+    top: float
+    start_min: float
+    end_min: float
+
+
 # ---- ViewerSession -------------------------------------------------------------------
 @dataclass
 class ViewerSession:
     """
     ---- Summary ----
-    Everything the experiment browser keeps between steps: the files, the window and the
-    recently read experiments.
+    Everything the experiment browser keeps between steps: the files, the window, the
+    recently read experiments, the fit in use and how to redraw the step being asked.
     Detailed structure can be found in DATA_FORMAT.md.
     """
 
@@ -78,6 +96,9 @@ class ViewerSession:
     window: Any
     current: int = 0
     cache: OrderedDict = field(default_factory=OrderedDict)
+    fit: Optional[dict] = None
+    redraw: Optional[Callable[[], bool]] = None
+    is_figure: bool = False
 
 
 # ---- PREVIEW HELPERS -----------------------------------------------------------------
@@ -375,7 +396,8 @@ def all_data_exporter(session: ViewerSession,
                                normalise_od=False,
                                averaging=False,
                                export_spectra=include_spectra,
-                               ))
+                               ),
+                          )
     for number, summary in enumerate(session.summaries, start=1):
         try:
             with session.window.output_capturer():
@@ -560,10 +582,7 @@ def pca_spectra_gatherer(session: ViewerSession,
                                        start_time=info['trim_start'],
                                        end_time=info['trim_end'],
                                        )
-                experiment_attenuation_adder(experiment,
-                                             mode=settings.TRANSMISSION_MODE,
-                                             datasets=(dataset,),
-                                             )
+                experiment_attenuation_adder(experiment, datasets=(dataset,))
             data = experiment['raw_spectra'][dataset]
             times = np.asarray(data['time'], dtype=float)
             duration = float(experiment['CcO2'].iloc[-1, 0])
@@ -583,7 +602,8 @@ def pca_spectra_gatherer(session: ViewerSession,
                              'wavelengths': wavelengths[inside],
                              'spectra': spectra,
                              'times': times[keep],
-                             })
+                             },
+                            )
         except Exception as exc:  # one unreadable file must not stop the others
             problems.append(f'{name}: {type(exc).__name__}: {exc}')
         if progress is not None:
@@ -667,7 +687,7 @@ def preview_drawer(session: ViewerSession,
         session,
         spec,
         name or session.summaries[session.current]['name'],
-    )
+        )
     if notes:
         print('\n'.join(f'  {line}' for line in notes.splitlines()))
     if figure is None:
@@ -760,7 +780,8 @@ def preview_figure_builder(session: ViewerSession,
                                 'SHOW_INDIVIDUAL_FIGURES': False,
                                 'FIGURE_DPI': PREVIEW_DPI,
                                 **plot_extras,
-                                })
+                                },
+                               )
             _, axes = experiment_plotter(experiment,
                                          plot_config,
                                          session.export_root,
@@ -863,3 +884,56 @@ def skipped_windows_finder(session: ViewerSession,
         if skipped:
             found[summary['name']] = skipped
     return found
+
+
+# ---- time_axis_finder ----------------------------------------------------------------
+def time_axis_finder(fig: Figure) -> Optional[TimeAxis]:
+    """
+    ---- Summary ----
+    Main function to find where the time axis of a drawn preview sits in its picture:
+    the panels that share the x axis of the first panel. Call it once the figure has
+    its final layout (after it is saved).
+
+    ---- Inputs ----
+    fig : Figure
+        The drawn preview figure.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[TimeAxis]
+        The place and the range of the time axis, or None when the figure has no panel
+        or its axis has no length.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    left, right, bottom, top = the outer edges of the panels, as fractions of the
+    figure measured from its bottom left corner.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if not fig.axes:
+        return None
+    first = fig.axes[0]
+    shared = first.get_shared_x_axes()
+    boxes = [ax.get_position()
+             for ax in fig.axes
+             if ax is first or shared.joined(first, ax)
+             ]
+    start, end = (float(value) for value in first.get_xlim())
+    left = min(box.x0 for box in boxes)
+    right = max(box.x1 for box in boxes)
+    if end == start or right <= left:
+        return None
+    return TimeAxis(left=left,
+                    right=right,
+                    bottom=min(box.y0 for box in boxes),
+                    top=max(box.y1 for box in boxes),
+                    start_min=start,
+                    end_min=end,
+                    )

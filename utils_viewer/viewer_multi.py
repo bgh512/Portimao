@@ -82,10 +82,11 @@ def _kept_builder(names: List[str],
                                     context['limits'],
                                     context['details'],
                                     )
-        info['custom'] = customs.get(name, {'time_response_group': None,
-                                            'haem_ocr': False,
-                                            },
-                              )
+        info['custom'] = customs.get(name,
+                                     {'time_response_group': None,
+                                      'haem_ocr': False,
+                                      },
+                                     )
         key = (name, repr(info['custom']), id(fit))
         processed = context.setdefault('_processed', {}).get(key)
         if processed is None:  # reading and decomposing is slow, so it is kept
@@ -173,7 +174,8 @@ def _pictures_builder(kind: str,
     answers.update({'plot_time_response': kind == 'time_response',
                     'plot_haem_ocr': kind == 'haem_ocr',
                     'plot_exemplar': kind == 'exemplar',
-                    })
+                    },
+                   )
 
     # ---- 2 Make the figure, keeping the picture instead of the files -----------------
     pictures: List[Tuple[str, bytes]] = []
@@ -219,8 +221,8 @@ def multi_figure_checker_builder(context: dict,
     """
     ---- Summary ----
     Main function to build the figure checker the multi-experiment questions call after
-    each figure: it draws the figure from the data, shows it in the browser window and
-    asks whether to accept it.
+    each figure: it draws the figure from the data (the "Drawing ..." sign is on the
+    plot meanwhile), shows it in the browser window and asks whether to accept it.
 
     ---- Inputs ----
     context : dict
@@ -258,6 +260,7 @@ def multi_figure_checker_builder(context: dict,
                      depth=2,
                      )
         question_asked = payload.get('question')
+        window.drawing_sign_shower()
         pictures, notes = _pictures_builder(kind, payload, context, makers, window)
         if notes:
             info_printer(notes, depth=2)

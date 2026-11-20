@@ -82,7 +82,7 @@ def difference_spectrum_calculator(experiment: dict,
 # ---- difference_spectrum_decomposer --------------------------------------------------
 def difference_spectrum_decomposer(experiment: dict,
                                    fit: dict,
-                                   degree_of_scatter: int = 1,
+                                   background: str,
                                    haemfactor: float = 1000000,
                                    percent_basis: str = 'signed',
                                    ) -> dict:
@@ -96,8 +96,8 @@ def difference_spectrum_decomposer(experiment: dict,
         Experiment dictionary, as defined in DATA_FORMAT.md.
     fit : dict
         Fit dictionary from import_fit: {haem_list, data}.
-    degree_of_scatter : int
-        Number of scatter terms in the decomposition.
+    background : str
+        Background fitted under the haems (BACKGROUND_LABELS in spectral_decomposer).
     haemfactor : float
         Scale factor applied to the fit spectra.
     percent_basis : str
@@ -141,7 +141,7 @@ def difference_spectrum_decomposer(experiment: dict,
      haem_total,
      haem_individual,
      residual,
-     ) = spectrum_decomposer(experimental, fit['data'], degree_of_scatter, haemfactor)
+     ) = spectrum_decomposer(experimental, fit['data'], background, haemfactor)
 
     # ---- 3 Calculate the haem percentages --------------------------------------------
     haem_names = [str(h) for h in fit['haem_list']]

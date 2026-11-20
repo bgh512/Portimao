@@ -9,7 +9,7 @@ import subprocess
 import sys
 from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
-from typing import Any, Iterator, List, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 from matplotlib.figure import Figure
@@ -40,12 +40,17 @@ class PictureWindow:
     ---- Methods ----
     __init__
     _file_opener
+    drawing_sign_shower
     extra_publisher
     figure_shower
     file_focuser
     output_capturer
     pictures_publisher
     session_attacher
+    strip_fits_setter
+    strip_listener_setter
+    strip_setter
+    strip_state_setter
     window_closer
     """
 
@@ -126,6 +131,33 @@ class PictureWindow:
             pass  # the path is printed, so the picture can still be opened by hand
 
     # ---- MAIN METHODS ----------------------------------------------------------------
+
+    # ---- drawing_sign_shower ---------------------------------------------------------
+    def drawing_sign_shower(self) -> None:
+        """
+        ---- Summary ----
+        Method that does nothing: a picture file has no "Drawing ..." sign, and the
+        terminal says what is being drawn.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
 
     # ---- extra_publisher -------------------------------------------------------------
     def extra_publisher(self, title: str, png: bytes, is_shown: bool = True) -> None:
@@ -308,6 +340,120 @@ class PictureWindow:
         ---- Inputs ----
         session : Any
             The browser session.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+    # ---- strip_fits_setter -----------------------------------------------------------
+    def strip_fits_setter(self, names: List[str]) -> None:
+        """
+        ---- Summary ----
+        Method that does nothing: without a window there is no settings strip, and the
+        fit is asked as a question.
+
+        ---- Inputs ----
+        names : List[str]
+            File names of the fits (ignored).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+    # ---- strip_listener_setter -------------------------------------------------------
+    def strip_listener_setter(self,
+                              listener: Optional[Callable[[Dict[str, Any]], None]],
+                              ) -> None:
+        """
+        ---- Summary ----
+        Method that does nothing: without a window there is no settings strip to
+        listen to.
+
+        ---- Inputs ----
+        listener : Optional[Callable[[Dict[str, Any]], None]]
+            The function that would be told the changes (ignored).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+    # ---- strip_setter ----------------------------------------------------------------
+    def strip_setter(self, values: Dict[str, Any]) -> None:
+        """
+        ---- Summary ----
+        Method that does nothing: without a window there is no settings strip to show
+        the values in.
+
+        ---- Inputs ----
+        values : Dict[str, Any]
+            Strip values (ignored).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+    # ---- strip_state_setter ----------------------------------------------------------
+    def strip_state_setter(self, is_enabled: bool) -> None:
+        """
+        ---- Summary ----
+        Method that does nothing: without a window there is no settings strip to grey
+        out.
+
+        ---- Inputs ----
+        is_enabled : bool
+            Whether the strip could be changed (ignored).
 
         ---- Globals read ----
         None.

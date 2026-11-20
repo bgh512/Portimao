@@ -14,11 +14,15 @@ from utils_shared.helpers import name_simplifier
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+# The standard settings: a dataset never opened before starts from them, and a dataset
+# opened before from the settings kept in its own folder (utils_shared.dataset_settings).
+# The standard fit is the file in fits/ used for the haems of the standard plot.
+STANDARD_FIT = 'bswitch_no2_mycobl_b557.csv'
 DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ranges
                    # the same at the end of the recording
                    'ignore_last_minutes': 0.0,
-                   'decompose': False,
-                   'fit_file': None,
+                   'decompose': True,
+                   'fit_file': STANDARD_FIT,
                    'decomposition_dataset': 'Cyt',
                    'normalise_od': False,
                    'averaging': False,
@@ -31,7 +35,8 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ocr_mode': 'od',
                    # event label rotation in degrees: 0 = horizontal, 90 = vertical
                    'event_label_angle': 45,
-                   'plot_haems': False,
+                   # the haems of the fit, when decomposed, in the figure of each file
+                   'plot_haems': True,
                    'haems': [],
                    # "abs", "delta", "conc" or "percent"
                    'haem_mode': 'delta',
@@ -42,6 +47,7 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    # height (fraction of a page).
                    # The *_size_mode answer is "default" (the journal question was
                    # answered None: Nature and the size below) or "custom".
+                   # The standard figure: Nature, 1 column wide, 0.5 of a page tall.
                    'journal': 'nature',
                    'columns': 1,
                    'height': 0.5,
@@ -88,11 +94,21 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ho_pub_height': 0.75,
                    'ho_size_mode': 'default',
                    }
-TRANSMISSION_MODE = 'fraction'  # "fraction", "percentage" or "absorbance"
+# the background fitted under the haems (names and words in
+# utils_shared.spectral_decomposer.BACKGROUND_LABELS); one that can bend is needed for bL
+# to fall when reduced, as the instrument's own trace does
+HAEM_BACKGROUND = 'scatter_2'
+# scatter terms the component finder takes out of the spectra; it does not follow
+# HAEM_BACKGROUND yet
 DEGREE_OF_SCATTER = 1
 HAEM_FACTOR = 1_000_000
-DELTA_ABS_WINDOW_SECONDS = 30
-PERCENT_AVERAGE_WINDOW_SECONDS = 30
+# points in a row whose median is a reference level: the 0 of delta A, the 0 % and the
+# 100 % of the % scale (50 points are 25 s when a point is taken every 0.5 s)
+REFERENCE_WINDOW_POINTS = 50
+# least data the baseline average (before the first addition) must span
+BASELINE_MINIMUM_SECONDS = 10
+# an averaging window dragged across the plot is rounded to whole steps of this
+DRAG_STEP_SECONDS = 5
 # axis-label size. Tick labels, legends and event labels are 1 pt smaller and titles 1
 # pt larger; panel letters follow the journal.
 BASE_FONT_PT = 6

@@ -154,7 +154,8 @@ def _haem_ocr_asker(names: List[str],
                     'ho_metric': 'delta',
                     'ho_haems': [],
                     'ho_blocks': ('baseline', 'ocr_response'),
-                    })
+                    },
+                   )
     ocr_default = (defaults['ho_ocr_mode']
                    if defaults['ho_ocr_mode'] in ocr_keys
                    else ocr_keys[0]
@@ -662,7 +663,8 @@ def _window_ensurer(answers: dict, defaults: dict) -> None:
     """
 
     if not answers['averaging'] and not answers.get('window_asked'):
-        info_printer('This figure averages around the events, like section 3.3.',
+        info_printer('This figure averages around the events, so the averaging '
+                     'window is asked here.',
                      depth=2,
                      )
         averaging_asker(answers, defaults, forced=True, depth=2)

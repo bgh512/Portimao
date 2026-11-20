@@ -85,7 +85,8 @@ def _baseline_change_adder(window_stats: Dict[str, Dict[str, float]],
 def experiment_averages_calculator(experiment: dict,
                                    window_minutes: float,
                                    gap_minutes: float,
-                                   final_window_gap_minutes: float = 0.5,
+                                   final_window_gap_minutes: float,
+                                   baseline_minimum_seconds: float,
                                    vo2_source: Optional[str] = 'od',
                                    haem_source: Optional[str] = 'abs',
                                    ) -> dict:
@@ -104,29 +105,36 @@ def experiment_averages_calculator(experiment: dict,
     final_window_gap_minutes : float
         How long before the end of the recording the last window ends, in minutes (>=
         0).
+    baseline_minimum_seconds : float
+        Least time the data inside the baseline window (average0) must span, in
+        seconds (>= 0).
     vo2_source : Optional[str]
         VoO2 source key (e.g. 'od', 'raw', 'percent'); None leaves VoO2 out.
     haem_source : Optional[str]
         Haem source key (e.g. 'abs', 'delta_abs_od'); None leaves the haems out.
 
     ---- Globals read ----
-    schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES; schema.resolve_source, get_times.
+    schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES.
 
     ---- Outputs ----
     dict
         The same experiment dictionary. Raises ValueError for invalid settings, no
         source, no events or invalid times. A window that does not fit between two
-        additions (or after the last one) is skipped, not an error.
+        additions (or after the last one) is skipped, not an error; so is the baseline
+        window when it holds too little data, and the run then has no baseline: the
+        delta and change of every window are NaN.
 
     ---- Globals mutated ----
     experiment: adds experiment["averages"] = {"settings", "windows", "skipped"}
     (layout in DATA_FORMAT.md).
 
     ---- Equations ----
-    average0 ends gap_minutes before the first event; averageN ends gap_minutes before
-    event N+1 (final_window_gap_minutes before the end of the recording for the last
-    event); each window starts window_minutes before its end and is skipped when that
-    is before its own event. change = mean /
+    average0 ends gap_minutes before the first event and starts window_minutes before
+    its end, or at the start of the recording when that is later; it is skipped when
+    the points inside it span less than baseline_minimum_seconds. averageN ends
+    gap_minutes before event N+1 (final_window_gap_minutes before the end of the
+    recording for the last event); each window starts window_minutes before its end
+    and is skipped when that is before its own event. change = mean /
     mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0).
 
     ---- Helpers ----
@@ -139,11 +147,21 @@ def experiment_averages_calculator(experiment: dict,
     # ---- 1 Validate the inputs -------------------------------------------------------
     name = experiment['experiment_name']
     if window_minutes <= 0:
-        raise ValueError('window_minutes must be positive.')
+        raise ValueError('The averaging window must be longer than 0 min. Correct it '
+                         'where the program asks for it.',
+                         )
     if gap_minutes < 0 or final_window_gap_minutes < 0:
-        raise ValueError('Averaging gaps cannot be negative.')
+        raise ValueError('The gap before an averaging window cannot be negative. '
+                         'Correct it where the program asks for it.',
+                         )
+    if baseline_minimum_seconds < 0:
+        raise ValueError('The least length of the baseline cannot be negative. '
+                         'Correct it in config.py.',
+                         )
     if vo2_source is None and haem_source is None:
-        raise ValueError(f'{name}: nothing to average (no VO2 and no haem source).')
+        raise ValueError(f'{name}: there is nothing to average, neither oxygen '
+                         'consumption nor haems.',
+                         )
 
     # ---- 2 Resolve the data sources --------------------------------------------------
     vo2_key, vo2_df = (source_resolver(experiment, vo2_source, VO2_KEYS, 'VO2')
@@ -160,20 +178,37 @@ def experiment_averages_calculator(experiment: dict,
                     key=lambda event: event['time'],
                     )
     if not events:
-        raise ValueError(f'{name}: no timed events found for averaging.')
+        raise ValueError(f'{name}: none of the additions has a time, so there is '
+                         'nothing to average around.',
+                         )
     reference_df = vo2_df if vo2_df is not None else haem_df
     reference_times = time_getter(reference_df)
     if not np.any(np.isfinite(reference_times)):
-        raise ValueError(f'{name}: no valid times.')
+        raise ValueError(f'{name}: the times of the values could not be read, so '
+                         'they cannot be averaged.',
+                         )
+    recording_start = float(np.nanmin(reference_times))
     recording_end = float(np.nanmax(reference_times))
-    # Define the averaging windows.
+    # The baseline window never reaches back before the recording, and counts only
+    # when its data span long enough to be a level and not a few points.
     first_event = float(events[0]['time'])
-    boundaries = [('average0',
-                   first_event - gap_minutes - window_minutes,
-                   first_event - gap_minutes,
-                   ),
-                  ]
+    baseline_end = first_event - gap_minutes
+    baseline_start = max(baseline_end - window_minutes, recording_start)
+    inside = reference_times[np.isfinite(reference_times)
+                             & (reference_times >= baseline_start)
+                             & (reference_times <= baseline_end)
+                             ]
+    span_seconds = float(inside.max() - inside.min()) * 60.0 if inside.size else 0.0
+    boundaries = []
     skipped: Dict[str, dict] = {}
+    if span_seconds < baseline_minimum_seconds - 1e-9:
+        skipped['average0'] = {'start_time': baseline_start,
+                               'end_time': baseline_end,
+                               'reason': f'Less than {baseline_minimum_seconds:g} s of '
+                                         'data before the first addition.',
+                               }
+    else:
+        boundaries.append(('average0', baseline_start, baseline_end))
     for i, event in enumerate(events):
         event_time = float(event['time'])
         if i + 1 < len(events):
@@ -208,7 +243,7 @@ def experiment_averages_calculator(experiment: dict,
                                 }
 
     # ---- 5 Store the results ---------------------------------------------------------
-    baseline = windows['average0']
+    baseline = windows.get('average0', {'vo2': {}, 'haem': {}})  # none: all NaN
     haem_is_absolute = haem_source not in DELTA_HAEM_SOURCES
     for window in windows.values():
         _baseline_change_adder(window['vo2'], baseline['vo2'])
@@ -224,6 +259,8 @@ def experiment_averages_calculator(experiment: dict,
                                            'vo2_key': vo2_key,
                                            'haem_source': haem_source,
                                            'haem_key': haem_key,
+                                           'baseline_minimum_seconds':
+                                               baseline_minimum_seconds,
                                            },
                               'windows': windows,
                               'skipped': skipped,

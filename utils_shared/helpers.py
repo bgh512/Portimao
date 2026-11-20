@@ -13,6 +13,8 @@ from matplotlib.figure import Figure
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 _figure_capture: Optional[Callable[[Figure, str], None]] = None
+# written where the user gave no concentration
+MISSING_CONCENTRATION = '? µM'
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -23,20 +25,22 @@ def concentration_formatter(concentration_um: Any) -> str:
     """
     ---- Summary ----
     Main function to write a concentration given in micromolar with the most readable
-    unit: M from 1 000 000 uM, mM from 1000 uM and uM below that.
+    unit: M from 1 000 000 µM, mM from 1000 µM and µM below that. It is the one place
+    where a concentration is turned into text.
 
     ---- Inputs ----
     concentration_um : Any
-        Concentration in micromolar (uM); anything float() accepts.
+        Concentration in micromolar (µM); anything float() accepts, or None when the
+        user gave none.
 
     ---- Globals read ----
-    None.
+    MISSING_CONCENTRATION (module constant).
 
     ---- Outputs ----
     str
-        For example '2 uM', '2 mM' (from 2000 uM) or '1.5 mM'; the unit is written
-        with the micro sign. Raises ValueError or TypeError if the value is not a
-        number.
+        For example '2 µM', '2 mM' (from 2000 µM) or '1.5 mM'; the unit is written
+        with the micro sign. MISSING_CONCENTRATION ('? µM') for None. Raises ValueError
+        or TypeError if the value is neither None nor a number.
 
     ---- Globals mutated ----
     None.
@@ -49,6 +53,8 @@ def concentration_formatter(concentration_um: Any) -> str:
     """
 
     # ---- 1 Choose the unit -----------------------------------------------------------
+    if concentration_um is None:
+        return MISSING_CONCENTRATION
     value = float(concentration_um)
     if abs(value) >= 1_000_000:
         return f'{value / 1_000_000:g} M'
@@ -151,7 +157,7 @@ def figure_saver(fig: Figure,
     fig : Figure
         Matplotlib figure to save.
     folder : Path
-        Output folder; created if missing.
+        Output folder; created if missing (not in preview mode).
     stem : str
         File name without the extension.
     formats : Sequence[str]
@@ -181,15 +187,15 @@ def figure_saver(fig: Figure,
     None.
     """
 
-    # ---- 1 Prepare the folder and size -----------------------------------------------
-    folder = Path(folder)
-    folder.mkdir(parents=True, exist_ok=True)
+    # ---- 1 Pin the size, and only show the figure in preview mode --------------------
     fig.set_size_inches(*size, forward=False)
     if _figure_capture is not None:  # preview mode: show the figure, write nothing
         _figure_capture(fig, stem)
         return []
 
     # ---- 2 Save every format ---------------------------------------------------------
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
     paths = []
     for extension in formats:
         path = folder / f'{stem}.{extension}'

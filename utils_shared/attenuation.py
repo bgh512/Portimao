@@ -3,7 +3,7 @@ Convert transmission spectra to the attenuation spectra used for decomposition.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-from typing import Optional, Sequence, Union
+from typing import Optional, Sequence, Tuple, Union
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
@@ -14,19 +14,15 @@ import numpy as np
 
 # ---- attenuation_converter -----------------------------------------------------------
 def attenuation_converter(transmission: Union[Sequence[float], np.ndarray],
-                          mode: str = 'fraction',
                           ) -> np.ndarray:
     """
     ---- Summary ----
-    Main function to convert transmission spectra to attenuation (log10 of the
-    transmittance).
+    Main function to convert transmission spectra to attenuation (minus log10 of the
+    transmittance), as the instrument exports it.
 
     ---- Inputs ----
     transmission : Union[Sequence[float], np.ndarray]
-        Transmission values, any shape.
-    mode : str
-        Meaning of the input: 'fraction' (0-1), 'percentage' (0-100) or 'absorbance'
-        (already converted, returned as is).
+        Transmission as a fraction (0-1), as the .paf files hold it; any shape.
 
     ---- Globals read ----
     None.
@@ -34,46 +30,36 @@ def attenuation_converter(transmission: Union[Sequence[float], np.ndarray],
     ---- Outputs ----
     np.ndarray
         Attenuation with the shape of the input. Zero, negative or non-finite
-        transmission becomes NaN. Raises ValueError for an unknown mode.
+        transmission becomes NaN.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    attenuation = log10(T), where T is the transmittance (fraction). This is the
-    NEGATIVE of the conventional -log10(T); the decomposition basis spectra are negated
-    too, so the two signs cancel (change both together or neither).
+    attenuation = -log10(T), where T is the transmittance (fraction): less light than
+    the reference gives a positive attenuation. The fit shapes are stored with this
+    sign, so the decomposition uses them as they are.
 
     ---- Helpers ----
     None.
     """
 
-    # ---- 1 Convert the input to transmittance ----------------------------------------
-    transmission = np.asarray(transmission, dtype=float)
-    if mode == 'absorbance':
-        return transmission.copy()
-    if mode == 'fraction':
-        transmittance = transmission
-    elif mode == 'percentage':
-        transmittance = transmission / 100.0
-    else:
-        raise ValueError(f'Unknown transmission mode: {mode!r}')
-
-    # ---- 2 Calculate the attenuation -------------------------------------------------
     # Zero, negative or non-finite transmission has no logarithm. Those values become
-    # NaN (a gap in the decomposition for the
-    # spectra that contain them) instead of stopping the whole experiment; the caller
-    # reports how many there were.
+    # NaN (a gap in the decomposition for the spectra that contain them) instead of
+    # stopping the whole experiment; the caller reports how many there were.
+    transmittance = np.asarray(transmission, dtype=float)
     bad = ~np.isfinite(transmittance) | (transmittance <= 0)
+    # Taken from 0.0, not negated: a transmittance of exactly 1 then gives 0.0 and not
+    # -0.0, which would be written as "-0.0" in the exported files.
     with np.errstate(divide='ignore', invalid='ignore'):
-        attenuation = np.log10(np.where(bad, np.nan, transmittance))
+        attenuation = 0.0 - np.log10(np.where(bad, np.nan, transmittance))
     return attenuation
 
 
 # ---- experiment_attenuation_adder ----------------------------------------------------
 def experiment_attenuation_adder(experiment: dict,
-                                 mode: str = 'fraction',
                                  datasets: Optional[Sequence[str]] = None,
+                                 checked_range_nm: Optional[Tuple[float, float]] = None,
                                  ) -> dict:
     """
     ---- Summary ----
@@ -82,11 +68,12 @@ def experiment_attenuation_adder(experiment: dict,
     ---- Inputs ----
     experiment : dict
         Experiment dictionary, as defined in DATA_FORMAT.md.
-    mode : str
-        Transmission mode passed to attenuation_converter ('fraction', 'percentage' or
-        'absorbance').
     datasets : Optional[Sequence[str]]
         Dataset names to convert; None converts all of them.
+    checked_range_nm : Optional[Tuple[float, float]]
+        (lowest, highest) wavelength (nm) in which blank values are counted for the
+        warning: the range of the fit when the spectra are decomposed, since a blank
+        outside it changes no haem amount. None counts every wavelength.
 
     ---- Globals read ----
     None.
@@ -98,8 +85,8 @@ def experiment_attenuation_adder(experiment: dict,
 
     ---- Globals mutated ----
     experiment: adds raw_spectra[dataset]["attenuation"] (n_spectra x n_wavelengths) for
-    each converted dataset; prints a warning with the number of blank values (side
-    effect).
+    each converted dataset; prints a warning with the number of blank values inside
+    checked_range_nm (side effect).
 
     ---- Equations ----
     None.
@@ -119,15 +106,24 @@ def experiment_attenuation_adder(experiment: dict,
                              'transmission must be a 2D array before attenuation '
                              'conversion.',
                              )
-        dataset['attenuation'] = attenuation_converter(transmission, mode=mode)
-        n_bad = int(np.count_nonzero(np.isnan(dataset['attenuation'],
-                                              ) & ~np.isnan(transmission),
-                                     ) + np.count_nonzero(np.isnan(transmission)),
-                    )
+        dataset['attenuation'] = attenuation_converter(transmission)
+        blank = np.isnan(dataset['attenuation'])
+        where = ''
+        if checked_range_nm is not None:
+            lowest, highest = checked_range_nm
+            wavelengths = np.asarray(dataset.get('wavelengths'), dtype=float)
+            # Only when the wavelengths match the spectra; otherwise every value is
+            # counted, and the decomposition reports the mismatch itself.
+            if wavelengths.shape == (blank.shape[1],):
+                blank = blank[:, (wavelengths >= lowest) & (wavelengths <= highest)]
+                where = (f' between {lowest:g} and {highest:g} nm (the range of the '
+                         'fit)'
+                         )
+        n_bad = int(np.count_nonzero(blank))
         if n_bad:
-            rows = int(np.count_nonzero(np.isnan(dataset['attenuation']).any(axis=1)))
-            print(f'  Warning: {dataset_name}: {n_bad} transmission values were zero, '
-                  f'negative or missing '
+            rows = int(np.count_nonzero(blank.any(axis=1)))
+            print(f'  Warning: {dataset_name}: {n_bad} transmission values{where} '
+                  'were zero, negative or missing '
                   f'({rows} spectra affected); they are left blank.',
                   )
     return experiment

@@ -10,6 +10,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_custom.run_namer import run_name_lister
+from utils_shared.dataset_settings import dataset_settings_reader
 from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_exporter import saved_settings_reader
 from utils_shared.paf_reader import experiment_summary_reader, PafError
@@ -42,6 +43,10 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'percent': 'OCR (% of the range)',
               }
 PCA_CHOICE = '__pca__'
+# raised form of the characters of an exponent typed as -1 or ^2
+SUPERSCRIPT_TABLE = str.maketrans('-+0123456789', '⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹')
+# the units a label is tidied around; a name with numbers (nd-011992) is none of them
+UNIT_PATTERN = r'(?:[mµnpk]?(?:M|L|g|mol)|min|s|h|OD)'
 
 
 # ---- SURVEY HELPERS ------------------------------------------------------------------
@@ -317,7 +322,8 @@ def _limits_asker(summaries: List[dict],
     Helper function to ask the questions for one edge of the data (trim start, trim end,
     ignore start or ignore end): whether to do it at all, how many minutes for ALL the
     files, and then optionally how many for each file. The limits are stored and passed
-    to ``progress`` after every answer, so a plot can show them building up.
+    to ``progress`` after every answer, so a plot can show them building up. In the
+    window a click on the plot of a file gives the minutes that put the cut there.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -357,6 +363,7 @@ def _limits_asker(summaries: List[dict],
     _limits_filler
     _minutes_recaller
     info_printer
+    limit_minutes_finder
     number_asker
     yes_no_asker
     """
@@ -364,6 +371,17 @@ def _limits_asker(summaries: List[dict],
     key = f'{kind}_{edge}'
     verb, place = kind.upper(), edge.upper()
     past = 'TRIMMED' if kind == 'trim' else 'IGNORED'
+    by_name = {s['name']: s for s in summaries}
+    def clicked(name: str, time_min: float) -> Optional[float]:
+        # the minutes a click on the plot of a file gives, for this edge
+        if name not in by_name:
+            return None
+        return limit_minutes_finder(by_name[name],
+                                    collected[name],
+                                    kind,
+                                    edge,
+                                    time_min,
+                                    )
     fallback = (settings.DEFAULT_ANSWERS['ignore_first_minutes']
                 if key == 'ignore_start' else 0.0
                 )
@@ -391,6 +409,7 @@ def _limits_asker(summaries: List[dict],
                           minimum=0,
                           maximum=min(caps, default=None),
                           depth=2,
+                          time_reader=clicked,
                           )
     for summary in summaries:
         collected[summary['name']][key] = _limit_converter(summary, kind, edge, common)
@@ -424,6 +443,7 @@ def _limits_asker(summaries: List[dict],
                                minimum=0,
                                maximum=maxima[name],
                                depth=2,
+                               time_reader=clicked,
                                )
         collected[name][key] = _limit_converter(summary, kind, edge, minutes)
         progress(_limits_filler(summaries, collected))
@@ -607,73 +627,63 @@ def _subscript_stripper(match: 're.Match') -> str:
     return match.group(1) if match.group(1) is not None else match.group(2)
 
 
-# ---- MAIN FUNCTIONS ------------------------------------------------------------------
-
-
-# ---- analysis_asker ------------------------------------------------------------------
-def analysis_asker(summaries: List[dict],
-                   answers: dict,
-                   defaults: dict,
-                   fits_folder: Path,
-                   export_root: Path,
-                   ) -> tuple:
+# ---- _tidy_labels_offerer ------------------------------------------------------------
+def _tidy_labels_offerer(with_events: List[dict],
+                         result: Dict[str, List[dict]],
+                         ) -> None:
     """
     ---- Summary ----
-    Main function to ask section 3: haem decomposition, OD scaling, event averaging
-    and the event labels.
+    Helper function to list the current event labels that could be written more tidily
+    (8 ug ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use
+    them all. Asks nothing when every label is tidy already.
 
     ---- Inputs ----
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md).
-    answers : dict
-        Answers dictionary the values are stored in.
-    defaults : dict
-        Default answers.
-    fits_folder : Path
-        Folder holding the fit .csv files.
-    export_root : Path
-        Results folder, where the saved OD and event values are looked for.
+    with_events : List[dict]
+        File summaries (DATA_FORMAT.md) of the files that have events.
+    result : Dict[str, List[dict]]
+        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
+        labels are replaced by their tidy forms when the user agrees.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    tuple
-        (fit, details). details is {file name: {'OD', 'volume', 'dilution_factor',
-        'events'}}; the OD entries are only present when scaling by OD.
+    None
+        Nothing.
 
     ---- Globals mutated ----
-    None. Stores the answers in ``answers`` (side effect).
+    None. Changes the labels in ``result`` and reads from and prints to the terminal
+    (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    averaging_asker
-    decomposition_asker
-    event_asker
-    od_scaling_asker
-    saved_values_reader
+    info_printer
+    label_tidier
+    yes_no_asker
     """
 
-    # ---- 1 Decomposition -------------------------------------------------------------
-    (answers['decompose'],
-     answers['fit_file'],
-     fit,
-     answers['decomposition_dataset'],
-     ) = decomposition_asker(summaries, defaults, fits_folder)
+    # ---- 1 Find the labels that could be tidier --------------------------------------
+    found = []
+    for summary in with_events:
+        for event, entry in zip(summary['events'], result[summary['name']]):
+            tidy = label_tidier(entry['label'])
+            if not entry['ignored'] and tidy != entry['label']:
+                found.append((summary['name'], event['time'], entry, tidy))
+    if not found:
+        return
 
-    # ---- 2 OD scaling ----------------------------------------------------------------
-    saved = saved_values_reader(summaries, export_root)
-    details = od_scaling_asker(summaries, answers, defaults, saved)
+    # ---- 2 List them and ask once ----------------------------------------------------
+    info_printer('These labels can be written more tidily:')
+    for name, time, entry, tidy in found:
+        info_printer(f"  {name}, {time:.2f} min: {entry['label']} -> {tidy}", depth=2)
+    if yes_no_asker('Do you want to use these tidy forms?', True):
+        for _, _, entry, tidy in found:
+            entry['label'] = tidy
 
-    # ---- 3 Averaging -----------------------------------------------------------------
-    averaging_asker(answers, defaults)
 
-    # ---- 4 Event labels --------------------------------------------------------------
-    for name, events in event_asker(summaries, saved).items():
-        details[name]['events'] = events
-    return fit, details
+# ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
 # ---- averaging_asker -----------------------------------------------------------------
@@ -681,11 +691,15 @@ def averaging_asker(answers: dict,
                     defaults: dict,
                     forced: bool = False,
                     depth: int = 1,
+                    additions: Optional[Dict[str, List[float]]] = None,
                     ) -> None:
     """
     ---- Summary ----
     Main function to ask whether to average around the events, and the window
-    settings.
+    settings, in seconds. When the plot shows the files, a drag across one window on
+    the plot gives its length, and the gap from where the drag ended to the next
+    addition is then offered as the default of the gap question; a drag during the gap
+    question gives the gap alone.
 
     ---- Inputs ----
     answers : dict
@@ -697,6 +711,10 @@ def averaging_asker(answers: dict,
         that needs the averages was chosen). The averaging answer is not changed.
     depth : int
         Numbering depth of the first question.
+    additions : Optional[Dict[str, List[float]]]
+        {file name: times of its additions (min, not those marked ignore), on the time
+        axis of the plot}, so a drag on the plot of a file can be read; None when the
+        plot does not show the files (the answers are then typed).
 
     ---- Globals read ----
     None.
@@ -706,12 +724,14 @@ def averaging_asker(answers: dict,
         Nothing.
 
     ---- Globals mutated ----
-    None. Stores window_minutes and gap_minutes (and averaging) in ``answers``.
+    None. Stores window_minutes and gap_minutes (in minutes) and averaging in
+    ``answers``.
 
     ---- Equations ----
-    None.
+    minutes = seconds / 60.
 
     ---- Helpers ----
+    averaging_drag_reader
     number_asker
     yes_no_asker
     """
@@ -725,22 +745,175 @@ def averaging_asker(answers: dict,
         if not answers['averaging']:
             return
 
-    # ---- 2 Ask for the window and gap ------------------------------------------------
+    # ---- 2 Set up the reading of a drag on the plot ----------------------------------
+    dragged: Dict[str, Optional[float]] = {}
+    def length_reader(name: str, start_min: float, end_min: float) -> Optional[float]:
+        if name not in additions:
+            return None
+        length_s, dragged['gap_s'] = averaging_drag_reader(additions[name],
+                                                           start_min,
+                                                           end_min,
+                                                           )
+        return length_s
+    def gap_reader(name: str, start_min: float, end_min: float) -> Optional[float]:
+        if name not in additions:
+            return None
+        return averaging_drag_reader(additions[name], start_min, end_min)[1]
+
+    # ---- 3 Ask for the window and gap ------------------------------------------------
     sub = depth if forced else depth + 1
-    answers['window_minutes'] = number_asker('How long a window (minutes) should the '
-                                             'average be taken over?',
-                                             defaults['window_minutes'],
-                                             minimum=0,
-                                             exclusive_minimum=True,
-                                             depth=sub,
-                                             )
-    answers['gap_minutes'] = number_asker('How long before the next addition should '
-                                          'the averaging window end (minutes)?',
-                                          defaults['gap_minutes'],
-                                          minimum=0,
-                                          depth=sub,
-                                          )
+    window_s = number_asker('How long a window (s) should the average be taken over?',
+                            round(defaults['window_minutes'] * 60.0, 2),
+                            minimum=0,
+                            exclusive_minimum=True,
+                            depth=sub,
+                            span_reader=length_reader if additions else None,
+                            )
+    gap_default = dragged.get('gap_s')
+    if gap_default is None:
+        gap_default = round(defaults['gap_minutes'] * 60.0, 2)
+    gap_s = number_asker('How long before the next addition should the averaging '
+                         'window end (s)?',
+                         gap_default,
+                         minimum=0,
+                         depth=sub,
+                         span_reader=gap_reader if additions else None,
+                         )
+    answers['window_minutes'] = window_s / 60.0
+    answers['gap_minutes'] = gap_s / 60.0
     answers['window_asked'] = True
+
+
+# ---- averaging_drag_reader -----------------------------------------------------------
+def averaging_drag_reader(additions_min: List[float],
+                          start_min: float,
+                          end_min: float,
+                          ) -> Tuple[float, Optional[float]]:
+    """
+    ---- Summary ----
+    Main function to turn a drag across one averaging window on the plot of a file into
+    the window's length and how long before the next addition it ends, both in seconds
+    rounded to whole steps.
+
+    ---- Inputs ----
+    additions_min : List[float]
+        Times of the file's additions on the time axis of the plot (min), not those
+        marked ignore.
+    start_min : float
+        Where the drag started (min).
+    end_min : float
+        Where the drag ended (min); after ``start_min``.
+
+    ---- Globals read ----
+    config.DRAG_STEP_SECONDS (the rounding step).
+
+    ---- Outputs ----
+    Tuple[float, Optional[float]]
+        (length_s, gap_s): the length is at least one step; the gap is at least 0, and
+        None when no addition comes after the end of the drag (the last window ends a
+        set time before the end of the recording instead).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    length_s = round((end - start) x 60 / step) x step, at least one step;
+    gap_s = round((first addition at or after the end - end) x 60 / step) x step.
+
+    ---- Helpers ----
+    None.
+    """
+
+    step = float(settings.DRAG_STEP_SECONDS)
+    length_s = max(round((end_min - start_min) * 60.0 / step) * step, step)
+    later = [time for time in additions_min if time >= end_min]
+    if not later:
+        return length_s, None
+    gap_s = max(round((min(later) - end_min) * 60.0 / step) * step, 0.0)
+    return length_s, gap_s
+
+
+# ---- data_folder_lister --------------------------------------------------------------
+def data_folder_lister(root: Path) -> List[Path]:
+    """
+    ---- Summary ----
+    Main function to list the folders directly inside a folder that hold .paf files,
+    so they can be offered by number.
+
+    ---- Inputs ----
+    root : Path
+        Folder to look in (the program folder).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Path]
+        The folders with at least one .paf file directly inside, in natural name
+        order. Folders whose name starts with a dot or an underscore, and folders that
+        cannot be read, are left out.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _natural_sorter
+    paf_finder
+    """
+
+    found = []
+    for path in Path(root).iterdir():
+        if not path.is_dir() or path.name.startswith(('.', '_')):
+            continue
+        try:
+            if paf_finder(path):
+                found.append(path)
+        except OSError:  # a folder that cannot be read holds no data for us
+            continue
+    return sorted(found, key=lambda p: _natural_sorter(p.name))
+
+
+# ---- data_folder_resolver ------------------------------------------------------------
+def data_folder_resolver(text: str, listed: List[Path]) -> Path:
+    """
+    ---- Summary ----
+    Main function to turn the answer to the folder question into a folder: a number or
+    a name from the list of data folders, or any other path.
+
+    ---- Inputs ----
+    text : str
+        The answer as typed (or dragged in).
+    listed : List[Path]
+        The data folders offered, in the order they were numbered from 1.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Path
+        The listed folder of that number or name (capitals do not matter), otherwise
+        the answer as a path. It is not checked to exist.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    path_cleaner
+    """
+
+    cleaned = path_cleaner(text)
+    if cleaned.isdigit() and 1 <= int(cleaned) <= len(listed):
+        return listed[int(cleaned) - 1]
+    for folder in listed:
+        if folder.name.lower() == cleaned.lower():
+            return folder
+    return Path(cleaned).expanduser()
 
 
 # ---- decomposition_asker -------------------------------------------------------------
@@ -837,9 +1010,11 @@ def decomposition_asker(summaries: List[dict],
     default_fit = defaults.get('fit_file')
     choices = [(n, n) for n in names]
     if pca_runner is not None:
-        choices.append((PCA_CHOICE, 'Find the components from the data (principal '
-                                    'component analysis)',
-                        ))
+        choices.append((PCA_CHOICE,
+                        'Find the components from the data (principal '
+                        'component analysis)',
+                        ),
+                       )
     dataset = None
     while True:
         fit_file = choice_asker('Which fit would you like to use?',
@@ -877,7 +1052,9 @@ def event_asker(summaries: List[dict],
     """
     ---- Summary ----
     Main function to ask whether to change the event labels, concentrations and which
-    events to ignore, file by file.
+    events to ignore, file by file. A label that could be written more tidily (8 ug
+    ml-1 as 8 µg mL⁻¹) is offered in its tidy form: the labels the files hold all at
+    once, then each label as it is typed or kept.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -885,8 +1062,9 @@ def event_asker(summaries: List[dict],
     saved : dict
         {file name: values read from its workbook} (read_saved_settings).
     again : bool
-        True when the user asked to change the labels again: the yes/no question is
-        skipped and the runs are listed straight away.
+        True when the user asked to change the labels again: the tidy forms of the
+        current labels and the yes/no question are skipped and the runs are listed
+        straight away.
 
     ---- Globals read ----
     None.
@@ -905,7 +1083,9 @@ def event_asker(summaries: List[dict],
     ---- Helpers ----
     _event_line_builder
     _file_focuser
+    _tidy_labels_offerer
     info_printer
+    label_tidier
     number_asker
     numbering_setter
     numbers_asker
@@ -942,8 +1122,10 @@ def event_asker(summaries: List[dict],
         info_printer(f"{number}) {summary['name']}:")
         for event, entry in zip(summary['events'], result[summary['name']]):
             info_printer(_event_line_builder(event, entry), depth=2)
-    if not again and not yes_no_asker('Do you want to change any event labels?', False):
-        return result
+    if not again:
+        _tidy_labels_offerer(with_events, result)
+        if not yes_no_asker('Do you want to change any event labels?', False):
+            return result
     chosen = numbers_asker('Which run(s) do you want to change?',
                            len(with_events),
                            depth=2,
@@ -965,7 +1147,14 @@ def event_asker(summaries: List[dict],
                                entry['label'],
                                depth=3,
                                )
-            entry['label'] = label or entry['label']
+            label = label or entry['label']
+            tidy = label_tidier(label)
+            if tidy != label and yes_no_asker(f"Do you want to write this as '{tidy}'?",
+                                              True,
+                                              depth=3,
+                                              ):
+                label = tidy
+            entry['label'] = label
             entry['ignored'] = entry['label'].strip().lower() == 'ignore'
             if entry['ignored']:
                 continue
@@ -1014,23 +1203,26 @@ def file_focus_setter(hook: Optional[Callable[[str], None]]) -> None:
 
 
 # ---- files_asker ---------------------------------------------------------------------
-def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
+def files_asker(last: dict) -> Tuple[Path, List[dict], Path, dict]:
     """
     ---- Summary ----
-    Main function to ask for the folder of .paf files (1.1) and the results folder
-    (1.2), and to read a summary of every file.
+    Main function to ask for the folder of .paf files (1.1), offering the data folders
+    found in the program folder, and the results folder (1.2), and to read a summary of
+    every file and the settings saved with the dataset.
 
     ---- Inputs ----
     last : dict
-        Remembered answers (last_answers.json); uses data_folder and export_folder.
+        Contents of last_answers.json; uses data_folder (the folder used last).
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    Tuple[Path, List[dict], Path]
-        (data folder, summary of each readable file, results folder). Each summary
-        has name, path, duration_min, events and datasets (DATA_FORMAT.md).
+    Tuple[Path, List[dict], Path, dict]
+        (data folder, summary of each readable file, results folder, settings saved
+        with the dataset). Each summary has name, path, duration_min, events and
+        datasets; the settings are those of dataset_settings_reader, empty for a
+        dataset never saved (DATA_FORMAT.md).
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect).
@@ -1039,6 +1231,9 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
     None.
 
     ---- Helpers ----
+    data_folder_lister
+    data_folder_resolver
+    dataset_settings_reader
     experiment_summary_reader
     info_printer
     paf_finder
@@ -1049,14 +1244,17 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
     """
 
     # ---- 1 Ask for the .paf folder ---------------------------------------------------
-    # A hint only: folders ending _data in the program folder are listed, never chosen.
     root = Path(__file__).resolve().parents[1]
-    data_folders = sorted(p.name for p in root.iterdir()
-                          if p.is_dir() and p.name.endswith('_data')
-                          )
-    if data_folders:
-        info_printer('_data folders found in ' + str(root) + ': '
-                     + ', '.join(data_folders),
+    listed = data_folder_lister(root)
+    if listed:
+        info_printer(f'Data folders found in {root}:')
+        for number, found in enumerate(listed, start=1):
+            count = len(paf_finder(found))
+            info_printer(f"  {number}) {found.name} ({count} file"
+                         f"{'' if count == 1 else 's'})",
+                         )
+        info_printer('Type a number or a name from this list, or the path of another '
+                     'folder.',
                      )
     while True:
         text = text_asker('What is the directory with the .paf files?',
@@ -1065,7 +1263,7 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
         if not text:
             info_printer('Please type or drag in a folder.')
             continue
-        folder = Path(path_cleaner(text)).expanduser()
+        folder = data_folder_resolver(text, listed)
         if not folder.is_dir():
             info_printer('That folder does not exist.')
             continue
@@ -1083,7 +1281,8 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
             summary = experiment_summary_reader(path)
         except PafError as exc:
             progress_clearer()
-            info_printer(f'Skipping {path.name}: {exc}')
+            # the message starts with the file name
+            info_printer(f'Skipping {exc}')
             continue
         summary['path'] = path
         summaries.append(summary)
@@ -1097,16 +1296,23 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
                      )
 
     # ---- 3 Ask for the results folder ------------------------------------------------
-    same_folder = last.get('data_folder') == str(folder)
-    default = last.get('export_folder') if same_folder else str(folder / 'export')
+    saved = dataset_settings_reader(folder)
+    if saved:
+        info_printer('This dataset was opened before: the settings saved in its folder '
+                     'are offered as the defaults.',
+                     )
     text = text_asker('To which directory would you like the results to be saved?',
-                      default,
+                      str(saved.get('export_folder') or folder / 'export'),
                       )
-    return folder, summaries, Path(path_cleaner(text)).expanduser()
+    return folder, summaries, Path(path_cleaner(text)).expanduser(), saved
 
 
 # ---- haem_choice_asker ---------------------------------------------------------------
-def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
+def haem_choice_asker(answers: dict,
+                      defaults: dict,
+                      fit: Optional[dict],
+                      is_shown_asked: bool = True,
+                      ) -> bool:
     """
     ---- Summary ----
     Main function to ask whether the haems are plotted, and which ones in which order.
@@ -1118,6 +1324,10 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
         Default answers.
     fit : Optional[dict]
         Fit dictionary (haem_list) used to list the haems, or None.
+    is_shown_asked : bool
+        False when whether the haems are plotted is already answered (the Haems box
+        of the window's settings strip, in answers['plot_haems']): only which ones and
+        in which order are asked, and only when they are plotted.
 
     ---- Globals read ----
     None.
@@ -1139,12 +1349,13 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
     yes_no_asker
     """
 
-    answers['plot_haems'] = False
     if not (answers['decompose'] and fit is not None):
+        answers['plot_haems'] = False
         return False
-    answers['plot_haems'] = yes_no_asker('Do you want to plot the haems?',
-                                         defaults['plot_haems'],
-                                         )
+    if is_shown_asked:
+        answers['plot_haems'] = yes_no_asker('Do you want to plot the haems?',
+                                             defaults['plot_haems'],
+                                             )
     if answers['plot_haems']:
         answers['haems'] = multi_asker('Which haems would you like to plot, and in '
                                        'which order?',
@@ -1378,6 +1589,113 @@ def label_angle_asker(answers: dict, defaults: dict) -> None:
                                                 )
 
 
+# ---- label_tidier --------------------------------------------------------------------
+def label_tidier(text: str) -> str:
+    """
+    ---- Summary ----
+    Main function to write the units of an event label the tidy way: u as µ, l as L, a
+    space between a number and its unit, and exponents raised. Only units are changed;
+    a name with numbers in it (nd-011992, Q203) and a chemical formula (H2O2) are left
+    as they are, since the two cannot be told apart.
+
+    ---- Inputs ----
+    text : str
+        The label as typed or as written in the file.
+
+    ---- Globals read ----
+    SUPERSCRIPT_TABLE, UNIT_PATTERN (module constants).
+
+    ---- Outputs ----
+    str
+        The tidy label, for example '8 µg mL⁻¹ rifampicin' for '8ug ml-1 rifampicin';
+        the same text when nothing can be tidied.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Micro and litre -----------------------------------------------------------
+    text = re.sub(r'(?<![A-Za-z])u(?=(?:M|L|l|g|mol)(?![A-Za-z]))', 'µ', text)
+    text = re.sub(r'(?<![A-Za-zµ])([mµn])l(?![A-Za-z])', r'\1L', text)
+    # a litre by itself only where it cannot be a word: after a slash or with an exponent
+    text = re.sub(r'(?<=/)l(?![A-Za-z])|(?<![A-Za-z0-9µ])l(?=\^?-\d)', 'L', text)
+
+    # ---- 2 A space between a number and its unit -------------------------------------
+    text = re.sub(rf'(\d)(?={UNIT_PATTERN}(?![A-Za-z]))', r'\1 ', text)
+
+    # ---- 3 Raised exponents: -1 after a unit, anything after ^ -----------------------
+    text = re.sub(rf'(?<![A-Za-z0-9µ])({UNIT_PATTERN})\^?(-\d)(?![\dA-Za-z])',
+                  lambda match: match.group(1) + match.group(2).translate(SUPERSCRIPT_TABLE,
+                                                                          ),
+                  text,
+                  )
+    return re.sub(r'\^([-+]?\d+)',
+                  lambda match: match.group(1).translate(SUPERSCRIPT_TABLE),
+                  text,
+                  )
+
+
+# ---- limit_minutes_finder ------------------------------------------------------------
+def limit_minutes_finder(summary: dict,
+                         limits: dict,
+                         kind: str,
+                         edge: str,
+                         time_min: float,
+                         ) -> float:
+    """
+    ---- Summary ----
+    Main function to turn a time clicked on the plot of the whole recording into the
+    minutes a trim or ignore question asks for: how much is taken off that edge so the
+    cut falls at the click.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with duration_min.
+    limits : dict
+        The limits of this file asked so far: 'trim_start' and 'trim_end' as times on
+        the original recording (None or missing for no trim).
+    kind : str
+        'trim' or 'ignore'.
+    edge : str
+        'start' or 'end'.
+    time_min : float
+        The time clicked, on the original recording (min).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        Minutes to take off that edge; 0 when the click is beyond the edge.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Trim start = t. Trim end = duration - t. Ignore start = t - trim start (ignore
+    times count from the new 0 after trimming). Ignore end = (trim end, or the
+    duration) - t.
+
+    ---- Helpers ----
+    None.
+    """
+
+    duration = float(summary['duration_min'])
+    if kind == 'trim':
+        minutes = time_min if edge == 'start' else duration - time_min
+    elif edge == 'start':
+        minutes = time_min - (limits.get('trim_start') or 0.0)
+    else:
+        minutes = (limits.get('trim_end') or duration) - time_min
+    return max(float(minutes), 0.0)
+
+
 # ---- multi_experiment_asker ----------------------------------------------------------
 def multi_experiment_asker(summaries: List[dict],
                            answers: dict,
@@ -1387,8 +1705,8 @@ def multi_experiment_asker(summaries: List[dict],
                            ) -> tuple:
     """
     ---- Summary ----
-    Main function to ask section 5: the side-by-side figure of two experiments and
-    the 2x2 figure of four experiments.
+    Main function to ask the multi-experiment plots: the side-by-side figure of two
+    experiments and the 2x2 figure of four experiments.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1398,7 +1716,8 @@ def multi_experiment_asker(summaries: List[dict],
     defaults : dict
         Default answers.
     plotted : bool
-        True when section 4 plots at least one panel (both figures reuse its choices).
+        True when the individual experiment plots show at least one panel (both
+        figures reuse their choices).
     figure_checker : Optional[Callable[[str, dict], bool]]
         Function called after the questions of each figure with a name and a dictionary:
         ('comparison', {'comparison': ...}) or ('exemplar', {'exemplar_names': ...}). It
@@ -1434,9 +1753,9 @@ def multi_experiment_asker(summaries: List[dict],
     answers['plot_comparison'] = False
     answers['plot_exemplar'] = False
     if not plotted:
-        info_printer('The figures below reuse the panels chosen in section 4, and '
-                     'nothing '
-                     'is plotted there, so they are skipped.',
+        info_printer('The figures below reuse the panels chosen for the individual '
+                     'experiment plots, and nothing is plotted there, so they are '
+                     'skipped.',
                      )
         return comparison, exemplar_names
 
@@ -1508,9 +1827,7 @@ def multi_experiment_asker(summaries: List[dict],
                 answers['ho_exemplar_run'] = int(run)
                 if not answers['averaging']:
                     info_printer('This figure starts at the baseline averaging window, '
-                                 'so '
-                                 'the '
-                                 'events are averaged as in section 3.3.',
+                                 'so the events are averaged as in the processing.',
                                  depth=2,
                                  )
                     averaging_asker(answers, defaults, forced=True, depth=2)
@@ -1521,7 +1838,7 @@ def multi_experiment_asker(summaries: List[dict],
                     'Do you want the run name written faintly on each plot?',
                     defaults['ex_watermark'],
                     depth=2,
-                )
+                    )
                 size_asker(answers,
                            defaults,
                            {'journal': 'ex_journal',
@@ -1539,6 +1856,38 @@ def multi_experiment_asker(summaries: List[dict],
             break
         defaults = dict(answers)
     return comparison, exemplar_names
+
+
+# ---- ocr_kind_lister -----------------------------------------------------------------
+def ocr_kind_lister(has_od: bool) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to list the kinds of OCR that can be offered: the OCR itself, the OCR
+    per OD when OD values were entered, and the OCR as a percentage of its range.
+
+    ---- Inputs ----
+    has_od : bool
+        True when OD values were entered (scaling by OD is on).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[str]
+        The keys 'raw', 'od' (only with OD values) and 'percent', in the order they are
+        offered.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return ['raw'] + (['od'] if has_od else []) + ['percent']
 
 
 # ---- ocr_option_builder --------------------------------------------------------------
@@ -1647,11 +1996,14 @@ def od_scaling_asker(summaries: List[dict],
                      answers: dict,
                      defaults: dict,
                      saved: dict,
+                     table_filler: Optional[Callable[[Dict[str, dict]],
+                                                     Dict[str, dict]]] = None,
                      ) -> Dict[str, dict]:
     """
     ---- Summary ----
     Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
-    factor of every file, offering the stored values.
+    factor of every file, offering the stored values: in a table when one is given,
+    otherwise with three questions per file.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1662,6 +2014,10 @@ def od_scaling_asker(summaries: List[dict],
         Default answers (normalise_od).
     saved : dict
         {file name: values read from its workbook} (saved_values_reader).
+    table_filler : Optional[Callable[[Dict[str, dict]], Dict[str, dict]]]
+        Function that shows the OD table filled in with the given rows (od_rows,
+        DATA_FORMAT.md), waits until every cell is right, and returns the rows; None
+        to ask the questions instead.
 
     ---- Globals read ----
     None.
@@ -1693,7 +2049,22 @@ def od_scaling_asker(summaries: List[dict],
     if not answers['normalise_od']:
         return details
 
-    # ---- 2 List what is stored -------------------------------------------------------
+    # ---- 2 Fill in the table, when there is one --------------------------------------
+    if table_filler is not None:
+        rows = {}
+        for summary in summaries:
+            old = saved.get(summary['name']) or {}
+            rows[summary['name']] = {'OD': old.get('OD'),
+                                     'volume': old.get('volume'),
+                                     'dilution_factor': (old.get('dilution_factor')
+                                                         or 1.0
+                                                         ),
+                                     }
+        for name, values in table_filler(rows).items():
+            details[name].update(values)
+        return details
+
+    # ---- 3 List what is stored -------------------------------------------------------
     # List what is already stored for each run and only ask about the rest unless
     # the user wants to change them.
     stored_keys = ('OD', 'volume', 'dilution_factor')
@@ -1712,7 +2083,7 @@ def od_scaling_asker(summaries: List[dict],
                 text = 'nothing stored'
             info_printer(f"  {summary['name']}: {text}", depth=2, tight=True)
 
-    # ---- 3 Ask for the values --------------------------------------------------------
+    # ---- 4 Ask for the values --------------------------------------------------------
     change = (not complete) or yes_no_asker('Do you want to change any of these?',
                                             False,
                                             )
@@ -1842,6 +2213,7 @@ def signal_asker(answers: dict, defaults: dict) -> bool:
 
     ---- Helpers ----
     choice_asker
+    ocr_kind_lister
     ocr_option_builder
     yes_no_asker
     """
@@ -1854,7 +2226,7 @@ def signal_asker(answers: dict, defaults: dict) -> bool:
                                        defaults['plot_ocr'],
                                        )
     if answers['plot_ocr']:
-        keys = ['raw'] + (['od'] if answers['normalise_od'] else []) + ['percent']
+        keys = ocr_kind_lister(answers['normalise_od'])
         answers['ocr_mode'] = choice_asker('Which OCR would you like to plot?',
                                            ocr_option_builder(keys),
                                            defaults['ocr_mode']
