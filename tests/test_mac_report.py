@@ -39,7 +39,7 @@ def _app_maker(home: Path) -> Path:
     ---- Summary ----
     Helper function to make a small Portimao app in Applications, holding the report
     and a question list with a made-up version as the build puts them, and the app's
-    own folder in the home folder with a launch log and an update log.
+    own folder in the home folder with a launch log, an update log and a move log.
 
     ---- Inputs ----
     home : Path
@@ -70,6 +70,7 @@ def _app_maker(home: Path) -> Path:
     logs.mkdir(parents=True)
     (logs / 'launch.log').write_bytes(b'launch line\n')
     (logs / 'update.log').write_bytes(b'update line\n')
+    (logs / 'move_to_app.log').write_bytes(b'move line\n')
     return inside
 
 
@@ -288,7 +289,8 @@ def test_report_inside_app_describes_it(tmp_path: Path) -> None:
     """
     ---- Summary ----
     Main function to check that the report run from inside the app (as Copy details
-    does) describes the app and reads the logs of the app's own folder, leaves out the
+    does) describes the app and reads the logs of the app's own folder (the move log
+    among them), leaves out the
     launcher's parts, prints only the report on its output and changes nothing.
 
     ---- Inputs ----
@@ -322,6 +324,7 @@ def test_report_inside_app_describes_it(tmp_path: Path) -> None:
     assert 'Version: V9.9' in report
     assert 'there, can be written to' in report
     assert 'launch line' in report and 'update line' in report
+    assert 'move line' in report
     assert '== Pythons' not in report and '== Portimao folder ==' not in report
     assert 'Mac problem' not in report  # the help lines are not copied
     assert _snapshot_taker(tmp_path) == before

@@ -6,6 +6,8 @@
 # At each --major or --hotfix release (the tag V<version> on main's commit), both zips
 # then go on the Releases page, where the app looks for updates, and each Mac checks
 # that the release before updates itself to the new one.
+# Each Mac also installs the newest release as users do: an install of the old launcher
+# is moved to the app, then the install line (install_mac.sh) is pasted.
 name: Mac check
 
 on:
@@ -193,19 +195,23 @@ jobs:
           path: apps
           merge-multiple: true
 
-      # The app looks for these two zip names (utils_shared/app_updater.py). The note is
-      # the release's summary. Run again, the zips of the release are replaced.
+      # The app and install_mac.sh look for these two zip names
+      # (utils_shared/app_updater.py). The note is the release's summary and the install
+      # line. Run again, the zips of the release are replaced.
       - name: Make the release with both zips
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           zips='apps/Portimao-mac-apple-silicon.zip apps/Portimao-mac-intel.zip'
+          line="curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install_mac.sh | bash"
+          notes="$(printf '%s\n\n%s\n\n    %s\n' "$(git log -1 --format=%s)" \
+            'On a Mac, install or update Portimao by pasting this line into Terminal:' "$line")"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" $zips --clobber
           else
             gh release create "$GITHUB_REF_NAME" $zips \
               --title "Portimao $GITHUB_REF_NAME" \
-              --notes "$(git log -1 --format=%s)" \
+              --notes "$notes" \
               --verify-tag
           fi
 
@@ -282,5 +288,142 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: update-logs-${{ matrix.runner }}
+          path: ~/Portimao/logs/
+          if-no-files-found: warn
+
+  install_check:
+    name: ${{ matrix.mac }} installs the newest release
+    needs: release
+    # At a tag, after its release; at a push to dev (no release), the newest release is
+    # installed with this commit's install_mac.sh and mac_app_mover.py. A tag whose apps
+    # failed is not tried.
+    if: >-
+      always() && (needs.release.result == 'success'
+      || (needs.release.result == 'skipped' && github.ref_type == 'branch'))
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mac: Apple Silicon Mac
+            runner: macos-15
+          - mac: Intel Mac
+            runner: macos-15-intel
+    steps:
+      # A git copy of this commit on main in ~/Portimao, as users of the old launcher have
+      # it once the update has taken Portimao.app away, with made-up things of theirs and
+      # the old launcher's link on the Desktop. PORTIMAO_UPDATED keeps the launcher from
+      # pulling main; the app it moves to opens with the check switch.
+      - name: Move an install of the old launcher to the app
+        timeout-minutes: 12
+        env:
+          PORTIMAO_SELF_TEST: '1'
+          PORTIMAO_UPDATED: '1'
+        run: |
+          own="$HOME/Portimao"
+          git clone --quiet "https://github.com/$GITHUB_REPOSITORY.git" "$own"
+          cd "$own"
+          git checkout --quiet -B main "$GITHUB_SHA"
+          mkdir -p data_check "$HOME/Desktop"
+          printf 'made-up run\n' > data_check/run1.paf
+          printf 'made-up fit\n' > fits/own_fit.csv
+          printf '{}\n' > last_answers.json
+          ln -sfn "$own/Portimao.app" "$HOME/Desktop/Portimao.app"
+          code=0
+          python3 launchers/bootstrap.pyw || code=$?
+          echo "The launcher ended with $code."
+          result='did not end'
+          for second in $(seq 1 600); do
+            if grep -q 'Self-test passed' logs/self_test.log 2>/dev/null; then
+              result='passed'
+              break
+            fi
+            if grep -q 'Self-test failed' logs/self_test.log 2>/dev/null; then
+              result='failed'
+              break
+            fi
+            sleep 1
+          done
+          echo "The app's self-test $result."
+          echo '== move_to_app.log =='
+          cat logs/move_to_app.log 2>/dev/null || echo 'No move log.'
+          problems=''
+          if [ "$result" != 'passed' ]; then
+            problems="$problems the self-test $result;"
+          fi
+          for gone in main.py launchers utils_shared install_mac.sh .git; do
+            if [ -e "$gone" ]; then
+              problems="$problems $gone is still there;"
+            fi
+          done
+          for kept in data_check/run1.paf fits/own_fit.csv last_answers.json; do
+            if [ ! -e "$kept" ]; then
+              problems="$problems $kept is gone;"
+            fi
+          done
+          if [ "$(readlink "$HOME/Desktop/Portimao.app")" != "$HOME/Applications/Portimao.app" ]; then
+            problems="$problems the Desktop link does not open the app;"
+          fi
+          if [ -n "$problems" ]; then
+            echo "Wrong after the move:$problems"
+            exit 1
+          fi
+          echo "Moved: the program files are gone and the user's made-up things are kept."
+
+      # The line as users paste it, fetched from this commit, puts the newest release in
+      # place of the app the move installed (or installs it, when the move failed).
+      - name: Install with the line
+        if: always()
+        timeout-minutes: 12
+        env:
+          PORTIMAO_SELF_TEST: '1'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          app="$HOME/Applications/Portimao.app"
+          log="$HOME/Portimao/logs/self_test.log"
+          # the moved app closes by itself after its self-test
+          for second in $(seq 1 60); do
+            if ! pgrep -f "$app/Contents/MacOS/" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          rm -f "$log"
+          newest="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+          curl -fsSL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/install_mac.sh" | bash
+          result='did not end'
+          for second in $(seq 1 600); do
+            if grep -q 'Self-test passed' "$log" 2>/dev/null; then
+              result='passed'
+              break
+            fi
+            if grep -q 'Self-test failed' "$log" 2>/dev/null; then
+              result='failed'
+              break
+            fi
+            sleep 1
+          done
+          version="$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist" 2>/dev/null || true)"
+          flag='no'
+          if xattr -p com.apple.quarantine "$app" >/dev/null 2>&1; then
+            flag='yes'
+          fi
+          echo "Installed V${version:-(unreadable)} (the newest release is $newest); download flag: $flag; the app's self-test $result."
+          [ "$result" = 'passed' ] && [ "V$version" = "$newest" ] && [ "$flag" = 'no' ]
+
+      # The line the README gives for the Mac report.
+      - name: Run the Mac report of the app
+        if: always()
+        run: |
+          report="$(sh "$HOME/Applications/Portimao.app/Contents/Resources/launchers/mac_report.sh")"
+          printf '%s\n' "$report"
+          printf '%s\n' "$report" | grep -q '== Portimao app =='
+
+      - name: Keep the app's logs on the run's page
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: install-logs-${{ matrix.runner }}
           path: ~/Portimao/logs/
           if-no-files-found: warn

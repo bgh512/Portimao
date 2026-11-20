@@ -1,5 +1,5 @@
 """
-Makes every icon file from assets/icon.png (square, 512 x 512 pixels or larger).
+Makes the Windows icon from assets/icon.png (square, 512 x 512 pixels or larger).
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -21,21 +21,21 @@ WINDOWS_SIZES = [(16, 16),
                  (128, 128),
                  (256, 256),
                  ]
-MAC_FILE = ROOT / 'Portimao.app' / 'Contents' / 'Resources' / 'Portimao.icns'
 
 
 # ---- main ----------------------------------------------------------------------------
 def main() -> int:
     """
     ---- Summary ----
-    Main function to turn assets/icon.png into the Windows icon (assets/icon.ico) and
-    the Mac icon (inside Portimao.app).
+    Main function to square assets/icon.png and turn it into the Windows icon
+    (assets/icon.ico). The Mac app's icon is made from assets/icon.png when the app is
+    built (launchers/mac_app_builder.py).
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    ROOT, SOURCE, WINDOWS_SIZES, MAC_FILE (module constants).
+    ROOT, SOURCE, WINDOWS_SIZES (module constants).
 
     ---- Outputs ----
     int
@@ -60,9 +60,7 @@ def main() -> int:
     square.paste(picture, ((side - picture.width) // 2, (side - picture.height) // 2))
     square.save(SOURCE)
     square.save(ROOT / 'assets' / 'icon.ico', sizes=WINDOWS_SIZES)
-    MAC_FILE.parent.mkdir(parents=True, exist_ok=True)
-    square.resize((1024, 1024)).save(MAC_FILE, format='ICNS')
-    print('Made assets/icon.ico and Portimao.app/Contents/Resources/Portimao.icns.')
+    print('Made assets/icon.ico.')
     return 0
 
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Mac and Linux: starts Portimao without keeping a terminal open (the first run sets things up).
+# Linux, and a Mac run from source (developers, Macs older than macOS 14): starts
+# Portimao without keeping a terminal open (the first run sets things up). Other Macs
+# use the Mac app (install_mac.sh).
 cd "$(dirname "$0")" || exit 1
 PY="$(command -v python3 || command -v python)"
 if [ -z "$PY" ]; then

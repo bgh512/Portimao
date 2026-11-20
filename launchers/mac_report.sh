@@ -1,9 +1,11 @@
 #!/bin/sh
 # The Mac report: prints, and copies to the clipboard, what is needed to find out why
 # Portimao does not start on a Mac. It only reads: nothing on the Mac is changed.
-# Run it from Terminal: type sh and a space, drag this file onto the window, press Enter.
 # The Mac app carries a copy and runs it for its Copy details button; the report then
-# describes the app.
+# describes the app. To run the app's copy from Terminal, paste this line:
+#     sh ~/Applications/Portimao.app/Contents/Resources/launchers/mac_report.sh
+# A Portimao folder run from source (developers, Macs older than macOS 14) has its own
+# copy: type sh and a space, drag this file onto the window, press Enter.
 
 # ---- CONSTANTS ----
 FOLDER="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
@@ -225,14 +227,14 @@ folder_reporter() {
         printf '%s\n' 'Installed from a zip file (not a git clone)'
     fi
     printf '%s\n' 'Download flag:'
-    for item in '' Portimao.app Portimao.app/Contents/MacOS/Portimao launchers/bootstrap.pyw; do
+    for item in '' run.sh launchers/bootstrap.pyw; do
         printf '%s\n' "  ${item:-the folder}: $(_flag_describer "$FOLDER/$item")"
     done
-    runnable='no'
-    if [ -x "$FOLDER/Portimao.app/Contents/MacOS/Portimao" ]; then
-        runnable='yes'
+    desktop_file='missing'
+    if [ -f "$HOME/Desktop/Portimao.command" ]; then
+        desktop_file='there'
     fi
-    printf '%s\n' "Portimao.app's script can run: $runnable"
+    printf '%s\n' "Portimao file on the Desktop: $desktop_file"
     _environment_describer
 }
 
@@ -334,6 +336,8 @@ report_maker() {
         _log_shower logs/launch.log
         printf '\n'
         _log_shower logs/update.log
+        printf '\n'
+        _log_shower logs/move_to_app.log
         return
     fi
     folder_reporter

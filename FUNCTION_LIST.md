@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.3
+- **Version:** V2.3.1
 - **Date:** 20/11/2026
 
 ## Contents
@@ -15,6 +15,26 @@
     - [`_arguments_builder`](#_arguments_builder)
     - [`_info_plist_writer`](#_info_plist_writer)
     - [`main`](#main)
+- [`launchers/mac_app_mover.py`](#launchersmac_app_moverpy)
+    - [`_app_opener`](#_app_opener)
+    - [`_command_text_maker`](#_command_text_maker)
+    - [`_desktop_link_mover`](#_desktop_link_mover)
+    - [`_git_runner`](#_git_runner)
+    - [`_installer_runner`](#_installer_runner)
+    - [`_link_into_checker`](#_link_into_checker)
+    - [`_log_opener`](#_log_opener)
+    - [`_macos_too_old_checker`](#_macos_too_old_checker)
+    - [`_macos_version_reader`](#_macos_version_reader)
+    - [`_note_shower`](#_note_shower)
+    - [`_our_command_checker`](#_our_command_checker)
+    - [`_program_file_lister`](#_program_file_lister)
+    - [`_program_file_remover`](#_program_file_remover)
+    - [`_reason_shortener`](#_reason_shortener)
+    - [`_tree_remover`](#_tree_remover)
+    - [`_user_things_copier`](#_user_things_copier)
+    - [`app_mover`](#app_mover)
+    - [`desktop_file_maker`](#desktop_file_maker)
+    - [`move_blocker_finder`](#move_blocker_finder)
 - [`launchers/mac_app_starter.py`](#launchersmac_app_starterpy)
     - [`_problem_logger`](#_problem_logger)
     - [`main`](#main)
@@ -105,6 +125,29 @@
     - [`test_app_carries_program_files`](#test_app_carries_program_files)
     - [`test_plist_gets_version_and_keeps_keys`](#test_plist_gets_version_and_keeps_keys)
     - [`test_plist_refuses_unknown_version`](#test_plist_refuses_unknown_version)
+- [`tests/test_mac_app_mover.py`](#teststest_mac_app_moverpy)
+    - [`_git_runner`](#_git_runner)
+    - [`_installer_faker`](#_installer_faker)
+    - [`_link_tester`](#_link_tester)
+    - [`_old_install_maker`](#_old_install_maker)
+    - [`test_desktop_file_is_made_once`](#test_desktop_file_is_made_once)
+    - [`test_desktop_file_replaces_the_old_link`](#test_desktop_file_replaces_the_old_link)
+    - [`test_developer_copy_is_not_moved`](#test_developer_copy_is_not_moved)
+    - [`test_failed_install_takes_nothing_away`](#test_failed_install_takes_nothing_away)
+    - [`test_folder_elsewhere_gets_its_fits_copied`](#test_folder_elsewhere_gets_its_fits_copied)
+    - [`test_move_keeps_the_desktop_link_working`](#test_move_keeps_the_desktop_link_working)
+    - [`test_move_takes_away_only_program_files`](#test_move_takes_away_only_program_files)
+    - [`test_old_macos_is_not_moved`](#test_old_macos_is_not_moved)
+- [`tests/test_mac_install.py`](#teststest_mac_installpy)
+    - [`_install_runner`](#_install_runner)
+    - [`_old_app_maker`](#_old_app_maker)
+    - [`test_download_failure_keeps_the_old_app`](#test_download_failure_keeps_the_old_app)
+    - [`test_intel_mac_gets_the_intel_zip`](#test_intel_mac_gets_the_intel_zip)
+    - [`test_line_installs_and_opens_the_app`](#test_line_installs_and_opens_the_app)
+    - [`test_no_open_replaces_the_old_app`](#test_no_open_replaces_the_old_app)
+    - [`test_not_a_mac_is_refused`](#test_not_a_mac_is_refused)
+    - [`test_old_macos_is_refused`](#test_old_macos_is_refused)
+    - [`test_open_app_is_refused`](#test_open_app_is_refused)
 - [`tests/test_mac_report.py`](#teststest_mac_reportpy)
     - [`_app_maker`](#_app_maker)
     - [`_folder_maker`](#_folder_maker)
@@ -1093,6 +1136,636 @@ _info_plist_writer
 program_version_reader
 ```
 
+## `launchers/mac_app_mover.py`
+
+Moves a Mac install of the old launcher to the Mac app, and makes the Desktop file of a
+
+### MOVE HELPERS
+
+#### `_app_opener`
+
+```text
+---- Summary ----
+Helper function to open the app as a click does, passing on the check switch when it
+is set, so the Mac check follows the move through to the app's self-test.
+
+---- Inputs ----
+app : Path
+    The installed .app folder.
+
+---- Globals read ----
+SELF_TEST_SWITCH (module constant); os.environ['PORTIMAO_SELF_TEST'].
+
+---- Outputs ----
+None
+    Nothing. Raises OSError when macOS's open cannot be run.
+
+---- Globals mutated ----
+None. Starts the app (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_command_text_maker`
+
+```text
+---- Summary ----
+Helper function to write the Desktop file that starts Portimao the old way: the
+launcher with the Python that runs it now, or run.sh when that Python has gone.
+
+---- Inputs ----
+root : Path
+    The program folder.
+python : str
+    Path of the Python running the launcher.
+
+---- Globals read ----
+COMMAND_MARK (module constant).
+
+---- Outputs ----
+str
+    The text of the file, a shell script; its second line names the folder.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_desktop_link_mover`
+
+```text
+---- Summary ----
+Helper function to point the Desktop at the app: the old launcher's link, or our
+Desktop file, is replaced by a link to the app with the same name, so a double-click
+where the user is used to opens the app. With neither there, nothing is added.
+
+---- Inputs ----
+root : Path
+    The program folder being moved.
+home : Path
+    The home folder.
+app : Path
+    The installed .app folder.
+log : Callable[[str], None]
+    Adds a line to the move log.
+
+---- Globals read ----
+APP_NAME, COMMAND_NAME (module constants).
+
+---- Outputs ----
+None
+    Nothing. A Desktop that cannot be changed is left as it is (logged).
+
+---- Globals mutated ----
+None. Deletes and makes links on the Desktop (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_link_into_checker
+_our_command_checker
+```
+
+#### `_git_runner`
+
+```text
+---- Summary ----
+Helper function to run a git command in the program folder and keep its output.
+
+---- Inputs ----
+root : Path
+    The program folder.
+arguments : List[str]
+    What follows `git`.
+
+---- Globals read ----
+HIDDEN (module constant).
+
+---- Outputs ----
+subprocess.CompletedProcess
+    The finished command; its return code is 127 when git cannot be run.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_installer_runner`
+
+```text
+---- Summary ----
+Helper function to install the app with the program's own install_mac.sh, as the
+install line does, but without opening it; each line it prints is shown and logged.
+
+---- Inputs ----
+root : Path
+    The program folder, which holds install_mac.sh.
+home : Path
+    The home folder; the app goes in its Applications folder.
+show : Callable[[str], None]
+    Shows a line of progress.
+log : Callable[[str], None]
+    Adds a line to the move log.
+
+---- Globals read ----
+APP_NAME, INSTALLER_NAME (module constants).
+
+---- Outputs ----
+Tuple[Optional[Path], str]
+    (the installed .app folder, '') or (None, why it was not installed).
+
+---- Globals mutated ----
+None. Downloads and installs the app (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_reason_shortener
+```
+
+#### `_link_into_checker`
+
+```text
+---- Summary ----
+Helper function to say whether a Desktop item is the old launcher's link: a symbolic
+link to something inside the program folder (its Portimao.app, which the update has
+taken away).
+
+---- Inputs ----
+link : Path
+    The Desktop item.
+root : Path
+    The program folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when it is a link into the program folder.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_log_opener`
+
+```text
+---- Summary ----
+Helper function to give the function that adds a line, with the date and time, to
+the move log in the folder's logs folder (which the move keeps).
+
+---- Inputs ----
+root : Path
+    The program folder.
+
+---- Globals read ----
+LOG_NAME (module constant).
+
+---- Outputs ----
+Callable[[str], None]
+    Adds one line. A log that cannot be written just loses its lines.
+
+---- Globals mutated ----
+None. Writes the log (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_macos_too_old_checker`
+
+```text
+---- Summary ----
+Helper function to say whether a macOS version is too old for the app.
+
+---- Inputs ----
+version : str
+    The macOS version, for example "13.6"; empty when not known.
+
+---- Globals read ----
+OLDEST_MACOS (module constant).
+
+---- Outputs ----
+bool
+    True when it is older than macOS 14; False when newer or unreadable.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_macos_version_reader`
+
+```text
+---- Summary ----
+Helper function to read this Mac's macOS version from sw_vers, which gives the real
+one where a Python built for older Macs is told "10.16".
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The version, for example "15.1"; Python's own reading when sw_vers cannot be
+    run, empty when neither knows.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_note_shower`
+
+```text
+---- Summary ----
+Helper function to show a macOS message that holds nothing up: the launcher goes on
+(or closes) while it is on screen.
+
+---- Inputs ----
+text : str
+    The message.
+shows_messages : bool
+    False to show nothing (for the tests).
+
+---- Globals read ----
+SELF_TEST_SWITCH (module constant); os.environ['PORTIMAO_SELF_TEST'].
+
+---- Outputs ----
+None
+    Nothing. No message is shown with the check switch, or where macOS's message
+    cannot be shown.
+
+---- Globals mutated ----
+None. Shows a message (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_our_command_checker`
+
+```text
+---- Summary ----
+Helper function to say whether a Desktop file is the one made for this program
+folder (by desktop_file_maker).
+
+---- Inputs ----
+command : Path
+    The Desktop file.
+root : Path
+    The program folder.
+
+---- Globals read ----
+COMMAND_MARK (module constant).
+
+---- Outputs ----
+bool
+    True when it is a file whose mark names this folder.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_program_file_lister`
+
+```text
+---- Summary ----
+Helper function to list the old program files: what git tracks, apart from the fits
+and any file the user has changed, then what the program made beside them (its
+Python environment, its marks and caches) and git's own folder.
+
+---- Inputs ----
+root : Path
+    The program folder, a git clone.
+
+---- Globals read ----
+KEPT_FOLDERS, PROGRAM_EXTRAS (module constants).
+
+---- Outputs ----
+Optional[List[Path]]
+    The files and folders to take away, git's folder last; None when git could not
+    list them.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_git_runner
+```
+
+#### `_program_file_remover`
+
+```text
+---- Summary ----
+Helper function to take away the old program files, then the folders they leave
+empty (or holding only Python's caches). Nothing outside the program folder is
+touched, and a link is taken away without following it.
+
+---- Inputs ----
+root : Path
+    The program folder.
+paths : List[Path]
+    The files and folders to take away (_program_file_lister).
+log : Callable[[str], None]
+    Adds a line to the move log.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing. What cannot be taken away is left and named in the log.
+
+---- Globals mutated ----
+None. Deletes files and folders (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_tree_remover
+```
+
+#### `_reason_shortener`
+
+```text
+---- Summary ----
+Helper function to keep what went wrong from one of install_mac.sh's sentences,
+which say what went wrong, a colon, then what to do on the command line.
+
+---- Inputs ----
+sentence : str
+    The last line the install printed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The part before the colon, without a full stop; empty for an empty line.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_tree_remover`
+
+```text
+---- Summary ----
+Helper function to delete a folder with everything in it, read-only files included
+(git keeps its files read-only, which Windows would refuse to delete).
+
+---- Inputs ----
+folder : Path
+    The folder; not a link.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing. Raises OSError when it cannot be deleted.
+
+---- Globals mutated ----
+None. Deletes files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_user_things_copier`
+
+```text
+---- Summary ----
+Helper function to copy the user's fits and last answers from a program folder that
+is not the app's own folder into it, so the app finds them. A file already there is
+never overwritten; the data folders stay where they are.
+
+---- Inputs ----
+root : Path
+    The program folder being moved.
+own_folder : Path
+    The app's own folder (Portimao in the home folder); made when missing.
+log : Callable[[str], None]
+    Adds a line to the move log.
+
+---- Globals read ----
+FITS_FOLDER_NAME, LAST_ANSWERS_NAME (module constants).
+
+---- Outputs ----
+None
+    Nothing. What cannot be copied is named in the log.
+
+---- Globals mutated ----
+None. Makes folders and copies files (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `app_mover`
+
+```text
+---- Summary ----
+Main function to move an install of the old launcher to the Mac app, at its first
+start after the update, without asking. Only a git clone on main (the user
+download) on macOS 14 or newer is moved. The app is installed in the user's own
+Applications folder first, and nothing is taken away unless it is in. Then the old
+program files go; the fits, the data folders, the logs, the last answers, any
+program file the user changed and anything else of theirs stay. The Desktop link
+opens the app from then on, the app opens at once and a note beside it says where
+the user's things are. Every step is written to logs/move_to_app.log.
+
+---- Inputs ----
+root : Path
+    The program folder.
+home : Path
+    The home folder.
+show : Callable[[str], None]
+    Shows a line in the launcher's small window.
+macos_version : Optional[str]
+    The macOS version; None for this Mac's.
+installer : Optional[Callable[..., Tuple[Optional[Path], str]]]
+    Installs the app, called with (root, home, show, log); None for install_mac.sh
+    (the tests give their own).
+opener : Optional[Callable[[Path], None]]
+    Opens the app; None for macOS's open.
+shows_messages : bool
+    False to show no message (for the tests).
+
+---- Globals read ----
+OWN_FOLDER_NAME (module constant).
+
+---- Outputs ----
+bool
+    True when the app is installed and opening, so the launcher closes; False when
+    this install is not moved, or the app could not be installed (a note says so),
+    so the program starts the old way.
+
+---- Globals mutated ----
+None. Installs the app, deletes the old program files, copies files, changes the
+Desktop link, opens the app and writes the move log (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_opener
+_desktop_link_mover
+_installer_runner
+_log_opener
+_macos_version_reader
+_note_shower
+_program_file_lister
+_program_file_remover
+_user_things_copier
+move_blocker_finder
+```
+
+#### `desktop_file_maker`
+
+```text
+---- Summary ----
+Main function to give a Mac that runs Portimao from its folder (older than macOS
+14, a move that failed, a developer's copy) a file on the Desktop that starts it the
+old way. It takes the place of the old launcher's link, which the update made
+useless, and is made the first time a folder is started; on macOS older than 14 a
+note says why, once.
+
+---- Inputs ----
+root : Path
+    The program folder.
+home : Path
+    The home folder.
+python : str
+    Path of the Python running the launcher.
+is_first : bool
+    True the first time this folder is started (the launcher's shortcut mark).
+macos_version : Optional[str]
+    The macOS version; None for this Mac's.
+shows_messages : bool
+    False to show no message (for the tests).
+
+---- Globals read ----
+APP_NAME, COMMAND_NAME (module constants).
+
+---- Outputs ----
+bool
+    True when the old launcher's link was replaced.
+
+---- Globals mutated ----
+None. Writes the Desktop file and deletes the old link (side effects). Raises
+OSError when the Desktop cannot be changed.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_command_text_maker
+_link_into_checker
+_macos_too_old_checker
+_macos_version_reader
+_note_shower
+```
+
+#### `move_blocker_finder`
+
+```text
+---- Summary ----
+Main function to say why this install is not moved to the app. Only the user
+download is moved: a git clone on main, with its install script, on macOS 14 or
+newer. A developer's copy on another branch, and a copy from a zip file, are left
+as they are.
+
+---- Inputs ----
+root : Path
+    The program folder.
+macos_version : str
+    The macOS version, for example "15.1".
+
+---- Globals read ----
+INSTALLER_NAME, MAIN_BRANCH, OLDEST_MACOS (module constants).
+
+---- Outputs ----
+Optional[str]
+    Why it is not moved, in plain words; None when it is.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_git_runner
+_macos_too_old_checker
+```
+
 ## `launchers/mac_app_starter.py`
 
 The Mac app's start: updates the app, then runs the program, and says what to do when
@@ -1166,7 +1839,7 @@ user_places_finder
 
 ## `launchers/make_icons.py`
 
-Makes every icon file from assets/icon.png (square, 512 x 512 pixels or larger).
+Makes the Windows icon from assets/icon.png (square, 512 x 512 pixels or larger).
 
 ### FUNCTIONS
 
@@ -1174,14 +1847,15 @@ Makes every icon file from assets/icon.png (square, 512 x 512 pixels or larger).
 
 ```text
 ---- Summary ----
-Main function to turn assets/icon.png into the Windows icon (assets/icon.ico) and
-the Mac icon (inside Portimao.app).
+Main function to square assets/icon.png and turn it into the Windows icon
+(assets/icon.ico). The Mac app's icon is made from assets/icon.png when the app is
+built (launchers/mac_app_builder.py).
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-ROOT, SOURCE, WINDOWS_SIZES, MAC_FILE (module constants).
+ROOT, SOURCE, WINDOWS_SIZES (module constants).
 
 ---- Outputs ----
 int
@@ -3575,6 +4249,629 @@ _info_plist_writer
 _plist_maker
 ```
 
+## `tests/test_mac_app_mover.py`
+
+Tests that an install of the old launcher on a Mac is moved to the app: what goes, what
+
+### HELPERS
+
+#### `_git_runner`
+
+```text
+---- Summary ----
+Helper function to run a git command in the made-up install, as a test user.
+
+---- Inputs ----
+root : Path
+    The made-up install.
+*arguments : str
+    What follows `git`.
+
+---- Globals read ----
+HIDDEN (module constant).
+
+---- Outputs ----
+None
+    Nothing. The test fails when git fails.
+
+---- Globals mutated ----
+None. Changes the git copy (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_installer_faker`
+
+```text
+---- Summary ----
+Helper function to give a stand-in for install_mac.sh, which makes a small app in
+the user's own Applications folder, or fails as a download with no internet does.
+
+---- Inputs ----
+is_installed : bool
+    False to fail.
+calls : List[Path]
+    Gets the program folder of each call.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Callable[..., Tuple[Optional[Path], str]]
+    Called with (root, home, show, log) as the mover calls it.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_link_tester`
+
+```text
+---- Summary ----
+Helper function to skip the test where symbolic links cannot be made (Windows
+without the right to make them).
+
+---- Inputs ----
+folder : Path
+    A folder to try in.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing. Skips the test when no link can be made.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_old_install_maker`
+
+```text
+---- Summary ----
+Helper function to make an install of the old launcher as a git copy: the program's
+files committed on a branch, then the user's things and the program's own leftovers
+added, and one program file changed by the user.
+
+---- Inputs ----
+root : Path
+    Folder to make it in.
+branch : str
+    The branch it is on.
+
+---- Globals read ----
+ADDED, TRACKED (module constants).
+
+---- Outputs ----
+Path
+    The made-up install.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_git_runner
+```
+
+### MAIN FUNCTIONS
+
+#### `test_desktop_file_is_made_once`
+
+```text
+---- Summary ----
+Main function to check that a Mac run from its folder gets the Desktop file the
+first time the folder is started, naming the folder and the Python, and that it is
+not made again later once the user has deleted it.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+COMMAND_MARK, OLD_MACOS, PYTHON (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_desktop_file_replaces_the_old_link`
+
+```text
+---- Summary ----
+Main function to check that on a Mac that cannot run the app, the old launcher's
+link (into the program folder, whose Portimao.app the update took away) is replaced
+by the Desktop file at any start, and that a link the user made elsewhere is left.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+OLD_MACOS, PYTHON (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_link_tester
+```
+
+#### `test_developer_copy_is_not_moved`
+
+```text
+---- Summary ----
+Main function to check that a git copy on another branch than main (a developer's)
+is not moved and nothing is installed.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+NEW_MACOS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_installer_faker
+_old_install_maker
+```
+
+#### `test_failed_install_takes_nothing_away`
+
+```text
+---- Summary ----
+Main function to check that when the app cannot be installed, no file is taken
+away, nothing is opened, the program starts the old way and the log says why.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+NEW_MACOS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_installer_faker
+_old_install_maker
+```
+
+#### `test_folder_elsewhere_gets_its_fits_copied`
+
+```text
+---- Summary ----
+Main function to check that an install that is not the app's own folder has its
+fits and last answers copied into the app's own folder, while its data stays.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+NEW_MACOS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_installer_faker
+_old_install_maker
+```
+
+#### `test_move_keeps_the_desktop_link_working`
+
+```text
+---- Summary ----
+Main function to check that the move points the old launcher's link on the Desktop
+at the app, and replaces the Desktop file left by an earlier failed move with the
+same link.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+NEW_MACOS, PYTHON (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_installer_faker
+_link_tester
+_old_install_maker
+```
+
+#### `test_move_takes_away_only_program_files`
+
+```text
+---- Summary ----
+Main function to check that the move installs the app, takes away the files git
+tracks (outside fits), git's folder, the Python environment, the mark and the
+folders left empty, keeps the fits, the data, the logs, the last answers, anything
+else of the user's and the program file they changed, opens the app and logs it.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+ADDED, NEW_MACOS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_installer_faker
+_old_install_maker
+```
+
+#### `test_old_macos_is_not_moved`
+
+```text
+---- Summary ----
+Main function to check that a Mac older than macOS 14 is not moved, the reason
+naming its version, and nothing is installed.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+OLD_MACOS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_installer_faker
+_old_install_maker
+```
+
+## `tests/test_mac_install.py`
+
+Tests that the install line puts the right app in the user's own Applications folder,
+
+### HELPERS
+
+#### `_install_runner`
+
+```text
+---- Summary ----
+Helper function to run install_mac.sh as `curl ... | bash` does, its text coming in
+through the shell's input, with the Mac's commands stood in for and a stand-in home
+folder.
+
+---- Inputs ----
+home : Path
+    Stand-in home folder.
+arguments : Sequence[str]
+    Arguments after the script (`--no-open`).
+system : str
+    What uname says the system is.
+macos_version : str
+    What sw_vers says the macOS version is.
+is_apple_silicon : bool
+    True for an Apple Silicon Mac.
+is_open : bool
+    True when Portimao is found open.
+is_downloaded : bool
+    False when the download fails.
+
+---- Globals read ----
+HIDDEN, RELEASE_URL, SCRIPT, SHELL, STAND_INS (module constants).
+
+---- Outputs ----
+subprocess.CompletedProcess
+    The finished run, with its output as text.
+
+---- Globals mutated ----
+None. Runs the script, which writes into the home folder (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_old_app_maker`
+
+```text
+---- Summary ----
+Helper function to put an older Portimao app, with a file only it has, in the
+user's own Applications folder.
+
+---- Inputs ----
+home : Path
+    Stand-in home folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The old .app folder.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_download_failure_keeps_the_old_app`
+
+```text
+---- Summary ----
+Main function to check that a download that fails stops with one sentence saying
+what to do, keeps the app already there and leaves no download folder.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_install_runner
+_old_app_maker
+```
+
+#### `test_intel_mac_gets_the_intel_zip`
+
+```text
+---- Summary ----
+Main function to check that an Intel Mac downloads the Intel app.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+RELEASE_URL (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_install_runner
+```
+
+#### `test_line_installs_and_opens_the_app`
+
+```text
+---- Summary ----
+Main function to check that on an Apple Silicon Mac the line downloads the Apple
+Silicon app, puts it in the user's own Applications folder (made when missing),
+opens it, says so with the version and leaves no download folder behind.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+RELEASE_URL (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_install_runner
+```
+
+#### `test_no_open_replaces_the_old_app`
+
+```text
+---- Summary ----
+Main function to check that the line run again puts the new app wholly in place of
+the old one, and that --no-open (used by the move) leaves it closed.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_install_runner
+_old_app_maker
+```
+
+#### `test_not_a_mac_is_refused`
+
+```text
+---- Summary ----
+Main function to check that the line run on another system stops with one sentence
+and downloads nothing.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_install_runner
+```
+
+#### `test_old_macos_is_refused`
+
+```text
+---- Summary ----
+Main function to check that a Mac older than macOS 14 is told, in one sentence
+naming its version, to update macOS, and that nothing is downloaded or made.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_install_runner
+```
+
+#### `test_open_app_is_refused`
+
+```text
+---- Summary ----
+Main function to check that the line asks for Portimao to be closed when it is open,
+and leaves the app as it is.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_install_runner
+_old_app_maker
+```
+
 ## `tests/test_mac_report.py`
 
 Tests that the Mac report runs to the end, finds where the folder or the app is and
@@ -3587,7 +4884,7 @@ Tests that the Mac report runs to the end, finds where the folder or the app is 
 ---- Summary ----
 Helper function to make a small Portimao app in Applications, holding the report
 and a question list with a made-up version as the build puts them, and the app's
-own folder in the home folder with a launch log and an update log.
+own folder in the home folder with a launch log, an update log and a move log.
 
 ---- Inputs ----
 home : Path
@@ -3762,7 +5059,8 @@ _report_runner
 ```text
 ---- Summary ----
 Main function to check that the report run from inside the app (as Copy details
-does) describes the app and reads the logs of the app's own folder, leaves out the
+does) describes the app and reads the logs of the app's own folder (the move log
+among them), leaves out the
 launcher's parts, prints only the report on its output and changes nothing.
 
 ---- Inputs ----

@@ -22,7 +22,7 @@ body:
     id: mac-report
     attributes:
       label: The Mac report
-      description: Open Terminal (Cmd + Space, type Terminal, press Enter). Type sh and a space, open the Portimao folder, then its launchers folder, drag the file mac_report.sh onto the Terminal window and press Enter. The report is copied by itself, so click here and paste it (Cmd + V). It shows where the Portimao folder is, which includes your Mac user name; change it before sending if you prefer.
+      description: If Portimao showed a Copy details button, click it and the report is copied. Otherwise open Terminal (Cmd + Space, type Terminal, press Enter), paste the line sh ~/Applications/Portimao.app/Contents/Resources/launchers/mac_report.sh and press Enter (leave out the ~ if you put Portimao in the main Applications folder yourself; on a Mac older than macOS 14 the line is sh ~/Portimao/launchers/mac_report.sh). The report is copied by itself, so click here and paste it (Cmd + V). It shows where Portimao is, which includes your Mac user name; change it before sending if you prefer.
       render: text
     validations:
       required: true

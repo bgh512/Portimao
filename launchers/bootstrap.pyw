@@ -1,5 +1,6 @@
 """
-Launcher: checks for updates, sets up the environment, makes the icon, starts Portimao.
+Launcher: checks for updates, moves a Mac install to the Mac app, sets up the
+environment, makes the icon, starts Portimao.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -12,6 +13,7 @@ import threading
 import time
 import traceback
 from pathlib import Path
+from types import ModuleType
 from typing import Callable, List, Optional
 
 
@@ -37,6 +39,49 @@ MINIMUM_TK = 8.6  # Tk 8.5 (the one Apple's own Python uses) draws blank windows
 
 
 # ---- LAUNCHER HELPERS ----------------------------------------------------------------
+
+
+# ---- _app_move_trier -----------------------------------------------------------------
+def _app_move_trier(show: Callable[[str], None]) -> bool:
+    """
+    ---- Summary ----
+    Helper function to move this folder to the Mac app on a Mac (mac_app_mover). A move
+    that stops in a way it did not foresee leaves the program to start the old way,
+    with what happened in logs/move_to_app.log.
+
+    ---- Inputs ----
+    show : Callable[[str], None]
+        Function that shows a line of progress text.
+
+    ---- Globals read ----
+    ROOT (module constant).
+
+    ---- Outputs ----
+    bool
+        True when the app is opening in place of this folder, so the launcher closes.
+
+    ---- Globals mutated ----
+    None. May install the app and take away the program files (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _mac_mover_loader
+    app_mover
+    """
+
+    try:
+        return _mac_mover_loader().app_mover(ROOT, Path.home(), show)
+    except Exception:  # the old way still works, so the start goes on
+        try:
+            log = ROOT / 'logs' / 'move_to_app.log'
+            log.parent.mkdir(parents=True, exist_ok=True)
+            with open(log, 'a', encoding='utf-8') as stream:
+                stream.write(f'The move stopped:\n{traceback.format_exc()}')
+        except OSError:
+            pass
+        return False
 
 
 # ---- _command_runner -----------------------------------------------------------------
@@ -77,6 +122,40 @@ def _command_runner(command: List[str],
                           timeout=timeout,
                           creationflags=HIDDEN,
                           )
+
+
+# ---- _mac_mover_loader ---------------------------------------------------------------
+def _mac_mover_loader() -> ModuleType:
+    """
+    ---- Summary ----
+    Helper function to load the Mac's move to the app (launchers/mac_app_mover.py),
+    only on a Mac, from the launchers folder.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    ROOT (module constant).
+
+    ---- Outputs ----
+    ModuleType
+        The module mac_app_mover.
+
+    ---- Globals mutated ----
+    sys.path: the launchers folder is put first when it is missing.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    folder = str(ROOT / 'launchers')
+    if folder not in sys.path:
+        sys.path.insert(0, folder)
+    import mac_app_mover
+    return mac_app_mover
 
 
 # ---- _message_shower -----------------------------------------------------------------
@@ -487,12 +566,14 @@ def launcher_runner(show: Callable[[str], None]) -> int:
         0 when the program started, 1 otherwise.
 
     ---- Globals mutated ----
-    None. Starts the program and may restart this launcher (side effects).
+    None. Starts the program, may restart this launcher, and on a Mac may move this
+    folder to the Mac app (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _app_move_trier
     _message_shower
     _tk_version_getter
     environment_builder
@@ -509,6 +590,8 @@ def launcher_runner(show: Callable[[str], None]) -> int:
                              env=environment,
                              )
             return 0
+        if sys.platform == 'darwin' and _app_move_trier(show):
+            return 0  # the Mac app is opening in place of this folder
         environment_builder(show)
         tk_version = _tk_version_getter(str(ENVIRONMENT_PYTHON))
         if tk_version is None or tk_version < MINIMUM_TK:
@@ -644,9 +727,10 @@ def shortcut_maker() -> None:
     """
     ---- Summary ----
     Main function to make the clickable icon the first time (and again if the folder
-    is moved): Desktop and Start menu shortcuts on Windows, a link to Portimao.app on
-    the Desktop on a Mac, an entry in the applications menu and on the Desktop on
-    Linux.
+    is moved): Desktop and Start menu shortcuts on Windows, an entry in the
+    applications menu and on the Desktop on Linux. A Mac that runs Portimao from this
+    folder (one that cannot run the Mac app) gets a Portimao file on the Desktop, which
+    also takes the place of the old link to Portimao.app at any start.
 
     ---- Inputs ----
     None.
@@ -666,11 +750,21 @@ def shortcut_maker() -> None:
 
     ---- Helpers ----
     _command_runner
+    _mac_mover_loader
     _old_shortcut_remover
+    desktop_file_maker
     """
 
     try:
-        if SHORTCUT_MARK.exists() and SHORTCUT_MARK.read_text() == str(ROOT):
+        is_made = SHORTCUT_MARK.exists() and SHORTCUT_MARK.read_text() == str(ROOT)
+        if sys.platform == 'darwin':
+            # at every start, as the update takes away what the old link opened
+            _mac_mover_loader().desktop_file_maker(ROOT,
+                                                   Path.home(),
+                                                   sys.executable,
+                                                   not is_made,
+                                                   )
+        if is_made:
             return
         _old_shortcut_remover()
         if IS_WINDOWS:
@@ -689,11 +783,6 @@ def shortcut_maker() -> None:
                              str(target),
                              str(ROOT / 'Portimao.pyw'),
                              ])
-        elif sys.platform == 'darwin':
-            link = Path.home() / 'Desktop' / f'{APP_NAME}.app'
-            if link.is_symlink() or link.exists():
-                link.unlink() if link.is_symlink() else shutil.rmtree(link)
-            link.symlink_to(ROOT / f'{APP_NAME}.app')
         elif sys.platform.startswith('linux'):
             python = shutil.which('python3') or 'python3'
             launcher = ROOT / 'launchers' / 'bootstrap.pyw'
