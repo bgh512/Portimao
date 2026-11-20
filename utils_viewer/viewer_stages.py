@@ -58,6 +58,7 @@ from utils_viewer.viewer_preview import (all_data_exporter,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
+from utils_viewer.viewer_od_table import COLUMNS
 from utils_viewer.viewer_window import PictureWindow
 
 
@@ -76,6 +77,59 @@ STAGE_TITLES = {'browser': 'Experiment browser',
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
+
+
+# ---- _addition_time_lister -----------------------------------------------------------
+def _addition_time_lister(summaries: List[dict],
+                          limits: Dict[str, dict],
+                          details: Dict[str, dict],
+                          ) -> Dict[str, List[float]]:
+    """
+    ---- Summary ----
+    Helper function to list the times of the additions of every file on the time axis
+    of the processing plot, which starts at 0 where the trimmed data starts. Events
+    marked ignore are left out, as the averaging leaves them out.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md), with the events as the file holds them.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file; 'trim_start' is on the original
+        recording.
+    details : Dict[str, dict]
+        OD values and events of every file (details_stage_runner); an event's
+        'ignored' says it was marked ignore.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, List[float]]
+        {file name: addition times (min), in order}.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    time on the plot = time in the file - trim start.
+
+    ---- Helpers ----
+    None.
+    """
+
+    found = {}
+    for summary in summaries:
+        name = summary['name']
+        shift = (limits.get(name) or {}).get('trim_start') or 0.0
+        ignored = {event['datapoint']
+                   for event in (details.get(name) or {}).get('events', [])
+                   if event.get('ignored')
+                   }
+        found[name] = sorted(float(event['time']) - shift
+                             for event in summary['events']
+                             if event['datapoint'] not in ignored
+                             )
+    return found
 
 
 # ---- _all_data_asker -----------------------------------------------------------------
@@ -218,7 +272,8 @@ def _averaging_reviewer(session: ViewerSession,
     ---- Summary ----
     Helper function to ask whether to average around the events and over which window,
     draw the windows, list in red those that do not fit, and ask whether to accept them
-    or answer again.
+    or answer again. In the window, a drag across the plot of a file gives the window
+    and the gap, from the additions of that file.
 
     ---- Inputs ----
     session : ViewerSession
@@ -250,13 +305,18 @@ def _averaging_reviewer(session: ViewerSession,
     None.
 
     ---- Helpers ----
+    _addition_time_lister
     _review_asker
     _skipped_lister
     averaging_asker
     """
 
+    additions = (_addition_time_lister(session.summaries, limits, details)
+                 if session.window.is_interactive
+                 else None
+                 )
     while True:
-        averaging_asker(answers, defaults)
+        averaging_asker(answers, defaults, additions=additions)
         if not answers['averaging']:
             return
         redraw()
@@ -688,6 +748,73 @@ def _od_lister(details: Dict[str, dict]) -> None:
                      )
 
 
+# ---- _od_table_filler ----------------------------------------------------------------
+def _od_table_filler(session: ViewerSession,
+                     rows: Dict[str, Dict[str, Optional[float]]],
+                     ) -> Dict[str, Dict[str, Optional[float]]]:
+    """
+    ---- Summary ----
+    Helper function to have the OD values filled in in the table of the window: the
+    table is shown with the given rows, one question waits for Enter, and it is asked
+    again, naming the cells, while a cell is empty or not a number above 0. The table
+    is then taken away.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session, whose window has the table.
+    rows : Dict[str, Dict[str, Optional[float]]]
+        The rows to start from (od_rows, DATA_FORMAT.md); None leaves a cell empty.
+
+    ---- Globals read ----
+    COLUMNS (imported constant).
+
+    ---- Outputs ----
+    Dict[str, Dict[str, Optional[float]]]
+        The rows as filled in, every value a number above 0.
+
+    ---- Globals mutated ----
+    None. Shows and hides the table and reads from and prints to the terminal (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    text_asker
+    """
+
+    window = session.window
+    window.od_table_shower(rows)
+    try:
+        while True:
+            text_asker(
+                'Fill in the table under this text for each file: the OD of the '
+                'cells added, the volume of cells (mL) spun down and resuspended '
+                'in 5 mL, and the dilution factor if the cells were diluted mid '
+                'run. Then press Enter here.',
+                )
+            filled, wrong = window.od_table_reader()
+            empty = [f'{name}: {heading}'
+                     for name, values in filled.items()
+                     for key, heading in COLUMNS
+                     if values.get(key) is None and f'{name}: {heading}' not in wrong
+                     ]
+            if not (wrong or empty):
+                return filled
+            if wrong:
+                info_printer('These cells need a number above 0: '
+                             + ', '.join(wrong) + '.',
+                             depth=2,
+                             )
+            if empty:
+                info_printer('These cells are empty: ' + ', '.join(empty) + '.',
+                             depth=2,
+                             )
+    finally:
+        window.od_table_hider()
+
+
 # ---- _pca_pictures_publisher ---------------------------------------------------------
 def _pca_pictures_publisher(session: ViewerSession,
                             analysis: dict,
@@ -1033,7 +1160,8 @@ def details_stage_runner(session: ViewerSession,
     """
     ---- Summary ----
     Main function to ask the last questions of the import, on the standard plot cut to
-    the limits: the OD values, then the event labels. The OD values are only checked:
+    the limits: the OD values (in the table of the window, or with questions per file
+    and an accept question), then the event labels. The OD values are only checked:
     the data is scaled by OD in the individual plots. The plot is redrawn with the
     labels once they are entered.
 
@@ -1069,6 +1197,7 @@ def details_stage_runner(session: ViewerSession,
     ---- Helpers ----
     _answers_previewer
     _od_lister
+    _od_table_filler
     _review_asker
     event_asker
     od_scaling_asker
@@ -1091,13 +1220,22 @@ def details_stage_runner(session: ViewerSession,
                               )
 
     # ---- 2 OD values -----------------------------------------------------------------
-    # Only checked here; the data is scaled by OD in the individual plots
+    # Only checked here; the data is scaled by OD in the individual plots. In the window
+    # they are filled in in a table, which is its own check.
+    is_table = session.window.is_interactive
+    def table_filler(rows: Dict[str, dict]) -> Dict[str, dict]:
+        return _od_table_filler(session, rows)
     while True:
-        details = od_scaling_asker(summaries, answers, defaults, saved)
+        details = od_scaling_asker(summaries,
+                                   answers,
+                                   defaults,
+                                   saved,
+                                   table_filler=table_filler if is_table else None,
+                                   )
         if not answers['normalise_od']:
             break
         _od_lister(details)
-        if _review_asker(session,
+        if is_table or _review_asker(session,
                          'Do you accept these OD values?',
                          'No, enter the OD values again',
                          lambda: True,

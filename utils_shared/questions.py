@@ -19,9 +19,9 @@ MAX_DEPTH = 6
 _counters = [0] * MAX_DEPTH  # [section, question, sub question, ...]
 _colour_ready = False
 _tight_next = False  # True: the next question follows its heading line directly
-# What is told when a question wants a time (the window, which then takes clicks on the
-# plot); None in the terminal.
-_time_requester: Optional[Callable[[bool], None]] = None
+# What is told when a question can be answered with the mouse (the window, which then
+# takes clicks or drags on the plot); None in the terminal.
+_time_requester: Optional[Callable[[Optional[str], Optional[Callable]], None]] = None
 
 
 # ---- UserQuitError -------------------------------------------------------------------
@@ -160,15 +160,20 @@ def _question_printer(question: str, depth: int, hint: str = '') -> str:
 
 
 # ---- _time_announcer -----------------------------------------------------------------
-def _time_announcer(is_wanted: bool) -> None:
+def _time_announcer(kind: Optional[str], reader: Optional[Callable]) -> None:
     """
     ---- Summary ----
     Helper function to tell the window, when there is one, that the question being
-    asked wants a time (so a click on the plot can give it), or no longer does.
+    asked can be answered with the mouse (a click or a drag on the plot, turned into
+    the answer by ``reader``), or no longer can.
 
     ---- Inputs ----
-    is_wanted : bool
-        True while the question waits for a time.
+    kind : Optional[str]
+        'point' (a click), 'span' (a drag), or None once the question has its answer.
+    reader : Optional[Callable]
+        Turns what the mouse gave into the answer: reader(file name, time_min) for a
+        click, reader(file name, start_min, end_min) for a drag; it returns None when
+        that file or place gives no answer. None with kind None.
 
     ---- Globals read ----
     _time_requester (module state).
@@ -188,7 +193,7 @@ def _time_announcer(is_wanted: bool) -> None:
     """
 
     if _time_requester is not None:
-        _time_requester(is_wanted)
+        _time_requester(kind, reader)
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -491,14 +496,17 @@ def number_asker(question: str,
                  allow_blank: bool = False,
                  depth: int = 1,
                  blank_label: str = 'none',
-                 wants_time: bool = False,
+                 time_reader: Optional[Callable[[str, float],
+                                                Optional[float]]] = None,
+                 span_reader: Optional[Callable[[str, float, float],
+                                                Optional[float]]] = None,
                  ) -> Optional[float]:
     """
     ---- Summary ----
     Main function to ask a question answered with a number, asking again until the value
-    is valid. A question that wants a time says so to the window, where a click on the
-    plot then writes the pointed time into the answer box; in the terminal nothing
-    changes.
+    is valid. A question that can be answered with the mouse says so to the window,
+    where a click (``time_reader``) or a drag (``span_reader``) on the plot then writes
+    the answer it gives into the answer box; in the terminal nothing changes.
 
     ---- Inputs ----
     question : str
@@ -517,8 +525,12 @@ def number_asker(question: str,
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
     blank_label : str
         Word shown in [brackets] for an empty answer.
-    wants_time : bool
-        True when the number is a time on the plot (min), which the mouse can give.
+    time_reader : Optional[Callable[[str, float], Optional[float]]]
+        Turns a click on the plot into the answer: (file shown, time clicked in min) ->
+        answer, or None when that click gives none. None when a click gives nothing.
+    span_reader : Optional[Callable[[str, float, float], Optional[float]]]
+        Turns a drag across the plot into the answer: (file shown, start min, end min)
+        -> answer, or None. Used only when there is no ``time_reader``.
 
     ---- Globals read ----
     None.
@@ -550,8 +562,10 @@ def number_asker(question: str,
     indent = _question_printer(question, depth, hint)
 
     # ---- 3 Read and check the answer -------------------------------------------------
-    if wants_time:
-        _time_announcer(True)
+    if time_reader is not None:
+        _time_announcer('point', time_reader)
+    elif span_reader is not None:
+        _time_announcer('span', span_reader)
     try:
         while True:
             answer = _input_reader(question, indent).replace(',', '.')
@@ -579,8 +593,8 @@ def number_asker(question: str,
                 continue
             return value
     finally:
-        if wants_time:
-            _time_announcer(False)
+        if time_reader is not None or span_reader is not None:
+            _time_announcer(None, None)
 
 
 # ---- numbering_getter ----------------------------------------------------------------
@@ -965,16 +979,23 @@ def text_italiser(text: str) -> str:
 
 
 # ---- time_request_setter -------------------------------------------------------------
-def time_request_setter(requester: Optional[Callable[[bool], None]]) -> None:
+def time_request_setter(requester: Optional[Callable[[Optional[str],
+                                                      Optional[Callable],
+                                                      ],
+                                                     None,
+                                                     ]],
+                        ) -> None:
     """
     ---- Summary ----
-    Main function to register what is told when a question wants a time: the window
-    registers itself while it is open, so a click on its plot can give the time.
+    Main function to register what is told when a question can be answered with the
+    mouse: the window registers itself while it is open, so a click or a drag on its
+    plot can give the answer.
 
     ---- Inputs ----
-    requester : Optional[Callable[[bool], None]]
-        Function called with True when a question starts waiting for a time and False
-        when it has its answer; None to register nothing (the terminal).
+    requester : Optional[Callable[[Optional[str], Optional[Callable]], None]]
+        Function called with ('point' or 'span', reader) when a question starts waiting
+        for an answer the mouse can give, and with (None, None) when it has its answer
+        (see _time_announcer); None to register nothing (the terminal).
 
     ---- Globals read ----
     None.

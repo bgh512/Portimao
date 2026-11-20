@@ -44,8 +44,10 @@ ERROR_COLOUR = '#ff7b86'
 ICON_PATH = Path(__file__).resolve().parent.parent / 'assets' / 'icon.png'
 ANSWER_HINT = ('Type your answer and press Enter. If you type nothing, the value in '
                '[brackets] is used.')
-TIME_HINT = ('Click on the plot to pick a time, or type it, then press Enter. If you '
-             'type nothing, the value in [brackets] is used.')
+TIME_HINT = ('Click on the plot where the answer falls, or type it, then press Enter. '
+             'If you type nothing, the value in [brackets] is used.')
+SPAN_HINT = ('Drag across the plot to fill in the answer, or type it, then press Enter. '
+             'If you type nothing, the value in [brackets] is used.')
 TABLE_HINT = ('Click a cell of the table and type its value; Tab moves across, Enter '
               'moves down. When the table is filled in, press Enter in the box below.')
 SIGN_BACKGROUND = '#ffd76a'
@@ -132,8 +134,13 @@ class ViewerGui:
     ---- Methods ----
     __init__
     _answer_sender
+    _answer_writer
+    _axis_box_finder
+    _band_drawer
     _closing_handler
     _display_name_lister
+    _drag_ender
+    _dragger
     _drain_runner
     _drawing_sign_drawer
     _event_handler
@@ -174,7 +181,7 @@ class ViewerGui:
     strip_reader
     strip_setter
     text_sender
-    time_wanted_setter
+    time_reader_setter
     window_closer
     """
 
@@ -241,7 +248,9 @@ class ViewerGui:
         self._shown_axis: Optional[TimeAxis] = None
         self._picture_box: Optional[Tuple[float, float, int, int]] = None
         self._pointer: Optional[Tuple[int, int]] = None
-        self._is_time_wanted = False
+        self._time_kind: Optional[str] = None
+        self._time_reader: Optional[Callable] = None
+        self._drag_start: Optional[Tuple[float, float]] = None
         self._photo: Any = None
         self._decoded: Any = None
         self._resize_job: Any = None
@@ -302,8 +311,142 @@ class ViewerGui:
         self._entry.delete(0, 'end')
         self._entry.configure(state='disabled')
         self._hint.configure(text='Working ...')
+        self._drag_start = None
+        self._canvas.delete('band')
         self._pane_writer(answer + '\n', 'answer')
         self._answers.put(answer)
+
+    # ---- _answer_writer --------------------------------------------------------------
+    def _answer_writer(self, value: Optional[float]) -> None:
+        """
+        ---- Summary ----
+        Method to write the answer the mouse gave into the answer box, in place of what
+        was there; nothing changes when the mouse gave no answer.
+
+        ---- Inputs ----
+        value : Optional[float]
+            The answer, or None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the text of the answer box (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if value is None:
+            return
+        self._entry.delete(0, 'end')
+        self._entry.insert(0, f'{round(value, 2):g}')
+        self._entry.focus_set()
+
+    # ---- _axis_box_finder ------------------------------------------------------------
+    def _axis_box_finder(self) -> Optional[Tuple[float, float, float, float]]:
+        """
+        ---- Summary ----
+        Method to find where the panels of the picture shown sit in the plot area.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Optional[Tuple[float, float, float, float]]
+            (left, right, top, bottom) of the panels in pixels from the top left of the
+            plot area, or None when the picture has no time axis.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        x = picture left + fraction across * picture width;
+        y = picture top + (1 - fraction up) * picture height.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self._picture_box is None or self._shown_axis is None:
+            return None
+        left, top, width, height = self._picture_box
+        axis = self._shown_axis
+        return (left + axis.left * width,
+                left + axis.right * width,
+                top + (1.0 - axis.top) * height,
+                top + (1.0 - axis.bottom) * height,
+                )
+
+    # ---- _band_drawer ----------------------------------------------------------------
+    def _band_drawer(self, x: float) -> None:
+        """
+        ---- Summary ----
+        Method to draw the band of a drag over the panels, from where the drag started
+        to ``x`` (kept within the time axis), with its length in seconds above it.
+
+        ---- Inputs ----
+        x : float
+            Where the mouse is, in pixels from the left of the plot area.
+
+        ---- Globals read ----
+        POINTER_COLOUR (module constant).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        Length (s) = |time at x - time at the start| x 60.
+
+        ---- Helpers ----
+        _axis_box_finder
+        pointed_time_finder
+        """
+
+        self._canvas.delete('band')
+        box = self._axis_box_finder()
+        if box is None or self._drag_start is None:
+            return
+        left, right, top, bottom = box
+        start_x, start_min = self._drag_start
+        x = min(max(x, left + 0.5), right - 0.5)  # inside the edges despite rounding
+        end_min = pointed_time_finder(x,
+                                      (top + bottom) / 2.0,
+                                      self._picture_box,
+                                      self._shown_axis,
+                                      )
+        if end_min is None:
+            return
+        self._canvas.create_rectangle(min(start_x, x),
+                                      top,
+                                      max(start_x, x),
+                                      bottom,
+                                      outline=POINTER_COLOUR,
+                                      width=2,
+                                      tags='band',
+                                      )
+        self._canvas.create_text((start_x + x) / 2.0,
+                                 top - 4,
+                                 text=f'{abs(end_min - start_min) * 60.0:.0f} s',
+                                 anchor='s',
+                                 fill=POINTER_COLOUR,
+                                 font=(self._family, 10, 'bold'),
+                                 tags='band',
+                                 )
 
     # ---- _closing_handler ------------------------------------------------------------
     def _closing_handler(self) -> None:
@@ -379,6 +522,90 @@ class ViewerGui:
         return [f'[locked] {name}' if i < self._file_count else name
                 for i, name in enumerate(self._names)
                 ]
+
+    # ---- _drag_ender -----------------------------------------------------------------
+    def _drag_ender(self, event: Any) -> None:
+        """
+        ---- Summary ----
+        Method to end a drag across the plot: the times where it started and ended
+        (kept within the time axis) are turned into the answer, which is written into
+        the answer box. The band stays until the answer is sent.
+
+        ---- Inputs ----
+        event : Any
+            The Tk release event.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the text of the answer box (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _answer_writer
+        _axis_box_finder
+        pointed_time_finder
+        """
+
+        start = self._drag_start
+        self._drag_start = None
+        box = self._axis_box_finder()
+        if start is None or box is None or not self._is_waiting:
+            return
+        left, right, top, bottom = box
+        end_min = pointed_time_finder(min(max(event.x, left + 0.5), right - 0.5),
+                                      (top + bottom) / 2.0,
+                                      self._picture_box,
+                                      self._shown_axis,
+                                      )
+        if end_min is None or end_min == start[1] or self._time_reader is None:
+            self._canvas.delete('band')
+            return
+        self._answer_writer(self._time_reader(self._names[self._index],
+                                              min(start[1], end_min),
+                                              max(start[1], end_min),
+                                              ),
+                            )
+
+    # ---- _dragger --------------------------------------------------------------------
+    def _dragger(self, event: Any) -> None:
+        """
+        ---- Summary ----
+        Method to follow the mouse while the button is held: the time line moves with
+        it and, during a drag, the band is drawn to it.
+
+        ---- Inputs ----
+        event : Any
+            The Tk motion event.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _band_drawer
+        _pointer_mover
+        """
+
+        self._pointer_mover(event)
+        if self._drag_start is not None:
+            self._band_drawer(event.x)
 
     # ---- _drain_runner ---------------------------------------------------------------
     def _drain_runner(self) -> None:
@@ -521,9 +748,7 @@ class ViewerGui:
             if self._is_table_shown:
                 self._hint.configure(text=TABLE_HINT)
             else:
-                self._hint.configure(
-                    text=TIME_HINT if self._is_time_wanted else ANSWER_HINT,
-                    )
+                self._hint.configure(text=_hint_chooser(self._time_kind))
         elif kind == 'strip':
             self._strip.values_setter(event[1])
         elif kind == 'strip_fits':
@@ -539,10 +764,12 @@ class ViewerGui:
             self._od_table.frame.pack_forget()
             self._is_table_shown = False
         elif kind == 'time':
-            self._is_time_wanted = event[1]
+            self._time_kind, self._time_reader = event[1], event[2]
+            self._drag_start = None
+            self._canvas.delete('band')
             self._canvas.configure(cursor='crosshair' if event[1] else '')
-            if self._is_waiting:
-                self._hint.configure(text=TIME_HINT if event[1] else ANSWER_HINT)
+            if self._is_waiting and not self._is_table_shown:
+                self._hint.configure(text=_hint_chooser(event[1]))
         elif kind == 'session':
             self._session = event[1]
             self._names = [s['name'] for s in self._session.summaries]
@@ -1332,9 +1559,11 @@ class ViewerGui:
     def _time_clicker(self, event: Any) -> None:
         """
         ---- Summary ----
-        Method to write the time the mouse points at into the answer box when the plot
-        is clicked while a question waits for a time. The time replaces what was in the
-        box, can still be edited, and is accepted with Enter.
+        Method to act on a click on the plot of a file while the question waiting can
+        be answered with the mouse: for a click question, the answer the time gives
+        is written into the answer box; for a drag question, the drag starts here. The
+        answer replaces what was in the box, can still be edited, and is accepted with
+        Enter.
 
         ---- Inputs ----
         event : Any
@@ -1348,19 +1577,25 @@ class ViewerGui:
             Nothing.
 
         ---- Globals mutated ----
-        None. Changes the text of the answer box (side effect).
+        None. Changes the text of the answer box or starts a drag (side effects).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
+        _answer_writer
+        _band_drawer
         pointed_time_finder
         """
 
-        if not (self._is_time_wanted and self._is_waiting):
+        self._drag_start = None
+        if not (self._time_kind and self._is_waiting):
             return
-        if self._picture_box is None or self._shown_axis is None:
-            return
+        if (self._picture_box is None
+            or self._shown_axis is None
+            or self._index >= self._file_count
+            ):
+            return  # only the plot of a file has the times the answer is read from
         time_min = pointed_time_finder(event.x,
                                        event.y,
                                        self._picture_box,
@@ -1368,9 +1603,11 @@ class ViewerGui:
                                        )
         if time_min is None:
             return
-        self._entry.delete(0, 'end')
-        self._entry.insert(0, f'{time_min:.2f}')
-        self._entry.focus_set()
+        if self._time_kind == 'span':
+            self._drag_start = (float(event.x), time_min)
+            self._band_drawer(event.x)
+            return
+        self._answer_writer(self._time_reader(self._names[self._index], time_min))
 
     # ---- _time_line_drawer -----------------------------------------------------------
     def _time_line_drawer(self) -> None:
@@ -1644,6 +1881,8 @@ class ViewerGui:
         self._canvas.bind('<Motion>', self._pointer_mover)
         self._canvas.bind('<Leave>', lambda e: self._pointer_mover(None))
         self._canvas.bind('<Button-1>', self._time_clicker)
+        self._canvas.bind('<B1-Motion>', self._dragger)
+        self._canvas.bind('<ButtonRelease-1>', self._drag_ender)
         root.bind_all('<Prior>', lambda e: self._step_taker(-1))
         root.bind_all('<Next>', lambda e: self._step_taker(1))
         root.protocol('WM_DELETE_WINDOW', self._closing_handler)
@@ -2022,7 +2261,7 @@ class ViewerGui:
         sys.stdout = OutputRouter(original[0], self.text_sender, 'out', owner)
         sys.stderr = OutputRouter(original[1], self.text_sender, 'err', owner)
         builtins.input = self.input_reader
-        time_request_setter(self.time_wanted_setter)
+        time_request_setter(self.time_reader_setter)
         _active_gui = self
         self.logic_thread = threading.Thread(target=self._logic_runner,
                                              name='program',
@@ -2258,17 +2497,25 @@ class ViewerGui:
 
         self._events.put(('text', text, kind))
 
-    # ---- time_wanted_setter ----------------------------------------------------------
-    def time_wanted_setter(self, is_wanted: bool) -> None:
+    # ---- time_reader_setter ----------------------------------------------------------
+    def time_reader_setter(self,
+                           kind: Optional[str],
+                           reader: Optional[Callable],
+                           ) -> None:
         """
         ---- Summary ----
-        Method to say that the question being asked wants a time, so a click on the
-        plot writes the pointed time into the answer box, or that it no longer does.
-        It is called from the question thread.
+        Method to say that the question being asked can be answered with the mouse, so
+        a click (or a drag) on the plot of a file writes the answer it gives into the
+        answer box, or that it no longer can. It is called from the question thread.
 
         ---- Inputs ----
-        is_wanted : bool
-            True while the question waits for a time.
+        kind : Optional[str]
+            'point' (a click), 'span' (a drag), or None once the question has its
+            answer.
+        reader : Optional[Callable]
+            Turns what the mouse gave into the answer: reader(file name, time_min) for a
+            click, reader(file name, start_min, end_min) for a drag; None with kind
+            None. It is called on the window thread.
 
         ---- Globals read ----
         None.
@@ -2287,7 +2534,7 @@ class ViewerGui:
         None.
         """
 
-        self._events.put(('time', is_wanted))
+        self._events.put(('time', kind, reader))
 
     # ---- window_closer ---------------------------------------------------------------
     def window_closer(self) -> None:
@@ -2320,6 +2567,44 @@ class ViewerGui:
         if self._renderer is not None:
             self._renderer.stopper()
         self._events.put(('closed',))
+
+
+# ---- GUI HELPERS ---------------------------------------------------------------------
+
+
+# ---- _hint_chooser -------------------------------------------------------------------
+def _hint_chooser(time_kind: Optional[str]) -> str:
+    """
+    ---- Summary ----
+    Helper function to choose the hint shown under the answer box: what the mouse can
+    do for the question waiting, if anything.
+
+    ---- Inputs ----
+    time_kind : Optional[str]
+        'point' (a click gives the answer), 'span' (a drag gives it) or None.
+
+    ---- Globals read ----
+    ANSWER_HINT, SPAN_HINT, TIME_HINT (module constants).
+
+    ---- Outputs ----
+    str
+        The hint.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if time_kind == 'point':
+        return TIME_HINT
+    if time_kind == 'span':
+        return SPAN_HINT
+    return ANSWER_HINT
 
 
 # ---- active_gui_getter ---------------------------------------------------------------

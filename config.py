@@ -107,6 +107,8 @@ HAEM_FACTOR = 1_000_000
 REFERENCE_WINDOW_POINTS = 50
 # least data the baseline average (before the first addition) must span
 BASELINE_MINIMUM_SECONDS = 10
+# an averaging window dragged across the plot is rounded to whole steps of this
+DRAG_STEP_SECONDS = 5
 # axis-label size. Tick labels, legends and event labels are 1 pt smaller and titles 1
 # pt larger; panel letters follow the journal.
 BASE_FONT_PT = 6

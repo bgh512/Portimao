@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.20
+- **Version:** V1.22
 - **Date:** 20/11/2026
 
 ## Contents
@@ -140,6 +140,8 @@
     - [`test_average_over_three_runs`](#test_average_over_three_runs)
     - [`test_average_needs_two_runs`](#test_average_needs_two_runs)
 - [`tests/test_time_pointer.py`](#teststest_time_pointerpy)
+    - [`test_click_gives_the_minutes_of_each_edge`](#test_click_gives_the_minutes_of_each_edge)
+    - [`test_drag_gives_the_window_and_gap`](#test_drag_gives_the_window_and_gap)
     - [`test_pointed_time_inside_the_panels`](#test_pointed_time_inside_the_panels)
     - [`test_pointed_time_off_the_panels`](#test_pointed_time_off_the_panels)
     - [`test_pointed_time_on_a_scaled_picture`](#test_pointed_time_on_a_scaled_picture)
@@ -503,6 +505,7 @@
     - [`_subscript_stripper`](#_subscript_stripper)
     - [`_tidy_labels_offerer`](#_tidy_labels_offerer)
     - [`averaging_asker`](#averaging_asker)
+    - [`averaging_drag_reader`](#averaging_drag_reader)
     - [`data_folder_lister`](#data_folder_lister)
     - [`data_folder_resolver`](#data_folder_resolver)
     - [`decomposition_asker`](#decomposition_asker)
@@ -517,6 +520,7 @@
     - [`haem_scaling_asker`](#haem_scaling_asker)
     - [`label_angle_asker`](#label_angle_asker)
     - [`label_tidier`](#label_tidier)
+    - [`limit_minutes_finder`](#limit_minutes_finder)
     - [`multi_experiment_asker`](#multi_experiment_asker)
     - [`ocr_kind_lister`](#ocr_kind_lister)
     - [`ocr_option_builder`](#ocr_option_builder)
@@ -532,6 +536,7 @@
 - [`utils_viewer/viewer_gui.py`](#utils_viewerviewer_guipy)
     - [`GuiUnavailableError`](#guiunavailableerror)
     - [`ViewerGui`](#viewergui)
+    - [`_hint_chooser`](#_hint_chooser)
     - [`active_gui_getter`](#active_gui_getter)
     - [`gui_runner`](#gui_runner)
     - [`pointed_time_finder`](#pointed_time_finder)
@@ -561,6 +566,7 @@
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
     - [`PreviewRenderer`](#previewrenderer)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
+    - [`_addition_time_lister`](#_addition_time_lister)
     - [`_all_data_asker`](#_all_data_asker)
     - [`_answers_previewer`](#_answers_previewer)
     - [`_averaging_reviewer`](#_averaging_reviewer)
@@ -572,6 +578,7 @@
     - [`_fit_file_saver`](#_fit_file_saver)
     - [`_limits_lister`](#_limits_lister)
     - [`_od_lister`](#_od_lister)
+    - [`_od_table_filler`](#_od_table_filler)
     - [`_pca_pictures_publisher`](#_pca_pictures_publisher)
     - [`_review_asker`](#_review_asker)
     - [`_skipped_lister`](#_skipped_lister)
@@ -4322,9 +4329,71 @@ _run_builder
 
 ## `tests/test_time_pointer.py`
 
-Tests that the mouse over a preview gives the time worked out by hand, that the time
+Tests that the mouse over a preview gives the times and answers worked out by hand,
 
 ### MAIN FUNCTIONS
+
+#### `test_click_gives_the_minutes_of_each_edge`
+
+```text
+---- Summary ----
+Main function to check that a click on the plot of the whole recording gives the
+minutes each trim and ignore question asks for, worked out by hand for a 60 min
+recording, and 0 for a click beyond the edge.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim start: click at 4 -> 4. Trim end: click at 55 -> 60 - 55 = 5. Ignore start
+after a trim start at 4: click at 9.5 -> 9.5 - 4 = 5.5. Ignore end before a trim
+end at 55: click at 50 -> 55 - 50 = 5; with no trim end, 60 - 50 = 10. Ignore start
+clicked at 2, in the trimmed part: 0.
+
+---- Helpers ----
+None.
+```
+
+#### `test_drag_gives_the_window_and_gap`
+
+```text
+---- Summary ----
+Main function to check that a drag across one averaging window gives its length
+and how long before the next addition it ends, in seconds rounded to whole 5 s,
+worked out by hand for additions at 10 and 20 min.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+config.DRAG_STEP_SECONDS (5 s, checked first).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+18.5 to 19 min: 30 s long, 60 s before the addition at 20. 9 to 9.82 min: 49.2 s
+-> 50 s, and 10.8 s before the addition at 10 -> 10 s. 25 to 25.4 min, after the
+last addition: 24 s -> 25 s, no gap. 5 to 5.01 min: 0.6 s -> one step (5 s), and
+299.4 s -> 300 s before the addition at 10.
+
+---- Helpers ----
+None.
+```
 
 #### `test_pointed_time_inside_the_panels`
 
@@ -4413,9 +4482,10 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check that a number question that wants a time switches the
-registered window on before it reads and off once it has a valid answer, that
-other number questions leave it alone, and that nothing is needed in the terminal.
+Main function to check that a number question the mouse can answer hands its rule
+to the registered window before it reads (a click rule as 'point', a drag rule as
+'span') and takes it back once it has a valid answer, that other number questions
+leave the window alone, and that nothing is needed in the terminal.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -14126,11 +14196,16 @@ text_colourer
 ```text
 ---- Summary ----
 Helper function to tell the window, when there is one, that the question being
-asked wants a time (so a click on the plot can give it), or no longer does.
+asked can be answered with the mouse (a click or a drag on the plot, turned into
+the answer by ``reader``), or no longer can.
 
 ---- Inputs ----
-is_wanted : bool
-    True while the question waits for a time.
+kind : Optional[str]
+    'point' (a click), 'span' (a drag), or None once the question has its answer.
+reader : Optional[Callable]
+    Turns what the mouse gave into the answer: reader(file name, time_min) for a
+    click, reader(file name, start_min, end_min) for a drag; it returns None when
+    that file or place gives no answer. None with kind None.
 
 ---- Globals read ----
 _time_requester (module state).
@@ -14346,9 +14421,9 @@ _question_printer
 ```text
 ---- Summary ----
 Main function to ask a question answered with a number, asking again until the value
-is valid. A question that wants a time says so to the window, where a click on the
-plot then writes the pointed time into the answer box; in the terminal nothing
-changes.
+is valid. A question that can be answered with the mouse says so to the window,
+where a click (``time_reader``) or a drag (``span_reader``) on the plot then writes
+the answer it gives into the answer box; in the terminal nothing changes.
 
 ---- Inputs ----
 question : str
@@ -14367,8 +14442,12 @@ depth : int
     Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
 blank_label : str
     Word shown in [brackets] for an empty answer.
-wants_time : bool
-    True when the number is a time on the plot (min), which the mouse can give.
+time_reader : Optional[Callable[[str, float], Optional[float]]]
+    Turns a click on the plot into the answer: (file shown, time clicked in min) ->
+    answer, or None when that click gives none. None when a click gives nothing.
+span_reader : Optional[Callable[[str, float, float], Optional[float]]]
+    Turns a drag across the plot into the answer: (file shown, start min, end min)
+    -> answer, or None. Used only when there is no ``time_reader``.
 
 ---- Globals read ----
 None.
@@ -14712,13 +14791,15 @@ colour_checker
 
 ```text
 ---- Summary ----
-Main function to register what is told when a question wants a time: the window
-registers itself while it is open, so a click on its plot can give the time.
+Main function to register what is told when a question can be answered with the
+mouse: the window registers itself while it is open, so a click or a drag on its
+plot can give the answer.
 
 ---- Inputs ----
-requester : Optional[Callable[[bool], None]]
-    Function called with True when a question starts waiting for a time and False
-    when it has its answer; None to register nothing (the terminal).
+requester : Optional[Callable[[Optional[str], Optional[Callable]], None]]
+    Function called with ('point' or 'span', reader) when a question starts waiting
+    for an answer the mouse can give, and with (None, None) when it has its answer
+    (see _time_announcer); None to register nothing (the terminal).
 
 ---- Globals read ----
 None.
@@ -16093,7 +16174,8 @@ _last_event_finder
 Helper function to ask the questions for one edge of the data (trim start, trim end,
 ignore start or ignore end): whether to do it at all, how many minutes for ALL the
 files, and then optionally how many for each file. The limits are stored and passed
-to ``progress`` after every answer, so a plot can show them building up.
+to ``progress`` after every answer, so a plot can show them building up. In the
+window a click on the plot of a file gives the minutes that put the cut there.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -16133,6 +16215,7 @@ _limit_maximum_getter
 _limits_filler
 _minutes_recaller
 info_printer
+limit_minutes_finder
 number_asker
 yes_no_asker
 ```
@@ -16329,7 +16412,10 @@ yes_no_asker
 ```text
 ---- Summary ----
 Main function to ask whether to average around the events, and the window
-settings.
+settings, in seconds. When the plot shows the files, a drag across one window on
+the plot gives its length, and the gap from where the drag ended to the next
+addition is then offered as the default of the gap question; a drag during the gap
+question gives the gap alone.
 
 ---- Inputs ----
 answers : dict
@@ -16341,6 +16427,10 @@ forced : bool
     that needs the averages was chosen). The averaging answer is not changed.
 depth : int
     Numbering depth of the first question.
+additions : Optional[Dict[str, List[float]]]
+    {file name: times of its additions (min, not those marked ignore), on the time
+    axis of the plot}, so a drag on the plot of a file can be read; None when the
+    plot does not show the files (the answers are then typed).
 
 ---- Globals read ----
 None.
@@ -16350,14 +16440,53 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Stores window_minutes and gap_minutes (and averaging) in ``answers``.
+None. Stores window_minutes and gap_minutes (in minutes) and averaging in
+``answers``.
 
 ---- Equations ----
-None.
+minutes = seconds / 60.
 
 ---- Helpers ----
+averaging_drag_reader
 number_asker
 yes_no_asker
+```
+
+#### `averaging_drag_reader`
+
+```text
+---- Summary ----
+Main function to turn a drag across one averaging window on the plot of a file into
+the window's length and how long before the next addition it ends, both in seconds
+rounded to whole steps.
+
+---- Inputs ----
+additions_min : List[float]
+    Times of the file's additions on the time axis of the plot (min), not those
+    marked ignore.
+start_min : float
+    Where the drag started (min).
+end_min : float
+    Where the drag ended (min); after ``start_min``.
+
+---- Globals read ----
+config.DRAG_STEP_SECONDS (the rounding step).
+
+---- Outputs ----
+Tuple[float, Optional[float]]
+    (length_s, gap_s): the length is at least one step; the gap is at least 0, and
+    None when no addition comes after the end of the drag (the last window ends a
+    set time before the end of the recording instead).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+length_s = round((end - start) x 60 / step) x step, at least one step;
+gap_s = round((first addition at or after the end - end) x 60 / step) x step.
+
+---- Helpers ----
+None.
 ```
 
 #### `data_folder_lister`
@@ -16823,6 +16952,46 @@ None.
 None.
 ```
 
+#### `limit_minutes_finder`
+
+```text
+---- Summary ----
+Main function to turn a time clicked on the plot of the whole recording into the
+minutes a trim or ignore question asks for: how much is taken off that edge so the
+cut falls at the click.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with duration_min.
+limits : dict
+    The limits of this file asked so far: 'trim_start' and 'trim_end' as times on
+    the original recording (None or missing for no trim).
+kind : str
+    'trim' or 'ignore'.
+edge : str
+    'start' or 'end'.
+time_min : float
+    The time clicked, on the original recording (min).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    Minutes to take off that edge; 0 when the click is beyond the edge.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim start = t. Trim end = duration - t. Ignore start = t - trim start (ignore
+times count from the new 0 after trimming). Ignore end = (trim end, or the
+duration) - t.
+
+---- Helpers ----
+None.
+```
+
 #### `multi_experiment_asker`
 
 ```text
@@ -16965,7 +17134,8 @@ numbering_restarter
 ```text
 ---- Summary ----
 Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
-factor of every file, offering the stored values.
+factor of every file, offering the stored values: in a table when one is given,
+otherwise with three questions per file.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -16976,6 +17146,10 @@ defaults : dict
     Default answers (normalise_od).
 saved : dict
     {file name: values read from its workbook} (saved_values_reader).
+table_filler : Optional[Callable[[Dict[str, dict]], Dict[str, dict]]]
+    Function that shows the OD table filled in with the given rows (od_rows,
+    DATA_FORMAT.md), waits until every cell is right, and returns the rows; None
+    to ask the questions instead.
 
 ---- Globals read ----
 None.
@@ -17257,8 +17431,13 @@ MONO_FONTS and the colour constants (module constants).
 ---- Methods ----
 __init__
 _answer_sender
+_answer_writer
+_axis_box_finder
+_band_drawer
 _closing_handler
 _display_name_lister
+_drag_ender
+_dragger
 _drain_runner
 _drawing_sign_drawer
 _event_handler
@@ -17299,7 +17478,7 @@ strip_listener_setter
 strip_reader
 strip_setter
 text_sender
-time_wanted_setter
+time_reader_setter
 window_closer
 ```
 
@@ -17365,6 +17544,91 @@ None.
 _pane_writer
 ```
 
+##### `_answer_writer`
+
+```text
+---- Summary ----
+Method to write the answer the mouse gave into the answer box, in place of what
+was there; nothing changes when the mouse gave no answer.
+
+---- Inputs ----
+value : Optional[float]
+    The answer, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the text of the answer box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_axis_box_finder`
+
+```text
+---- Summary ----
+Method to find where the panels of the picture shown sit in the plot area.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Tuple[float, float, float, float]]
+    (left, right, top, bottom) of the panels in pixels from the top left of the
+    plot area, or None when the picture has no time axis.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+x = picture left + fraction across * picture width;
+y = picture top + (1 - fraction up) * picture height.
+
+---- Helpers ----
+None.
+```
+
+##### `_band_drawer`
+
+```text
+---- Summary ----
+Method to draw the band of a drag over the panels, from where the drag started
+to ``x`` (kept within the time axis), with its length in seconds above it.
+
+---- Inputs ----
+x : float
+    Where the mouse is, in pixels from the left of the plot area.
+
+---- Globals read ----
+POINTER_COLOUR (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area (side effect).
+
+---- Equations ----
+Length (s) = |time at x - time at the start| x 60.
+
+---- Helpers ----
+_axis_box_finder
+pointed_time_finder
+```
+
 ##### `_closing_handler`
 
 ```text
@@ -17417,6 +17681,66 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+##### `_drag_ender`
+
+```text
+---- Summary ----
+Method to end a drag across the plot: the times where it started and ended
+(kept within the time axis) are turned into the answer, which is written into
+the answer box. The band stays until the answer is sent.
+
+---- Inputs ----
+event : Any
+    The Tk release event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the text of the answer box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answer_writer
+_axis_box_finder
+pointed_time_finder
+```
+
+##### `_dragger`
+
+```text
+---- Summary ----
+Method to follow the mouse while the button is held: the time line moves with
+it and, during a drag, the band is drawn to it.
+
+---- Inputs ----
+event : Any
+    The Tk motion event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_band_drawer
+_pointer_mover
 ```
 
 ##### `_drain_runner`
@@ -17979,9 +18303,11 @@ None.
 
 ```text
 ---- Summary ----
-Method to write the time the mouse points at into the answer box when the plot
-is clicked while a question waits for a time. The time replaces what was in the
-box, can still be edited, and is accepted with Enter.
+Method to act on a click on the plot of a file while the question waiting can
+be answered with the mouse: for a click question, the answer the time gives
+is written into the answer box; for a drag question, the drag starts here. The
+answer replaces what was in the box, can still be edited, and is accepted with
+Enter.
 
 ---- Inputs ----
 event : Any
@@ -17995,12 +18321,14 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Changes the text of the answer box (side effect).
+None. Changes the text of the answer box or starts a drag (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_answer_writer
+_band_drawer
 pointed_time_finder
 ```
 
@@ -18592,17 +18920,22 @@ None.
 None.
 ```
 
-##### `time_wanted_setter`
+##### `time_reader_setter`
 
 ```text
 ---- Summary ----
-Method to say that the question being asked wants a time, so a click on the
-plot writes the pointed time into the answer box, or that it no longer does.
-It is called from the question thread.
+Method to say that the question being asked can be answered with the mouse, so
+a click (or a drag) on the plot of a file writes the answer it gives into the
+answer box, or that it no longer can. It is called from the question thread.
 
 ---- Inputs ----
-is_wanted : bool
-    True while the question waits for a time.
+kind : Optional[str]
+    'point' (a click), 'span' (a drag), or None once the question has its
+    answer.
+reader : Optional[Callable]
+    Turns what the mouse gave into the answer: reader(file name, time_min) for a
+    click, reader(file name, start_min, end_min) for a drag; None with kind
+    None. It is called on the window thread.
 
 ---- Globals read ----
 None.
@@ -18649,7 +18982,35 @@ None.
 None.
 ```
 
-### MAIN FUNCTIONS
+### GUI HELPERS
+
+#### `_hint_chooser`
+
+```text
+---- Summary ----
+Helper function to choose the hint shown under the answer box: what the mouse can
+do for the question waiting, if anything.
+
+---- Inputs ----
+time_kind : Optional[str]
+    'point' (a click gives the answer), 'span' (a drag gives it) or None.
+
+---- Globals read ----
+ANSWER_HINT, SPAN_HINT, TIME_HINT (module constants).
+
+---- Outputs ----
+str
+    The hint.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
 
 #### `active_gui_getter`
 
@@ -19928,6 +20289,41 @@ The steps of the experiment browser: ask, redraw the plot window, then accept or
 
 ### STAGE HELPERS
 
+#### `_addition_time_lister`
+
+```text
+---- Summary ----
+Helper function to list the times of the additions of every file on the time axis
+of the processing plot, which starts at 0 where the trimmed data starts. Events
+marked ignore are left out, as the averaging leaves them out.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md), with the events as the file holds them.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file; 'trim_start' is on the original
+    recording.
+details : Dict[str, dict]
+    OD values and events of every file (details_stage_runner); an event's
+    'ignored' says it was marked ignore.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, List[float]]
+    {file name: addition times (min), in order}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+time on the plot = time in the file - trim start.
+
+---- Helpers ----
+None.
+```
+
 #### `_all_data_asker`
 
 ```text
@@ -20004,7 +20400,8 @@ None.
 ---- Summary ----
 Helper function to ask whether to average around the events and over which window,
 draw the windows, list in red those that do not fit, and ask whether to accept them
-or answer again.
+or answer again. In the window, a drag across the plot of a file gives the window
+and the gap, from the additions of that file.
 
 ---- Inputs ----
 session : ViewerSession
@@ -20036,6 +20433,7 @@ redraws the window (side effects).
 None.
 
 ---- Helpers ----
+_addition_time_lister
 _review_asker
 _skipped_lister
 averaging_asker
@@ -20308,6 +20706,40 @@ None.
 info_printer
 ```
 
+#### `_od_table_filler`
+
+```text
+---- Summary ----
+Helper function to have the OD values filled in in the table of the window: the
+table is shown with the given rows, one question waits for Enter, and it is asked
+again, naming the cells, while a cell is empty or not a number above 0. The table
+is then taken away.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session, whose window has the table.
+rows : Dict[str, Dict[str, Optional[float]]]
+    The rows to start from (od_rows, DATA_FORMAT.md); None leaves a cell empty.
+
+---- Globals read ----
+COLUMNS (imported constant).
+
+---- Outputs ----
+Dict[str, Dict[str, Optional[float]]]
+    The rows as filled in, every value a number above 0.
+
+---- Globals mutated ----
+None. Shows and hides the table and reads from and prints to the terminal (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+text_asker
+```
+
 #### `_pca_pictures_publisher`
 
 ```text
@@ -20506,7 +20938,8 @@ preview_drawer
 ```text
 ---- Summary ----
 Main function to ask the last questions of the import, on the standard plot cut to
-the limits: the OD values, then the event labels. The OD values are only checked:
+the limits: the OD values (in the table of the window, or with questions per file
+and an accept question), then the event labels. The OD values are only checked:
 the data is scaled by OD in the individual plots. The plot is redrawn with the
 labels once they are entered.
 
@@ -20542,6 +20975,7 @@ None.
 ---- Helpers ----
 _answers_previewer
 _od_lister
+_od_table_filler
 _review_asker
 event_asker
 od_scaling_asker

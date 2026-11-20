@@ -322,7 +322,8 @@ def _limits_asker(summaries: List[dict],
     Helper function to ask the questions for one edge of the data (trim start, trim end,
     ignore start or ignore end): whether to do it at all, how many minutes for ALL the
     files, and then optionally how many for each file. The limits are stored and passed
-    to ``progress`` after every answer, so a plot can show them building up.
+    to ``progress`` after every answer, so a plot can show them building up. In the
+    window a click on the plot of a file gives the minutes that put the cut there.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -362,6 +363,7 @@ def _limits_asker(summaries: List[dict],
     _limits_filler
     _minutes_recaller
     info_printer
+    limit_minutes_finder
     number_asker
     yes_no_asker
     """
@@ -369,6 +371,17 @@ def _limits_asker(summaries: List[dict],
     key = f'{kind}_{edge}'
     verb, place = kind.upper(), edge.upper()
     past = 'TRIMMED' if kind == 'trim' else 'IGNORED'
+    by_name = {s['name']: s for s in summaries}
+    def clicked(name: str, time_min: float) -> Optional[float]:
+        # the minutes a click on the plot of a file gives, for this edge
+        if name not in by_name:
+            return None
+        return limit_minutes_finder(by_name[name],
+                                    collected[name],
+                                    kind,
+                                    edge,
+                                    time_min,
+                                    )
     fallback = (settings.DEFAULT_ANSWERS['ignore_first_minutes']
                 if key == 'ignore_start' else 0.0
                 )
@@ -396,6 +409,7 @@ def _limits_asker(summaries: List[dict],
                           minimum=0,
                           maximum=min(caps, default=None),
                           depth=2,
+                          time_reader=clicked,
                           )
     for summary in summaries:
         collected[summary['name']][key] = _limit_converter(summary, kind, edge, common)
@@ -429,6 +443,7 @@ def _limits_asker(summaries: List[dict],
                                minimum=0,
                                maximum=maxima[name],
                                depth=2,
+                               time_reader=clicked,
                                )
         collected[name][key] = _limit_converter(summary, kind, edge, minutes)
         progress(_limits_filler(summaries, collected))
@@ -676,11 +691,15 @@ def averaging_asker(answers: dict,
                     defaults: dict,
                     forced: bool = False,
                     depth: int = 1,
+                    additions: Optional[Dict[str, List[float]]] = None,
                     ) -> None:
     """
     ---- Summary ----
     Main function to ask whether to average around the events, and the window
-    settings.
+    settings, in seconds. When the plot shows the files, a drag across one window on
+    the plot gives its length, and the gap from where the drag ended to the next
+    addition is then offered as the default of the gap question; a drag during the gap
+    question gives the gap alone.
 
     ---- Inputs ----
     answers : dict
@@ -692,6 +711,10 @@ def averaging_asker(answers: dict,
         that needs the averages was chosen). The averaging answer is not changed.
     depth : int
         Numbering depth of the first question.
+    additions : Optional[Dict[str, List[float]]]
+        {file name: times of its additions (min, not those marked ignore), on the time
+        axis of the plot}, so a drag on the plot of a file can be read; None when the
+        plot does not show the files (the answers are then typed).
 
     ---- Globals read ----
     None.
@@ -701,12 +724,14 @@ def averaging_asker(answers: dict,
         Nothing.
 
     ---- Globals mutated ----
-    None. Stores window_minutes and gap_minutes (and averaging) in ``answers``.
+    None. Stores window_minutes and gap_minutes (in minutes) and averaging in
+    ``answers``.
 
     ---- Equations ----
-    None.
+    minutes = seconds / 60.
 
     ---- Helpers ----
+    averaging_drag_reader
     number_asker
     yes_no_asker
     """
@@ -720,22 +745,92 @@ def averaging_asker(answers: dict,
         if not answers['averaging']:
             return
 
-    # ---- 2 Ask for the window and gap ------------------------------------------------
+    # ---- 2 Set up the reading of a drag on the plot ----------------------------------
+    dragged: Dict[str, Optional[float]] = {}
+    def length_reader(name: str, start_min: float, end_min: float) -> Optional[float]:
+        if name not in additions:
+            return None
+        length_s, dragged['gap_s'] = averaging_drag_reader(additions[name],
+                                                           start_min,
+                                                           end_min,
+                                                           )
+        return length_s
+    def gap_reader(name: str, start_min: float, end_min: float) -> Optional[float]:
+        if name not in additions:
+            return None
+        return averaging_drag_reader(additions[name], start_min, end_min)[1]
+
+    # ---- 3 Ask for the window and gap ------------------------------------------------
     sub = depth if forced else depth + 1
-    answers['window_minutes'] = number_asker('How long a window (minutes) should the '
-                                             'average be taken over?',
-                                             defaults['window_minutes'],
-                                             minimum=0,
-                                             exclusive_minimum=True,
-                                             depth=sub,
-                                             )
-    answers['gap_minutes'] = number_asker('How long before the next addition should '
-                                          'the averaging window end (minutes)?',
-                                          defaults['gap_minutes'],
-                                          minimum=0,
-                                          depth=sub,
-                                          )
+    window_s = number_asker('How long a window (s) should the average be taken over?',
+                            round(defaults['window_minutes'] * 60.0, 2),
+                            minimum=0,
+                            exclusive_minimum=True,
+                            depth=sub,
+                            span_reader=length_reader if additions else None,
+                            )
+    gap_default = dragged.get('gap_s')
+    if gap_default is None:
+        gap_default = round(defaults['gap_minutes'] * 60.0, 2)
+    gap_s = number_asker('How long before the next addition should the averaging '
+                         'window end (s)?',
+                         gap_default,
+                         minimum=0,
+                         depth=sub,
+                         span_reader=gap_reader if additions else None,
+                         )
+    answers['window_minutes'] = window_s / 60.0
+    answers['gap_minutes'] = gap_s / 60.0
     answers['window_asked'] = True
+
+
+# ---- averaging_drag_reader -----------------------------------------------------------
+def averaging_drag_reader(additions_min: List[float],
+                          start_min: float,
+                          end_min: float,
+                          ) -> Tuple[float, Optional[float]]:
+    """
+    ---- Summary ----
+    Main function to turn a drag across one averaging window on the plot of a file into
+    the window's length and how long before the next addition it ends, both in seconds
+    rounded to whole steps.
+
+    ---- Inputs ----
+    additions_min : List[float]
+        Times of the file's additions on the time axis of the plot (min), not those
+        marked ignore.
+    start_min : float
+        Where the drag started (min).
+    end_min : float
+        Where the drag ended (min); after ``start_min``.
+
+    ---- Globals read ----
+    config.DRAG_STEP_SECONDS (the rounding step).
+
+    ---- Outputs ----
+    Tuple[float, Optional[float]]
+        (length_s, gap_s): the length is at least one step; the gap is at least 0, and
+        None when no addition comes after the end of the drag (the last window ends a
+        set time before the end of the recording instead).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    length_s = round((end - start) x 60 / step) x step, at least one step;
+    gap_s = round((first addition at or after the end - end) x 60 / step) x step.
+
+    ---- Helpers ----
+    None.
+    """
+
+    step = float(settings.DRAG_STEP_SECONDS)
+    length_s = max(round((end_min - start_min) * 60.0 / step) * step, step)
+    later = [time for time in additions_min if time >= end_min]
+    if not later:
+        return length_s, None
+    gap_s = max(round((min(later) - end_min) * 60.0 / step) * step, 0.0)
+    return length_s, gap_s
 
 
 # ---- data_folder_lister --------------------------------------------------------------
@@ -1537,6 +1632,61 @@ def label_tidier(text: str) -> str:
                   )
 
 
+# ---- limit_minutes_finder ------------------------------------------------------------
+def limit_minutes_finder(summary: dict,
+                         limits: dict,
+                         kind: str,
+                         edge: str,
+                         time_min: float,
+                         ) -> float:
+    """
+    ---- Summary ----
+    Main function to turn a time clicked on the plot of the whole recording into the
+    minutes a trim or ignore question asks for: how much is taken off that edge so the
+    cut falls at the click.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with duration_min.
+    limits : dict
+        The limits of this file asked so far: 'trim_start' and 'trim_end' as times on
+        the original recording (None or missing for no trim).
+    kind : str
+        'trim' or 'ignore'.
+    edge : str
+        'start' or 'end'.
+    time_min : float
+        The time clicked, on the original recording (min).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        Minutes to take off that edge; 0 when the click is beyond the edge.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Trim start = t. Trim end = duration - t. Ignore start = t - trim start (ignore
+    times count from the new 0 after trimming). Ignore end = (trim end, or the
+    duration) - t.
+
+    ---- Helpers ----
+    None.
+    """
+
+    duration = float(summary['duration_min'])
+    if kind == 'trim':
+        minutes = time_min if edge == 'start' else duration - time_min
+    elif edge == 'start':
+        minutes = time_min - (limits.get('trim_start') or 0.0)
+    else:
+        minutes = (limits.get('trim_end') or duration) - time_min
+    return max(float(minutes), 0.0)
+
+
 # ---- multi_experiment_asker ----------------------------------------------------------
 def multi_experiment_asker(summaries: List[dict],
                            answers: dict,
@@ -1837,11 +1987,14 @@ def od_scaling_asker(summaries: List[dict],
                      answers: dict,
                      defaults: dict,
                      saved: dict,
+                     table_filler: Optional[Callable[[Dict[str, dict]],
+                                                     Dict[str, dict]]] = None,
                      ) -> Dict[str, dict]:
     """
     ---- Summary ----
     Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
-    factor of every file, offering the stored values.
+    factor of every file, offering the stored values: in a table when one is given,
+    otherwise with three questions per file.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1852,6 +2005,10 @@ def od_scaling_asker(summaries: List[dict],
         Default answers (normalise_od).
     saved : dict
         {file name: values read from its workbook} (saved_values_reader).
+    table_filler : Optional[Callable[[Dict[str, dict]], Dict[str, dict]]]
+        Function that shows the OD table filled in with the given rows (od_rows,
+        DATA_FORMAT.md), waits until every cell is right, and returns the rows; None
+        to ask the questions instead.
 
     ---- Globals read ----
     None.
@@ -1883,7 +2040,22 @@ def od_scaling_asker(summaries: List[dict],
     if not answers['normalise_od']:
         return details
 
-    # ---- 2 List what is stored -------------------------------------------------------
+    # ---- 2 Fill in the table, when there is one --------------------------------------
+    if table_filler is not None:
+        rows = {}
+        for summary in summaries:
+            old = saved.get(summary['name']) or {}
+            rows[summary['name']] = {'OD': old.get('OD'),
+                                     'volume': old.get('volume'),
+                                     'dilution_factor': (old.get('dilution_factor')
+                                                         or 1.0
+                                                         ),
+                                     }
+        for name, values in table_filler(rows).items():
+            details[name].update(values)
+        return details
+
+    # ---- 3 List what is stored -------------------------------------------------------
     # List what is already stored for each run and only ask about the rest unless
     # the user wants to change them.
     stored_keys = ('OD', 'volume', 'dilution_factor')
@@ -1902,7 +2074,7 @@ def od_scaling_asker(summaries: List[dict],
                 text = 'nothing stored'
             info_printer(f"  {summary['name']}: {text}", depth=2, tight=True)
 
-    # ---- 3 Ask for the values --------------------------------------------------------
+    # ---- 4 Ask for the values --------------------------------------------------------
     change = (not complete) or yes_no_asker('Do you want to change any of these?',
                                             False,
                                             )

@@ -318,8 +318,10 @@ def everything_asker() -> Tuple[dict,
     print(f"  OD scaling:       {'yes' if answers['normalise_od'] else 'no'}")
     averaging_text = 'no'
     if answers['averaging']:
-        averaging_text = ('%g min window, ending %g min before the next addition'
-                          % (answers['window_minutes'], answers['gap_minutes'])
+        averaging_text = ('%g s window, ending %g s before the next addition'
+                          % (round(answers['window_minutes'] * 60.0, 2),
+                             round(answers['gap_minutes'] * 60.0, 2),
+                             )
                           )
     print(f'  Event averaging:  {averaging_text}')
     haem_names = [haem_name_formatter(name) for name in answers['haems']]

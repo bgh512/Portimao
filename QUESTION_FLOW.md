@@ -1,4 +1,4 @@
-# Portimao question flow (V1.22)
+# Portimao question flow (V1.23)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -72,37 +72,37 @@ The last part of the import: what is known about each run. Earlier OD and event 
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.1 | Do you want to scale by OD (divide by dilution factor x OD x volume)? `(y/N)` | **3.1.1** | **3.3** (no OD scaling anywhere in the run) |
+| 3.1 | Do you want to scale by OD (divide by dilution factor x OD x volume)? `(y/N)` | **3.1.1** | **3.2** (no OD scaling anywhere in the run) |
 
 A table opens under the terminal text, above the answer box, with one row per file and a column each for the OD, the volume (mL) and the dilution factor. The values stored for a file are filled in, and the dilution factor is 1 when none is stored. Click a cell and type; Tab moves across and Enter moves down.
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.1.1 | Fill in the table under this text for each file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run. Then press Enter here. | If a cell is empty or not a number above 0, those cells are named and the question is asked again (with the next number). Otherwise the table closes, the values of every file are listed and the next step is **3.3**. |
+| 3.1.1 | Fill in the table under this text for each file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run. Then press Enter here. | If a cell is empty or not a number above 0, those cells are named and the question is asked again (with the next number). Otherwise the table closes, the values of every file are listed and the next step is **3.2**. |
 
 The data is **not** scaled by OD here. The values are only checked; the scaling is chosen in section 5.
 
 ### 3.B Event labels
 
-If no file has any event, 3.3 to 3.5 are not asked and the next step is **3.6**.
+If no file has any event, 3.2 to 3.4 are not asked and the next step is **3.5**.
 
 "Current runs with events are:" and the runs with their event labels are listed first. A label whose units could be written more tidily is offered in its tidy form: `u` in front of a unit as µ (`100 uM` as 100 µM), a litre as a capital L, a space between a number and its unit, and `-1` after a unit or anything after `^` raised (`8ug ml-1` as 8 µg mL⁻¹). Only units are changed: a name with numbers in it (`nd-011992`) and a formula (`H2O2`) are left as they are. The **Symbols** row under the answer box types µ, ⁻¹, ₂ and the like by hand.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.3 | *(only when a label in the list could be tidier; those labels are listed as "label -> tidy form", then)* Do you want to use these tidy forms? `(Y/n)` | every listed label is replaced by its tidy form, then **3.4** | the labels stay as they are (each is offered its tidy form again if you go through it in 3.5.1), then **3.4** |
-| 3.4 | Do you want to change any event labels? `(y/N)` | **3.5** | the labels are drawn **(plot)**, then **3.6** |
+| 3.2 | *(only when a label in the list could be tidier; those labels are listed as "label -> tidy form", then)* Do you want to use these tidy forms? `(Y/n)` | every listed label is replaced by its tidy form, then **3.3** | the labels stay as they are (each is offered its tidy form again if you go through it in 3.4.1), then **3.3** |
+| 3.3 | Do you want to change any event labels? `(y/N)` | **3.4** | the labels are drawn **(plot)**, then **3.5** |
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.5 | Which run(s) do you want to change? (numbers from the list, separated by commas) | **3.5.1** for the first chosen run |
-| 3.5.1 | For each event of the run: What was added at *time* min? Write 'ignore' to ignore this event. `[current label]` | If you write `ignore`, the next event. If the label, typed or kept with Enter, could be tidier, **3.5.2**. Otherwise **3.5.3**. |
-| 3.5.2 | Do you want to write this as '*tidy form*'? `(Y/n)` | **Yes**: the tidy form is used. **No**: the label stays as it is. Then **3.5.3**. |
-| 3.5.3 | What was the final concentration in uM? `[unknown]` | the next event, then the next chosen run, then the labels are drawn **(plot)** and **3.6** |
+| 3.4 | Which run(s) do you want to change? (numbers from the list, separated by commas) | **3.4.1** for the first chosen run |
+| 3.4.1 | For each event of the run: What was added at *time* min? Write 'ignore' to ignore this event. `[current label]` | If you write `ignore`, the next event. If the label, typed or kept with Enter, could be tidier, **3.4.2**. Otherwise **3.4.3**. |
+| 3.4.2 | Do you want to write this as '*tidy form*'? `(Y/n)` | **Yes**: the tidy form is used. **No**: the label stays as it is. Then **3.4.3**. |
+| 3.4.3 | What was the final concentration in uM? `[unknown]` | the next event, then the next chosen run, then the labels are drawn **(plot)** and **3.5** |
 
 | # | Question | 1 → | 2 → |
 |---|---|---|---|
-| 3.6 | Do you accept these event labels? | **4.1** | **3.5** (change the labels again: the runs are listed again and 3.3 and 3.4 are not asked) |
+| 3.5 | Do you accept these event labels? | **4.1** | **3.4** (change the labels again: the runs are listed again and 3.2 and 3.3 are not asked) |
 
 ---
 
@@ -372,9 +372,22 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 
 ## If the window cannot open (terminal mode)
 
-The questions and their order are the same. These differ:
+The questions and their order are the same, apart from the OD values. These differ:
 
-- In **2** to **5** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer.
+- In **2** to **5** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer. Nothing can be clicked or dragged on it: every number is typed.
+- In **3.A** there is no table. The values stored for some files are listed, the OD values are asked one file at a time, and then accepted, so the event label questions are numbered one higher on screen (3.3 to 3.6):
+
+| # | Question | Leads to |
+|---|---|---|
+| 3.1.1 | *(only when some files already have OD values stored)* The stored values are listed, then: Do you want to change any of these? `(y/N)` | **Yes**: all files are asked **3.1.2**. **No**: only the files without stored values are asked **3.1.2**. If every file has stored values and you say No, no OD questions are asked and the next step is **3.2**. |
+| 3.1.2 | For each file in turn: What was the OD of the cells added? | **3.1.3** |
+| 3.1.3 | What volume of cells (mL) were spun down and resuspended in 5 mL? | **3.1.4** |
+| 3.1.4 | What is the dilution factor, if the cells were diluted mid run? `[1]` | the next file, then the values of every file are listed and **3.2** |
+
+| # | Question | 1 → | 2 → |
+|---|---|---|---|
+| 3.2 | Do you accept these OD values? | the event labels | **3.1** (asked again, then the OD values) |
+
 - After **1.2** comes a section of its own, **2. Experiment browser**, where the standard plot is shown, with a small menu that steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring. Every later section is therefore numbered one higher on screen than in this list (trimming and ignoring is 3, the OD values and event labels are 4, and so on), and the going back question (**5.8**) offers the experiment browser as well.
 - Every "Do you accept...?" question of sections 2 to 5 has one more answer at the end, **Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.
 - There is no **Symbols** row: a symbol is typed or pasted from the keyboard.
