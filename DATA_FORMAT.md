@@ -260,6 +260,29 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 | `'answers'` | dict | | | Terminal answers |
 | `'files'` | dict | | min | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}}`; trim times are on the original recording, ignore times count from the new 0 after trimming |
 
+#### `strip_values`
+
+What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/viewer_strip.py`). Given by `ViewerGui.strip_reader`, taken in part or whole by `ViewerGui.strip_setter` (checked by `strip_values_checker`), and told one value at a time, as `(name, value)`, to the function registered with `ViewerGui.strip_listener_setter`. The names are those of the answers in `config.DEFAULT_ANSWERS`.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'plot_haems'` | bool | | | Whether the haems are shown |
+| `'fit_file'` | str | | | File name of the fit, one of the list given with `ViewerGui.strip_fits_setter` |
+| `'journal'` | str | | | `'none'` (the standard size, on the page of the standard journal) or a key of `config.JOURNAL_SPECS` |
+| `'columns'` | float | | columns | Width, one of the widths the journal allows (`'widths_mm'`) |
+| `'height'` | float | | fraction of a page | Height, above 0 and up to 1 |
+
+#### `od_rows`
+
+The rows of the OD table of the window (`ODTable`, `utils_viewer/viewer_od_table.py`), in the order shown: the same layout as the OD values the questions give. Taken by `ViewerGui.od_table_shower` and given back by `ViewerGui.od_table_reader`, together with the list of the wrong cells (`'file name: column heading'`).
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| *file name* | dict | | | `{'OD', 'volume', 'dilution_factor'}` of that file |
+| `'OD'` | Optional[float] | | OD | OD of the cells added; `None` for a cell that is empty or not a number above 0 |
+| `'volume'` | Optional[float] | | mL | Volume of cells spun down; `None` as above |
+| `'dilution_factor'` | Optional[float] | | | Dilution factor; `None` as above |
+
 ### 1.2 Dataclasses
 
 #### `Spectra`

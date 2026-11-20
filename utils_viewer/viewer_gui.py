@@ -21,12 +21,14 @@ from PIL import Image
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.output_capture import output_capturer
 from utils_shared.questions import time_request_setter
+from utils_viewer.viewer_od_table import ODTable
 from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          PreviewSpec,
                                          TimeAxis,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_renderer import PreviewRenderer
+from utils_viewer.viewer_strip import SettingsStrip, strip_values_checker
 from utils_viewer.viewer_terminal import (ansi_splitter,
                                           ansi_style_updater,
                                           OutputRouter,
@@ -44,6 +46,8 @@ ANSWER_HINT = ('Type your answer and press Enter. If you type nothing, the value
                '[brackets] is used.')
 TIME_HINT = ('Click on the plot to pick a time, or type it, then press Enter. If you '
              'type nothing, the value in [brackets] is used.')
+TABLE_HINT = ('Click a cell of the table and type its value; Tab moves across, Enter '
+              'moves down. When the table is filled in, press Enter in the box below.')
 SIGN_BACKGROUND = '#ffd76a'
 SIGN_EDGE = '#e8a317'
 SIGN_TEXT = '#5a3d00'
@@ -147,6 +151,7 @@ class ViewerGui:
     _pointer_mover
     _resizer
     _step_taker
+    _strip_change_teller
     _symbol_inserter
     _time_clicker
     _time_line_drawer
@@ -156,11 +161,18 @@ class ViewerGui:
     figure_shower
     file_focuser
     input_reader
+    od_table_hider
+    od_table_reader
+    od_table_shower
     output_capturer
     pictures_publisher
     run
     session_attacher
     spec_publisher
+    strip_fits_setter
+    strip_listener_setter
+    strip_reader
+    strip_setter
     text_sender
     time_wanted_setter
     window_closer
@@ -245,6 +257,8 @@ class ViewerGui:
         self._is_pictures = False
         self._file_count = 0
         self._help_base = ''
+        self._is_table_shown = False
+        self._strip_listener: Optional[Callable[[str, Any], None]] = None
         self._widgets_builder()
         self._icon_setter()
 
@@ -472,7 +486,8 @@ class ViewerGui:
         ---- Inputs ----
         event : tuple
             (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-            'extra', 'image', 'time', 'closed' or 'finished'.
+            'extra', 'image', 'time', 'strip', 'strip_fits', 'od_show', 'od_hide',
+            'closed' or 'finished'.
 
         ---- Globals read ----
         None.
@@ -503,9 +518,26 @@ class ViewerGui:
             self._is_waiting = True
             self._entry.configure(state='normal')
             self._entry.focus_set()
-            self._hint.configure(
-                text=TIME_HINT if self._is_time_wanted else ANSWER_HINT,
-                )
+            if self._is_table_shown:
+                self._hint.configure(text=TABLE_HINT)
+            else:
+                self._hint.configure(
+                    text=TIME_HINT if self._is_time_wanted else ANSWER_HINT,
+                    )
+        elif kind == 'strip':
+            self._strip.values_setter(event[1])
+        elif kind == 'strip_fits':
+            self._strip.fits_setter(event[1])
+        elif kind == 'od_show':
+            # Above the answer box and under the text, which gives up the room.
+            self._od_table.rows_setter(event[1])
+            self._od_table.frame.pack(side='bottom', fill='x', after=self._bottom)
+            self._is_table_shown = True
+            if self._is_waiting:
+                self._hint.configure(text=TABLE_HINT)
+        elif kind == 'od_hide':
+            self._od_table.frame.pack_forget()
+            self._is_table_shown = False
         elif kind == 'time':
             self._is_time_wanted = event[1]
             self._canvas.configure(cursor='crosshair' if event[1] else '')
@@ -1230,6 +1262,40 @@ class ViewerGui:
             return
         self._navigator(self._index + step, True)
 
+    # ---- _strip_change_teller --------------------------------------------------------
+    def _strip_change_teller(self, name: str, value: Any) -> None:
+        """
+        ---- Summary ----
+        Method to pass a change the user made in the settings strip to the function
+        the program registered, if any.
+
+        ---- Inputs ----
+        name : str
+            Name of the strip value that changed.
+        value : Any
+            Its new value.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the registered function (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        listener = self._strip_listener
+        if listener is not None:
+            listener(name, value)
+
     # ---- _symbol_inserter ------------------------------------------------------------
     def _symbol_inserter(self, symbol: str) -> None:
         """
@@ -1382,7 +1448,9 @@ class ViewerGui:
     def _widgets_builder(self) -> None:
         """
         ---- Summary ----
-        Method to build the terminal, the answer box, the plot and its file controls.
+        Method to build the terminal, the answer box and the OD table (hidden until it
+        is asked for) on the left, and the plot, its file controls and the settings
+        strip on the right.
 
         ---- Inputs ----
         None.
@@ -1410,8 +1478,11 @@ class ViewerGui:
         _pointer_mover
         _resizer
         _step_taker
+        _strip_change_teller
         _symbol_inserter
         _time_clicker
+        ODTable
+        SettingsStrip
         """
 
         tk = self._tk
@@ -1498,6 +1569,18 @@ class ViewerGui:
         self._entry.pack(side='left', fill='x', expand=True, padx=(0, 10), ipady=5)
         row.pack(fill='x', pady=(2, 10))
         bottom.pack(side='bottom', fill='x')
+        self._bottom = bottom
+        self._od_table = ODTable(tk,
+                                 ttk,
+                                 left,
+                                 (self._family, self._size),
+                                 {'background': TERMINAL_BACKGROUND,
+                                  'text': TERMINAL_TEXT,
+                                  'cell': ENTRY_BACKGROUND,
+                                  'edge': ANSWER_COLOUR,
+                                  },
+                                 self._entry.focus_set,
+                                 )
         scroll.pack(side='right', fill='y')
         self._text.pack(side='left', fill='both', expand=True)
         panes.add(left, weight=1)
@@ -1507,8 +1590,15 @@ class ViewerGui:
 
         # ---- 2 The plot on the right -------------------------------------------------
         right = tk.Frame(panes, bg=PLOT_BACKGROUND)
+        self._strip = SettingsStrip(tk,
+                                    ttk,
+                                    right,
+                                    PLOT_BACKGROUND,
+                                    self._strip_change_teller,
+                                    )
+        self._strip.frame.pack(side='bottom', pady=(2, 8))
         controls = tk.Frame(right, bg=PLOT_BACKGROUND)
-        controls.pack(side='bottom', pady=(4, 8))
+        controls.pack(side='bottom', pady=(4, 6))
         self._help = tk.Label(right,
                               text='',
                               bg=PLOT_BACKGROUND,
@@ -1734,6 +1824,101 @@ class ViewerGui:
             raise EOFError
         return answer
 
+    # ---- od_table_hider --------------------------------------------------------------
+    def od_table_hider(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the OD table away again. What was typed can still be read
+        with od_table_reader.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('od_hide',))
+
+    # ---- od_table_reader -------------------------------------------------------------
+    def od_table_reader(self,
+                        ) -> Tuple[Dict[str, Dict[str, Optional[float]]], List[str]]:
+        """
+        ---- Summary ----
+        Method to give what the OD table holds. It is meant to be called once the
+        user has answered the question asked after od_table_shower, which is when the
+        table is sure to hold the rows that were sent.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Tuple[Dict[str, Dict[str, Optional[float]]], List[str]]
+            ({file name: {'OD', 'volume', 'dilution_factor'}}, with None for a cell
+            that is empty or wrong (DATA_FORMAT.md); the wrong cells as 'file name:
+            column heading').
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return self._od_table.rows_reader(), self._od_table.problems_lister()
+
+    # ---- od_table_shower -------------------------------------------------------------
+    def od_table_shower(self, rows: Dict[str, Dict[str, Optional[float]]]) -> None:
+        """
+        ---- Summary ----
+        Method to bring up the OD table above the answer box, with one row per file.
+
+        ---- Inputs ----
+        rows : Dict[str, Dict[str, Optional[float]]]
+            {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the
+            rows; a value that is None or missing leaves its cell empty
+            (DATA_FORMAT.md).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the rows for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(
+            ('od_show', {name: dict(values) for name, values in rows.items()}),
+            )
+
     # ---- output_capturer -------------------------------------------------------------
     @contextmanager
     def output_capturer(self) -> Iterator[io.StringIO]:
@@ -1920,6 +2105,127 @@ class ViewerGui:
         """
 
         self._events.put(('spec', spec, name))
+
+    # ---- strip_fits_setter -----------------------------------------------------------
+    def strip_fits_setter(self, names: List[str]) -> None:
+        """
+        ---- Summary ----
+        Method to give the settings strip the fits listed in its drop-down.
+
+        ---- Inputs ----
+        names : List[str]
+            File names of the fits.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the list for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('strip_fits', list(names)))
+
+    # ---- strip_listener_setter -------------------------------------------------------
+    def strip_listener_setter(self,
+                              listener: Optional[Callable[[str, Any], None]],
+                              ) -> None:
+        """
+        ---- Summary ----
+        Method to register the function that is told what the user changes in the
+        settings strip, or None to stop listening.
+
+        ---- Inputs ----
+        listener : Optional[Callable[[str, Any], None]]
+            Called with (name, value) at each change, on the window thread: it must
+            return at once (for example by queueing the change).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the function on the instance (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._strip_listener = listener
+
+    # ---- strip_reader ----------------------------------------------------------------
+    def strip_reader(self) -> Dict[str, Any]:
+        """
+        ---- Summary ----
+        Method to give the values the settings strip shows now.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Dict[str, Any]
+            The strip values (DATA_FORMAT.md).
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return self._strip.values_reader()
+
+    # ---- strip_setter ----------------------------------------------------------------
+    def strip_setter(self, values: Dict[str, Any]) -> None:
+        """
+        ---- Summary ----
+        Method to show values in the settings strip. The listener is not told, as the
+        program made the change itself.
+
+        ---- Inputs ----
+        values : Dict[str, Any]
+            Some or all of the strip values (DATA_FORMAT.md).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing. Raises ValueError for a value the strip cannot show.
+
+        ---- Globals mutated ----
+        None. Queues the values for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        strip_values_checker
+        """
+
+        strip_values_checker(values)
+        self._events.put(('strip', dict(values)))
 
     # ---- text_sender -----------------------------------------------------------------
     def text_sender(self, text: str, kind: str) -> None:
