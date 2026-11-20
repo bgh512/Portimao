@@ -11,7 +11,10 @@ from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.averaging import experiment_averages_calculator
 from utils_shared.normalisation import experiment_normaliser, percent_converter
 from utils_shared.paf_reader import experiment_paf_loader, PafError
-from utils_shared.spectral_decomposer import experiment_decomposer, fit_range_finder
+from utils_shared.spectral_decomposer import (BACKGROUND_LABELS,
+                                              experiment_decomposer,
+                                              fit_range_finder,
+                                              )
 from utils_shared.trimming import experiment_trimmer
 
 
@@ -138,8 +141,8 @@ def experiment_data_processor(info: dict,
         so the file is not read again). It is processed in place. None reads the file.
 
     ---- Globals read ----
-    settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
-    settings.BASELINE_MINIMUM_SECONDS.
+    settings.HAEM_BACKGROUND, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
+    settings.BASELINE_MINIMUM_SECONDS; BACKGROUND_LABELS.
 
     ---- Outputs ----
     dict
@@ -238,7 +241,7 @@ def experiment_data_processor(info: dict,
                                   fit,
                                   dataset_name=a['decomposition_dataset'],
                                   spectrum_type='attenuation',
-                                  degree_of_scatter=settings.DEGREE_OF_SCATTER,
+                                  background=settings.HAEM_BACKGROUND,
                                   haemfactor=settings.HAEM_FACTOR,
                                   delta_exclude_first_minutes=ignore_first,
                                   delta_window_points=window_points,
@@ -249,8 +252,9 @@ def experiment_data_processor(info: dict,
                               for haem, (first, last)
                               in reference['window_by_haem'].items()
                               )
-            print(f"  Decomposed with {a['fit_file']}; delta A zero is the median of "
-                  f'the highest {window_points} points in a row '
+            print(f"  Decomposed with {a['fit_file']} and a "
+                  f'{BACKGROUND_LABELS[settings.HAEM_BACKGROUND]} background; delta A '
+                  f'zero is the median of the highest {window_points} points in a row '
                   f"({reference['window_seconds']:.3g} s) of each haem: {spans}",
                   )
             for note in fit.get('notes', []):

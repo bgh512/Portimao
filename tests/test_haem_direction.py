@@ -1,7 +1,8 @@
 """
 Tests that our haem amounts move the same way as the instrument's own haem traces of
 the example run, that the instrument's traces go down when the haems are reduced, and
-that the haem shapes of our fit file are those of the instrument's own fit file.
+that the haem shapes of our fit file and our Valencia background are those of the
+instrument's own fit file.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -17,7 +18,10 @@ import pytest
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.paf_reader import experiment_paf_loader, MARK, PafFile, token_reader
-from utils_shared.spectral_decomposer import experiment_decomposer, fit_importer
+from utils_shared.spectral_decomposer import (background_builder,
+                                              experiment_decomposer,
+                                              fit_importer,
+                                              )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -41,6 +45,10 @@ DITHIONITE_SPECTRUM = 5388  # dithionite reduces every haem fully
 WINDOW_SPECTRA = 240  # 2 min of spectra, 0.5 s apart
 SAME_WAY = 0.0  # correlation above this: the same way; below it: upside down
 SAME_SHAPE = 0.99  # correlation of two shapes above this (or below minus this): the same
+# Largest difference between two background shapes, on a 0-to-1 scale, that counts as
+# the same: 1/wavelength and 1/wavelength^2 differ by about 0.017 over 520 to 630 nm.
+SAME_BACKGROUND = 1e-4
+INSTRUMENT_BACKGROUND = '1/lambda^2 BG'  # name of the background in its fit file
 
 pytestmark = pytest.mark.skipif(
     not PAF_FILE.exists(),
@@ -175,7 +183,7 @@ def _haem_trace_loader() -> dict:
     experiment_decomposer(experiment,
                           fit_importer(FIT_FILE),
                           dataset_name=answers['decomposition_dataset'],
-                          degree_of_scatter=settings.DEGREE_OF_SCATTER,
+                          background=settings.HAEM_BACKGROUND,
                           haemfactor=settings.HAEM_FACTOR,
                           delta_exclude_first_minutes=answers['ignore_first_minutes'],
                           delta_window_points=settings.REFERENCE_WINDOW_POINTS,
@@ -324,6 +332,49 @@ def test_haem_shapes_are_those_of_the_instrument(name: str) -> None:
     assert abs(correlation) > SAME_SHAPE, (
         f"The {name} shape of our fit file is not the instrument's: the correlation "
         f'of the two is {correlation:+.4f} (+1 or -1 is the same shape).'
+    )
+
+
+# ---- test_valencia_background_is_the_instruments -------------------------------------
+def test_valencia_background_is_the_instruments() -> None:
+    """
+    ---- Summary ----
+    Main function to check that our Valencia background can make the background shape
+    of the instrument's own fit file, over the wavelengths the instrument fits.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    INSTRUMENT_FIT_FILE, INSTRUMENT_BACKGROUND, SAME_BACKGROUND (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The instrument's shape is matched by the best mix of our flat level and our shape
+    (least squares); the largest difference left, divided by the instrument's range
+    (highest - lowest), must be below SAME_BACKGROUND.
+
+    ---- Helpers ----
+    _instrument_fit_reader
+    """
+
+    instrument = _instrument_fit_reader(INSTRUMENT_FIT_FILE)
+    shape = instrument['shapes'][instrument['names'].index(INSTRUMENT_BACKGROUND)]
+    first, last = instrument['range_nm']
+    inside = (shape[:, 0] >= first) & (shape[:, 0] <= last)
+    assert inside.sum() > 100
+    theirs = shape[inside, 1]
+    ours = background_builder(shape[inside, 0], 'valencia')
+    amounts = np.linalg.lstsq(ours, theirs, rcond=None)[0]
+    misfit = float(np.max(np.abs(ours @ amounts - theirs)) / np.ptp(theirs))
+    assert misfit < SAME_BACKGROUND, (
+        "Our Valencia background cannot make the instrument's own background shape: "
+        f'they differ by {misfit:.2g} of its range.'
     )
 
 

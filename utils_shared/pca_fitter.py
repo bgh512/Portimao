@@ -12,9 +12,9 @@ import pandas as pd
 from scipy.signal import savgol_filter
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.spectral_decomposer import (background_builder,
-                                              basis_solver,
+from utils_shared.spectral_decomposer import (basis_solver,
                                               fit_scale_standardiser,
+                                              scatter_background_builder,
                                               )
 
 
@@ -87,9 +87,9 @@ def _nuisance_basis_builder(wavelengths: np.ndarray,
                             ) -> np.ndarray:
     """
     ---- Summary ----
-    Helper function to build the offset and scatter terms that the haem decomposition
-    fits alongside the haems, as an orthonormal basis, so they can be taken out of the
-    spectra before the components are searched for.
+    Helper function to build the offset and scatter terms (one of the scatter
+    backgrounds of the haem decomposition) as an orthonormal basis, so they can be
+    taken out of the spectra before the components are searched for.
 
     ---- Inputs ----
     wavelengths : np.ndarray
@@ -109,14 +109,14 @@ def _nuisance_basis_builder(wavelengths: np.ndarray,
     None.
 
     ---- Equations ----
-    The columns of background_builder (the same terms as the haem decomposition),
-    orthonormalised by QR.
+    The columns of scatter_background_builder (the haem decomposition's scatter
+    backgrounds), orthonormalised by QR.
 
     ---- Helpers ----
-    background_builder
+    scatter_background_builder
     """
 
-    q, _ = np.linalg.qr(background_builder(wavelengths, degree_of_scatter))
+    q, _ = np.linalg.qr(scatter_background_builder(wavelengths, degree_of_scatter))
     return q
 
 

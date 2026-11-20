@@ -123,7 +123,7 @@ def _time_response_preparer(experiment: dict,
         Fit dictionary from import_fit.
 
     ---- Globals read ----
-    config.DEGREE_OF_SCATTER, config.HAEM_FACTOR.
+    config.HAEM_BACKGROUND, config.HAEM_FACTOR.
 
     ---- Outputs ----
     dict
@@ -160,7 +160,7 @@ def _time_response_preparer(experiment: dict,
     difference_spectrum_calculator(prepared, 'penultimate', 'final')
     difference_spectrum_decomposer(prepared,
                                    fit,
-                                   settings.DEGREE_OF_SCATTER,
+                                   settings.HAEM_BACKGROUND,
                                    settings.HAEM_FACTOR,
                                    'signed',
                                    )

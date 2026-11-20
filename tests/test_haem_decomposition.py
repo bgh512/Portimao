@@ -1,6 +1,7 @@
 """
-Tests that the haem decomposition gives back the amounts a spectrum was built from, and
-that the component finder gives back the shapes its spectra were mixed from.
+Tests that the haem decomposition gives back the amounts a spectrum was built from,
+whatever its background, with only some haems or from the first spectrum, and that the
+component finder gives back the shapes its spectra were mixed from.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -13,6 +14,7 @@ import pandas as pd
 import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+import config as settings
 from utils_shared.pca_fitter import (component_builder,
                                      component_count_suggester,
                                      component_finder,
@@ -20,9 +22,12 @@ from utils_shared.pca_fitter import (component_builder,
                                      fit_table_builder,
                                      )
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
-from utils_shared.spectral_decomposer import (delta_abs_calculator,
+from utils_shared.spectral_decomposer import (background_builder,
+                                              delta_abs_calculator,
                                               experiment_decomposer,
+                                              fit_haem_selector,
                                               fit_importer,
+                                              fit_range_finder,
                                               spectrum_decomposer,
                                               )
 
@@ -45,6 +50,8 @@ HAEM_FACTOR = 1000000.0  # the scale the program gives the fit shapes
 AMOUNTS = np.array([1.0, 2.0, 3.0, 4.0, 5.0]) * 1e-4
 OFFSET = 0.4  # a flat background under the haems (OD)
 SLOPE = 0.05  # size of the scatter background (OD)
+# the backgrounds the program offers, each fitted by a test of its own
+BACKGROUNDS = ('scatter_1', 'scatter_2', 'linear', 'quadratic', 'valencia')
 SEED = 0  # the one random seed, for the noise and amounts of the mixed spectra
 PEAKS_NM = (550.0, 605.0)  # where the two mixed shapes have their peaks
 WIDTHS_NM = (8.0, 10.0)
@@ -86,6 +93,47 @@ def _background_builder(wavelengths: np.ndarray) -> np.ndarray:
 
     inverse = 1.0 / wavelengths
     return (inverse - inverse.min()) / (inverse.max() - inverse.min())
+
+
+# ---- _background_shape_builder -------------------------------------------------------
+def _background_shape_builder(background: str, wavelengths: np.ndarray) -> list:
+    """
+    ---- Summary ----
+    Helper function to write out, by hand and in other units than the program's, the
+    shapes a background of the program must be able to fit beside a flat level.
+
+    ---- Inputs ----
+    background : str
+        Name of the background, as the program names it.
+    wavelengths : np.ndarray
+        Wavelengths (nm), shape (n_wavelengths).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    list
+        The shapes, each of shape (n_wavelengths).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    x = wl / 100 nm. scatter_1: 1/x; scatter_2: 1/x and 1/x^2; linear: x - 5.5;
+    quadratic: x - 5.5 and (x - 6)^2, a curve with its bottom off the middle;
+    valencia: 1/x^2.
+
+    ---- Helpers ----
+    None.
+    """
+
+    x = wavelengths / 100.0
+    return {'scatter_1': [1.0 / x],
+            'scatter_2': [1.0 / x, 1.0 / x ** 2],
+            'linear': [x - 5.5],
+            'quadratic': [x - 5.5, (x - 6.0) ** 2],
+            'valencia': [1.0 / x ** 2],
+            }[background]
 
 
 # ---- _haem_spectrum_builder ----------------------------------------------------------
@@ -185,7 +233,7 @@ def _mixed_spectra_builder() -> Tuple[np.ndarray, np.ndarray, list]:
 
 
 # ---- _series_decomposer --------------------------------------------------------------
-def _series_decomposer(fit: dict) -> dict:
+def _series_decomposer(fit: dict, is_change_from_first: bool = False) -> dict:
     """
     ---- Summary ----
     Helper function to decompose, with a given fit, a run of four spectra holding 1, 4,
@@ -194,6 +242,8 @@ def _series_decomposer(fit: dict) -> dict:
     ---- Inputs ----
     fit : dict
         Fit dictionary from fit_importer, holding the five haems of the test fit file.
+    is_change_from_first : bool
+        True fits the change of each spectrum from the first.
 
     ---- Globals read ----
     HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
@@ -230,10 +280,11 @@ def _series_decomposer(fit: dict) -> dict:
     return experiment_decomposer(experiment,
                                  fit,
                                  dataset_name='Cyt',
-                                 degree_of_scatter=1,
+                                 background='scatter_1',
                                  haemfactor=HAEM_FACTOR,
                                  delta_exclude_first_minutes=0.0,
                                  delta_window_points=1,
+                                 is_change_from_first=is_change_from_first,
                                  )
 
 
@@ -354,7 +405,7 @@ def test_leftover_rows_are_left_out(tmp_path: Path) -> None:
     assert '650.00 nm' in fits['leftover']['notes'][0]
     found = spectrum_decomposer(np.column_stack((wavelengths, spectrum)),
                                 fits['leftover']['data'],
-                                degree_of_scatter=1,
+                                background='scatter_1',
                                 haemfactor=HAEM_FACTOR,
                                 )
     assert found[1][-1, 0] == 650.0  # the last wavelength the haems share
@@ -592,7 +643,7 @@ def test_one_spectrum_gives_its_amounts_back() -> None:
     found, _, scatter, _, haems, single, residual = spectrum_decomposer(
         np.column_stack((wavelengths, spectrum)),
         fit['data'],
-        degree_of_scatter=1,
+        background='scatter_1',
         haemfactor=HAEM_FACTOR,
         )
     assert np.allclose(found[:5], AMOUNTS, rtol=EXACT, atol=0.0)
@@ -653,7 +704,7 @@ def test_a_series_gives_its_amounts_back() -> None:
     experiment_decomposer(experiment,
                           fit,
                           dataset_name='Cyt',
-                          degree_of_scatter=1,
+                          background='scatter_1',
                           haemfactor=HAEM_FACTOR,
                           delta_exclude_first_minutes=0.0,
                           delta_window_points=1,
@@ -712,7 +763,7 @@ def test_the_three_routes_give_the_same_amounts() -> None:
     names = list(fit['haem_list'])
     one = spectrum_decomposer(np.column_stack((wavelengths, spectrum)),
                               fit['data'],
-                              degree_of_scatter=1,
+                              background='scatter_1',
                               haemfactor=HAEM_FACTOR,
                               )[0][:len(AMOUNTS)]
     experiment = {'experiment_name': 'twice',
@@ -727,7 +778,7 @@ def test_the_three_routes_give_the_same_amounts() -> None:
     experiment_decomposer(experiment,
                           fit,
                           dataset_name='Cyt',
-                          degree_of_scatter=1,
+                          background='scatter_1',
                           haemfactor=HAEM_FACTOR,
                           delta_exclude_first_minutes=0.0,
                           delta_window_points=1,
@@ -784,7 +835,7 @@ def test_same_shapes_give_a_plain_error() -> None:
     with pytest.raises(ValueError, match='cannot be told apart'):
         spectrum_decomposer(np.column_stack((wavelengths, spectrum)),
                             table,
-                            degree_of_scatter=1,
+                            background='scatter_1',
                             haemfactor=HAEM_FACTOR,
                             )
 
@@ -832,7 +883,7 @@ def test_a_failed_decomposition_leaves_nothing() -> None:
         experiment_decomposer(experiment,
                               fit_importer(FIT_FILE),
                               dataset_name='Cyt',
-                              degree_of_scatter=1,
+                              background='scatter_1',
                               haemfactor=HAEM_FACTOR,
                               delta_exclude_first_minutes=10.0,
                               delta_window_points=50,
@@ -885,6 +936,228 @@ def test_delta_a_zero_is_the_median_of_the_highest_points() -> None:
     assert np.isclose(record['window_seconds'], 180.0)
     with pytest.raises(ValueError, match='Ignore less'):
         delta_abs_calculator(frame, exclude_first_minutes=0.0, window_points=9)
+
+
+# ---- test_each_background_gives_back_the_amounts -------------------------------------
+@pytest.mark.parametrize('background', BACKGROUNDS)
+def test_each_background_gives_back_the_amounts(background: str) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a spectrum built from known amounts of each haem on a
+    background of one kind decomposes, with that background, into those amounts and
+    that background, with nothing left over.
+
+    ---- Inputs ----
+    background : str
+        Name of the background, as the program names it.
+
+    ---- Globals read ----
+    FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE, EXACT (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    spectrum = sum(amount_i x shape_i) x HAEM_FACTOR + OFFSET + SLOPE x each shape of
+    the background (_background_shape_builder). The amounts found must be AMOUNTS, and
+    the background found the part of the spectrum that is not haem.
+
+    ---- Helpers ----
+    _background_shape_builder
+    _haem_spectrum_builder
+    """
+
+    wavelengths, _, shapes = _haem_spectrum_builder()
+    haem_part = (shapes @ AMOUNTS) * HAEM_FACTOR
+    spectrum = haem_part + OFFSET
+    for shape in _background_shape_builder(background, wavelengths):
+        spectrum = spectrum + SLOPE * shape
+    found, _, fitted_background, _, _, _, residual = spectrum_decomposer(
+        np.column_stack((wavelengths, spectrum)),
+        fit_importer(FIT_FILE)['data'],
+        background=background,
+        haemfactor=HAEM_FACTOR,
+        )
+    assert np.allclose(found[:5], AMOUNTS, rtol=EXACT, atol=0.0)
+    assert np.allclose(fitted_background[:, 1], spectrum - haem_part, atol=1e-9)
+    assert np.abs(residual[:, 1]).max() < 1e-9
+
+
+# ---- test_an_unknown_background_is_refused -------------------------------------------
+def test_an_unknown_background_is_refused() -> None:
+    """
+    ---- Summary ----
+    Main function to check that a background the program does not know is refused with
+    a message that names it and the ones it knows, and that the standard background in
+    config.py is one it knows.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    BACKGROUNDS (module constant); settings.HAEM_BACKGROUND.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    wavelengths = np.array([500.0, 550.0, 600.0])
+    with pytest.raises(ValueError, match='no background called "cubic"'):
+        background_builder(wavelengths, 'cubic')
+    assert settings.HAEM_BACKGROUND in BACKGROUNDS
+    assert background_builder(wavelengths, settings.HAEM_BACKGROUND).shape[0] == 3
+
+
+# ---- test_some_haems_only_give_back_their_amounts ------------------------------------
+def test_some_haems_only_give_back_their_amounts(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a fit can keep only some of its haems: they are kept in
+    the order of the file, a spectrum built from them alone decomposes into their
+    amounts, leaving out a short haem widens the wavelengths used, the fit given is not
+    changed, and naming no haem or one the fit does not hold is refused.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest.
+
+    ---- Globals read ----
+    FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE, EXACT (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Writes a fit file in tmp_path (side effect).
+
+    ---- Equations ----
+    The test fit runs from 400 to 700 nm in 1 nm steps; Cyt cc is ended at 650 nm (row
+    251), so the five haems share 400 to 650 nm and the four others 400 to 700 nm.
+    spectrum = AMOUNTS of Cyt cc and Cyt bL only x their shapes x HAEM_FACTOR + OFFSET
+    + SLOPE x background.
+
+    ---- Helpers ----
+    _background_builder
+    _haem_spectrum_builder
+    """
+
+    # ---- 1 Keep two haems and decompose a spectrum made of them ----------------------
+    wavelengths, _, shapes = _haem_spectrum_builder()
+    fit = fit_importer(FIT_FILE)
+    kept = fit_haem_selector(fit, ['Cyt bL', 'Cyt cc'])
+    assert kept['haem_list'] == ['Cyt cc', 'Cyt bL']
+    assert len(fit['haem_list']) == 5
+    spectrum = ((shapes[:, [1, 3]] @ AMOUNTS[[1, 3]]) * HAEM_FACTOR
+                + OFFSET
+                + SLOPE * _background_builder(wavelengths)
+                )
+    found = spectrum_decomposer(np.column_stack((wavelengths, spectrum)),
+                                kept['data'],
+                                background='scatter_1',
+                                haemfactor=HAEM_FACTOR,
+                                )[0]
+    assert len(found) == 4  # two haems, the flat level and the scatter term
+    assert np.allclose(found[:2], AMOUNTS[[1, 3]], rtol=EXACT, atol=0.0)
+
+    # ---- 2 Leave out a short haem ----------------------------------------------------
+    table = pd.read_csv(FIT_FILE)
+    table.iloc[251:, 2:4] = np.nan
+    table.to_csv(tmp_path / 'short.csv', index=False)
+    short = fit_importer(tmp_path / 'short.csv')
+    assert fit_range_finder(short['data']) == (400.0, 650.0)
+    others = [name for name in short['haem_list'] if name != 'Cyt cc']
+    assert fit_range_finder(fit_haem_selector(short, others)['data']) == (400.0, 700.0)
+    alone = fit_haem_selector(short, ['Cyt cc'])
+    assert alone['data'].shape == (251, 2)  # its blank rows below 650 nm are gone
+
+    # ---- 3 Refuse what cannot be kept ------------------------------------------------
+    with pytest.raises(ValueError, match='No haem was chosen'):
+        fit_haem_selector(fit, [])
+    with pytest.raises(ValueError, match='Cyt x: not in the fit file'):
+        fit_haem_selector(fit, ['Cyt cc', 'Cyt x'])
+
+
+# ---- test_the_change_from_the_first_spectrum -----------------------------------------
+def test_the_change_from_the_first_spectrum() -> None:
+    """
+    ---- Summary ----
+    Main function to check that fitting the change of each spectrum from the first, as
+    the instrument does, gives each amount and absorbance minus that of the first
+    spectrum, and the same change from the highest point (delta A) as fitting the
+    spectra themselves; and that a first spectrum with a blank value is refused.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    FIT_FILE, HAEM_FACTOR, AMOUNTS, EXACT (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The run holds 1, 4, 3 and 2 times AMOUNTS (_series_decomposer), so its changes from
+    the first spectrum are 0, 3, 2 and 1 times AMOUNTS; absorbance = amount x highest
+    point of |shape_i| x HAEM_FACTOR x 1000.
+
+    ---- Helpers ----
+    _haem_spectrum_builder
+    _series_decomposer
+    """
+
+    # ---- 1 The change of a run -------------------------------------------------------
+    fit = fit_importer(FIT_FILE)
+    names = list(fit['haem_list'])
+    change = _series_decomposer(fit, is_change_from_first=True)
+    itself = _series_decomposer(fit)
+    expected = np.outer([0.0, 3.0, 2.0, 1.0], AMOUNTS)
+    assert np.allclose(change['haem_conc'][names].to_numpy(),
+                       expected,
+                       rtol=EXACT,
+                       atol=EXACT * expected.max(),
+                       )
+    _, _, shapes = _haem_spectrum_builder()
+    absorbances = expected * np.abs(shapes).max(axis=0)[None, :] * HAEM_FACTOR * 1000.0
+    assert np.allclose(change['haem_abs'][names].to_numpy(),
+                       absorbances,
+                       rtol=EXACT,
+                       atol=EXACT * absorbances.max(),
+                       )
+    delta = itself['haem_delta_abs'][names].to_numpy()
+    assert np.allclose(change['haem_delta_abs'][names].to_numpy(),
+                       delta,
+                       rtol=EXACT,
+                       atol=EXACT * np.abs(delta).max(),
+                       )
+
+    # ---- 2 A first spectrum with a blank value ---------------------------------------
+    blank = _series_decomposer(fit)
+    blank['raw_spectra']['Cyt']['attenuation'][0, 100] = np.nan
+    with pytest.raises(ValueError, match='first Cyt spectrum has blank values'):
+        experiment_decomposer(blank,
+                              fit,
+                              dataset_name='Cyt',
+                              background='scatter_1',
+                              haemfactor=HAEM_FACTOR,
+                              delta_exclude_first_minutes=0.0,
+                              delta_window_points=1,
+                              is_change_from_first=True,
+                              )
 
 
 # ---- test_two_mixed_shapes_give_two_components ---------------------------------------
