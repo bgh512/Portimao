@@ -17,6 +17,9 @@ from utils_shared.normalisation import (data_normaliser,
                                         experiment_normaliser,
                                         percent_scaler,
                                         )
+from utils_shared.reference_level import (reference_level_finder,
+                                          window_seconds_calculator,
+                                          )
 from utils_shared.schema import TIME_COLUMN
 from utils_shared.trimming import experiment_trimmer
 
@@ -297,8 +300,13 @@ def test_percent_of_a_trace_with_plateaus() -> None:
     None.
 
     ---- Equations ----
-    A point every 6 s for 12 min: 2 for the first 4 min, then 6, then 4 from 8 min.
-    percent = (value - 2) / (6 - 2) x 100, so 2 -> 0, 6 -> 100 and 4 -> 50.
+    A point every 6 s for 12 min: 2 for the first 4 min (40 points), then 6 (40
+    points), then 4 from 8 min. With 30 points in a row, the lowest median is 2 and
+    the highest 6. percent = (value - 2) / (6 - 2) x 100, so 2 -> 0, 6 -> 100 and
+    4 -> 50. 30 points, 6 s apart, last 180 s. The first window of median 2 is points
+    0 to 29 (0 to 2.9 min). The first of median 6 is points 26 to 55 (2.6 to 5.5 min):
+    it holds 14 twos and 16 sixes, so its two middle values are both 6; a window may
+    reach over a step as long as most of it is on the level.
 
     ---- Helpers ----
     None.
@@ -307,15 +315,18 @@ def test_percent_of_a_trace_with_plateaus() -> None:
     number = np.arange(121)
     values = np.where(number < 40, 2.0, np.where(number < 80, 6.0, 4.0))
     frame = pd.DataFrame({TIME_COLUMN: number * 0.1, VO2_COLUMN: values})
-    result = percent_scaler(frame, window_seconds=30.0)
+    result = percent_scaler(frame, window_points=30)
     expected = np.where(number < 40, 0.0, np.where(number < 80, 100.0, 50.0))
     assert np.allclose(result[VO2_COLUMN], expected, atol=1e-9)
     assert np.allclose(result[TIME_COLUMN], number * 0.1)
     scaling = result.attrs['percent_scaling'][VO2_COLUMN]
-    assert np.isclose(scaling['minimum_mean'], 2.0)
-    assert np.isclose(scaling['maximum_mean'], 6.0)
-    assert scaling['zero_percent_window']['end_time'] < 4.0
-    assert 4.0 <= scaling['hundred_percent_window']['start_time'] < 8.0
+    assert np.isclose(scaling['zero_percent_level'], 2.0)
+    assert np.isclose(scaling['hundred_percent_level'], 6.0)
+    assert np.isclose(scaling['zero_percent_window']['start_time'], 0.0)
+    assert np.isclose(scaling['zero_percent_window']['end_time'], 2.9)
+    assert np.isclose(scaling['hundred_percent_window']['start_time'], 2.6)
+    assert np.isclose(scaling['hundred_percent_window']['end_time'], 5.5)
+    assert np.isclose(scaling['window_seconds'], 180.0)
 
 
 # ---- test_percent_of_a_flat_trace ----------------------------------------------------
@@ -323,7 +334,7 @@ def test_percent_of_a_flat_trace() -> None:
     """
     ---- Summary ----
     Main function to check that a trace that never changes has no percent scale (every
-    value blank), and that a window longer than the trace is refused.
+    value blank), and that a window of more points than the trace has is refused.
 
     ---- Inputs ----
     None.
@@ -345,9 +356,66 @@ def test_percent_of_a_flat_trace() -> None:
     """
 
     frame = pd.DataFrame({TIME_COLUMN: np.arange(61) * 0.1, VO2_COLUMN: 3.0})
-    assert np.all(np.isnan(percent_scaler(frame, window_seconds=30.0)[VO2_COLUMN]))
+    assert np.all(np.isnan(percent_scaler(frame, window_points=30)[VO2_COLUMN]))
+    with pytest.raises(ValueError, match='Ignore less'):
+        percent_scaler(frame, window_points=62)
+
+
+# ---- test_reference_level_from_points_in_a_row ---------------------------------------
+def test_reference_level_from_points_in_a_row() -> None:
+    """
+    ---- Summary ----
+    Main function to check the one finder of the reference levels: the median of the
+    highest, or the lowest, points in a row, with a blank value, with an ignored start
+    and end, and with too few points.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Values 1, 2, 9, 3, 4, 5, 0, 0 at 0 to 7 min, three points in a row. Medians of the
+    six windows: 2, 3, 4, 4, 4, 0. Highest: 4, first at 9, 3, 4 (2 to 4 min); lowest:
+    0, at 5, 0, 0 (5 to 7 min). With the 3 blank, the points left are 1, 2, 9, 4, 5,
+    0, 0 with medians 2, 4, 5, 4, 0: highest 5, at 9, 4, 5 (2 to 5 min, over the
+    blank). Between 1 and 5 min only: 2, 9, 3, 4, 5 with medians 3, 4, 4: highest 4
+    (2 to 4 min), lowest 3 (1 to 3 min). Three points, 1 min apart, last 180 s.
+
+    ---- Helpers ----
+    None.
+    """
+
+    times = np.arange(8, dtype=float)
+    values = np.array([1.0, 2.0, 9.0, 3.0, 4.0, 5.0, 0.0, 0.0])
+    highest = reference_level_finder(times, values, 0.0, 7.0, 3)
+    assert highest == {'level': 4.0, 'start_time': 2.0, 'end_time': 4.0, 'n_points': 3}
+    lowest = reference_level_finder(times, values, 0.0, 7.0, 3, is_highest=False)
+    assert lowest == {'level': 0.0, 'start_time': 5.0, 'end_time': 7.0, 'n_points': 3}
+    with_blank = values.copy()
+    with_blank[3] = np.nan
+    over_blank = reference_level_finder(times, with_blank, 0.0, 7.0, 3)
+    assert (over_blank['level'], over_blank['start_time'], over_blank['end_time']) == (
+        5.0,
+        2.0,
+        5.0,
+        )
+    inner = reference_level_finder(times, values, 1.0, 5.0, 3)
+    assert (inner['level'], inner['start_time'], inner['end_time']) == (4.0, 2.0, 4.0)
+    inner_low = reference_level_finder(times, values, 1.0, 5.0, 3, is_highest=False)
+    assert (inner_low['level'], inner_low['start_time']) == (3.0, 1.0)
+    assert reference_level_finder(times, values, 0.0, 7.0, 9) is None
+    assert reference_level_finder(times, values, 6.5, 7.0, 3) is None
     with pytest.raises(ValueError):
-        percent_scaler(frame, window_seconds=600.0)
+        reference_level_finder(times, values, 0.0, 7.0, 0)
+    assert np.isclose(window_seconds_calculator(times, 3), 180.0)
 
 
 # ---- test_window_mean_and_spread -----------------------------------------------------
@@ -490,6 +558,71 @@ def test_average_that_does_not_fit() -> None:
     assert list(averages['windows']) == ['average0']
     assert sorted(averages['skipped']) == ['average1', 'average2']
     assert np.isclose(averages['windows']['average0']['vo2'][VO2_COLUMN]['mean'], 10.0)
+    assert np.isclose(averages['windows']['average0']['start_time'], 0.0)
+
+
+# ---- test_baseline_needs_ten_seconds_of_data -----------------------------------------
+def test_baseline_needs_ten_seconds_of_data() -> None:
+    """
+    ---- Summary ----
+    Main function to check that a run with less than 10 s of data in its baseline
+    window has no baseline, so its changes from baseline are blank while its averages
+    are kept, and that a baseline window cut at the start of the recording counts when
+    it still holds 10 s.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    VO2_COLUMN (module constant).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    A point every 0.5 min from 0 min; 2 min windows ending 0.5 min before the next
+    addition. First addition at 0.6 min: the baseline window ends at 0.1 min and is
+    cut at 0 min, where it holds one point (0 s of data), so there is no baseline;
+    the windows 5.5 to 7.5 and 9.5 to 11.5 min still average 5 and 2. First addition
+    at 1 min: the window is 0 to 0.5 min and holds two points 30 s apart, so it is
+    the baseline (mean 10) and the second window (5) is 50 % of it.
+
+    ---- Helpers ----
+    _plateau_experiment_builder
+    """
+
+    settings = {'window_minutes': 2.0,
+                'gap_minutes': 0.5,
+                'final_window_gap_minutes': 0.5,
+                'vo2_source': 'raw',
+                'haem_source': None,
+                'baseline_minimum_seconds': 10.0,
+                }
+    short = _plateau_experiment_builder()
+    short['metadata']['events'][0]['time'] = 0.6
+    averages = experiment_averages_calculator(short, **settings)['averages']
+    assert list(averages['windows']) == ['average1', 'average2']
+    assert list(averages['skipped']) == ['average0']
+    assert np.isclose(averages['skipped']['average0']['start_time'], 0.0)
+    for name, mean in (('average1', 5.0), ('average2', 2.0)):
+        stats = averages['windows'][name]['vo2'][VO2_COLUMN]
+        assert np.isclose(stats['mean'], mean)
+        assert np.isnan(stats['change'])
+        assert np.isnan(stats['delta'])
+    enough = _plateau_experiment_builder()
+    enough['metadata']['events'][0]['time'] = 1.0
+    averages = experiment_averages_calculator(enough, **settings)['averages']
+    assert list(averages['windows']) == ['average0', 'average1', 'average2']
+    assert averages['skipped'] == {}
+    assert np.isclose(averages['windows']['average0']['start_time'], 0.0)
+    assert np.isclose(averages['windows']['average0']['end_time'], 0.5)
+    assert np.isclose(averages['windows']['average0']['vo2'][VO2_COLUMN]['mean'], 10.0)
+    assert np.isclose(averages['windows']['average1']['vo2'][VO2_COLUMN]['change'],
+                      50.0,
+                      )
 
 
 # ---- test_trimming_keeps_exactly_the_chosen_times ------------------------------------
@@ -535,6 +668,45 @@ def test_trimming_keeps_exactly_the_chosen_times() -> None:
     assert all('row_index' not in event for event in events)
     assert experiment['metadata']['trimmed_before_minutes'] == 2.0
     assert experiment['metadata']['trimmed_after_minutes'] == 7.0
+
+
+# ---- test_trimming_moves_the_ignored_additions ---------------------------------------
+def test_trimming_moves_the_ignored_additions() -> None:
+    """
+    ---- Summary ----
+    Main function to check that after a cut at the start the ignored additions are
+    counted from the new zero like everything else, and that one made before the cut
+    gets a negative time.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Cut at 2 and 7 min; ignored additions at 1 and 5 min move to -1 and 3 min, as the
+    kept ones at 3 and 6 min move to 1 and 4 min.
+
+    ---- Helpers ----
+    _ramp_experiment_builder
+    """
+
+    experiment = _ramp_experiment_builder()
+    experiment['metadata']['ignored_events'] = [{'time': 1.0, 'row_index': 1},
+                                                {'time': 5.0, 'row_index': 5},
+                                                ]
+    experiment_trimmer(experiment, 2.0, 7.0)
+    ignored = experiment['metadata']['ignored_events']
+    assert [event['time'] for event in ignored] == [-1.0, 3.0]
+    assert all('row_index' not in event for event in ignored)
+    assert [event['time'] for event in experiment['metadata']['events']] == [1.0, 4.0]
 
 
 # ---- test_trimming_never_cuts_an_addition --------------------------------------------

@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V1.10
-- **Date:** 19/11/2026
+- **Version:** V1.11
+- **Date:** 20/11/2026
 
 ## Contents
 
@@ -30,6 +30,7 @@
     - [`test_the_three_routes_give_the_same_amounts`](#test_the_three_routes_give_the_same_amounts)
     - [`test_same_shapes_give_a_plain_error`](#test_same_shapes_give_a_plain_error)
     - [`test_a_failed_decomposition_leaves_nothing`](#test_a_failed_decomposition_leaves_nothing)
+    - [`test_delta_a_zero_is_the_median_of_the_highest_points`](#test_delta_a_zero_is_the_median_of_the_highest_points)
     - [`test_two_mixed_shapes_give_two_components`](#test_two_mixed_shapes_give_two_components)
     - [`test_the_two_shapes_are_found_again`](#test_the_two_shapes_are_found_again)
 - [`tests/test_haem_direction.py`](#teststest_haem_directionpy)
@@ -77,10 +78,13 @@
     - [`test_normalising_by_od_volume_and_dilution`](#test_normalising_by_od_volume_and_dilution)
     - [`test_percent_of_a_trace_with_plateaus`](#test_percent_of_a_trace_with_plateaus)
     - [`test_percent_of_a_flat_trace`](#test_percent_of_a_flat_trace)
+    - [`test_reference_level_from_points_in_a_row`](#test_reference_level_from_points_in_a_row)
     - [`test_window_mean_and_spread`](#test_window_mean_and_spread)
     - [`test_averages_around_the_additions`](#test_averages_around_the_additions)
     - [`test_average_that_does_not_fit`](#test_average_that_does_not_fit)
+    - [`test_baseline_needs_ten_seconds_of_data`](#test_baseline_needs_ten_seconds_of_data)
     - [`test_trimming_keeps_exactly_the_chosen_times`](#test_trimming_keeps_exactly_the_chosen_times)
+    - [`test_trimming_moves_the_ignored_additions`](#test_trimming_moves_the_ignored_additions)
     - [`test_trimming_never_cuts_an_addition`](#test_trimming_never_cuts_an_addition)
     - [`test_trimming_the_end_only`](#test_trimming_the_end_only)
 - [`tests/test_question_flow.py`](#teststest_question_flowpy)
@@ -399,6 +403,9 @@
     - [`text_colourer`](#text_colourer)
     - [`text_italiser`](#text_italiser)
     - [`yes_no_asker`](#yes_no_asker)
+- [`utils_shared/reference_level.py`](#utils_sharedreference_levelpy)
+    - [`reference_level_finder`](#reference_level_finder)
+    - [`window_seconds_calculator`](#window_seconds_calculator)
 - [`utils_shared/run_logging.py`](#utils_sharedrun_loggingpy)
     - [`_Tee`](#_tee)
     - [`logging_starter`](#logging_starter)
@@ -410,7 +417,6 @@
     - [`time_getter`](#time_getter)
     - [`value_getter`](#value_getter)
 - [`utils_shared/spectral_decomposer.py`](#utils_sharedspectral_decomposerpy)
-    - [`_best_window_finder`](#_best_window_finder)
     - [`_wavelength_masker`](#_wavelength_masker)
     - [`background_builder`](#background_builder)
     - [`basis_solver`](#basis_solver)
@@ -1204,8 +1210,8 @@ None.
 amount of haem i in a spectrum = its multiple x AMOUNTS_i; absorbance (mOD) =
 amount x highest point of |shape_i| x HAEM_FACTOR x 1000; change = absorbance - the
 highest absorbance of that haem (the second spectrum), so it is 0 there and
-negative elsewhere. The highest point is looked for in 30 s windows that must end
-before the run does, so the last spectrum can never be it.
+negative elsewhere. The reference window is one spectrum here, as the run has only
+four.
 
 ---- Helpers ----
 _background_builder
@@ -1294,6 +1300,36 @@ The run lasts 1 min and its first 10 min are ignored, so nothing is left.
 
 ---- Helpers ----
 _haem_spectrum_builder
+```
+
+#### `test_delta_a_zero_is_the_median_of_the_highest_points`
+
+```text
+---- Summary ----
+Main function to check that the zero of delta A is the median of the highest points
+in a row, so that one spike does not set it, and that a run with fewer points than
+one window is refused in place of taking the zero from too few spectra.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Absorbances 1, 2, 9, 3, 4, 5, 0, 0 at 0 to 7 min, three points in a row. Medians
+of the six windows: 2, 3, 4, 4, 4, 0. The highest is 4, first reached by the
+window 9, 3, 4 (2 to 4 min), so delta A = absorbance - 4 and the spike of 9 is not
+the zero. A window of nine points does not fit in eight.
+
+---- Helpers ----
+None.
 ```
 
 #### `test_two_mixed_shapes_give_two_components`
@@ -2504,8 +2540,13 @@ None.
 None.
 
 ---- Equations ----
-A point every 6 s for 12 min: 2 for the first 4 min, then 6, then 4 from 8 min.
-percent = (value - 2) / (6 - 2) x 100, so 2 -> 0, 6 -> 100 and 4 -> 50.
+A point every 6 s for 12 min: 2 for the first 4 min (40 points), then 6 (40
+points), then 4 from 8 min. With 30 points in a row, the lowest median is 2 and
+the highest 6. percent = (value - 2) / (6 - 2) x 100, so 2 -> 0, 6 -> 100 and
+4 -> 50. 30 points, 6 s apart, last 180 s. The first window of median 2 is points
+0 to 29 (0 to 2.9 min). The first of median 6 is points 26 to 55 (2.6 to 5.5 min):
+it holds 14 twos and 16 sixes, so its two middle values are both 6; a window may
+reach over a step as long as most of it is on the level.
 
 ---- Helpers ----
 None.
@@ -2516,7 +2557,7 @@ None.
 ```text
 ---- Summary ----
 Main function to check that a trace that never changes has no percent scale (every
-value blank), and that a window longer than the trace is refused.
+value blank), and that a window of more points than the trace has is refused.
 
 ---- Inputs ----
 None.
@@ -2532,6 +2573,38 @@ None.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_reference_level_from_points_in_a_row`
+
+```text
+---- Summary ----
+Main function to check the one finder of the reference levels: the median of the
+highest, or the lowest, points in a row, with a blank value, with an ignored start
+and end, and with too few points.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Values 1, 2, 9, 3, 4, 5, 0, 0 at 0 to 7 min, three points in a row. Medians of the
+six windows: 2, 3, 4, 4, 4, 0. Highest: 4, first at 9, 3, 4 (2 to 4 min); lowest:
+0, at 5, 0, 0 (5 to 7 min). With the 3 blank, the points left are 1, 2, 9, 4, 5,
+0, 0 with medians 2, 4, 5, 4, 0: highest 5, at 9, 4, 5 (2 to 5 min, over the
+blank). Between 1 and 5 min only: 2, 9, 3, 4, 5 with medians 3, 4, 4: highest 4
+(2 to 4 min), lowest 3 (1 to 3 min). Three points, 1 min apart, last 180 s.
 
 ---- Helpers ----
 None.
@@ -2622,6 +2695,39 @@ window (-0.5 to 3.5 min) holds only the level 10.
 _plateau_experiment_builder
 ```
 
+#### `test_baseline_needs_ten_seconds_of_data`
+
+```text
+---- Summary ----
+Main function to check that a run with less than 10 s of data in its baseline
+window has no baseline, so its changes from baseline are blank while its averages
+are kept, and that a baseline window cut at the start of the recording counts when
+it still holds 10 s.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A point every 0.5 min from 0 min; 2 min windows ending 0.5 min before the next
+addition. First addition at 0.6 min: the baseline window ends at 0.1 min and is
+cut at 0 min, where it holds one point (0 s of data), so there is no baseline;
+the windows 5.5 to 7.5 and 9.5 to 11.5 min still average 5 and 2. First addition
+at 1 min: the window is 0 to 0.5 min and holds two points 30 s apart, so it is
+the baseline (mean 10) and the second window (5) is 50 % of it.
+
+---- Helpers ----
+_plateau_experiment_builder
+```
+
 #### `test_trimming_keeps_exactly_the_chosen_times`
 
 ```text
@@ -2645,6 +2751,34 @@ None.
 Points at 0 to 10 min; kept: 2, 3, 4, 5, 6, 7 -> new times 0 to 5. Their values
 (10 x old time) are 20 to 70; their spectrum numbers 3 to 8; the additions at 3 and
 6 min move to 1 and 4 min.
+
+---- Helpers ----
+_ramp_experiment_builder
+```
+
+#### `test_trimming_moves_the_ignored_additions`
+
+```text
+---- Summary ----
+Main function to check that after a cut at the start the ignored additions are
+counted from the new zero like everything else, and that one made before the cut
+gets a negative time.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Cut at 2 and 7 min; ignored additions at 1 and 5 min move to -1 and 3 min, as the
+kept ones at 3 and 6 min move to 1 and 4 min.
 
 ---- Helpers ----
 _ramp_experiment_builder
@@ -8754,25 +8888,32 @@ vo2_source : Optional[str]
     VoO2 source key (e.g. 'od', 'raw', 'percent'); None leaves VoO2 out.
 haem_source : Optional[str]
     Haem source key (e.g. 'abs', 'delta_abs_od'); None leaves the haems out.
+baseline_minimum_seconds : float
+    Least time the data inside the baseline window (average0) must span, in
+    seconds (>= 0).
 
 ---- Globals read ----
-schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES; schema.resolve_source, get_times.
+schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES.
 
 ---- Outputs ----
 dict
     The same experiment dictionary. Raises ValueError for invalid settings, no
     source, no events or invalid times. A window that does not fit between two
-    additions (or after the last one) is skipped, not an error.
+    additions (or after the last one) is skipped, not an error; so is the baseline
+    window when it holds too little data, and the run then has no baseline: the
+    delta and change of every window are NaN.
 
 ---- Globals mutated ----
 experiment: adds experiment["averages"] = {"settings", "windows", "skipped"}
 (layout in DATA_FORMAT.md).
 
 ---- Equations ----
-average0 ends gap_minutes before the first event; averageN ends gap_minutes before
-event N+1 (final_window_gap_minutes before the end of the recording for the last
-event); each window starts window_minutes before its end and is skipped when that
-is before its own event. change = mean /
+average0 ends gap_minutes before the first event and starts window_minutes before
+its end, or at the start of the recording when that is later; it is skipped when
+the points inside it span less than baseline_minimum_seconds. averageN ends
+gap_minutes before event N+1 (final_window_gap_minutes before the end of the
+recording for the last event); each window starts window_minutes before its end
+and is skipped when that is before its own event. change = mean /
 mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0).
 
 ---- Helpers ----
@@ -9027,7 +9168,7 @@ experiment : Optional[dict]
 
 ---- Globals read ----
 settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
-settings.DELTA_ABS_WINDOW_SECONDS, settings.PERCENT_AVERAGE_WINDOW_SECONDS.
+settings.REFERENCE_WINDOW_POINTS, settings.BASELINE_MINIMUM_SECONDS.
 
 ---- Outputs ----
 dict
@@ -10618,7 +10759,7 @@ source_key : str
 target_key : str
     Key the scaled table is stored under, e.g. 'haem_percent'.
 **scaling_kwargs : Any
-    exclude_first_minutes, exclude_last_minutes and window_seconds, passed to
+    exclude_first_minutes, exclude_last_minutes and window_points, passed to
     percent_scaler.
 
 ---- Globals read ----
@@ -10652,32 +10793,38 @@ df : pd.DataFrame
 label : str
     Name used in error messages.
 exclude_first_minutes : float
-    Windows must start at least this long after the first measurement.
+    Minutes after the first measurement that are ignored at the start.
 exclude_last_minutes : float
-    Windows must finish at least this long before the last measurement.
-window_seconds : float
-    Length of each averaging window, in seconds (> 0).
+    Minutes before the last measurement that are ignored at the end.
+window_points : int
+    Number of points in a row that make a reference window (>= 1).
 
 ---- Globals read ----
-schema.get_times, measurement_columns.
+None.
 
 ---- Outputs ----
 pd.DataFrame
-    Scaled copy; the windows used are stored in result.attrs["percent_scaling"]. A
-    constant column becomes NaN. Raises ValueError for invalid settings or when no
-    complete window remains.
+    Scaled copy; result.attrs["percent_scaling"] holds, per column,
+    {'zero_percent_window', 'hundred_percent_window': the windows found
+    (reference_level_finder), 'zero_percent_level', 'hundred_percent_level': their
+    medians, 'window_seconds': the length of such a window}. A constant column
+    becomes NaN. Raises ValueError, with a message for the user, for invalid
+    settings or when fewer than window_points values are left after the ignored
+    parts.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-percent = (value - low) / (high - low) x 100, where low and high are the lowest and
-highest window means (windows must contain data spanning at least 80 % of their
-length). Values outside the range are kept.
+percent = (value - low) / (high - low) x 100, where low and high are the medians of
+the lowest and of the highest points in a row (reference_level_finder). Values
+outside the range are kept.
 
 ---- Helpers ----
 measurement_column_finder
+reference_level_finder
 time_getter
+window_seconds_calculator
 ```
 
 ## `utils_shared/output_capture.py`
@@ -13116,6 +13263,88 @@ _input_reader
 _question_printer
 ```
 
+## `utils_shared/reference_level.py`
+
+The one finder of the reference level of a trace: the median of its highest or lowest
+
+### MAIN FUNCTIONS
+
+#### `reference_level_finder`
+
+```text
+---- Summary ----
+Main function to find the reference level of a trace: the median of its highest (or
+lowest) points in a row. It is the one rule behind the 0 of delta A and the 0 % and
+100 % of the % scale.
+
+---- Inputs ----
+times : np.ndarray
+    Time of each point in minutes, shape (n_timepoints).
+values : np.ndarray
+    Value at each point, shape (n_timepoints).
+start : float
+    Earliest time that may be used, in minutes.
+stop : float
+    Latest time that may be used, in minutes.
+n_points : int
+    Number of points in a row that make one window (>= 1).
+is_highest : bool
+    True for the window with the highest median, False for the lowest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[dict]
+    {'level': the median of the chosen window, 'start_time' and 'end_time': the
+    times of its first and last point (min), 'n_points': n_points}, or None when
+    fewer than n_points usable points lie between start and stop. Of equal windows
+    the earliest is chosen. Raises ValueError when n_points is below 1.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The points are put in time order; points with a blank time or value, or outside
+start to stop, are dropped, so the points on either side of a blank count as
+neighbours. Window i = points i to i + n_points - 1; level = max (or min) over i
+of median(window i). The windows are counted in points, not in time, and the last
+one ends at the last usable point.
+
+---- Helpers ----
+None.
+```
+
+#### `window_seconds_calculator`
+
+```text
+---- Summary ----
+Main function to work out how long a window of points in a row lasts, for the
+messages to the user.
+
+---- Inputs ----
+times : np.ndarray
+    Time of each point in minutes, shape (n_timepoints).
+n_points : int
+    Number of points in a row that make one window.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    Length of the window in seconds; NaN when fewer than two times are known.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+seconds = n_points x median time between neighbouring points (min) x 60.
+
+---- Helpers ----
+None.
+```
+
 ## `utils_shared/run_logging.py`
 
 Mirror console output to a timestamped log file for the duration of a run.
@@ -13504,44 +13733,6 @@ Spectral fit loading and haem decomposition routines.
 
 ### SPECTRAL DECOMPOSER HELPERS
 
-#### `_best_window_finder`
-
-```text
----- Summary ----
-Helper function to find the window of a given length with the highest average.
-
----- Inputs ----
-times : np.ndarray
-    Time of each spectrum in minutes.
-values : np.ndarray
-    Value at each spectrum.
-start : float
-    Earliest time that may be used.
-stop : float
-    Latest time that may be used.
-width : float
-    Window length in minutes.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Optional[Tuple[float, float, float]]
-    (highest average, time of its first spectrum, time of its last spectrum), or
-    None when there is no finite value between start and stop. When the usable
-    part is shorter than the window, all of it is one window.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-Window average = (running sum at the window end - running sum at its start) /
-number of spectra in the window.
-
----- Helpers ----
-None.
-```
-
 #### `_wavelength_masker`
 
 ```text
@@ -13680,44 +13871,48 @@ _wavelength_masker
 ```text
 ---- Summary ----
 Main function to shift each haem absorbance so that its reference level is 0, giving
-a change in absorbance (mOD). The reference level of each haem is the average of its
-highest window (for example the fully oxidised point), wherever it occurs in the
-run outside the ignored start and end.
+a change in absorbance (mOD). The reference level of each haem is the median of its
+highest points in a row (for example the fully oxidised point), wherever they occur
+in the run outside the ignored start and end.
 
 ---- Inputs ----
 haem_abs : pd.DataFrame
     Haem absorbance table in mOD (time, spectrum index and one column per haem).
 exclude_first_minutes : float
     Minutes after the first measurement that are ignored at the start.
-window_seconds : float
-    Length of the reference window, in seconds (> 0).
+window_points : int
+    Number of spectra in a row that make the reference window (>= 1).
 label : str
     Name used in error messages.
 exclude_last_minutes : float
     Minutes before the last measurement that are ignored at the end.
 
 ---- Globals read ----
-schema.get_times, get_values, measurement_columns.
+None.
 
 ---- Outputs ----
 pd.DataFrame
-    Shifted copy; the means and the window of each haem are stored in
-    result.attrs["delta_abs_baseline"]. Raises ValueError for invalid settings or
-    when no spectra are left after the ignored parts.
+    Shifted copy; result.attrs["delta_abs_baseline"] holds {'level_by_haem': the
+    level subtracted from each haem (mOD), 'window_by_haem': the (first, last)
+    time of each haem's window (min), 'window_points', 'window_seconds': the
+    length of such a window}. Raises ValueError, with a message for the user, for
+    invalid settings or when fewer than window_points spectra are left after the
+    ignored parts.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-delta_abs = abs - max over windows of mean(abs inside the window), per haem. The
-windows start at each spectrum and last window_seconds. Only a constant is
-subtracted, so differences between points are unchanged.
+delta_abs = abs - max over windows of median(abs inside the window), per haem
+(reference_level_finder). Only a constant is subtracted, so differences between
+points are unchanged.
 
 ---- Helpers ----
-_best_window_finder
 measurement_column_finder
+reference_level_finder
 time_getter
 value_getter
+window_seconds_calculator
 ```
 
 #### `experiment_decomposer`
@@ -13741,10 +13936,10 @@ degree_of_scatter : int
 haemfactor : float
     Scale factor applied to the haem basis spectra.
 delta_exclude_first_minutes : float
-    Start of the delta absorbance reference window, in minutes after the first
-    spectrum.
-delta_window_seconds : float
-    Length of the delta absorbance reference window, in seconds.
+    Minutes after the first spectrum that are ignored when finding the delta
+    absorbance reference.
+delta_window_points : int
+    Number of spectra in a row that make the delta absorbance reference window.
 delta_exclude_last_minutes : float
     Minutes before the last spectrum that are ignored when finding the delta
     absorbance reference.
@@ -13767,7 +13962,7 @@ decomposition.
 ---- Equations ----
 c = the least-squares amounts of the basis S in every spectrum (basis_solver);
 haem_abs = c x peak amplitude of the haem basis spectrum x 1000 (OD to mOD);
-haem_delta_abs = haem_abs - mean of the highest window.
+haem_delta_abs = haem_abs - median of the highest points in a row.
 
 ---- Helpers ----
 _wavelength_masker
@@ -15084,7 +15279,8 @@ dict
     times.
 
 ---- Globals mutated ----
-None. Trims CcO2, CsO2, VoO2 and the raw spectra, shifts the event times and sets
+None. Trims CcO2, CsO2, VoO2 and the raw spectra, shifts the times of the events
+and of the ignored events (one before the new start gets a negative time) and sets
 metadata trimmed_before_minutes / trimmed_after_minutes in place (side effects).
 
 ---- Equations ----

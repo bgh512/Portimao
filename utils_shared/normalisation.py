@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.reference_level import (reference_level_finder,
+                                          window_seconds_calculator,
+                                          )
 from utils_shared.schema import measurement_column_finder, time_getter
 
 
@@ -189,7 +192,7 @@ def percent_converter(experiment: dict,
     target_key : str
         Key the scaled table is stored under, e.g. 'haem_percent'.
     **scaling_kwargs : Any
-        exclude_first_minutes, exclude_last_minutes and window_seconds, passed to
+        exclude_first_minutes, exclude_last_minutes and window_points, passed to
         percent_scaler.
 
     ---- Globals read ----
@@ -230,7 +233,7 @@ def percent_scaler(df: pd.DataFrame,
                    label: str = 'data',
                    exclude_first_minutes: float = 0.0,
                    exclude_last_minutes: float = 0.0,
-                   window_seconds: float = 30.0,
+                   window_points: int = 50,
                    ) -> pd.DataFrame:
     """
     ---- Summary ----
@@ -243,45 +246,47 @@ def percent_scaler(df: pd.DataFrame,
     label : str
         Name used in error messages.
     exclude_first_minutes : float
-        Windows must start at least this long after the first measurement.
+        Minutes after the first measurement that are ignored at the start.
     exclude_last_minutes : float
-        Windows must finish at least this long before the last measurement.
-    window_seconds : float
-        Length of each averaging window, in seconds (> 0).
+        Minutes before the last measurement that are ignored at the end.
+    window_points : int
+        Number of points in a row that make a reference window (>= 1).
 
     ---- Globals read ----
-    schema.get_times, measurement_columns.
+    None.
 
     ---- Outputs ----
     pd.DataFrame
-        Scaled copy; the windows used are stored in result.attrs["percent_scaling"]. A
-        constant column becomes NaN. Raises ValueError for invalid settings or when no
-        complete window remains.
+        Scaled copy; result.attrs["percent_scaling"] holds, per column,
+        {'zero_percent_window', 'hundred_percent_window': the windows found
+        (reference_level_finder), 'zero_percent_level', 'hundred_percent_level': their
+        medians, 'window_seconds': the length of such a window}. A constant column
+        becomes NaN. Raises ValueError, with a message for the user, for invalid
+        settings or when fewer than window_points values are left after the ignored
+        parts.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    percent = (value - low) / (high - low) x 100, where low and high are the lowest and
-    highest window means (windows must contain data spanning at least 80 % of their
-    length). Values outside the range are kept.
+    percent = (value - low) / (high - low) x 100, where low and high are the medians of
+    the lowest and of the highest points in a row (reference_level_finder). Values
+    outside the range are kept.
 
     ---- Helpers ----
     measurement_column_finder
+    reference_level_finder
     time_getter
+    window_seconds_calculator
     """
 
     # ---- 1 Validate the inputs -------------------------------------------------------
-    if window_seconds <= 0:
-        raise ValueError('The averaging window of the % scale must be longer than 0 s. '
-                         'Correct it in config.py.',
-                         )
     if exclude_first_minutes < 0 or exclude_last_minutes < 0:
         raise ValueError('The time ignored at the start or the end of the run cannot '
                          'be negative. Correct it where the program asks for it.',
                          )
 
-    # ---- 2 Find the allowed windows --------------------------------------------------
+    # ---- 2 Find the usable part of the run -------------------------------------------
     columns = measurement_column_finder(df)
     if not columns:
         raise ValueError(f'{label}: there are no values to put on the % scale.')
@@ -291,51 +296,31 @@ def percent_scaler(df: pd.DataFrame,
         raise ValueError(f'{label}: the times of the values could not be read, so '
                          'the % scale cannot be found.',
                          )
-    window_minutes = window_seconds / 60.0
-    first_allowed = finite_times.min() + exclude_first_minutes
-    last_allowed = finite_times.max() - exclude_last_minutes
-    # Candidate windows must start after the excluded period and fit before the end.
-    after_start = times >= first_allowed
-    before_end = times + window_minutes <= last_allowed + 1e-12
-    allowed = np.isfinite(times) & after_start & before_end
-    candidate_starts = np.unique(times[allowed])
-    if candidate_starts.size == 0:
-        raise ValueError(f'{label}: less than {window_seconds:g} s of the run is left '
-                         'after the ignored start and end, too little to find the 0 % '
-                         'and the 100 %. Ignore less of the start or the end of the '
-                         'run.',
-                         )
+    start = float(finite_times.min()) + exclude_first_minutes
+    stop = float(finite_times.max()) - exclude_last_minutes
+    window_seconds = window_seconds_calculator(times, window_points)
 
     # ---- 3 Scale each column ---------------------------------------------------------
     result = df.copy()
     scaling_info = {}
     for column in columns:
         values = pd.to_numeric(df[column], errors='coerce').to_numpy(dtype=float)
-        lowest = highest = None
-        for start in candidate_starts:
-            in_window = (times >= start) & (times <= start + window_minutes)
-            mask = np.isfinite(times) & np.isfinite(values) & in_window
-            window_times, window_values = times[mask], values[mask]
-            # Require measurements to span at least 80 % of the window.
-            if (window_times.size < 2 or
-                window_times.max() - window_times.min() < window_minutes * 0.8
-                ):
-                continue
-            info = {'mean': float(np.mean(window_values)),
-                    'start_time': float(window_times.min()),
-                    'end_time': float(window_times.max()),
-                    'n_points': int(window_values.size),
-                    }
-            if lowest is None or info['mean'] < lowest['mean']:
-                lowest = info
-            if highest is None or info['mean'] > highest['mean']:
-                highest = info
+        lowest = reference_level_finder(times,
+                                        values,
+                                        start,
+                                        stop,
+                                        window_points,
+                                        is_highest=False,
+                                        )
+        highest = reference_level_finder(times, values, start, stop, window_points)
         if lowest is None or highest is None:
-            raise ValueError(f'{label}: {column} has too few values in any '
-                             f'{window_seconds:g} s of the run to find its 0 % and '
-                             '100 %. Ignore less of the start or the end of the run.',
+            raise ValueError(f'{label}: fewer than {window_points} {column} values '
+                             'are left after the ignored start and end, too few to '
+                             'find the 0 % and the 100 % (the medians of the lowest '
+                             f'and of the highest {window_points} points in a row). '
+                             'Ignore less of the start or the end of the run.',
                              )
-        low, span = lowest['mean'], highest['mean'] - lowest['mean']
+        low, span = lowest['level'], highest['level'] - lowest['level']
         # A constant signal has no measurable relative range.
         result[column] = (np.nan
                           if np.isclose(span, 0.0)
@@ -343,8 +328,9 @@ def percent_scaler(df: pd.DataFrame,
                           )
         scaling_info[column] = {'zero_percent_window': lowest,
                                 'hundred_percent_window': highest,
-                                'minimum_mean': low,
-                                'maximum_mean': highest['mean'],
+                                'zero_percent_level': low,
+                                'hundred_percent_level': highest['level'],
+                                'window_seconds': window_seconds,
                                 }
     result.attrs['percent_scaling'] = scaling_info
     return result

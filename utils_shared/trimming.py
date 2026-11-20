@@ -45,7 +45,8 @@ def experiment_trimmer(experiment: dict,
         times.
 
     ---- Globals mutated ----
-    None. Trims CcO2, CsO2, VoO2 and the raw spectra, shifts the event times and sets
+    None. Trims CcO2, CsO2, VoO2 and the raw spectra, shifts the times of the events
+    and of the ignored events (one before the new start gets a negative time) and sets
     metadata trimmed_before_minutes / trimmed_after_minutes in place (side effects).
 
     ---- Equations ----
@@ -111,7 +112,9 @@ def experiment_trimmer(experiment: dict,
         dataset['time'] = dataset['time'] - start
 
     # ---- 5 Shift the events and record the trim --------------------------------------
-    for event in events:
+    # The ignored additions go on the same clock; one before the new start gets a
+    # negative time, so the workbook still records when it was made.
+    for event in events + experiment['metadata'].get('ignored_events', []):
         event['time'] = float(event['time']) - start
         event.pop('row_index', None)  # no longer a row of the trimmed data
     if start_time is not None:

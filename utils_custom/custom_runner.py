@@ -23,7 +23,7 @@ from utils_custom.exemplar_plotter import exemplar_figure_plotter
 from utils_custom.ocr_and_haem_response_exporter import ocr_and_haem_response_exporter
 from utils_custom.ocr_and_haem_response_plotter import (
     ocr_and_haem_response_figure_plotter,
-)
+    )
 from utils_custom.spectral_difference import (difference_spectrum_calculator,
                                               difference_spectrum_decomposer,
                                               spectral_averager,
@@ -94,6 +94,9 @@ def _ocr_and_haem_response_preparer(experiment: dict,
                                    final_window_gap_minutes=final_gap,
                                    vo2_source=vo2_source,
                                    haem_source=haem_source,
+                                   baseline_minimum_seconds=(
+                                       settings.BASELINE_MINIMUM_SECONDS
+                                   ),
                                    )
     return prepared
 

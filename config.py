@@ -91,8 +91,11 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
 TRANSMISSION_MODE = 'fraction'  # "fraction", "percentage" or "absorbance"
 DEGREE_OF_SCATTER = 1
 HAEM_FACTOR = 1_000_000
-DELTA_ABS_WINDOW_SECONDS = 30
-PERCENT_AVERAGE_WINDOW_SECONDS = 30
+# points in a row whose median is a reference level: the 0 of delta A, the 0 % and the
+# 100 % of the % scale (50 points are 25 s when a point is taken every 0.5 s)
+REFERENCE_WINDOW_POINTS = 50
+# least data the baseline average (before the first addition) must span
+BASELINE_MINIMUM_SECONDS = 10
 # axis-label size. Tick labels, legends and event labels are 1 pt smaller and titles 1
 # pt larger; panel letters follow the journal.
 BASE_FONT_PT = 6

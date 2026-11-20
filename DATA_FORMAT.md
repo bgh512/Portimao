@@ -19,7 +19,7 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
 | `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem |
 | `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum |
-| `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the mean of its highest 30 s window (outside the ignored start and end) is 0 |
+| `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the median of its highest 50 spectra in a row (outside the ignored start and end; `REFERENCE_WINDOW_POINTS` in `config.py`) is 0 |
 | `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. The matching tables divided by dilution factor x OD x volume |
 | `'haem_percent'` | pd.DataFrame | (n_spectra, 2 + n_haems) | % | Optional. `haem_conc` scaled to 0-100 % |
 | `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; every spectrum has a time, and the transmission is NaN where it cannot be worked out (zero counts in the reference); dropped after the special figures are prepared |
@@ -46,7 +46,7 @@ What is known about one experiment, stored as `experiment['metadata']`. The firs
 | `'acquisition'` | List[dict] | (n_datasets,) | | One entry per spectrometer: `'dataset'`, `'spectrometer'` (its name in the file), `'frames'`, `'wavelengths'` (their number), `'wavelength_range_nm'` (first and last) and, when the file gives them, `'centre_wavelength_nm'` and `'slit_um'` |
 | `'notes'` | str | | | The notes typed in the instrument software, as plain text; empty when there are none |
 | `'OD'`, `'volume'`, `'dilution_factor'` | float | | | Optional. As entered by the user, used for the OD scaling |
-| `'ignored_events'` | List[dict] | | | The additions the user chose to ignore; they are kept only for the workbook |
+| `'ignored_events'` | List[dict] | | | The additions the user chose to ignore; they are kept only for the workbook. After a start trim their times are counted from the new 0 like those of the other additions, so one made before the cut has a negative time |
 | `'trimmed_before_minutes'`, `'trimmed_after_minutes'` | float | | min | Optional. Where the recording was cut, on the original time |
 | `'ignore_first_minutes'`, `'ignore_last_minutes'` | float | | min | Start and end left out of the averages and references |
 | `'fit_file'` | str or None | | | Fit file of the decomposition; None when the haems were not decomposed |
@@ -85,9 +85,9 @@ Event-window statistics of one experiment. Created by `experiment_averages_calcu
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key` |
-| `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window, then `average1` ... one per event |
-| `'skipped'` | dict | | | `{window name: {start_time, end_time, reason}}` of the windows that do not fit between two additions (or after the last one); they have no record in `'windows'` and are drawn red in the previews |
+| `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key`, `baseline_minimum_seconds` |
+| `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window (it starts at the start of the recording when the recording starts later than the window would), then `average1` ... one per event |
+| `'skipped'` | dict | | | `{window name: {start_time, end_time, reason}}` of the windows that do not fit between two additions (or after the last one), and of `average0` when its data span less than `baseline_minimum_seconds` (the run then has no baseline); they have no record in `'windows'` and are drawn red in the previews |
 
 Window record:
 
@@ -104,8 +104,8 @@ Statistics of one measurement in one window:
 |---|---|---|---|---|
 | `'mean'` | float | | as the source | Mean over the window |
 | `'sd'` | float | | as the source | Sample standard deviation (n - 1) over the window |
-| `'delta'` | float | | as the source | Mean minus the mean of `average0` |
-| `'change'` | float | | % | Mean as a percentage of the mean of `average0` (NaN for delta sources or a zero baseline) |
+| `'delta'` | float | | as the source | Mean minus the mean of `average0` (NaN when the run has no baseline) |
+| `'change'` | float | | % | Mean as a percentage of the mean of `average0` (NaN for delta sources, a zero baseline or a run without a baseline) |
 
 #### `triplicate`
 

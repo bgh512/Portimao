@@ -139,7 +139,7 @@ def experiment_data_processor(info: dict,
 
     ---- Globals read ----
     settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
-    settings.DELTA_ABS_WINDOW_SECONDS, settings.PERCENT_AVERAGE_WINDOW_SECONDS.
+    settings.REFERENCE_WINDOW_POINTS, settings.BASELINE_MINIMUM_SECONDS.
 
     ---- Outputs ----
     dict
@@ -169,6 +169,7 @@ def experiment_data_processor(info: dict,
     # ---- 1 Set up the run ------------------------------------------------------------
     a = cfg.answers
     ignore_first, ignore_last = info['ignore_start'], info['ignore_end']
+    window_points = settings.REFERENCE_WINDOW_POINTS
 
     # ---- 2 Read the file -------------------------------------------------------------
     if experiment is None:
@@ -227,7 +228,6 @@ def experiment_data_processor(info: dict,
                                          datasets=attenuation_datasets,
                                          )
             print('  Decomposing ...')
-            delta_window_seconds = settings.DELTA_ABS_WINDOW_SECONDS
             experiment_decomposer(experiment,
                                   fit,
                                   dataset_name=a['decomposition_dataset'],
@@ -235,13 +235,17 @@ def experiment_data_processor(info: dict,
                                   degree_of_scatter=settings.DEGREE_OF_SCATTER,
                                   haemfactor=settings.HAEM_FACTOR,
                                   delta_exclude_first_minutes=ignore_first,
-                                  delta_window_seconds=delta_window_seconds,
+                                  delta_window_points=window_points,
                                   delta_exclude_last_minutes=ignore_last,
                                   )
             reference = experiment['haem_delta_abs'].attrs['delta_abs_baseline']
-            print(f"  Decomposed with {a['fit_file']}; delta A zero is the highest "
-                  f'{delta_window_seconds:g} s average of each haem '
-                  f"({reference['start_time']:.2f}-{reference['end_time']:.2f} min)",
+            spans = ', '.join(f'{haem} {first:.2f}-{last:.2f} min'
+                              for haem, (first, last)
+                              in reference['window_by_haem'].items()
+                              )
+            print(f"  Decomposed with {a['fit_file']}; delta A zero is the median of "
+                  f'the highest {window_points} points in a row '
+                  f"({reference['window_seconds']:.3g} s) of each haem: {spans}",
                   )
         except (KeyError, ValueError, PafError) as exc:
             _skip_reporter('the decomposition into haems', exc)
@@ -262,7 +266,6 @@ def experiment_data_processor(info: dict,
 
     # ---- 4.4 Convert to percentages --------------------------------------------------
     percent_vo2, percent_haem = cfg.percent_need_checker()
-    percent_window_seconds = settings.PERCENT_AVERAGE_WINDOW_SECONDS
     for needed, source_key, target_key, what in (
         (percent_haem, 'haem_conc', 'haem_percent', 'the haems'),
         (percent_vo2, 'VoO2', 'VoO2_percent', 'the oxygen consumption'),
@@ -274,7 +277,7 @@ def experiment_data_processor(info: dict,
                                   target_key,
                                   exclude_first_minutes=ignore_first,
                                   exclude_last_minutes=ignore_last,
-                                  window_seconds=percent_window_seconds,
+                                  window_points=window_points,
                                   )
             except (KeyError, ValueError, TypeError) as exc:
                 _skip_reporter(f'the % scale of {what}', exc)
@@ -294,17 +297,26 @@ def experiment_data_processor(info: dict,
                                        else None
                                        )
                 final_gap = a['final_gap_minutes']
+                minimum_seconds = settings.BASELINE_MINIMUM_SECONDS
                 experiment_averages_calculator(experiment,
                                                window_minutes=a['window_minutes'],
                                                gap_minutes=a['gap_minutes'],
                                                final_window_gap_minutes=final_gap,
                                                vo2_source=vo2_source,
                                                haem_source=average_haem_source,
+                                               baseline_minimum_seconds=minimum_seconds,
                                                )
                 print(f"  Calculated {len(experiment['averages']['windows'])} event "
                       f'averages',
                       )
-                skipped = experiment['averages']['skipped']
+                skipped = dict(experiment['averages']['skipped'])
+                if skipped.pop('average0', None):
+                    print(f'  Warning: there is less than {minimum_seconds:g} s of '
+                          'data before the first addition, so this run has no '
+                          'baseline and its changes from baseline are left empty. '
+                          'Trim less of the start, or shorten the gap before the '
+                          'additions.',
+                          )
                 if skipped:
                     print(f"  Warning: averaging skipped for {', '.join(skipped)} "
                           '(not enough time for the window and gap)',

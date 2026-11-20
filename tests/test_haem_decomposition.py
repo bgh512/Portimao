@@ -18,8 +18,9 @@ from utils_shared.pca_fitter import (component_builder,
                                      component_finder,
                                      decomposition_example_finder,
                                      )
-from utils_shared.schema import TIME_COLUMN
-from utils_shared.spectral_decomposer import (experiment_decomposer,
+from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
+from utils_shared.spectral_decomposer import (delta_abs_calculator,
+                                              experiment_decomposer,
                                               fit_importer,
                                               spectrum_decomposer,
                                               )
@@ -246,8 +247,8 @@ def test_a_series_gives_its_amounts_back() -> None:
     amount of haem i in a spectrum = its multiple x AMOUNTS_i; absorbance (mOD) =
     amount x highest point of |shape_i| x HAEM_FACTOR x 1000; change = absorbance - the
     highest absorbance of that haem (the second spectrum), so it is 0 there and
-    negative elsewhere. The highest point is looked for in 30 s windows that must end
-    before the run does, so the last spectrum can never be it.
+    negative elsewhere. The reference window is one spectrum here, as the run has only
+    four.
 
     ---- Helpers ----
     _background_builder
@@ -273,6 +274,7 @@ def test_a_series_gives_its_amounts_back() -> None:
                           fit,
                           haemfactor=HAEM_FACTOR,
                           delta_exclude_first_minutes=0.0,
+                          delta_window_points=1,
                           )
     names = list(fit['haem_list'])
     expected = np.outer(scale, AMOUNTS)
@@ -344,6 +346,7 @@ def test_the_three_routes_give_the_same_amounts() -> None:
                           fit,
                           haemfactor=HAEM_FACTOR,
                           delta_exclude_first_minutes=0.0,
+                          delta_window_points=1,
                           )
     run = experiment['haem_conc'][names].to_numpy()[0]
     components = shapes * HAEM_FACTOR
@@ -449,6 +452,52 @@ def test_a_failed_decomposition_leaves_nothing() -> None:
                               )
     for key in ('haem_conc', 'haem_abs', 'haem_delta_abs'):
         assert key not in experiment
+
+
+# ---- test_delta_a_zero_is_the_median_of_the_highest_points ---------------------------
+def test_delta_a_zero_is_the_median_of_the_highest_points() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the zero of delta A is the median of the highest points
+    in a row, so that one spike does not set it, and that a run with fewer points than
+    one window is refused in place of taking the zero from too few spectra.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Absorbances 1, 2, 9, 3, 4, 5, 0, 0 at 0 to 7 min, three points in a row. Medians
+    of the six windows: 2, 3, 4, 4, 4, 0. The highest is 4, first reached by the
+    window 9, 3, 4 (2 to 4 min), so delta A = absorbance - 4 and the spike of 9 is not
+    the zero. A window of nine points does not fit in eight.
+
+    ---- Helpers ----
+    None.
+    """
+
+    values = np.array([1.0, 2.0, 9.0, 3.0, 4.0, 5.0, 0.0, 0.0])
+    frame = pd.DataFrame({TIME_COLUMN: np.arange(8, dtype=float),
+                          SPECTRUM_INDEX_COLUMN: np.arange(1, 9),
+                          'haem': values,
+                          },
+                         )
+    result = delta_abs_calculator(frame, exclude_first_minutes=0.0, window_points=3)
+    assert np.allclose(result['haem'], values - 4.0)
+    record = result.attrs['delta_abs_baseline']
+    assert np.isclose(record['level_by_haem']['haem'], 4.0)
+    assert record['window_by_haem']['haem'] == (2.0, 4.0)
+    assert np.isclose(record['window_seconds'], 180.0)
+    with pytest.raises(ValueError, match='Ignore less'):
+        delta_abs_calculator(frame, exclude_first_minutes=0.0, window_points=9)
 
 
 # ---- test_two_mixed_shapes_give_two_components ---------------------------------------
