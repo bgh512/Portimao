@@ -158,12 +158,14 @@ class ViewerGui:
     _pointer_mover
     _resizer
     _step_taker
+    _strip_change_runner
     _strip_change_teller
     _symbol_inserter
     _time_clicker
     _time_line_drawer
     _widgets_builder
     _window_raiser
+    drawing_sign_shower
     extra_publisher
     figure_shower
     file_focuser
@@ -180,6 +182,7 @@ class ViewerGui:
     strip_listener_setter
     strip_reader
     strip_setter
+    strip_state_setter
     text_sender
     time_reader_setter
     window_closer
@@ -267,7 +270,8 @@ class ViewerGui:
         self._file_count = 0
         self._help_base = ''
         self._is_table_shown = False
-        self._strip_listener: Optional[Callable[[str, Any], None]] = None
+        self._is_busy = False
+        self._strip_listener: Optional[Callable[[Dict[str, Any]], None]] = None
         self._widgets_builder()
         self._icon_setter()
 
@@ -713,8 +717,9 @@ class ViewerGui:
         ---- Inputs ----
         event : tuple
             (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-            'extra', 'image', 'time', 'strip', 'strip_fits', 'od_show', 'od_hide',
-            'closed' or 'finished'.
+            'extra', 'image', 'time', 'strip', 'strip_fits', 'strip_state', 'busy',
+            'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..." sign of
+            'busy' stays until the next question, preview or picture shown.
 
         ---- Globals read ----
         None.
@@ -740,6 +745,10 @@ class ViewerGui:
         """
 
         kind = event[0]
+        if kind in ('prompt', 'pictures', 'spec') or (kind == 'extra' and event[3]):
+            was_busy, self._is_busy = self._is_busy, False
+            if was_busy and kind == 'prompt':
+                self._picture_shower()  # takes the sign away
         if kind == 'prompt':
             self._pane_writer(event[1])
             self._is_waiting = True
@@ -753,6 +762,11 @@ class ViewerGui:
             self._strip.values_setter(event[1])
         elif kind == 'strip_fits':
             self._strip.fits_setter(event[1])
+        elif kind == 'strip_state':
+            self._strip.state_setter(event[1])
+        elif kind == 'busy':
+            self._is_busy = True
+            self._picture_shower()
         elif kind == 'od_show':
             # Above the answer box and under the text, which gives up the room.
             self._od_table.rows_setter(event[1])
@@ -1314,8 +1328,9 @@ class ViewerGui:
         ---- Summary ----
         Method to show the picture of the current file, scaled to fit the plot area, or
         say why there is none yet. While the picture for the latest settings is still
-        being made, the "Drawing ..." sign is on the plot (over the previous picture
-        when there is one).
+        being made, or the program is making pictures of its own (drawing_sign_shower),
+        the "Drawing ..." sign is on the plot (over the previous picture when there is
+        one).
 
         ---- Inputs ----
         None.
@@ -1386,7 +1401,7 @@ class ViewerGui:
         self._shown_axis = (self._previous_axes if is_stale else self._axes).get(name)
         if self._is_pictures and self._index < self._file_count:
             self._lock_drawer()
-        if is_stale:
+        if is_stale or self._is_busy:
             self._drawing_sign_drawer()
         lines = self._notes.get(name, '').splitlines()
         key = [line[len(KEY_PREFIX):] for line in lines if line.startswith(KEY_PREFIX)]
@@ -1489,18 +1504,19 @@ class ViewerGui:
             return
         self._navigator(self._index + step, True)
 
-    # ---- _strip_change_teller --------------------------------------------------------
-    def _strip_change_teller(self, name: str, value: Any) -> None:
+    # ---- _strip_change_runner --------------------------------------------------------
+    def _strip_change_runner(self, changes: Dict[str, Any], prompt: Any) -> None:
         """
         ---- Summary ----
-        Method to pass a change the user made in the settings strip to the function
-        the program registered, if any.
+        Method to hand a change made in the settings strip to the function the program
+        registered, on the program thread while a question waits. What it prints goes
+        on lines of its own, and the answer prompt is shown again under it.
 
         ---- Inputs ----
-        name : str
-            Name of the strip value that changed.
-        value : Any
-            Its new value.
+        changes : Dict[str, Any]
+            {name: new value} of the strip values that changed.
+        prompt : Any
+            The prompt of the question that waits, shown again after a message.
 
         ---- Globals read ----
         None.
@@ -1510,7 +1526,47 @@ class ViewerGui:
             Nothing.
 
         ---- Globals mutated ----
-        None. Calls the registered function (side effect).
+        None. Calls the registered function, prints and queues the prompt (side
+        effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        output_capturer
+        """
+
+        listener = self._strip_listener
+        if listener is None:
+            return
+        with output_capturer() as printed:
+            listener(changes)
+        text = printed.getvalue()
+        if text:
+            print(f'\n{text}', end='' if text.endswith('\n') else '\n')
+            self._events.put(('prompt', str(prompt)))
+
+    # ---- _strip_change_teller --------------------------------------------------------
+    def _strip_change_teller(self, changes: Dict[str, Any]) -> None:
+        """
+        ---- Summary ----
+        Method to pass a change the user made in the settings strip to the program
+        thread: it joins the typed answers, so a question that waits takes it at once
+        (input_reader).
+
+        ---- Inputs ----
+        changes : Dict[str, Any]
+            {name: new value} of the strip values that changed.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change (side effect).
 
         ---- Equations ----
         None.
@@ -1519,9 +1575,7 @@ class ViewerGui:
         None.
         """
 
-        listener = self._strip_listener
-        if listener is not None:
-            listener(name, value)
+        self._answers.put(('strip', dict(changes)))
 
     # ---- _symbol_inserter ------------------------------------------------------------
     def _symbol_inserter(self, symbol: str) -> None:
@@ -1932,6 +1986,37 @@ class ViewerGui:
 
     # ---- MAIN METHODS ----------------------------------------------------------------
 
+    # ---- drawing_sign_shower ---------------------------------------------------------
+    def drawing_sign_shower(self) -> None:
+        """
+        ---- Summary ----
+        Method to put the "Drawing ..." sign on the plot while the program makes
+        pictures of its own (the combined figures, the components found from the
+        data). The sign goes when the next picture or preview is shown, or the next
+        question is asked.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the sign for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('busy',))
+
     # ---- extra_publisher -------------------------------------------------------------
     def extra_publisher(self, title: str, png: bytes, is_shown: bool = True) -> None:
         """
@@ -2031,8 +2116,9 @@ class ViewerGui:
         """
         ---- Summary ----
         Method that replaces the built-in input while the window is open: it shows the
-        prompt in the terminal and waits for the answer typed in the answer box. Other
-        threads still use the real input.
+        prompt in the terminal and waits for the answer typed in the answer box. A
+        change made in the settings strip meanwhile is handed to the program's listener
+        and the question goes on waiting. Other threads still use the real input.
 
         ---- Inputs ----
         prompt : Any
@@ -2046,22 +2132,25 @@ class ViewerGui:
             The typed answer. Raises EOFError when the window is closed.
 
         ---- Globals mutated ----
-        None. Waits for the user (side effect).
+        None. Waits for the user and runs the strip listener (side effects).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
-        None.
+        _strip_change_runner
         """
 
         if threading.current_thread() is not self.logic_thread:
             return self._real_input(prompt)
         self._events.put(('prompt', str(prompt)))
-        answer = self._answers.get()
-        if answer is _CLOSED:
-            raise EOFError
-        return answer
+        while True:
+            answer = self._answers.get()
+            if answer is _CLOSED:
+                raise EOFError
+            if isinstance(answer, str):
+                return answer
+            self._strip_change_runner(answer[1], prompt)
 
     # ---- od_table_hider --------------------------------------------------------------
     def od_table_hider(self) -> None:
@@ -2376,7 +2465,7 @@ class ViewerGui:
 
     # ---- strip_listener_setter -------------------------------------------------------
     def strip_listener_setter(self,
-                              listener: Optional[Callable[[str, Any], None]],
+                              listener: Optional[Callable[[Dict[str, Any]], None]],
                               ) -> None:
         """
         ---- Summary ----
@@ -2384,9 +2473,11 @@ class ViewerGui:
         settings strip, or None to stop listening.
 
         ---- Inputs ----
-        listener : Optional[Callable[[str, Any], None]]
-            Called with (name, value) at each change, on the window thread: it must
-            return at once (for example by queueing the change).
+        listener : Optional[Callable[[Dict[str, Any]], None]]
+            Called with {name: new value} of the values changed at once, on the
+            program thread while a question waits (a change made while the program is
+            busy is taken when the next question is asked). What it prints shows under
+            the question, which then goes on waiting.
 
         ---- Globals read ----
         None.
@@ -2465,6 +2556,36 @@ class ViewerGui:
 
         strip_values_checker(values)
         self._events.put(('strip', dict(values)))
+
+    # ---- strip_state_setter ----------------------------------------------------------
+    def strip_state_setter(self, is_enabled: bool) -> None:
+        """
+        ---- Summary ----
+        Method to let the user change the settings strip, or grey it out while what it
+        shows is not being used. It starts greyed out.
+
+        ---- Inputs ----
+        is_enabled : bool
+            True to let the user change it, False to grey it out.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('strip_state', bool(is_enabled)))
 
     # ---- text_sender -----------------------------------------------------------------
     def text_sender(self, text: str, kind: str) -> None:

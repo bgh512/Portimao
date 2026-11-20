@@ -1308,7 +1308,11 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path, dict]:
 
 
 # ---- haem_choice_asker ---------------------------------------------------------------
-def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
+def haem_choice_asker(answers: dict,
+                      defaults: dict,
+                      fit: Optional[dict],
+                      is_shown_asked: bool = True,
+                      ) -> bool:
     """
     ---- Summary ----
     Main function to ask whether the haems are plotted, and which ones in which order.
@@ -1320,6 +1324,10 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
         Default answers.
     fit : Optional[dict]
         Fit dictionary (haem_list) used to list the haems, or None.
+    is_shown_asked : bool
+        False when whether the haems are plotted is already answered (the Haems box
+        of the window's settings strip, in answers['plot_haems']): only which ones and
+        in which order are asked, and only when they are plotted.
 
     ---- Globals read ----
     None.
@@ -1341,12 +1349,13 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
     yes_no_asker
     """
 
-    answers['plot_haems'] = False
     if not (answers['decompose'] and fit is not None):
+        answers['plot_haems'] = False
         return False
-    answers['plot_haems'] = yes_no_asker('Do you want to plot the haems?',
-                                         defaults['plot_haems'],
-                                         )
+    if is_shown_asked:
+        answers['plot_haems'] = yes_no_asker('Do you want to plot the haems?',
+                                             defaults['plot_haems'],
+                                             )
     if answers['plot_haems']:
         answers['haems'] = multi_asker('Which haems would you like to plot, and in '
                                        'which order?',

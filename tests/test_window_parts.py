@@ -1,7 +1,8 @@
 """
 Tests of the parts of the settings strip and the OD table that need no window: the
 widths a journal allows, the check of a typed height, the check of values meant for the
-strip, and the reading of one cell of the table.
+strip, the answers shown in the strip and taken back from it, and the reading of one
+cell of the table.
 """
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
@@ -12,6 +13,8 @@ import config as settings
 from utils_viewer.viewer_od_table import cell_reader
 from utils_viewer.viewer_strip import (height_checker,
                                        NO_JOURNAL,
+                                       size_answers_builder,
+                                       strip_values_builder,
                                        strip_values_checker,
                                        width_choices_lister,
                                        )
@@ -98,6 +101,78 @@ def test_height_typed_in_the_strip() -> None:
         height, reason = height_checker(wrong, 'nature')
         assert height is None
         assert 'above 0 and up to 1' in reason
+
+
+# ---- test_answers_shown_in_the_strip -------------------------------------------------
+def test_answers_shown_in_the_strip() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the answers of a run are shown in the strip as they
+    are meant (the standard size as the journal "None", a chosen journal by its name,
+    the box ticked only when the haems are worked out), that the strip can show them,
+    and that its journal, width and height give the same answers back.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    settings.DEFAULT_ANSWERS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The standard size ---------------------------------------------------------
+    standard = dict(settings.DEFAULT_ANSWERS)
+    values = strip_values_builder(standard, True)
+    assert values == {'plot_haems': True,
+                      'fit_file': settings.STANDARD_FIT,
+                      'journal': NO_JOURNAL,
+                      'columns': 1,
+                      'height': 0.5,
+                      }
+    strip_values_checker(values)
+    assert size_answers_builder(values) == {'journal': 'nature',
+                                            'size_mode': 'default',
+                                            'columns': 1,
+                                            'height': 0.5,
+                                            }
+
+    # ---- 2 A chosen journal, without haems -------------------------------------------
+    chosen = dict(standard,
+                  journal='cell',
+                  columns=1.5,
+                  height=0.75,
+                  size_mode='custom',
+                  fit_file=None,
+                  )
+    values = strip_values_builder(chosen, False)
+    assert values == {'plot_haems': False,
+                      'fit_file': '',
+                      'journal': 'cell',
+                      'columns': 1.5,
+                      'height': 0.75,
+                      }
+    strip_values_checker(values)
+    assert size_answers_builder(values) == {'journal': 'cell',
+                                            'size_mode': 'custom',
+                                            'columns': 1.5,
+                                            'height': 0.75,
+                                            }
+
+    # ---- 3 Only what changed is given back -------------------------------------------
+    assert size_answers_builder({'height': 0.3}) == {'height': 0.3}
+    assert size_answers_builder({'plot_haems': False, 'fit_file': 'x.csv'}) == {}
 
 
 # ---- test_values_meant_for_the_strip -------------------------------------------------

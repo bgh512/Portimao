@@ -1,4 +1,4 @@
-# Portimao question flow (V1.24)
+# Portimao question flow (V1.25)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -388,9 +388,22 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 
 ## If the window cannot open (terminal mode)
 
-The questions and their order are the same, apart from the OD values. These differ:
+The questions and their order are the same, apart from the OD values and what the strip does in the window. These differ:
 
 - In **2** to **5** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer. Nothing can be clicked or dragged on it: every number is typed.
+- In **3.A** there is no table. The values stored for some files are listed, the OD values are asked one file at a time, and then accepted, so the event label questions are numbered one higher on screen (3.3 to 3.6):
+
+| # | Question | Leads to |
+|---|---|---|
+| 3.1.1 | *(only when some files already have OD values stored)* The stored values are listed, then: Do you want to change any of these? `(y/N)` | **Yes**: all files are asked **3.1.2**. **No**: only the files without stored values are asked **3.1.2**. If every file has stored values and you say No, no OD questions are asked and the next step is **3.2**. |
+| 3.1.2 | For each file in turn: What was the OD of the cells added? | **3.1.3** |
+| 3.1.3 | What volume of cells (mL) were spun down and resuspended in 5 mL? | **3.1.4** |
+| 3.1.4 | What is the dilution factor, if the cells were diluted mid run? `[1]` | the next file, then the values of every file are listed and **3.2** |
+
+| # | Question | 1 → | 2 → |
+|---|---|---|---|
+| 3.2 | Do you accept these OD values? | the event labels | **3.1** (asked again, then the OD values) |
+
 - There is no strip and no **Drawing ...** sign, so the haems, the fit, the journal and the size are asked as questions:
     - **4.1** has the dataset's saved answer as its default.
     - **4.2** has three answers:
@@ -405,19 +418,6 @@ The questions and their order are the same, apart from the OD values. These diff
 | # | Question | Yes → | No → |
 |---|---|---|---|
 | 5.4 | Do you want to plot the haems? `(Y/n)` | **5.4.1** | the figure is drawn **(plot)**, then **5.1** |
-
-- In **3.A** there is no table. The values stored for some files are listed, the OD values are asked one file at a time, and then accepted, so the event label questions are numbered one higher on screen (3.3 to 3.6):
-
-| # | Question | Leads to |
-|---|---|---|
-| 3.1.1 | *(only when some files already have OD values stored)* The stored values are listed, then: Do you want to change any of these? `(y/N)` | **Yes**: all files are asked **3.1.2**. **No**: only the files without stored values are asked **3.1.2**. If every file has stored values and you say No, no OD questions are asked and the next step is **3.2**. |
-| 3.1.2 | For each file in turn: What was the OD of the cells added? | **3.1.3** |
-| 3.1.3 | What volume of cells (mL) were spun down and resuspended in 5 mL? | **3.1.4** |
-| 3.1.4 | What is the dilution factor, if the cells were diluted mid run? `[1]` | the next file, then the values of every file are listed and **3.2** |
-
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 3.2 | Do you accept these OD values? | the event labels | **3.1** (asked again, then the OD values) |
 
 - After **1.2** comes a section of its own, **2. Experiment browser**, where the standard plot is shown, with a small menu that steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring. Every later section is therefore numbered one higher on screen than in this list (trimming and ignoring is 3, the OD values and event labels are 4, and so on), and the going back question (**5.8**) offers the experiment browser as well.
 - Every "Do you accept...?" question of sections 2 to 5 has one more answer at the end, **Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.

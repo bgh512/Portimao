@@ -29,7 +29,8 @@ class SettingsStrip:
     haems, a drop-down of the fits, a drop-down of the journal, a drop-down of the
     widths that journal allows and a typing box for the height. It tells the window
     what the user changed and can be set by the program; it changes nothing by itself.
-    Every method runs on the window thread, except values_reader.
+    It starts greyed out, until the program says it is listening. Every method runs on
+    the window thread, except values_reader.
 
     ---- Attributes ----
     frame : Any
@@ -49,6 +50,7 @@ class SettingsStrip:
     _size_refresher
     _width_handler
     fits_setter
+    state_setter
     values_reader
     values_setter
     """
@@ -59,7 +61,7 @@ class SettingsStrip:
                  ttk: Any,
                  parent: Any,
                  background: str,
-                 on_change: Callable[[str, Any], None],
+                 on_change: Callable[[Dict[str, Any]], None],
                  ) -> None:
         """
         ---- Summary ----
@@ -74,9 +76,10 @@ class SettingsStrip:
             The widget the strip is built in.
         background : str
             Background colour of the strip.
-        on_change : Callable[[str, Any], None]
-            Called with (name, value) each time the user changes a value; the names
-            are those of VALUE_NAMES.
+        on_change : Callable[[Dict[str, Any]], None]
+            Called once for each change the user makes, with {name: value} of every
+            value that changed (a new journal can change the width and the height
+            too); the names are those of VALUE_NAMES.
 
         ---- Globals read ----
         settings.DEFAULT_ANSWERS, JOURNAL_NAMES, NO_JOURNAL, NO_JOURNAL_TEXT,
@@ -114,20 +117,22 @@ class SettingsStrip:
                                         }
         self._journals = [NO_JOURNAL] + list(JOURNAL_NAMES)
         self._width_columns: List[float] = []
+        self._is_enabled = False
         self.frame = tk.Frame(parent, bg=background)
 
         # ---- 2 First row: the haems and the fit --------------------------------------
         upper = tk.Frame(self.frame, bg=background)
         upper.pack(pady=(0, 3))
         self._haems = tk.BooleanVar(master=parent, value=self._values['plot_haems'])
-        tk.Checkbutton(upper,
-                       text='Haems',
-                       variable=self._haems,
-                       command=self._haems_handler,
-                       bg=background,
-                       activebackground=background,
-                       highlightthickness=0,
-                       ).pack(side='left', padx=(4, 12))
+        self._haems_box = tk.Checkbutton(upper,
+                                         text='Haems',
+                                         variable=self._haems,
+                                         command=self._haems_handler,
+                                         bg=background,
+                                         activebackground=background,
+                                         highlightthickness=0,
+                                         )
+        self._haems_box.pack(side='left', padx=(4, 12))
         tk.Label(upper, text='Fit', bg=background).pack(side='left', padx=(0, 4))
         self._fit_combo = ttk.Combobox(upper,
                                        state='readonly',
@@ -178,7 +183,8 @@ class SettingsStrip:
     def _change_reporter(self, before: Dict[str, Any]) -> None:
         """
         ---- Summary ----
-        Method to tell the window each value that differs from what it was.
+        Method to tell the window, in one call, every value that differs from what it
+        was; nothing is told when nothing changed.
 
         ---- Inputs ----
         before : Dict[str, Any]
@@ -201,9 +207,12 @@ class SettingsStrip:
         None.
         """
 
-        for name in VALUE_NAMES:
-            if self._values[name] != before[name]:
-                self._on_change(name, self._values[name])
+        changes = {name: self._values[name]
+                   for name in VALUE_NAMES
+                   if self._values[name] != before[name]
+                   }
+        if changes:
+            self._on_change(changes)
 
     # ---- _fit_handler ----------------------------------------------------------------
     def _fit_handler(self, event: Any = None) -> None:
@@ -363,7 +372,8 @@ class SettingsStrip:
         """
         ---- Summary ----
         Method to show the kept values in every part of the strip: the widths offered
-        follow the journal, and the width and the height are greyed for "None".
+        follow the journal, the width and the height are greyed for "None", and the
+        whole strip is greyed while the program is not listening.
 
         ---- Inputs ----
         None.
@@ -407,7 +417,11 @@ class SettingsStrip:
         self._note.configure(text=height_checker(text, values['journal'])[1],
                              fg=NOTE_TEXT,
                              )
-        if is_standard:
+        choice_state = 'readonly' if self._is_enabled else 'disabled'
+        self._haems_box.configure(state='normal' if self._is_enabled else 'disabled')
+        self._fit_combo.configure(state=choice_state)
+        self._journal_combo.configure(state=choice_state)
+        if is_standard or not self._is_enabled:
             self._width_combo.configure(state='disabled')
             self._height_entry.configure(state='disabled')
 
@@ -475,6 +489,37 @@ class SettingsStrip:
         """
 
         self._fit_combo.configure(values=list(names))
+
+    # ---- state_setter ----------------------------------------------------------------
+    def state_setter(self, is_enabled: bool) -> None:
+        """
+        ---- Summary ----
+        Method to let the user change the strip, or grey it out while what it shows
+        is not being used. The values stay on show either way.
+
+        ---- Inputs ----
+        is_enabled : bool
+            True to let the user change the values, False to grey the strip out.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _size_refresher
+        """
+
+        self._is_enabled = bool(is_enabled)
+        self._size_refresher()
 
     # ---- values_reader ---------------------------------------------------------------
     def values_reader(self) -> Dict[str, Any]:
@@ -655,6 +700,93 @@ def height_checker(text: str, journal: str) -> Tuple[Optional[float], str]:
     if height is None or not 0 < height <= 1:
         return None, f'Type {HEIGHT_HELP}.'
     return height, f'of a page ({round(height * page_mm, 1):g} mm)'
+
+
+# ---- size_answers_builder ------------------------------------------------------------
+def size_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to turn the journal, width and height of the strip into the answers
+    of the figure of each file. The haems and the fit are left out: they need the fit
+    file read, which the questions do.
+
+    ---- Inputs ----
+    values : Dict[str, Any]
+        Some or all of the strip values (DATA_FORMAT.md), as checked by
+        strip_values_checker.
+
+    ---- Globals read ----
+    settings.DEFAULT_ANSWERS, NO_JOURNAL.
+
+    ---- Outputs ----
+    Dict[str, Any]
+        The answers to update: journal and size_mode for a journal ("None" is the
+        standard journal with size_mode 'default'), columns and height as given.
+        Empty when the values hold none of them.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    answers: Dict[str, Any] = {}
+    if 'journal' in values:
+        if values['journal'] == NO_JOURNAL:
+            answers.update({'journal': settings.DEFAULT_ANSWERS['journal'],
+                            'size_mode': 'default',
+                            },
+                           )
+        else:
+            answers.update({'journal': values['journal'], 'size_mode': 'custom'})
+    for name in ('columns', 'height'):
+        if name in values:
+            answers[name] = values[name]
+    return answers
+
+
+# ---- strip_values_builder ------------------------------------------------------------
+def strip_values_builder(answers: dict, has_haems: bool) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to give the strip values that show the answers of the run.
+
+    ---- Inputs ----
+    answers : dict
+        The answers (fit_file, journal, columns, height, size_mode); a fit_file of
+        None shows an empty fit.
+    has_haems : bool
+        True when the haems are worked out and shown, which ticks the box.
+
+    ---- Globals read ----
+    NO_JOURNAL.
+
+    ---- Outputs ----
+    Dict[str, Any]
+        All the strip values (DATA_FORMAT.md). A figure of the standard size
+        (size_mode other than 'custom') shows the journal as "None".
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    is_custom = answers['size_mode'] == 'custom'
+    return {'plot_haems': bool(has_haems),
+            'fit_file': str(answers['fit_file'] or ''),
+            'journal': answers['journal'] if is_custom else NO_JOURNAL,
+            'columns': answers['columns'],
+            'height': answers['height'],
+            }
 
 
 # ---- strip_values_checker ------------------------------------------------------------

@@ -9,7 +9,7 @@ import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib.pyplot as plt
@@ -86,8 +86,8 @@ class TimeAxis:
 class ViewerSession:
     """
     ---- Summary ----
-    Everything the experiment browser keeps between steps: the files, the window and the
-    recently read experiments.
+    Everything the experiment browser keeps between steps: the files, the window, the
+    recently read experiments, the fit in use and how to redraw the step being asked.
     Detailed structure can be found in DATA_FORMAT.md.
     """
 
@@ -96,6 +96,9 @@ class ViewerSession:
     window: Any
     current: int = 0
     cache: OrderedDict = field(default_factory=OrderedDict)
+    fit: Optional[dict] = None
+    redraw: Optional[Callable[[], bool]] = None
+    is_figure: bool = False
 
 
 # ---- PREVIEW HELPERS -----------------------------------------------------------------
