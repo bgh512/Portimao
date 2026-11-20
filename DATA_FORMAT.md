@@ -627,6 +627,24 @@ Written, and opened in the default picture viewer, only when the experiment brow
 
 The first lines are the project version, the random seed (none: the program uses no random numbers) and the settings of the run, then everything printed during the run.
 
+#### `self-test log`
+
+| Property | Value |
+|---|---|
+| File type | text |
+| Encoding | UTF-8 |
+| Location and name | `logs/self_test.log` next to `main.py` (not committed); overwritten by each check |
+
+Written only with the check switch (the environment variable `PORTIMAO_SELF_TEST` set to any value), which opens the window, shows a made-up experiment as a preview and closes the window by itself. The same lines go to the terminal. In order:
+
+- the program name and version, and the date and time;
+- the computer: Python, the system and its chip, Tk, and the versions of the main packages;
+- each step of the check;
+- any error, with its traceback;
+- last, `Self-test passed.` or a line starting `Self-test failed`.
+
+The line starting `The made-up preview is on show` tells the Mac check (`.github/workflows/mac_check.yml`) when to take its picture of the window.
+
 #### Figure files
 
 | Property | Value |

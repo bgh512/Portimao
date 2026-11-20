@@ -1,0 +1,106 @@
+# GitHub's own Macs run the tests and start Portimao at every push to dev, so problems
+# on a Mac show without a Mac. It can also be started by hand from the Actions page
+# ("Run workflow"). The logs, and a picture of the window when the Mac allows it, are
+# kept on the run's page.
+name: Mac check
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: ${{ matrix.mac }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      # One Mac failing still shows how the other one does.
+      fail-fast: false
+      matrix:
+        include:
+          - mac: Apple Silicon Mac
+            runner: macos-15
+          - mac: Intel Mac
+            runner: macos-15-intel
+    env:
+      PYTHON: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12
+    steps:
+      - name: Get the program
+        uses: actions/checkout@v7
+
+      # 3.12.10 is the last Python 3.12 with a Mac installer on python.org.
+      - name: Install Python 3.12 from python.org, as users do
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/python.pkg" \
+            https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg
+          sudo installer -pkg "$RUNNER_TEMP/python.pkg" -target /
+          "$PYTHON" --version
+
+      # The launcher's own code builds .venv_unix from requirements.txt.
+      - name: Set up the environment as the launcher does
+        run: |
+          "$PYTHON" - <<'EOF'
+          import importlib.machinery
+          import importlib.util
+          loader = importlib.machinery.SourceFileLoader('bootstrap',
+                                                        'launchers/bootstrap.pyw')
+          spec = importlib.util.spec_from_loader('bootstrap', loader)
+          launcher = importlib.util.module_from_spec(spec)
+          loader.exec_module(launcher)
+          launcher.environment_builder(print)
+          EOF
+          .venv_unix/bin/python -m pip list
+
+      - name: Check its Tk is 8.6 or newer
+        run: |
+          .venv_unix/bin/python - <<'EOF'
+          import sys
+          import tkinter
+          patch = tkinter.Tcl().eval('info patchlevel')
+          print(f'Tk {tkinter.TkVersion} (Tcl {patch})')
+          sys.exit(0 if tkinter.TkVersion >= 8.6 else 1)
+          EOF
+
+      # main has no tests folder, so this step is skipped there.
+      - name: Run the tests
+        if: hashFiles('tests/conftest.py') != ''
+        run: |
+          .venv_unix/bin/python -m pip install --quiet --disable-pip-version-check pytest
+          .venv_unix/bin/python -m pytest tests -q
+
+      # The program closes by itself and ends with 0, or with 1 and the error in
+      # logs/self_test.log. The picture is taken once the log says the preview is on
+      # show (the same words as SHOWN_MARK in utils_viewer/viewer_self_test.py);
+      # screencapture is given 20 s, as macOS may refuse it.
+      - name: Start Portimao with the check switch
+        timeout-minutes: 10
+        env:
+          PORTIMAO_SELF_TEST: '1'
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: '1'
+        run: |
+          mkdir -p logs
+          .venv_unix/bin/python main.py &
+          program=$!
+          for second in $(seq 1 300); do
+            if grep -q 'The made-up preview is on show' logs/self_test.log 2>/dev/null; then
+              perl -e 'alarm 20; exec @ARGV' screencapture -x logs/self_test_window.png \
+                || echo 'No picture of the window: the Mac did not allow it.'
+              break
+            fi
+            kill -0 "$program" 2>/dev/null || break
+            sleep 1
+          done
+          wait "$program"
+
+      - name: Keep the logs on the run's page
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ matrix.runner }}
+          path: logs/
+          if-no-files-found: warn

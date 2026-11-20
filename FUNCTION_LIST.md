@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.1
+- **Version:** V2.1.1
 - **Date:** 20/11/2026
 
 ## Contents
@@ -2872,7 +2872,7 @@ home : Path
     Stand-in home folder.
 
 ---- Globals read ----
-SHELL, REPORT (module constants).
+HIDDEN, SHELL, REPORT (module constants).
 
 ---- Outputs ----
 str
