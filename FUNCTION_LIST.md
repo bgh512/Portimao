@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.0
+- **Version:** V2.1
 - **Date:** 20/11/2026
 
 ## Contents
@@ -79,6 +79,12 @@
     - [`test_number_and_unit_get_a_space`](#test_number_and_unit_get_a_space)
     - [`test_symbols_can_be_drawn_in_the_figures`](#test_symbols_can_be_drawn_in_the_figures)
     - [`test_tidy_label_stays_as_it_is`](#test_tidy_label_stays_as_it_is)
+- [`tests/test_mac_report.py`](#teststest_mac_reportpy)
+    - [`_folder_maker`](#_folder_maker)
+    - [`_report_runner`](#_report_runner)
+    - [`_snapshot_taker`](#_snapshot_taker)
+    - [`test_report_in_downloads_names_it`](#test_report_in_downloads_names_it)
+    - [`test_report_in_home_folder_is_not_guarded`](#test_report_in_home_folder_is_not_guarded)
 - [`tests/test_ocr_checking.py`](#teststest_ocr_checkingpy)
     - [`_instrument_maker`](#_instrument_maker)
     - [`test_steady_fall_is_its_slope`](#test_steady_fall_is_its_slope)
@@ -144,6 +150,10 @@
     - [`test_trimming_moves_the_ignored_additions`](#test_trimming_moves_the_ignored_additions)
     - [`test_trimming_never_cuts_an_addition`](#test_trimming_never_cuts_an_addition)
     - [`test_trimming_the_end_only`](#test_trimming_the_end_only)
+- [`tests/test_program_version.py`](#teststest_program_versionpy)
+    - [`test_version_from_style_folder`](#test_version_from_style_folder)
+    - [`test_version_from_question_flow`](#test_version_from_question_flow)
+    - [`test_version_unknown_without_either_file`](#test_version_unknown_without_either_file)
 - [`tests/test_question_flow.py`](#teststest_question_flowpy)
     - [`_binding_resolver`](#_binding_resolver)
     - [`_carrier_finder`](#_carrier_finder)
@@ -383,6 +393,7 @@
     - [`file_name_sanitiser`](#file_name_sanitiser)
     - [`name_simplifier`](#name_simplifier)
     - [`program_title_builder`](#program_title_builder)
+    - [`program_version_reader`](#program_version_reader)
 - [`utils_shared/individual_experiment_exporter.py`](#utils_sharedindividual_experiment_exporterpy)
     - [`_frame_writer`](#_frame_writer)
     - [`_name_lister`](#_name_lister)
@@ -579,6 +590,7 @@
     - [`active_gui_getter`](#active_gui_getter)
     - [`gui_runner`](#gui_runner)
     - [`pointed_time_finder`](#pointed_time_finder)
+    - [`window_opener`](#window_opener)
 - [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
     - [`_kept_builder`](#_kept_builder)
     - [`_pictures_builder`](#_pictures_builder)
@@ -604,6 +616,11 @@
     - [`time_axis_finder`](#time_axis_finder)
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
     - [`PreviewRenderer`](#previewrenderer)
+- [`utils_viewer/viewer_self_test.py`](#utils_viewerviewer_self_testpy)
+    - [`_computer_describer`](#_computer_describer)
+    - [`_made_up_experiment_builder`](#_made_up_experiment_builder)
+    - [`_preview_shower`](#_preview_shower)
+    - [`self_test_runner`](#self_test_runner)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
     - [`_addition_time_lister`](#_addition_time_lister)
     - [`_all_data_asker`](#_all_data_asker)
@@ -1100,17 +1117,20 @@ None.
 ```text
 ---- Summary ----
 Main function of the program: run it in the experiment browser window (terminal on
-the left, plots on the right), or in the terminal when the window cannot open.
+the left, plots on the right), or in the terminal when the window cannot open. With
+the check switch (PORTIMAO_SELF_TEST set to any value) it only checks that the
+window opens and shows a made-up preview, then closes by itself.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-PROGRAM_TITLE (shown in the window title).
+HERE, PROGRAM_TITLE (shown in the window title); os.environ['PORTIMAO_SELF_TEST'].
 
 ---- Outputs ----
 int
     0 when every file finished, 1 when the run was cancelled or a file failed.
+    With the check switch: 0 when the check passed, 1 when it failed.
 
 ---- Globals mutated ----
 None. Opens the window or runs in the terminal (side effects).
@@ -1121,6 +1141,7 @@ None.
 ---- Helpers ----
 gui_runner
 program_runner
+self_test_runner
 ```
 
 #### `program_runner`
@@ -2799,6 +2820,159 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_mac_report.py`
+
+Tests that the Mac report runs to the end, finds where the folder is and changes nothing.
+
+### HELPERS
+
+#### `_folder_maker`
+
+```text
+---- Summary ----
+Helper function to make a small Portimao folder holding the report, a question
+list with a made-up version and a launch log of 50 numbered lines.
+
+---- Inputs ----
+home : Path
+    Stand-in home folder.
+place : str
+    Folder inside home to put Portimao in ('' for the home folder itself).
+
+---- Globals read ----
+N_LOG_LINES, REPORT (module constants).
+
+---- Outputs ----
+Path
+    The Portimao folder.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_report_runner`
+
+```text
+---- Summary ----
+Helper function to run the report of a Portimao folder as Terminal would, with
+the stand-in home folder as the user's home.
+
+---- Inputs ----
+folder : Path
+    Portimao folder made by _folder_maker.
+home : Path
+    Stand-in home folder.
+
+---- Globals read ----
+SHELL, REPORT (module constants).
+
+---- Outputs ----
+str
+    What the report printed. The test fails when it does not end with 0.
+
+---- Globals mutated ----
+None. Runs the report (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_snapshot_taker`
+
+```text
+---- Summary ----
+Helper function to read every file of a folder, to compare before and after.
+
+---- Inputs ----
+folder : Path
+    Folder to read.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, bytes]
+    Path inside the folder against the file's contents.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_report_in_downloads_names_it`
+
+```text
+---- Summary ----
+Main function to check that the report of a folder in Downloads ends without an
+error, has every part, names Downloads as guarded, gives the version, shows only
+the last 30 log lines and leaves every file as it was.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+SECTIONS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_folder_maker
+_report_runner
+_snapshot_taker
+```
+
+#### `test_report_in_home_folder_is_not_guarded`
+
+```text
+---- Summary ----
+Main function to check that a folder straight in the home folder is not named as
+guarded.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, used as the home folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_folder_maker
+_report_runner
 ```
 
 ## `tests/test_ocr_checking.py`
@@ -4522,6 +4696,93 @@ Points at 0 to 10 min; kept: 0 to 7 (eight points), values 0 to 70.
 
 ---- Helpers ----
 _ramp_experiment_builder
+```
+
+## `tests/test_program_version.py`
+
+Tests that the program finds its version on dev and on main, where the release leaves .style/ out.
+
+### MAIN FUNCTIONS
+
+#### `test_version_from_style_folder`
+
+```text
+---- Summary ----
+Main function to check that a folder with .style/VERSION (dev) takes its version
+from there, even when the question list carries another one.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, standing in for the program folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_version_from_question_flow`
+
+```text
+---- Summary ----
+Main function to check that a folder without .style/ (main, the user download)
+takes its version from the title of QUESTION_FLOW.md.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, standing in for the program folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_version_unknown_without_either_file`
+
+```text
+---- Summary ----
+Main function to check that a folder with neither file, or with a question list
+whose title has no version, gives "unknown" instead of stopping the program.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, standing in for the program folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `tests/test_question_flow.py`
@@ -11956,7 +12217,7 @@ the folder is a git clone) and the version.
 root : Path
     Program folder.
 version : str
-    Version text from the VERSION file.
+    Version text, from program_version_reader.
 
 ---- Globals read ----
 None.
@@ -11965,6 +12226,35 @@ None.
 str
     For example "Portimao dev V2.7"; without a branch (a folder from a zip file)
     "Portimao V2.7".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `program_version_reader`
+
+```text
+---- Summary ----
+Main function to find the program's version. The release leaves `.style/` off
+main (the user download), so where `.style/VERSION` is missing the version is
+taken from the title of `QUESTION_FLOW.md`, which every release rewrites.
+
+---- Inputs ----
+root : Path
+    Program folder.
+
+---- Globals read ----
+VERSION_TITLE_PATTERN (module constant).
+
+---- Outputs ----
+str
+    For example "2.7"; "unknown" when neither file gives a version.
 
 ---- Globals mutated ----
 None.
@@ -18692,6 +18982,9 @@ logic_thread : Optional[threading.Thread]
     The thread running the program, whose output belongs in the terminal.
 exit_code : int
     What the program returned (1 when it was stopped).
+window_errors : List[str]
+    The traceback of each error met in the window's own work (its Tk callbacks),
+    in order; empty when there was none.
 
 ---- Globals read ----
 MONO_FONTS and the colour constants (module constants).
@@ -18702,6 +18995,7 @@ _answer_sender
 _answer_writer
 _axis_box_finder
 _band_drawer
+_callback_error_keeper
 _closing_handler
 _display_name_lister
 _drag_ender
@@ -18768,6 +19062,10 @@ program : Callable[[], int]
     The program to run; it asks the questions and returns its exit code.
 title : str
     Window title.
+close_after_s : Optional[float]
+    Seconds after the program finishes when the window closes by itself,
+    without asking (the check switch); None leaves it open until the user
+    closes it.
 
 ---- Globals read ----
 None.
@@ -18777,12 +19075,14 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Sets the attributes on the instance and builds the widgets.
+None. Sets the attributes on the instance, builds the widgets and has the root
+window report its errors to _callback_error_keeper.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_callback_error_keeper
 _icon_setter
 _widgets_builder
 ```
@@ -18898,6 +19198,39 @@ Length (s) = |time at x - time at the start| x 60.
 ---- Helpers ----
 _axis_box_finder
 pointed_time_finder
+```
+
+##### `_callback_error_keeper`
+
+```text
+---- Summary ----
+Method that Tk calls when the window's own work (a Tk callback) meets an error:
+the traceback is printed as Tk does by default, and kept in window_errors so a
+check can tell the window went wrong.
+
+---- Inputs ----
+kind : type
+    Class of the error.
+value : BaseException
+    The error.
+trace : Any
+    Its traceback.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds to window_errors and prints to the error stream (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_closing_handler`
@@ -19081,7 +19414,8 @@ event : tuple
     (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
     'extra', 'image', 'time', 'strip', 'strip_fits', 'strip_state', 'busy',
     'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..." sign of
-    'busy' stays until the next question, preview or picture shown.
+    'busy' stays until the next question, preview or picture shown. With
+    close_after_s, 'finished' also closes the window after that time.
 
 ---- Globals read ----
 None.
@@ -19097,6 +19431,7 @@ None. Changes the window (side effects).
 None.
 
 ---- Helpers ----
+_closing_handler
 _display_name_lister
 _image_deliverer
 _image_receiver
@@ -20417,8 +20752,7 @@ title : str
     Window title.
 
 ---- Globals read ----
-MINIMUM_TK (module constant); os.environ["PORTIMAO_NO_GUI"] (set to anything to
-keep the terminal).
+None.
 
 ---- Outputs ----
 Optional[int]
@@ -20433,6 +20767,7 @@ None.
 
 ---- Helpers ----
 ViewerGui
+window_opener
 ```
 
 #### `pointed_time_finder`
@@ -20465,6 +20800,37 @@ None.
 ---- Equations ----
 across = (x - left) / width; up = 1 - (y - top) / height;
 time = start + (across - axis left) / (axis right - axis left) * (end - start).
+
+---- Helpers ----
+None.
+```
+
+#### `window_opener`
+
+```text
+---- Summary ----
+Main function to check that the browser window can open here and open its Tk root
+window.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MINIMUM_TK (module constant); os.environ["PORTIMAO_NO_GUI"] (set to anything to
+keep the terminal), os.environ["DISPLAY"] and os.environ["WAYLAND_DISPLAY"] (on
+Linux).
+
+---- Outputs ----
+Tuple[Any, Any]
+    (the tkinter module, the Tk root window). Raises GuiUnavailableError, with the
+    reason in plain words, when the window cannot open.
+
+---- Globals mutated ----
+None. On Windows, makes the text sharp and gives the program its own taskbar group
+(side effects).
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
@@ -21645,6 +22011,142 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `utils_viewer/viewer_self_test.py`
+
+The check switch (PORTIMAO_SELF_TEST): opens the window, shows one made-up preview and
+
+### SELF-TEST HELPERS
+
+#### `_computer_describer`
+
+```text
+---- Summary ----
+Helper function to describe the computer the check runs on: Python, the system and
+its chip, Tk and the versions of the main packages.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PACKAGES (module constant).
+
+---- Outputs ----
+List[str]
+    One line of text per item, for the log.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_made_up_experiment_builder`
+
+```text
+---- Summary ----
+Helper function to build a made-up experiment as the reader would give it from a
+file, with the summary of that file.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITION_TIMES_MIN, DURATION_MIN, MADE_UP_NAME, OCR_LEVELS_UM_PER_MIN, START_O2_UM,
+STEP_MIN, TIME_COLUMN (module constants).
+
+---- Outputs ----
+Tuple[dict, dict]
+    (experiment, experiment_summary), as in DATA_FORMAT.md: a point every 0.05 min
+    from 0 to 30 min, additions at 10 and 20 min, the OCR at 6, 9 and then
+    1 uM/min, the measured O2 falling from 220 uM at that rate and the set O2 at
+    220 uM. No spectra.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+O2(t_i) = O2(0) - sum over j < i of OCR(t_j) x step.
+
+---- Helpers ----
+None.
+```
+
+#### `_preview_shower`
+
+```text
+---- Summary ----
+Helper function, run as the program of the window, to draw the made-up experiment
+with the preview code of the program and show it in the window for a few seconds.
+
+---- Inputs ----
+report : Callable[[str], None]
+    Writes one line to the log, the window's terminal and the real terminal.
+log_folder : Path
+    The logs folder, given as the results folder of the preview (nothing is
+    written to it).
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS; DRAWN_WAIT_S, PREVIEW_DPI, SHOW_S, SHOWN_MARK (module
+constants).
+
+---- Outputs ----
+int
+    0 when the preview was drawn and handed to the window, 1 otherwise (the reason
+    and its traceback are reported).
+
+---- Globals mutated ----
+None. Shows the picture in the window and waits (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_made_up_experiment_builder
+active_gui_getter
+preview_figure_builder
+```
+
+### MAIN FUNCTIONS
+
+#### `self_test_runner`
+
+```text
+---- Summary ----
+Main function to check that the program works on this computer: it opens the
+window, shows one made-up preview, closes the window by itself after a few seconds
+and says the result. Everything is written to logs/self_test.log as well as to the
+terminal.
+
+---- Inputs ----
+title : str
+    Program name, branch and version (program_title_builder).
+program_root : Path
+    Program folder; the log goes to its logs folder.
+
+---- Globals read ----
+CLOSE_AFTER_S, LOG_NAME (module constants).
+
+---- Outputs ----
+int
+    0 when the check passed, 1 when it failed (the reason is in the log).
+
+---- Globals mutated ----
+None. Writes the log, opens and closes the window and prints (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_computer_describer
+_preview_shower
+ViewerGui
+window_opener
 ```
 
 ## `utils_viewer/viewer_stages.py`

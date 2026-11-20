@@ -5,6 +5,7 @@ Main program: read .paf files, process them and export figures and workbooks.
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import gc
 import json
+import os
 import sys
 import time
 import traceback
@@ -32,7 +33,7 @@ from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.questions import section_starter, UserQuitError, yes_no_asker
-from utils_shared.helpers import program_title_builder
+from utils_shared.helpers import program_title_builder, program_version_reader
 from utils_shared.run_logging import logging_starter, logging_stopper
 from utils_shared.survey import (files_asker,
                                  haem_name_formatter,
@@ -48,7 +49,7 @@ from utils_viewer.viewer_stages import viewer_asker
 HERE = Path(__file__).resolve().parent
 FITS_FOLDER = HERE / 'fits'
 LAST_ANSWERS_FILE = HERE / 'last_answers.json'
-VERSION = (HERE / '.style' / 'VERSION').read_text().strip()
+VERSION = program_version_reader(HERE)
 PROGRAM_TITLE = program_title_builder(HERE, VERSION)
 
 
@@ -570,17 +571,20 @@ def main() -> int:
     """
     ---- Summary ----
     Main function of the program: run it in the experiment browser window (terminal on
-    the left, plots on the right), or in the terminal when the window cannot open.
+    the left, plots on the right), or in the terminal when the window cannot open. With
+    the check switch (PORTIMAO_SELF_TEST set to any value) it only checks that the
+    window opens and shows a made-up preview, then closes by itself.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    PROGRAM_TITLE (shown in the window title).
+    HERE, PROGRAM_TITLE (shown in the window title); os.environ['PORTIMAO_SELF_TEST'].
 
     ---- Outputs ----
     int
         0 when every file finished, 1 when the run was cancelled or a file failed.
+        With the check switch: 0 when the check passed, 1 when it failed.
 
     ---- Globals mutated ----
     None. Opens the window or runs in the terminal (side effects).
@@ -591,8 +595,13 @@ def main() -> int:
     ---- Helpers ----
     gui_runner
     program_runner
+    self_test_runner
     """
 
+    if os.environ.get('PORTIMAO_SELF_TEST'):
+        # Imported only for the check, so a normal start never depends on its file.
+        from utils_viewer.viewer_self_test import self_test_runner
+        return self_test_runner(PROGRAM_TITLE, HERE)
     code = gui_runner(program_runner, PROGRAM_TITLE)
     if code is None:
         code = program_runner()

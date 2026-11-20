@@ -15,6 +15,8 @@ from matplotlib.figure import Figure
 _figure_capture: Optional[Callable[[Figure, str], None]] = None
 # written where the user gave no concentration
 MISSING_CONCENTRATION = '? µM'
+# the version at the end of a title, as the release writes it: "... (V2.7)"
+VERSION_TITLE_PATTERN = re.compile(r'\(V(\d+(?:\.\d+)*)\)\s*$')
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -284,7 +286,7 @@ def program_title_builder(root: Path, version: str) -> str:
     root : Path
         Program folder.
     version : str
-        Version text from the VERSION file.
+        Version text, from program_version_reader.
 
     ---- Globals read ----
     None.
@@ -312,3 +314,47 @@ def program_title_builder(root: Path, version: str) -> str:
     except OSError:
         pass
     return ' '.join(part for part in ('Portimao', branch, f'V{version}') if part)
+
+
+# ---- program_version_reader ----------------------------------------------------------
+def program_version_reader(root: Path) -> str:
+    """
+    ---- Summary ----
+    Main function to find the program's version. The release leaves `.style/` off
+    main (the user download), so where `.style/VERSION` is missing the version is
+    taken from the title of `QUESTION_FLOW.md`, which every release rewrites.
+
+    ---- Inputs ----
+    root : Path
+        Program folder.
+
+    ---- Globals read ----
+    VERSION_TITLE_PATTERN (module constant).
+
+    ---- Outputs ----
+    str
+        For example "2.7"; "unknown" when neither file gives a version.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    try:
+        version = (root / '.style' / 'VERSION').read_text(encoding='utf-8').strip()
+        if version:
+            return version
+    except OSError:
+        pass
+    try:
+        with open(root / 'QUESTION_FLOW.md', encoding='utf-8') as flow:
+            title = flow.readline()
+    except OSError:
+        return 'unknown'
+    found = VERSION_TITLE_PATTERN.search(title)
+    return found.group(1) if found else 'unknown'
