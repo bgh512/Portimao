@@ -10,7 +10,7 @@ from utils_shared.figure_layout import (figure_size_calculator,
                                         figure_style_builder,
                                         figure_style_checker,
                                         )
-from utils_shared.helpers import name_simplifier
+from utils_shared.helpers import haem_type_finder, name_simplifier
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -149,30 +149,23 @@ HAEM_COLOURS = {'cytc1': '#ff3636',
                 'cyta605': '#00b050',
                 'cytb557': '#00b0db',
                 }
-# Colours of the components found by the PCA, by the haem type their peaks look like
-# (pca_fitter.component_classifier): the colours of the usual haems, then darker and
-# lighter shades for a second and third component of the same type. 'other' (peaks of
-# more than one type, or none in a known band) uses colours no haem type has.
-PCA_TYPE_COLOURS = {'a': ['#00b050', '#006b30', '#7fd8a8'],
-                    'b': ['#3131ff', '#0d0d87', '#8f8fff'],
-                    'c': ['#ff3636', '#a00000', '#ff9b9b'],
-                    'other': ['#e69f00',
-                              '#cc79a7',
-                              '#7b3294',
-                              '#8c510a',
-                              '#d55e00',
-                              '#7f7f7f',
-                              ],
-                    }
-EXTRA_COLOURS = ['#e69f00',
-                 '#cc79a7',
-                 '#56b4e9',
-                 '#009e73',
-                 '#d55e00',
-                 '#0072b2',
-                 '#f0e442',
-                 '#7f7f7f',
-                 ]
+# Colours by haem type, green for a, blue for b and red for c: the colours of the usual
+# haems, then darker and lighter shades. They colour the components the PCA finds, by
+# the type their peaks look like (pca_fitter.component_classifier), and the haems of a
+# fit file that have no colour of their own above, by the type their name gives
+# (haem_colour_mapper). 'other' (peaks of more than one type, none in a known band, or
+# a name of no known type) uses colours no haem type has.
+HAEM_TYPE_COLOURS = {'a': ['#00b050', '#006b30', '#7fd8a8'],
+                     'b': ['#3131ff', '#0d0d87', '#8f8fff'],
+                     'c': ['#ff3636', '#a00000', '#ff9b9b'],
+                     'other': ['#e69f00',
+                               '#cc79a7',
+                               '#7b3294',
+                               '#8c510a',
+                               '#d55e00',
+                               '#7f7f7f',
+                               ],
+                     }
 # What each journal asks for. Only the Nature numbers were checked against the journal's
 # own figure guide (research-figure-guide.nature.com;
 # its 170 mm height is the maximum when the legend sits under the figure, 247 mm is the
@@ -602,19 +595,22 @@ class Config:
 def haem_colour_mapper(names: List[str]) -> Dict[str, str]:
     """
     ---- Summary ----
-    Main function to give each haem a plot colour: the original colour for the usual
-    haems, otherwise the next unused extra colour.
+    Main function to give each haem a plot colour of its type: shades of green for the
+    a haems, blue for the b and red for the c. A usual haem keeps its own colour
+    unless a haem before it in the list took that colour; any other haem takes the
+    first shade of its type no haem of the list has yet.
 
     ---- Inputs ----
     names : List[str]
-        Haem names as written in the fit file.
+        Haem names as written in the fit file, plain or in figure form.
 
     ---- Globals read ----
-    HAEM_COLOURS, EXTRA_COLOURS (module constants).
+    HAEM_COLOURS, HAEM_TYPE_COLOURS (module constants).
 
     ---- Outputs ----
     Dict[str, str]
-        {haem name: hex colour}.
+        {haem name: hex colour}. A name of no known type takes a colour no haem type
+        has. Colours repeat only when a type has more haems than shades.
 
     ---- Globals mutated ----
     None.
@@ -623,13 +619,27 @@ def haem_colour_mapper(names: List[str]) -> Dict[str, str]:
     None.
 
     ---- Helpers ----
+    haem_type_finder
     name_simplifier
     """
 
-    colours, spare = {}, iter(EXTRA_COLOURS * 3)
+    # ---- 1 The usual haems keep their own colour -------------------------------------
+    colours: Dict[str, str] = {}
     for name in names:
-        colours[name] = HAEM_COLOURS.get(name_simplifier(name)) or next(spare)
-    return colours
+        own = HAEM_COLOURS.get(name_simplifier(name))
+        if own and own not in colours.values():
+            colours[name] = own
+
+    # ---- 2 Every other haem takes a free shade of its type ---------------------------
+    for name in names:
+        if name in colours:
+            continue
+        kind = haem_type_finder(name)
+        shades = HAEM_TYPE_COLOURS[kind]
+        free = [shade for shade in shades if shade not in colours.values()]
+        same_type = [other for other in colours if haem_type_finder(other) == kind]
+        colours[name] = free[0] if free else shades[len(same_type) % len(shades)]
+    return {name: colours[name] for name in names}
 
 
 # ---- pca_colour_mapper ---------------------------------------------------------------
@@ -647,7 +657,7 @@ def pca_colour_mapper(types: List[str]) -> List[str]:
         (pca_fitter.component_classifier).
 
     ---- Globals read ----
-    PCA_TYPE_COLOURS (module constant).
+    HAEM_TYPE_COLOURS (module constant).
 
     ---- Outputs ----
     List[str]
@@ -664,11 +674,11 @@ def pca_colour_mapper(types: List[str]) -> List[str]:
     None.
     """
 
-    used = {key: 0 for key in PCA_TYPE_COLOURS}
+    used = {key: 0 for key in HAEM_TYPE_COLOURS}
     colours = []
     for kind in types:
         key = kind if kind in ('a', 'b', 'c') else 'other'
-        shades = PCA_TYPE_COLOURS[key]
+        shades = HAEM_TYPE_COLOURS[key]
         colours.append(shades[used[key] % len(shades)])
         used[key] += 1
     return colours

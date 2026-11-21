@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.helpers import haem_order_finder
 from utils_shared.reference_level import (reference_level_finder,
                                           window_seconds_calculator,
                                           )
@@ -1105,7 +1106,7 @@ def fit_haem_selector(fit: Dict[str, Any], haems: List[str]) -> Dict[str, Any]:
     ---- Outputs ----
     Dict[str, Any]
         A new fit dictionary with the same keys: 'haem_list' and 'data' hold only the
-        kept haems, in the order of the file, without the rows that are blank in all of
+        kept haems, in the order of the fit, without the rows that are blank in all of
         them. The fit given is not changed. Raises ValueError, with a message for the
         user, when no haem is named or a name is not in the fit.
 
@@ -1155,8 +1156,9 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
 
     ---- Outputs ----
     Dict[str, Any]
-        {'haem_list': haem names in file order, 'data': the cleaned table
-        (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the values
+        {'haem_list': haem names, the a haems first, then the b, then the c
+        (haem_order_finder), 'data': the cleaned table (_fit_table_cleaner) on the
+        standard scale, its column pairs in that order, 'scale_divisor': what the values
         of the file were divided by (1, 1 000 or 1 000 000), 'notes': sentences for
         the user about rows left out and the scale}. A file with heading lines gives
         its names in figure form (haem_name_typesetter); an older file gives them as
@@ -1173,6 +1175,7 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
     _fit_table_cleaner
     _headed_fit_reader
     fit_scale_standardiser
+    haem_order_finder
     """
 
     # ---- 1 Read the text -------------------------------------------------------------
@@ -1198,7 +1201,13 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
         cleaned, notes = _fit_table_cleaner(raw, label)
         data, divisor, scale_notes = fit_scale_standardiser(cleaned, label)
         notes = notes + scale_notes
-    return {'haem_list': [str(name) for name in data.columns[::2]],
+
+    # ---- 3 Put the haems in order: the a haems, then the b, then the c ---------------
+    # every list, figure and workbook follows this order, whatever the file's own
+    names = [str(name) for name in data.columns[::2]]
+    order = haem_order_finder(names)
+    data = data.iloc[:, [column for i in order for column in (2 * i, 2 * i + 1)]]
+    return {'haem_list': [names[i] for i in order],
             'data': data,
             'scale_divisor': divisor,
             'notes': notes,

@@ -18,7 +18,6 @@ from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
                                  haem_form_option_builder,
                                  haem_name_formatter,
-                                 haem_name_sorter,
                                  ocr_option_builder,
                                  size_asker,
                                  )
@@ -104,7 +103,6 @@ def _haem_ocr_asker(names: List[str],
     choice_asker
     haem_form_option_builder
     haem_name_formatter
-    haem_name_sorter
     info_printer
     multi_asker
     ocr_option_builder
@@ -200,7 +198,7 @@ def _haem_ocr_asker(names: List[str],
     while True:
         answers['ho_haems'] = multi_asker('Which haems should get a row, and in which '
                                           'order?',
-                                          haem_name_sorter(fit['haem_list']),
+                                          list(fit['haem_list']),
                                           default_all=True,
                                           keep_order=True,
                                           depth=2,

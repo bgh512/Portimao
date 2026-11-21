@@ -11,7 +11,6 @@ from typing import Callable, Dict, List, Optional, Tuple
 import config as settings
 from utils_custom.run_namer import run_name_lister
 from utils_shared.dataset_settings import dataset_settings_reader
-from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_exporter import saved_settings_reader
 from utils_shared.paf_reader import experiment_summary_reader, PafError
 from utils_shared.questions import (choice_asker,
@@ -1224,7 +1223,6 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
 
     ---- Helpers ----
     haem_name_formatter
-    haem_name_sorter
     multi_asker
     """
 
@@ -1234,7 +1232,7 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
     if answers['plot_haems']:
         answers['haems'] = multi_asker('Which haems would you like to plot, and in '
                                        'which order?',
-                                       haem_name_sorter(fit['haem_list']),
+                                       list(fit['haem_list']),
                                        default_all=True,
                                        keep_order=True,
                                        depth=2,
@@ -1352,37 +1350,6 @@ def haem_name_formatter(name: str) -> str:
 
     # ---- 1 Convert the maths spans ---------------------------------------------------
     return re.sub(r'\$([^$]*)\$', _maths_converter, str(name))
-
-
-# ---- haem_name_sorter ----------------------------------------------------------------
-def haem_name_sorter(names: List[str]) -> List[str]:
-    """
-    ---- Summary ----
-    Main function to put haem names in alphabetical order of the name as shown (ignoring
-    case and punctuation), for example a605, b557, bH, bL, cc.
-
-    ---- Inputs ----
-    names : List[str]
-        Haem names as written in the fit file.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    List[str]
-        The same names, sorted; the input list is not changed.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    name_simplifier
-    """
-
-    return sorted(names, key=name_simplifier)
 
 
 # ---- haem_scaling_asker --------------------------------------------------------------

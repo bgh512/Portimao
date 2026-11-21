@@ -49,7 +49,10 @@ UNIT_DIVISORS = {'OD/mM/cm': 1e6, 'OD/µM/cm': 1e3, 'OD/nM/cm': 1.0}
 # How closely a fit written to a file and read back must give the same shapes: the file
 # keeps 15 significant digits.
 ROUND_TRIP = 1e-14
-# Amounts of the five haems, in file order. With the test fit (peaks of 1e-5) they give
+# The haems of the test fit in the order the program reads them, the a haem first, then
+# the b, then the c; the file itself lists them a605, cc, bH, bL, b557.
+FIT_ORDER = ['Cyt a605', 'Cyt b557', 'Cyt bH', 'Cyt bL', 'Cyt cc']
+# Amounts of the five haems, in FIT_ORDER. With the test fit (peaks of 1e-5) they give
 # haem signals of 1 to 5 mOD, as in a real run; far smaller signals would be lost in
 # the rounding of the 0.4 OD background itself, whatever the maths.
 AMOUNTS = np.array([1.0, 2.0, 3.0, 4.0, 5.0]) * 1e-4
@@ -187,12 +190,12 @@ def _haem_spectrum_builder() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     None.
 
     ---- Globals read ----
-    FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
+    FIT_FILE, FIT_ORDER, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
 
     ---- Outputs ----
     Tuple[np.ndarray, np.ndarray, np.ndarray]
-        (wavelengths in nm, the spectrum, the haem shapes as columns); the wavelengths
-        are those of the fit file.
+        (wavelengths in nm, the spectrum, the haem shapes as columns in FIT_ORDER); the
+        wavelengths are those of the fit file.
 
     ---- Globals mutated ----
     None. Reads the fit file (side effect).
@@ -208,7 +211,7 @@ def _haem_spectrum_builder() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     wavelengths = table.iloc[:, 0].to_numpy(dtype=float)
     for column in range(0, table.shape[1], 2):  # every haem is on the same wavelengths
         assert np.array_equal(table.iloc[:, column].to_numpy(dtype=float), wavelengths)
-    shapes = table.iloc[:, 1::2].to_numpy(dtype=float)
+    shapes = table[[f'{name} response' for name in FIT_ORDER]].to_numpy(dtype=float)
     spectrum = ((shapes @ AMOUNTS) * HAEM_FACTOR
                 + OFFSET
                 + SLOPE * _background_builder(wavelengths)
@@ -596,7 +599,7 @@ def test_a_million_times_larger_fit_gives_the_same_amounts(tmp_path: Path) -> No
     assert len(thousand['notes']) == 1
     assert thousand['notes'][0].startswith('Warning')
     assert np.allclose(thousand['data'].iloc[:, 1::2].to_numpy(),
-                       table.iloc[:, 1::2].to_numpy() * 1e3,
+                       standard['data'].iloc[:, 1::2].to_numpy() * 1e3,
                        rtol=1e-12,
                        atol=0.0,
                        )
@@ -1432,9 +1435,9 @@ def test_some_haems_only_give_back_their_amounts(tmp_path: Path) -> None:
     wavelengths, _, shapes = _haem_spectrum_builder()
     fit = fit_importer(FIT_FILE)
     kept = fit_haem_selector(fit, ['Cyt bL', 'Cyt cc'])
-    assert kept['haem_list'] == ['Cyt cc', 'Cyt bL']
+    assert kept['haem_list'] == ['Cyt bL', 'Cyt cc']
     assert len(fit['haem_list']) == 5
-    spectrum = ((shapes[:, [1, 3]] @ AMOUNTS[[1, 3]]) * HAEM_FACTOR
+    spectrum = ((shapes[:, [3, 4]] @ AMOUNTS[[3, 4]]) * HAEM_FACTOR
                 + OFFSET
                 + SLOPE * _background_builder(wavelengths)
                 )
@@ -1444,7 +1447,7 @@ def test_some_haems_only_give_back_their_amounts(tmp_path: Path) -> None:
                                 haemfactor=HAEM_FACTOR,
                                 )[0]
     assert len(found) == 4  # two haems, the flat level and the scatter term
-    assert np.allclose(found[:2], AMOUNTS[[1, 3]], rtol=EXACT, atol=0.0)
+    assert np.allclose(found[:2], AMOUNTS[[3, 4]], rtol=EXACT, atol=0.0)
 
     # ---- 2 Leave out a short haem ----------------------------------------------------
     table = pd.read_csv(FIT_FILE)

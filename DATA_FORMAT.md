@@ -219,7 +219,7 @@ A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds th
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names, in file order. From a fit file with heading lines they are in figure form (`haem_name_typesetter`: `Cyt bH` becomes `Cyt $b_H$`); from an older file, as written |
+| `'haem_list'` | List[str] | (n_haems) | | Haem (or component) names. From `fit_importer` the a haems come first, then the b, then the c, then any other name, each type in alphabetical order (`helpers.haem_order_finder`: a605, b557, bH, bL, cc), whatever the order of the file, and `'data'` follows; from `fit_table_builder`, in the order of the components. Every list, figure and workbook keeps this order. `config.haem_colour_mapper` colours the haems by the type their name gives (`helpers.haem_type_finder`): a usual haem keeps its own colour (`HAEM_COLOURS`), any other takes a free shade of its type (`HAEM_TYPE_COLOURS`: green for a, blue for b, red for c). From a fit file with heading lines they are in figure form (`haem_name_typesetter`: `Cyt bH` becomes `Cyt $b_H$`); from an older file, as written |
 | `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD/mM/cm ÷ 1 000 000 | (wavelength, response) column pairs, one pair per haem. The decomposition uses the response as the basis spectrum; it has the sign of the attenuation, -log10(T), oxidised minus reduced (each haem's α peak is a dip). Each haem's rows are at the top, with wavelengths going upwards and blanks (NaN) below a shorter haem. The responses are on the standard scale, OD/mM/cm divided by a million (the instrument's own scale, which `HAEM_FACTOR` multiplies back): the highest point of the shapes lies between 1e-7 and 1e-3 |
 | `'scale_divisor'` | float | | | What the values of the file were divided by to reach the standard scale: set by the Unit line of a file with heading lines (1 000 000 for OD/mM/cm and relative, 1 000 for OD/µM/cm, 1 for OD/nM/cm); for an older file, 1, or 1 000 000 when it is a million above the standard |
 | `'notes'` | List[str] | | | Sentences for the user: leftover rows left out of a haem, an older fit divided by a million, a fit far from the usual size of its unit or on neither scale |
@@ -256,7 +256,7 @@ Returned by `component_builder`: the chosen number of components, optionally rot
 | `'rotated'` | bool | | | True when the varimax rotation was applied |
 | `'smoothing_nm'` | float | | nm | Width of the Savitzky-Golay smoothing of the components; 0 when not smoothed. `'explained'` and `'residual_rms'` are those of the components before smoothing |
 
-The haem type of each component (`'a'`, `'b'`, `'c'`, `'mixed'` or `'unknown'`) is worked out separately by `component_classifier`, from where its clear peaks and troughs are: the alpha and Soret bands of haem c (545-556.5 and 410-423 nm), b (556.5-570 and 423-437 nm) and a (595-612 and 437-450 nm). `config.pca_colour_mapper` turns the types into colours (`PCA_TYPE_COLOURS`).
+The haem type of each component (`'a'`, `'b'`, `'c'`, `'mixed'` or `'unknown'`) is worked out separately by `component_classifier`, from where its clear peaks and troughs are: the alpha and Soret bands of haem c (545-556.5 and 410-423 nm), b (556.5-570 and 423-437 nm) and a (595-612 and 437-450 nm). `config.pca_colour_mapper` turns the types into colours (`HAEM_TYPE_COLOURS`, the same shades as the haems of the fit files).
 
 #### `pca_spectra_set`
 

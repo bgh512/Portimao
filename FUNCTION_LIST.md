@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.3.2
+- **Version:** V2.4
 - **Date:** 21/11/2026
 
 ## Contents
@@ -49,6 +49,10 @@
     - [`main`](#main)
     - [`program_runner`](#program_runner)
     - [`special_figures_maker`](#special_figures_maker)
+- [`tests/conftest.py`](#testsconftestpy)
+    - [`HiddenPopen`](#hiddenpopen)
+    - [`_window_refuser`](#_window_refuser)
+    - [`pytest_configure`](#pytest_configure)
 - [`tests/test_app_updater.py`](#teststest_app_updaterpy)
     - [`_app_maker`](#_app_maker)
     - [`_closed_pid_giver`](#_closed_pid_giver)
@@ -120,6 +124,11 @@
     - [`test_haem_shapes_are_those_of_the_instrument`](#test_haem_shapes_are_those_of_the_instrument)
     - [`test_valencia_background_is_the_instruments`](#test_valencia_background_is_the_instruments)
     - [`test_instrument_traces_fall_when_reduced`](#test_instrument_traces_fall_when_reduced)
+- [`tests/test_haem_types.py`](#teststest_haem_typespy)
+    - [`test_a_fit_file_is_read_in_that_order`](#test_a_fit_file_is_read_in_that_order)
+    - [`test_haems_are_ordered_a_then_b_then_c`](#test_haems_are_ordered_a_then_b_then_c)
+    - [`test_haem_types_come_from_the_name`](#test_haem_types_come_from_the_name)
+    - [`test_haems_are_coloured_by_type`](#test_haems_are_coloured_by_type)
 - [`tests/test_label_tidier.py`](#teststest_label_tidierpy)
     - [`test_exponent_after_a_caret_is_raised`](#test_exponent_after_a_caret_is_raised)
     - [`test_exponent_after_a_unit_is_raised`](#test_exponent_after_a_unit_is_raised)
@@ -175,6 +184,10 @@
     - [`test_report_in_downloads_names_it`](#test_report_in_downloads_names_it)
     - [`test_report_in_home_folder_is_not_guarded`](#test_report_in_home_folder_is_not_guarded)
     - [`test_report_inside_app_describes_it`](#test_report_inside_app_describes_it)
+- [`tests/test_no_windows.py`](#teststest_no_windowspy)
+    - [`test_no_tk_window_can_open`](#test_no_tk_window_can_open)
+    - [`test_plots_are_drawn_off_screen`](#test_plots_are_drawn_off_screen)
+    - [`test_started_programs_have_no_console_window`](#test_started_programs_have_no_console_window)
 - [`tests/test_ocr_checking.py`](#teststest_ocr_checkingpy)
     - [`_instrument_maker`](#_instrument_maker)
     - [`test_steady_fall_is_its_slope`](#test_steady_fall_is_its_slope)
@@ -548,6 +561,8 @@
     - [`figure_capture_setter`](#figure_capture_setter)
     - [`figure_saver`](#figure_saver)
     - [`file_name_sanitiser`](#file_name_sanitiser)
+    - [`haem_order_finder`](#haem_order_finder)
+    - [`haem_type_finder`](#haem_type_finder)
     - [`name_simplifier`](#name_simplifier)
     - [`program_title_builder`](#program_title_builder)
     - [`program_version_reader`](#program_version_reader)
@@ -726,7 +741,6 @@
     - [`haem_form_asker`](#haem_form_asker)
     - [`haem_form_option_builder`](#haem_form_option_builder)
     - [`haem_name_formatter`](#haem_name_formatter)
-    - [`haem_name_sorter`](#haem_name_sorter)
     - [`haem_scaling_asker`](#haem_scaling_asker)
     - [`label_angle_asker`](#label_angle_asker)
     - [`label_tidier`](#label_tidier)
@@ -1024,19 +1038,22 @@ None.
 
 ```text
 ---- Summary ----
-Main function to give each haem a plot colour: the original colour for the usual
-haems, otherwise the next unused extra colour.
+Main function to give each haem a plot colour of its type: shades of green for the
+a haems, blue for the b and red for the c. A usual haem keeps its own colour
+unless a haem before it in the list took that colour; any other haem takes the
+first shade of its type no haem of the list has yet.
 
 ---- Inputs ----
 names : List[str]
-    Haem names as written in the fit file.
+    Haem names as written in the fit file, plain or in figure form.
 
 ---- Globals read ----
-HAEM_COLOURS, EXTRA_COLOURS (module constants).
+HAEM_COLOURS, HAEM_TYPE_COLOURS (module constants).
 
 ---- Outputs ----
 Dict[str, str]
-    {haem name: hex colour}.
+    {haem name: hex colour}. A name of no known type takes a colour no haem type
+    has. Colours repeat only when a type has more haems than shades.
 
 ---- Globals mutated ----
 None.
@@ -1045,6 +1062,7 @@ None.
 None.
 
 ---- Helpers ----
+haem_type_finder
 name_simplifier
 ```
 
@@ -1063,7 +1081,7 @@ types : List[str]
     (pca_fitter.component_classifier).
 
 ---- Globals read ----
-PCA_TYPE_COLOURS (module constant).
+HAEM_TYPE_COLOURS (module constant).
 
 ---- Outputs ----
 List[str]
@@ -2271,6 +2289,123 @@ time_response_runner
 warning_shower
 ```
 
+## `tests/conftest.py`
+
+Makes the program's folders importable from the tests, however pytest is started, and
+
+### CLASSES
+
+#### `HiddenPopen`
+
+```text
+---- Summary ----
+Starts a program as subprocess.Popen does, but on Windows without a console window
+of its own, so a test never puts a window on the screen.
+
+---- Attributes ----
+As subprocess.Popen.
+
+---- Globals read ----
+HIDDEN (module constant).
+
+---- Methods ----
+__init__
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Main function to start the program with the hidden flag added to any flags the
+caller gave.
+
+---- Inputs ----
+*args : Any
+    As subprocess.Popen.
+**kwargs : Any
+    As subprocess.Popen.
+
+---- Globals read ----
+HIDDEN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Starts the program (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### CONFTEST HELPERS
+
+#### `_window_refuser`
+
+```text
+---- Summary ----
+Helper function to stand in for tkinter.Tk: it refuses to open a window, as Tk does
+on a computer without a screen, so the program goes on without its window.
+
+---- Inputs ----
+*args : Any
+    As tkinter.Tk (not used).
+**kwargs : Any
+    As tkinter.Tk (not used).
+
+---- Globals read ----
+WINDOW_REFUSAL (module constant).
+
+---- Outputs ----
+None. Always raises tkinter.TclError.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `pytest_configure`
+
+```text
+---- Summary ----
+Main function to keep every window shut while the tests run, set before any test
+is collected: plots are drawn off screen, no Tk window can open (a Toplevel without
+its own window asks for a Tk one, so it cannot either), and on Windows every
+program a test starts runs without a console window.
+
+---- Inputs ----
+config : pytest.Config
+    pytest's settings (not used).
+
+---- Globals read ----
+HIDDEN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+os.environ['MPLBACKEND'], tkinter.Tk and, on Windows, subprocess.Popen, for this
+run of the tests only; the programs the tests start draw their plots off screen
+too.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_window_refuser
+HiddenPopen
+```
+
 ## `tests/test_app_updater.py`
 
 Tests the Mac app's update: the newest release, the zip for each Mac and the swap with a
@@ -3185,12 +3320,12 @@ test fit file, on a flat and a sloping background.
 None.
 
 ---- Globals read ----
-FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
+FIT_FILE, FIT_ORDER, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE (module constants).
 
 ---- Outputs ----
 Tuple[np.ndarray, np.ndarray, np.ndarray]
-    (wavelengths in nm, the spectrum, the haem shapes as columns); the wavelengths
-    are those of the fit file.
+    (wavelengths in nm, the spectrum, the haem shapes as columns in FIT_ORDER); the
+    wavelengths are those of the fit file.
 
 ---- Globals mutated ----
 None. Reads the fit file (side effect).
@@ -4235,6 +4370,122 @@ None.
 ---- Equations ----
 median of the last 2 min of the run (after the dithionite) - median of the 2 min
 before the first addition < 0.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_haem_types.py`
+
+Tests of the haem types read from the haem names, the order of the haems and their
+
+### MAIN FUNCTIONS
+
+#### `test_a_fit_file_is_read_in_that_order`
+
+```text
+---- Summary ----
+Main function to check that a fit file listing its haems c, b, a is read with the
+a haem first, then the b, then the c, each haem's shape moved with its name.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes a fit file in tmp_path (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_haems_are_ordered_a_then_b_then_c`
+
+```text
+---- Summary ----
+Main function to check the order of the haems: every a haem, then every b, then
+every c, then a name of no known type, each type in alphabetical order (a digit
+before a letter, so a3 before a605 and b557 before bH).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FILE_ORDER (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_haem_types_come_from_the_name`
+
+```text
+---- Summary ----
+Main function to check that a haem's type is the first letter after a leading
+'Cyt', 'cytochrome' or 'haem', and 'other' for any other name.
+
+---- Inputs ----
+name : str
+    Haem name, plain or in figure form.
+expected : str
+    Its type, worked out by hand.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_haems_are_coloured_by_type`
+
+```text
+---- Summary ----
+Main function to check the colours: the usual haems keep their own, a haem without
+one takes the first free shade of its type, two haems with the same usual colour
+get different shades, and a name of no known type a colour no haem type has.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
@@ -5691,6 +5942,90 @@ None.
 _app_maker
 _report_runner
 _snapshot_taker
+```
+
+## `tests/test_no_windows.py`
+
+Tests that the tests themselves open no windows on the screen (set in conftest.py).
+
+### MAIN FUNCTIONS
+
+#### `test_no_tk_window_can_open`
+
+```text
+---- Summary ----
+Main function to check that neither a Tk window nor a Toplevel one can open while
+the tests run.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_plots_are_drawn_off_screen`
+
+```text
+---- Summary ----
+Main function to check that matplotlib draws the tests' plots off screen, and so
+do the Pythons the tests start.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_started_programs_have_no_console_window`
+
+```text
+---- Summary ----
+Main function to check that on Windows a program a test starts, through
+subprocess.run or subprocess.Popen, gets no console window.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CONSOLE_CHECK (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `tests/test_ocr_checking.py`
@@ -9636,7 +9971,6 @@ _step_checker
 choice_asker
 haem_form_option_builder
 haem_name_formatter
-haem_name_sorter
 info_printer
 multi_asker
 ocr_option_builder
@@ -16821,6 +17155,68 @@ None.
 None.
 ```
 
+#### `haem_order_finder`
+
+```text
+---- Summary ----
+Main function to find the order haems are listed, plotted and exported in: every a
+haem, then every b, then every c, then any name of no known type; within a type in
+alphabetical order of the name (ignoring case and punctuation), so a605, b557, bH,
+bL, cc whatever the order of the fit file.
+
+---- Inputs ----
+names : Sequence[Any]
+    Haem names, plain or in figure form (converted with str).
+
+---- Globals read ----
+HAEM_TYPE_ORDER (module constant).
+
+---- Outputs ----
+List[int]
+    The position in ``names`` of each haem, in that order; two haems with the same
+    name keep the order they were given in.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+haem_type_finder
+name_simplifier
+```
+
+#### `haem_type_finder`
+
+```text
+---- Summary ----
+Main function to tell the type of a haem from its name: the first letter after a
+leading 'Cyt', 'cytochrome', 'haem' or 'heme', so 'Cyt bH' and 'Cyt $b_{557}$' are
+b haems, 'Cyt c1' and 'Cyt cc' c haems, 'Cyt a605' and 'Cyt aa3' a haems.
+
+---- Inputs ----
+name : Any
+    Haem name, plain or in figure form (converted with str).
+
+---- Globals read ----
+HAEM_NAME_PREFIXES, HAEM_TYPE_ORDER (module constants).
+
+---- Outputs ----
+str
+    'a', 'b' or 'c'; 'other' for any other name (a component named PC1, a haem d
+    or o, or a name that is only 'Cyt').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+name_simplifier
+```
+
 #### `name_simplifier`
 
 ```text
@@ -22019,7 +22415,7 @@ None.
 ---- Outputs ----
 Dict[str, Any]
     A new fit dictionary with the same keys: 'haem_list' and 'data' hold only the
-    kept haems, in the order of the file, without the rows that are blank in all of
+    kept haems, in the order of the fit, without the rows that are blank in all of
     them. The fit given is not changed. Raises ValueError, with a message for the
     user, when no haem is named or a name is not in the fit.
 
@@ -22053,8 +22449,9 @@ FIT_FILE_MARK (module constant).
 
 ---- Outputs ----
 Dict[str, Any]
-    {'haem_list': haem names in file order, 'data': the cleaned table
-    (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the values
+    {'haem_list': haem names, the a haems first, then the b, then the c
+    (haem_order_finder), 'data': the cleaned table (_fit_table_cleaner) on the
+    standard scale, its column pairs in that order, 'scale_divisor': what the values
     of the file were divided by (1, 1 000 or 1 000 000), 'notes': sentences for
     the user about rows left out and the scale}. A file with heading lines gives
     its names in figure form (haem_name_typesetter); an older file gives them as
@@ -22071,6 +22468,7 @@ None.
 _fit_table_cleaner
 _headed_fit_reader
 fit_scale_standardiser
+haem_order_finder
 ```
 
 #### `fit_range_finder`
@@ -23061,7 +23459,6 @@ None.
 
 ---- Helpers ----
 haem_name_formatter
-haem_name_sorter
 multi_asker
 ```
 
@@ -23151,34 +23548,6 @@ None.
 
 ---- Helpers ----
 _maths_converter
-```
-
-#### `haem_name_sorter`
-
-```text
----- Summary ----
-Main function to put haem names in alphabetical order of the name as shown (ignoring
-case and punctuation), for example a605, b557, bH, bL, cc.
-
----- Inputs ----
-names : List[str]
-    Haem names as written in the fit file.
-
----- Globals read ----
-None.
-
----- Outputs ----
-List[str]
-    The same names, sorted; the input list is not changed.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-name_simplifier
 ```
 
 #### `haem_scaling_asker`
@@ -27787,7 +28156,7 @@ types : List[str]
     Haem type of each component (component_classifier).
 
 ---- Globals read ----
-settings.PCA_TYPE_COLOURS, settings.pca_colour_mapper, settings.PREVIEW_DPI;
+settings.HAEM_TYPE_COLOURS, settings.pca_colour_mapper, settings.PREVIEW_DPI;
 BROWSING_ANSWERS (module constant).
 
 ---- Outputs ----

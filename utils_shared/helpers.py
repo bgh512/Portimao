@@ -15,6 +15,12 @@ from matplotlib.figure import Figure
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 _figure_capture: Optional[Callable[[Figure, str], None]] = None
+# Words a haem name may start with before its haem letter ("Cyt bH", "cytochrome c1");
+# 'cytochrome' comes before 'cyt', which it starts with.
+HAEM_NAME_PREFIXES = ('cytochrome', 'cyt', 'haem', 'heme')
+# The haem types in the order the haems are listed, plotted and exported; a name of no
+# known type comes after them.
+HAEM_TYPE_ORDER = ('a', 'b', 'c')
 # written where the user gave no concentration
 MISSING_CONCENTRATION = '? µM'
 # the version at the end of a title, as the release writes it: "... (V2.7)"
@@ -253,6 +259,85 @@ def file_name_sanitiser(name: Any, default: str = 'experiment') -> str:
 
     cleaned = re.sub(r'[<>:"/\\|?*]', '_', str(name)).strip('. ')
     return cleaned or default
+
+
+# ---- haem_order_finder ---------------------------------------------------------------
+def haem_order_finder(names: Sequence[Any]) -> List[int]:
+    """
+    ---- Summary ----
+    Main function to find the order haems are listed, plotted and exported in: every a
+    haem, then every b, then every c, then any name of no known type; within a type in
+    alphabetical order of the name (ignoring case and punctuation), so a605, b557, bH,
+    bL, cc whatever the order of the fit file.
+
+    ---- Inputs ----
+    names : Sequence[Any]
+        Haem names, plain or in figure form (converted with str).
+
+    ---- Globals read ----
+    HAEM_TYPE_ORDER (module constant).
+
+    ---- Outputs ----
+    List[int]
+        The position in ``names`` of each haem, in that order; two haems with the same
+        name keep the order they were given in.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    haem_type_finder
+    name_simplifier
+    """
+
+    ranks = HAEM_TYPE_ORDER + ('other',)
+    return sorted(range(len(names)),
+                  key=lambda i: (ranks.index(haem_type_finder(names[i])),
+                                 name_simplifier(names[i]),
+                                 ),
+                  )
+
+
+# ---- haem_type_finder ----------------------------------------------------------------
+def haem_type_finder(name: Any) -> str:
+    """
+    ---- Summary ----
+    Main function to tell the type of a haem from its name: the first letter after a
+    leading 'Cyt', 'cytochrome', 'haem' or 'heme', so 'Cyt bH' and 'Cyt $b_{557}$' are
+    b haems, 'Cyt c1' and 'Cyt cc' c haems, 'Cyt a605' and 'Cyt aa3' a haems.
+
+    ---- Inputs ----
+    name : Any
+        Haem name, plain or in figure form (converted with str).
+
+    ---- Globals read ----
+    HAEM_NAME_PREFIXES, HAEM_TYPE_ORDER (module constants).
+
+    ---- Outputs ----
+    str
+        'a', 'b' or 'c'; 'other' for any other name (a component named PC1, a haem d
+        or o, or a name that is only 'Cyt').
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    name_simplifier
+    """
+
+    simple = name_simplifier(name)
+    for prefix in HAEM_NAME_PREFIXES:
+        if simple.startswith(prefix):
+            simple = simple[len(prefix):]
+            break
+    letter = simple[:1]
+    return letter if letter and letter in HAEM_TYPE_ORDER else 'other'
 
 
 # ---- name_simplifier -----------------------------------------------------------------

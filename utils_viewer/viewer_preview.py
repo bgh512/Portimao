@@ -450,7 +450,7 @@ def pca_picture_builder(analysis: dict,
         Haem type of each component (component_classifier).
 
     ---- Globals read ----
-    settings.PCA_TYPE_COLOURS, settings.pca_colour_mapper, settings.PREVIEW_DPI;
+    settings.HAEM_TYPE_COLOURS, settings.pca_colour_mapper, settings.PREVIEW_DPI;
     BROWSING_ANSWERS (module constant).
 
     ---- Outputs ----
@@ -472,7 +472,7 @@ def pca_picture_builder(analysis: dict,
     width = cfg.FIGURE_SIZE[0]
     height = max(width * 0.5, 0.35 * width * result['count'] + 0.6)
     fig = Figure(figsize=(width, height), dpi=settings.PREVIEW_DPI)
-    type_colours = {kind: settings.PCA_TYPE_COLOURS[kind][0] for kind in 'abc'}
+    type_colours = {kind: settings.HAEM_TYPE_COLOURS[kind][0] for kind in 'abc'}
     pca_figure_builder(analysis,
                        result,
                        names,
