@@ -27,6 +27,7 @@ from utils_shared.schema import (HAEM_KEYS,
                                  value_getter,
                                  VO2_KEYS,
                                  )
+from utils_shared.user_notices import problem_shower, warning_shower
 
 
 # ---- _HideTopTickLabels --------------------------------------------------------------
@@ -245,12 +246,13 @@ def _haem_data_selector(experiment: dict,
         source is missing from the experiment (a warning is printed).
 
     ---- Globals mutated ----
-    None. Prints a warning when the source is missing (side effect).
+    None. Shows a warning when the source is missing (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    problem_shower
     source_resolver
     """
 
@@ -265,7 +267,7 @@ def _haem_data_selector(experiment: dict,
     except ValueError as exc:
         if source not in HAEM_KEYS:
             raise
-        print(f'  Warning: {exc} Haem panels will be skipped.')
+        problem_shower('  Warning: the haem panels are left out', exc)
         return None, source
     return haem_data, source
 
@@ -387,7 +389,7 @@ def _panel_builder(experiment: dict,
         selected.
 
     ---- Globals mutated ----
-    None. Prints a warning for haems missing from the data (side effect).
+    None. Shows a warning for haems missing from the data (side effect).
 
     ---- Equations ----
     None.
@@ -395,6 +397,7 @@ def _panel_builder(experiment: dict,
     ---- Helpers ----
     measurement_column_finder
     name_simplifier
+    warning_shower
     """
 
     # ---- 1 Add the panels ------------------------------------------------------------
@@ -414,9 +417,9 @@ def _panel_builder(experiment: dict,
                        ]
             missing = [h for h in spec['haems'] if name_simplifier(h) not in lookup]
             if missing:
-                print(f"  Warning: haem panel {spec['label']!r} could not find: "
-                      f'{missing}',
-                      )
+                warning_shower(f"  Warning: haem panel {spec['label']!r} could not "
+                               f'find: {missing}',
+                               )
             if matched:
                 panels.append({'type': 'haem',
                                'title': spec['label'],
@@ -518,8 +521,14 @@ def _skipped_window_drawer(axes: List[Axes], window_name: str, window: dict) -> 
 
     start, end = window['start_time'], window['end_time']
     for ax in axes:
-        ax.axvspan(start, end, facecolor='#d62728', alpha=0.18, edgecolor='#d62728',
-                   linewidth=0.8, linestyle='--', zorder=0,
+        ax.axvspan(start,
+                   end,
+                   facecolor='#d62728',
+                   alpha=0.18,
+                   edgecolor='#d62728',
+                   linewidth=0.8,
+                   linestyle='--',
+                   zorder=0,
                    )
     axes[0].text((start + end) / 2,
                  1.0,

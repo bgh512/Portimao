@@ -6,18 +6,67 @@ Per-thread capture of printed output, kept out of the terminal and the log file.
 import io
 import threading
 from contextlib import contextmanager
-from typing import Iterator, Optional
+from typing import Iterator, List, Optional
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 _local = threading.local()
 
 
+# ---- CapturedOutput ------------------------------------------------------------------
+class CapturedOutput(io.StringIO):
+    """
+    ---- Summary ----
+    The text a thread printed while its output was captured, with the warnings among
+    it also kept apart (user_notices.warning_shower), so the window can show them
+    without picking them out by their words.
+
+    ---- Attributes ----
+    warnings : List[str]
+        Each warning shown during the capture, without its indent, in order.
+
+    ---- Globals read ----
+    None.
+
+    ---- Methods ----
+    __init__
+    """
+
+    # ---- __init__ --------------------------------------------------------------------
+    def __init__(self) -> None:
+        """
+        ---- Summary ----
+        Method to start an empty capture with no warnings.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Sets the warnings attribute on the instance.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        super().__init__()
+        self.warnings: List[str] = []
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
 # ---- captured_buffer_getter ----------------------------------------------------------
-def captured_buffer_getter() -> Optional[io.StringIO]:
+def captured_buffer_getter() -> Optional[CapturedOutput]:
     """
     ---- Summary ----
     Main function to give the buffer that the current thread's output is being captured
@@ -30,7 +79,7 @@ def captured_buffer_getter() -> Optional[io.StringIO]:
     _local (module state).
 
     ---- Outputs ----
-    Optional[io.StringIO]
+    Optional[CapturedOutput]
         The buffer of the current thread, or None when its output is not captured.
 
     ---- Globals mutated ----
@@ -48,7 +97,7 @@ def captured_buffer_getter() -> Optional[io.StringIO]:
 
 # ---- output_capturer -----------------------------------------------------------------
 @contextmanager
-def output_capturer() -> Iterator[io.StringIO]:
+def output_capturer() -> Iterator[CapturedOutput]:
     """
     ---- Summary ----
     Main function to capture everything the current thread prints, while other threads
@@ -62,8 +111,9 @@ def output_capturer() -> Iterator[io.StringIO]:
     _local (module state).
 
     ---- Outputs ----
-    Iterator[io.StringIO]
-        The buffer the output is collected in; read it with getvalue().
+    Iterator[CapturedOutput]
+        The buffer the output is collected in; read it with getvalue(), and its
+        warnings with .warnings.
 
     ---- Globals mutated ----
     None. Sets and clears the capture of the current thread (side effect).
@@ -76,7 +126,7 @@ def output_capturer() -> Iterator[io.StringIO]:
     """
 
     previous = getattr(_local, 'buffer', None)
-    buffer = io.StringIO()
+    buffer = CapturedOutput()
     _local.buffer = buffer
     try:
         yield buffer

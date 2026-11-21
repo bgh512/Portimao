@@ -20,12 +20,16 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.app_messages import update_notice_shower
+from utils_shared.app_messages import RELEASES_LINK, update_notice_shower
 from utils_shared.user_places import UserPlaces
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 RELEASE_URL = 'https://api.github.com/repos/bgh512/Portimao/releases/latest'
+# asked when GitHub refuses the question above: the Releases page (RELEASES_LINK) leads
+# to the newest release's own page, and its zips are here, under its tag
+RELEASE_DOWNLOAD_URL = 'https://github.com/bgh512/Portimao/releases/download'
+TAG_ADDRESS_PATTERN = re.compile(r'/releases/tag/([^/?#\s]+)$')
 # the zips the Mac check puts on the Releases page (.github/workflows/mac_check.yml)
 APPLE_SILICON_ZIP = 'Portimao-mac-apple-silicon.zip'
 INTEL_ZIP = 'Portimao-mac-intel.zip'
@@ -34,6 +38,14 @@ SWAPPER = Path('launchers') / 'mac_app_swapper.sh'  # inside the program folder
 LOG_NAME = 'update.log'
 LOG_KEPT_LINES = 200
 ASK_TIMEOUT_S = 5  # GitHub's answer holds up every start, so it is kept short
+RETRY_WAIT_S = 3  # before asking again when GitHub did not answer
+# GitHub's answer when it refuses, mostly for too many questions from one network
+REFUSED_STATUSES = (403, 429)
+# curl's own codes for the usual ways of getting no answer
+CURL_REASONS = {6: 'the Mac could not find GitHub: no internet?',
+                7: 'GitHub could not be reached',
+                28: f'no answer within {ASK_TIMEOUT_S} s',
+                }
 CONNECT_TIMEOUT_S = 10
 # a download slower than this for this long has stalled and stops
 STALL_BYTES_PER_S = 1000
@@ -124,6 +136,64 @@ def _app_unpacker(zip_path: Path, folder: Path) -> Optional[Path]:
         return None
     apps = [path for path in folder.glob('*.app') if path.is_dir()]
     return apps[0] if done.returncode == 0 and len(apps) == 1 else None
+
+
+# ---- _ask_problem_describer ----------------------------------------------------------
+def _ask_problem_describer(curl_code: int,
+                           http_status: int,
+                           body: str,
+                           errors: str,
+                           ) -> Tuple[str, bool]:
+    """
+    ---- Summary ----
+    Helper function to say in plain words why a question to GitHub got no answer, and
+    whether GitHub refused it.
+
+    ---- Inputs ----
+    curl_code : int
+        curl's exit code; 0 when it had an answer of any kind.
+    http_status : int
+        GitHub's status code (200 when it answered); 0 when there was none, as for a
+        file:// address.
+    body : str
+        GitHub's answer; a refusal says why in it.
+    errors : str
+        What curl printed as its error.
+
+    ---- Globals read ----
+    CURL_REASONS, REFUSED_STATUSES (module constants).
+
+    ---- Outputs ----
+    Tuple[str, bool]
+        (the reason, empty when there is an answer to read; True when GitHub refused).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if curl_code == 0 and (http_status == 0 or 200 <= http_status < 300):
+        return '', False
+    if curl_code == 0 and http_status in REFUSED_STATUSES:
+        if 'rate limit' in body.lower():
+            return ('GitHub refused: too many questions from this network in the last '
+                    'hour',
+                    True,
+                    )
+        return f'GitHub refused (error {http_status})', True
+    if curl_code == 0:
+        kind = 'error' if http_status >= 400 else 'code'
+        return f'GitHub answered with {kind} {http_status}', False
+    if curl_code in CURL_REASONS:
+        return CURL_REASONS[curl_code], False
+    lines = errors.strip().splitlines()
+    detail = f' ({lines[-1].strip()})' if lines else ''
+    return f'curl ended with code {curl_code}{detail}', False
 
 
 # ---- _blocker_finder -----------------------------------------------------------------
@@ -389,6 +459,69 @@ def _newer_checker(own: Optional[str], offered: str) -> bool:
     return offered_parts > own_parts
 
 
+# ---- _newest_release_finder ----------------------------------------------------------
+def _newest_release_finder(release_url: str,
+                           log: Callable[[str], None],
+                           ) -> Optional[Tuple[str, Dict[str, Tuple[str, int]]]]:
+    """
+    ---- Summary ----
+    Helper function to find GitHub's newest release. With no answer it asks once more
+    after a few seconds; when GitHub refuses, it asks the Releases page instead, which
+    GitHub does not count in the same way. Each try and its reason go to the log.
+
+    ---- Inputs ----
+    release_url : str
+        The address of GitHub's answer (a file:// address in the tests).
+    log : Callable[[str], None]
+        Adds a line to the update log.
+
+    ---- Globals read ----
+    RELEASE_DOWNLOAD_URL, RELEASES_LINK, RETRY_WAIT_S (module constants).
+
+    ---- Outputs ----
+    Optional[Tuple[str, Dict[str, Tuple[str, int]]]]
+        (the version without its V, {zip name: (address, size in bytes, 0 when not
+        known)}), or None when no release was found, so the app starts as it is.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _release_asker
+    _release_page_asker
+    _release_page_reader
+    _release_reader
+    """
+
+    # ---- 1 Ask GitHub, and once more when it did not answer --------------------------
+    answer, reason, is_refused = _release_asker(release_url)
+    if answer is None and not is_refused:
+        log(f'GitHub did not answer ({reason}); asking again in {RETRY_WAIT_S} s.')
+        time.sleep(RETRY_WAIT_S)
+        answer, reason, is_refused = _release_asker(release_url)
+    if answer is not None:
+        release = _release_reader(answer)
+        if release is None:
+            log("GitHub's answer could not be read: starting as it is.")
+        return release
+    if not is_refused:
+        log(f'GitHub did not answer again ({reason}): starting as it is.')
+        return None
+
+    # ---- 2 Ask the Releases page when GitHub refused ---------------------------------
+    log(f'{reason}; asking the Releases page instead.')
+    address, page_reason = _release_page_asker(RELEASES_LINK)
+    release = _release_page_reader(address, RELEASE_DOWNLOAD_URL) if address else None
+    if release is None:
+        log(f'The Releases page did not say which release is the newest '
+            f'({page_reason or address}): starting as it is.',
+            )
+    return release
+
+
 # ---- _own_version_reader -------------------------------------------------------------
 def _own_version_reader(app: Path) -> Optional[str]:
     """
@@ -425,11 +558,12 @@ def _own_version_reader(app: Path) -> Optional[str]:
 
 
 # ---- _release_asker ------------------------------------------------------------------
-def _release_asker(url: str) -> Optional[str]:
+def _release_asker(url: str) -> Tuple[Optional[str], str, bool]:
     """
     ---- Summary ----
     Helper function to ask GitHub for its newest release with macOS's own curl, which
-    uses the Mac's certificates (the app's Python cannot find any).
+    uses the Mac's certificates (the app's Python cannot find any), keeping the reason
+    when there is no answer.
 
     ---- Inputs ----
     url : str
@@ -439,8 +573,131 @@ def _release_asker(url: str) -> Optional[str]:
     ASK_TIMEOUT_S, HIDDEN (module constants).
 
     ---- Outputs ----
-    Optional[str]
-        GitHub's answer (JSON text), or None when it did not answer in time.
+    Tuple[Optional[str], str, bool]
+        (GitHub's answer as JSON text, or None when there is none; why there is none,
+        empty when there is one; True when GitHub refused the question).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _ask_problem_describer
+    """
+
+    try:
+        asked = subprocess.run(['curl',
+                                '-sS',
+                                '--max-time',
+                                str(ASK_TIMEOUT_S),
+                                '-H',
+                                'Accept: application/vnd.github+json',
+                                '-w',
+                                '\n%{http_code}',
+                                url,
+                                ],
+                               capture_output=True,
+                               text=True,
+                               timeout=ASK_TIMEOUT_S + 5,
+                               creationflags=HIDDEN,
+                               )
+    except OSError as exc:
+        return None, f'curl could not be run ({exc.strerror})', False
+    except subprocess.SubprocessError:
+        return None, f'no answer within {ASK_TIMEOUT_S} s', False
+    body, _, status = (asked.stdout or '').rpartition('\n')
+    http_status = int(status) if status.strip().isdigit() else 0
+    reason, is_refused = _ask_problem_describer(asked.returncode,
+                                                http_status,
+                                                body,
+                                                asked.stderr or '',
+                                                )
+    return (None if reason else body), reason, is_refused
+
+
+# ---- _release_page_asker -------------------------------------------------------------
+def _release_page_asker(page_url: str) -> Tuple[Optional[str], str]:
+    """
+    ---- Summary ----
+    Helper function to ask the Releases page where its newest release is, with macOS's
+    own curl. The page leads to the release's own page, whose address ends in its tag.
+
+    ---- Inputs ----
+    page_url : str
+        The Releases page's address for the newest release.
+
+    ---- Globals read ----
+    ASK_TIMEOUT_S, HIDDEN (module constants).
+
+    ---- Outputs ----
+    Tuple[Optional[str], str]
+        (the address the page leads to, or None when there is none; why there is none,
+        empty when there is one).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _ask_problem_describer
+    """
+
+    try:
+        asked = subprocess.run(['curl',
+                                '-sS',
+                                '--max-time',
+                                str(ASK_TIMEOUT_S),
+                                '-o',
+                                os.devnull,
+                                '-w',
+                                '%{http_code}\n%{redirect_url}',
+                                page_url,
+                                ],
+                               capture_output=True,
+                               text=True,
+                               timeout=ASK_TIMEOUT_S + 5,
+                               creationflags=HIDDEN,
+                               )
+    except OSError as exc:
+        return None, f'curl could not be run ({exc.strerror})'
+    except subprocess.SubprocessError:
+        return None, f'no answer within {ASK_TIMEOUT_S} s'
+    status, _, address = (asked.stdout or '').partition('\n')
+    if asked.returncode != 0:
+        reason, _ = _ask_problem_describer(asked.returncode, 0, '', asked.stderr or '')
+        return None, reason
+    if not address.strip():
+        return None, f'it answered with code {status.strip() or "none"}'
+    return address.strip(), ''
+
+
+# ---- _release_page_reader ------------------------------------------------------------
+def _release_page_reader(address: str,
+                         download_url: str,
+                         ) -> Optional[Tuple[str, Dict[str, Tuple[str, int]]]]:
+    """
+    ---- Summary ----
+    Helper function to read the newest release's version from the address the Releases
+    page leads to, and to make the addresses of its zips.
+
+    ---- Inputs ----
+    address : str
+        The newest release's own page, ending in /releases/tag/V<version>.
+    download_url : str
+        Where the releases' zips are, each under its tag.
+
+    ---- Globals read ----
+    APPLE_SILICON_ZIP, INTEL_ZIP, TAG_ADDRESS_PATTERN, VERSION_PATTERN (module
+    constants).
+
+    ---- Outputs ----
+    Optional[Tuple[str, Dict[str, Tuple[str, int]]]]
+        (the version without its V, {zip name: (address, 0 as the size is not
+        known)}), or None when the address does not end in a release's tag.
 
     ---- Globals mutated ----
     None.
@@ -452,23 +709,17 @@ def _release_asker(url: str) -> Optional[str]:
     None.
     """
 
-    try:
-        asked = subprocess.run(['curl',
-                                '-fsSL',
-                                '--max-time',
-                                str(ASK_TIMEOUT_S),
-                                '-H',
-                                'Accept: application/vnd.github+json',
-                                url,
-                                ],
-                               capture_output=True,
-                               text=True,
-                               timeout=ASK_TIMEOUT_S + 5,
-                               creationflags=HIDDEN,
-                               )
-    except (OSError, subprocess.SubprocessError):
+    found = TAG_ADDRESS_PATTERN.search(address.strip())
+    if found is None:
         return None
-    return asked.stdout if asked.returncode == 0 else None
+    tag = found.group(1)
+    match = VERSION_PATTERN.fullmatch(tag)
+    if match is None:
+        return None
+    zips = {name: (f'{download_url}/{tag}/{name}', 0)
+            for name in (APPLE_SILICON_ZIP, INTEL_ZIP)
+            }
+    return match.group(1), zips
 
 
 # ---- _release_reader -----------------------------------------------------------------
@@ -879,10 +1130,12 @@ def update_installer(places: UserPlaces,
     Main function to update the Mac app at its start. It asks GitHub for the newest
     release (a few seconds at most) and, when it is newer, downloads the zip for this
     kind of Mac with a small "Updating Portimao" window, and starts the swap, which puts
-    it in place once this app has closed and opens it. With no internet it starts as it
-    is and says nothing; when it cannot replace itself, or the download fails, it starts
-    as it is with a message saying where to download the new one. Run from source,
-    nothing is done. Every step is written to logs/update.log.
+    it in place once this app has closed and opens it. When GitHub does not answer it
+    asks once more, and when GitHub refuses it asks the Releases page; with no answer at
+    all it starts as it is and says nothing. When it cannot replace itself, or the
+    download fails, it starts as it is with a message saying where to download the new
+    one. Run from source, nothing is done. Every step, with the reason for any failure,
+    is written to logs/update.log.
 
     ---- Inputs ----
     places : UserPlaces
@@ -921,9 +1174,8 @@ def update_installer(places: UserPlaces,
     _log_opener
     _new_app_fetcher
     _newer_checker
+    _newest_release_finder
     _own_version_reader
-    _release_asker
-    _release_reader
     _start_command_maker
     _status_window_maker
     _translation_checker
@@ -943,14 +1195,9 @@ def update_installer(places: UserPlaces,
     own = _own_version_reader(app)
     log(f'Looking for a newer Portimao; this app is V{own} at {app}')
 
-    # ---- 2 Ask GitHub for its newest release -----------------------------------------
-    answer = _release_asker(release_url)
-    if answer is None:
-        log('GitHub did not answer (no internet?): starting as it is.')
-        return False
-    release = _release_reader(answer)
+    # ---- 2 Find GitHub's newest release ----------------------------------------------
+    release = _newest_release_finder(release_url, log)
     if release is None:
-        log("GitHub's answer could not be read: starting as it is.")
         return False
     version, zips = release
     if not _newer_checker(own, version):

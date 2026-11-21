@@ -1,5 +1,6 @@
 """
-The settings strip under the plot: the haems, the fit, the journal and the figure size.
+The settings strip under the plot: the haems, the fit, the journal, the figure size and
+the times of the edges dragged on the plot.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -19,6 +20,277 @@ HEIGHT_HELP = 'a share of a page: a number above 0 and up to 1, such as 0.5'
 ERROR_BACKGROUND = '#ffd6d6'
 ERROR_TEXT = '#b00020'
 NOTE_TEXT = '#404040'
+MINUTES_HELP = 'Type a number of minutes, 0 or more.'
+
+
+# ---- EdgeRow -------------------------------------------------------------------------
+class EdgeRow:
+    """
+    ---- Summary ----
+    The row of the strip shown while edges are dragged on the plot: a typing box for
+    each edge, holding its value for the file shown, and the "Every file" tick box. It
+    follows the drag and passes on what the user types or ticks; it changes nothing by
+    itself. Every method runs on the window thread.
+
+    ---- Attributes ----
+    frame : Any
+        The Tk frame holding the row, for the window to place.
+
+    ---- Globals read ----
+    ERROR_BACKGROUND, ERROR_TEXT, NOTE_TEXT.
+
+    ---- Methods ----
+    __init__
+    _every_file_handler
+    _value_handler
+    fields_setter
+    values_setter
+    """
+
+    # ---- __init__ --------------------------------------------------------------------
+    def __init__(self,
+                 tk: Any,
+                 parent: Any,
+                 background: str,
+                 on_value: Callable[[str, float], None],
+                 on_every_file: Callable[[bool], None],
+                 on_return: Callable[[], None],
+                 ) -> None:
+        """
+        ---- Summary ----
+        Method to build the row, with no boxes until fields_setter.
+
+        ---- Inputs ----
+        tk : Any
+            The tkinter module.
+        parent : Any
+            The widget the row is built in.
+        background : str
+            Background colour of the row.
+        on_value : Callable[[str, float], None]
+            Called with (field, number) when a number is typed in a box.
+        on_every_file : Callable[[bool], None]
+            Called with the new state of the tick box when it is clicked.
+        on_return : Callable[[], None]
+            Called after Enter in a box has passed its number on (or found it as it
+            was), so the keyboard can go back to the answer box.
+
+        ---- Globals read ----
+        NOTE_TEXT.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Creates the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _every_file_handler
+        """
+
+        self._tk = tk
+        self._background = background
+        self._on_value = on_value
+        self._on_every_file = on_every_file
+        self._on_return = on_return
+        self._boxes: Dict[str, Any] = {}
+        self._shown: Dict[str, str] = {}
+        self.frame = tk.Frame(parent, bg=background)
+        self._boxes_frame = tk.Frame(self.frame, bg=background)
+        self._boxes_frame.pack(side='left')
+        self._every_file = tk.BooleanVar(master=parent, value=True)
+        tk.Checkbutton(self.frame,
+                       text='Every file',
+                       variable=self._every_file,
+                       command=self._every_file_handler,
+                       bg=background,
+                       activebackground=background,
+                       highlightthickness=0,
+                       ).pack(side='left', padx=(12, 4))
+        self._note = tk.Label(self.frame, text='', bg=background, fg=NOTE_TEXT)
+        self._note.pack(side='left', padx=(0, 4))
+
+    # ---- ROW HELPERS -----------------------------------------------------------------
+
+    # ---- _every_file_handler ---------------------------------------------------------
+    def _every_file_handler(self) -> None:
+        """
+        ---- Summary ----
+        Method to pass on the new state of the "Every file" tick box.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the function given as on_every_file (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._on_every_file(bool(self._every_file.get()))
+
+    # ---- _value_handler --------------------------------------------------------------
+    def _value_handler(self, key: str, is_return: bool = False) -> None:
+        """
+        ---- Summary ----
+        Method to take the number typed in one box, when Enter is pressed or the box is
+        left; a box left as it was shown passes nothing on. A number that cannot be
+        used turns the box red, with the reason beside the tick box, and keeps the
+        keyboard; after Enter, any other answer gives it back to the answer box.
+
+        ---- Inputs ----
+        key : str
+            The field of the box.
+        is_return : bool
+            True when Enter was pressed in the box.
+
+        ---- Globals read ----
+        ERROR_BACKGROUND, ERROR_TEXT.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the box and calls the function given as on_value (side
+        effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        minutes_checker
+        """
+
+        box = self._boxes.get(key)
+        if box is None:
+            return
+        text = box.get().strip()
+        if text != self._shown.get(key):
+            value, note = minutes_checker(text)
+            if value is None:
+                box.configure(bg=ERROR_BACKGROUND)
+                self._note.configure(text=note, fg=ERROR_TEXT)
+                return
+            self._note.configure(text='')
+            self._on_value(key, value)
+        box.configure(bg='white')
+        if is_return:
+            self._on_return()
+
+    # ---- MAIN METHODS ----------------------------------------------------------------
+
+    # ---- fields_setter ---------------------------------------------------------------
+    def fields_setter(self,
+                      fields: List[Tuple[str, str]],
+                      is_every_file: bool,
+                      ) -> None:
+        """
+        ---- Summary ----
+        Method to make one typing box for each field, each after its name, followed by
+        "min", and set the tick box.
+
+        ---- Inputs ----
+        fields : List[Tuple[str, str]]
+            [(field, name shown before its box)] in order.
+        is_every_file : bool
+            Whether "Every file" is ticked.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Replaces the boxes (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _value_handler
+        """
+
+        tk, background = self._tk, self._background
+        for child in self._boxes_frame.winfo_children():
+            child.destroy()
+        self._boxes, self._shown = {}, {}
+        for index, (key, name) in enumerate(fields):
+            gap = 12 if index and name[:1].isupper() else 4
+            tk.Label(self._boxes_frame,
+                     text=name,
+                     bg=background,
+                     ).pack(side='left', padx=(gap, 4))
+            box = tk.Entry(self._boxes_frame,
+                           width=6,
+                           justify='right',
+                           bg='white',
+                           relief='solid',
+                           borderwidth=1,
+                           )
+            box.pack(side='left')
+            box.bind('<Return>',
+                     lambda event, name=key: self._value_handler(name, True),
+                     )
+            box.bind('<FocusOut>', lambda event, name=key: self._value_handler(name))
+            self._boxes[key] = box
+        tk.Label(self._boxes_frame, text='min', bg=background).pack(side='left',
+                                                                    padx=(4, 0),
+                                                                    )
+        self._every_file.set(is_every_file)
+        self._note.configure(text='')
+
+    # ---- values_setter ---------------------------------------------------------------
+    def values_setter(self, values: Optional[Dict[str, float]]) -> None:
+        """
+        ---- Summary ----
+        Method to show the values of the file shown in the boxes.
+
+        ---- Inputs ----
+        values : Optional[Dict[str, float]]
+            {field: value}, or None to empty the boxes.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the boxes (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        for key, box in self._boxes.items():
+            text = '' if values is None else f'{round(values[key], 2):g}'
+            box.configure(bg='white')
+            box.delete(0, 'end')
+            box.insert(0, text)
+            self._shown[key] = text
+        self._note.configure(text='')
 
 
 # ---- SettingsStrip -------------------------------------------------------------------
@@ -700,6 +972,39 @@ def height_checker(text: str, journal: str) -> Tuple[Optional[float], str]:
     if height is None or not 0 < height <= 1:
         return None, f'Type {HEIGHT_HELP}.'
     return height, f'of a page ({round(height * page_mm, 1):g} mm)'
+
+
+# ---- minutes_checker -----------------------------------------------------------------
+def minutes_checker(text: str) -> Tuple[Optional[float], str]:
+    """
+    ---- Summary ----
+    Main function to check a number of minutes typed in a box of the edges row.
+
+    ---- Inputs ----
+    text : str
+        What was typed, e.g. '4.5' or '4,5'.
+
+    ---- Globals read ----
+    MINUTES_HELP.
+
+    ---- Outputs ----
+    Tuple[Optional[float], str]
+        (minutes, '') for a number of 0 or more, or (None, what to type instead).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _number_reader
+    """
+
+    minutes = _number_reader(text)
+    if minutes is None or minutes < 0:
+        return None, MINUTES_HELP
+    return minutes + 0.0, ''
 
 
 # ---- size_answers_builder ------------------------------------------------------------

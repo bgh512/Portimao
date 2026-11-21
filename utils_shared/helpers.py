@@ -3,7 +3,9 @@ Small, generic utilities shared by several modules.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import os
 import re
+import sys
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Sequence, Tuple
 
@@ -17,6 +19,13 @@ _figure_capture: Optional[Callable[[Figure, str], None]] = None
 MISSING_CONCENTRATION = '? µM'
 # the version at the end of a title, as the release writes it: "... (V2.7)"
 VERSION_TITLE_PATTERN = re.compile(r'\(V(\d+(?:\.\d+)*)\)\s*$')
+# why a git copy could not update itself, from the launcher (launchers/bootstrap.pyw)
+UPDATE_NOTE_SWITCH = 'PORTIMAO_UPDATE_NOTE'
+ZIP_NOTE = ('This copy was downloaded as a zip, so it does not update itself: for '
+            'updates, {}.')
+ZIP_FIXES = {'darwin': 'install the Portimao app (README, section 1.1)',
+             'other': 'install Portimao with git (README, section 1.2)',
+             }
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -214,7 +223,8 @@ def figure_saver(fig: Figure,
 def file_name_sanitiser(name: Any, default: str = 'experiment') -> str:
     """
     ---- Summary ----
-    Main function to replace the characters that are illegal in file names.
+    Main function to clean a file name: the one rule every file the program names goes
+    through.
 
     ---- Inputs ----
     name : Any
@@ -227,7 +237,9 @@ def file_name_sanitiser(name: Any, default: str = 'experiment') -> str:
 
     ---- Outputs ----
     str
-        File name with the characters < > : " / backslash | ? * replaced by underscores.
+        File name with the characters < > : " / backslash | ? * replaced by underscores,
+        and without dots or spaces at either end (a leading dot hides a file on a Mac
+        or Linux, and Windows drops a trailing one).
 
     ---- Globals mutated ----
     None.
@@ -239,7 +251,7 @@ def file_name_sanitiser(name: Any, default: str = 'experiment') -> str:
     None.
     """
 
-    cleaned = re.sub(r'[<>:"/\\|?*]', '_', str(name)).strip()
+    cleaned = re.sub(r'[<>:"/\\|?*]', '_', str(name)).strip('. ')
     return cleaned or default
 
 
@@ -358,3 +370,44 @@ def program_version_reader(root: Path) -> str:
         return 'unknown'
     found = VERSION_TITLE_PATTERN.search(title)
     return found.group(1) if found else 'unknown'
+
+
+# ---- update_note_finder --------------------------------------------------------------
+def update_note_finder(root: Path, is_app: bool) -> str:
+    """
+    ---- Summary ----
+    Main function to say why this copy does not update itself, to be shown beside its
+    version: a copy from a zip never can; a git copy says what the launcher found when
+    it tried. The Mac app updates itself, and says so in its own message when it
+    cannot.
+
+    ---- Inputs ----
+    root : Path
+        Program folder.
+    is_app : bool
+        True when running as the Mac app.
+
+    ---- Globals read ----
+    UPDATE_NOTE_SWITCH, ZIP_FIXES, ZIP_NOTE (module constants);
+    os.environ['PORTIMAO_UPDATE_NOTE']; sys.platform.
+
+    ---- Outputs ----
+    str
+        One sentence saying why, and what to do; empty when this copy updates itself
+        (or was not started by the launcher, which alone tries).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if is_app:
+        return ''
+    if not (root / '.git').exists():
+        return ZIP_NOTE.format(ZIP_FIXES.get(sys.platform, ZIP_FIXES['other']))
+    return os.environ.get(UPDATE_NOTE_SWITCH, '').strip()

@@ -619,12 +619,12 @@ def _time_response_asker(names: List[str],
     # ---- 3 Figure size ---------------------------------------------------------------
     size_asker(answers,
                defaults,
-               {'journal': 'ho_journal',
-                'columns': 'ho_pub_columns',
-                'height': 'ho_pub_height',
-                'mode': 'ho_size_mode',
+               {'journal': 'tr_journal',
+                'columns': 'tr_columns',
+                'height': 'tr_height',
+                'mode': 'tr_size_mode',
                 },
-               (2, 0.75),
+               (2, 1.0),  # the standard size of config.py
                depth=2,
                )
     return members

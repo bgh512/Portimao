@@ -24,6 +24,7 @@ from utils_shared.figure_layout import figure_finisher, gap_space_calculator
 from utils_shared.helpers import concentration_formatter, name_simplifier
 from utils_shared.individual_experiment_plotter import _HideTopTickLabels
 from utils_shared.schema import DELTA_HAEM_SOURCES, finite_float_converter
+from utils_shared.user_notices import warning_shower
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -128,6 +129,7 @@ def _baseline_bar_plotter(ax: Axes,
     _significance_formatter
     experiment_classifier
     finite_float_converter
+    warning_shower
     """
 
     # ---- 1 Collect the baseline of each run ------------------------------------------
@@ -148,9 +150,9 @@ def _baseline_bar_plotter(ax: Axes,
         if np.isfinite(value):
             runs[strain][name] = value
         else:
-            print(f'Warning: no baseline OCR for {name}; excluded from the baseline '
-                  f'panel.',
-                  )
+            warning_shower(f'Warning: no baseline OCR for {name}; excluded from the '
+                           f'baseline panel.',
+                           )
 
     # ---- 2 Draw bars and points ------------------------------------------------------
     values = {strain: list(runs[strain].values()) for strain in strains}
@@ -224,13 +226,13 @@ def _baseline_bar_plotter(ax: Axes,
     alpha = config['RESPONSE_TEST_ALPHA']
     if config['BASELINE_TEST']:
         if len(strains) != 2:
-            print(f'Warning: the baseline t-test needs exactly two groups in '
-                  f'STRAIN_ROWS (got {len(strains)}); skipped.',
-                  )
+            warning_shower(f'Warning: the baseline t-test needs exactly two groups in '
+                           f'STRAIN_ROWS (got {len(strains)}); skipped.',
+                           )
         elif min(len(values[s]) for s in strains) < 2:
-            print('Warning: the baseline t-test needs at least two runs per group; '
-                  'skipped.',
-                  )
+            warning_shower('Warning: the baseline t-test needs at least two runs per '
+                           'group; skipped.',
+                           )
         else:
             result = scipy_stats.ttest_ind(values[strains[0]],
                                            values[strains[1]],
@@ -519,6 +521,7 @@ def _haem_block_plotter(fig: Figure,
     _row_ylim_sharer
     _tick_label_builder
     _window_orderer
+    warning_shower
     """
 
     # ---- 1 Create the axes -----------------------------------------------------------
@@ -601,9 +604,9 @@ def _haem_block_plotter(fig: Figure,
                                         measurement=column,
                                         )
             if not drawn:
-                print(f"Warning: no data for haem {row['haem']!r} ("
-                      f'{ORDER_TITLES[order]}).',
-                      )
+                warning_shower(f"Warning: no data for haem {row['haem']!r} ("
+                               f'{ORDER_TITLES[order]}).',
+                               )
                 ax.text(0.5,
                         0.5,
                         f"No {row['haem']} data",
@@ -1108,6 +1111,7 @@ def _ocr_block_plotter(fig: Figure,
     _row_ylim_sharer
     _tick_label_builder
     _window_orderer
+    warning_shower
     """
 
     # ---- 1 Create the axes -----------------------------------------------------------
@@ -1148,7 +1152,9 @@ def _ocr_block_plotter(fig: Figure,
             measurements = triplicates[condition]['vo2']
             column = _column_chooser(measurements, config['OCR_VO2_COLUMN'])
             if column is None:
-                print(f'Warning: OCR column unavailable for {condition}; not plotted.')
+                warning_shower(f'Warning: OCR column unavailable for {condition}; not '
+                               f'plotted.',
+                               )
                 continue
             series[strain] = [measurements[column].get(w) for w in windows]
             dodge = (k - (len(strains) - 1) / 2) * config['RESPONSE_GROUP_DODGE']
@@ -2203,6 +2209,7 @@ def ocr_and_haem_response_figure_plotter(experiments: dict,
     _response_metric_checker
     experiment_classifier
     figure_finisher
+    warning_shower
     """
 
     # ---- 1 Validate and select -------------------------------------------------------
@@ -2217,9 +2224,9 @@ def ocr_and_haem_response_figure_plotter(experiments: dict,
                                      )
     unclassified = [n for n in experiments if None in experiment_classifier(n)[:2]]
     if unclassified:
-        print('Note: not used in the OCR and haem response figure (strain/order/run '
-              f'not identified): {unclassified}',
-              )
+        warning_shower('Note: not used in the OCR and haem response figure '
+                       f'(strain/order/run not identified): {unclassified}',
+                       )
     blocks = list(config['BLOCK_ORDER'])
     haem_source = None
     if 'haem_response' in blocks:

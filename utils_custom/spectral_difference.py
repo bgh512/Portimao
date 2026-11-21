@@ -10,6 +10,7 @@ import numpy as np
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.spectral_decomposer import spectrum_decomposer
+from utils_shared.user_notices import warning_shower
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -213,12 +214,14 @@ def spectral_averager(experiment: dict,
         The experiment, with spectral_averages added (DATA_FORMAT.md).
 
     ---- Globals mutated ----
-    None. Adds ``spectral_averages`` to the experiment (side effect).
+    None. Adds ``spectral_averages`` to the experiment and shows a warning for each
+    window skipped (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    warning_shower
     window_definer
     """
 
@@ -275,7 +278,7 @@ def spectral_averager(experiment: dict,
                                 else np.full(selected.shape[1], np.nan),
                                 }
     for window_name, reason in skipped.items():
-        print(f'  Averaging window {window_name} skipped: {reason}.')
+        warning_shower(f'  Averaging window {window_name} skipped: {reason}.')
 
     # ---- 4 Store the result ----------------------------------------------------------
     final_name, penultimate_name = boundaries[-1][0], boundaries[-2][0]

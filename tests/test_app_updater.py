@@ -18,8 +18,11 @@ from typing import Tuple
 import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.app_updater import (_blocker_finder,
+import utils_shared.app_updater as app_updater
+from utils_shared.app_updater import (_ask_problem_describer,
+                                      _blocker_finder,
                                       _newer_checker,
+                                      _release_page_reader,
                                       _release_reader,
                                       _zip_namer,
                                       APPLE_SILICON_ZIP,
@@ -253,6 +256,56 @@ def test_app_only_waits_for_a_newer_release(tmp_path: Path) -> None:
     assert not update_installer(source, release_url=address, shows_messages=False)
 
 
+# ---- test_ask_problem_is_described ---------------------------------------------------
+def test_ask_problem_is_described() -> None:
+    """
+    ---- Summary ----
+    Main function to check that each way of getting no answer from GitHub is said in
+    plain words, and that only GitHub's refusals are taken as refusals.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _ask_problem_describer
+    """
+
+    limited = '{"message": "API rate limit exceeded for 203.0.113.7."}'
+    assert _ask_problem_describer(0, 200, '{}', '') == ('', False)
+    assert _ask_problem_describer(0, 0, '{}', '') == ('', False)
+    assert _ask_problem_describer(0, 403, limited, '') == (
+        'GitHub refused: too many questions from this network in the last hour',
+        True,
+        )
+    assert _ask_problem_describer(0, 429, '', '') == ('GitHub refused (error 429)',
+                                                      True,
+                                                      )
+    assert _ask_problem_describer(0, 502, '', '') == ('GitHub answered with error 502',
+                                                      False,
+                                                      )
+    assert _ask_problem_describer(6, 0, '', 'curl: (6) Could not resolve host') == (
+        'the Mac could not find GitHub: no internet?',
+        False,
+        )
+    assert _ask_problem_describer(28, 0, '', '') == ('no answer within 5 s', False)
+    assert _ask_problem_describer(37, 0, '', "curl: (37) Couldn't open file /x") == (
+        "curl ended with code 37 (curl: (37) Couldn't open file /x)",
+        False,
+        )
+
+
 # ---- test_failed_swap_keeps_the_app --------------------------------------------------
 @pytest.mark.skipif(not HAS_SHELL, reason='no sh on this computer')
 def test_failed_swap_keeps_the_app(tmp_path: Path) -> None:
@@ -334,6 +387,64 @@ def test_newer_release_is_found() -> None:
     assert not _newer_checker('2.4', 'nightly')
 
 
+# ---- test_refused_ask_uses_the_release_page ------------------------------------------
+def test_refused_ask_uses_the_release_page(tmp_path: Path,
+                                           monkeypatch: pytest.MonkeyPatch,
+                                           ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that when GitHub refuses the question, the app finds the
+    newest release from the Releases page instead, and starts as it is when that page
+    does not answer either; the reasons are in its update log.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for GitHub's two answers.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. The stand-ins last only for this test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _app_maker
+    update_installer
+    user_places_finder
+    """
+
+    refusal = 'GitHub refused: too many questions from this network in the last hour'
+    newest = 'https://github.com/bgh512/Portimao/releases/tag/V2.4.0'
+    monkeypatch.setattr(app_updater,
+                        '_release_asker',
+                        lambda url: (None, refusal, True),
+                        )
+    monkeypatch.setattr(app_updater, '_release_page_asker', lambda url: (newest, ''))
+    app = tmp_path / 'Applications' / 'Portimao.app'
+    program = _app_maker(app, '2.4')
+    places = user_places_finder(is_app=True, home=tmp_path, program_folder=ROOT)
+    assert not update_installer(places, executable=str(program), shows_messages=False)
+    log_path = places.logs_folder / 'update.log'
+    log = log_path.read_text(encoding='utf-8')
+    assert f'{refusal}; asking the Releases page instead.' in log
+    assert 'The newest release is V2.4.0: nothing to update.' in log
+    monkeypatch.setattr(app_updater,
+                        '_release_page_asker',
+                        lambda url: (None, 'no answer within 5 s'),
+                        )
+    assert not update_installer(places, executable=str(program), shows_messages=False)
+    log = log_path.read_text(encoding='utf-8')
+    assert 'did not say which release is the newest (no answer within 5 s)' in log
+
+
 # ---- test_release_answer_is_read -----------------------------------------------------
 def test_release_answer_is_read() -> None:
     """
@@ -374,6 +485,45 @@ def test_release_answer_is_read() -> None:
     assert _release_reader(json.dumps({'assets': []})) is None
     assert _release_reader(json.dumps({'tag_name': 'nightly', 'assets': []})) is None
     assert _release_reader(json.dumps(['V2.4'])) is None
+
+
+# ---- test_release_page_address_is_read -----------------------------------------------
+def test_release_page_address_is_read() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the version is read from the address the Releases page
+    leads to, that both zips are found under its tag, and that any other address is
+    refused.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    APPLE_SILICON_ZIP, INTEL_ZIP (imported constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _release_page_reader
+    """
+
+    page = 'https://github.com/bgh512/Portimao/releases'
+    downloads = f'{page}/download'
+    version, zips = _release_page_reader(f'{page}/tag/V2.4.1\n', downloads)
+    assert version == '2.4.1'
+    assert zips == {APPLE_SILICON_ZIP: (f'{downloads}/V2.4.1/{APPLE_SILICON_ZIP}', 0),
+                    INTEL_ZIP: (f'{downloads}/V2.4.1/{INTEL_ZIP}', 0),
+                    }
+    assert _release_page_reader(f'{page}/latest', downloads) is None
+    assert _release_page_reader(f'{page}/tag/nightly', downloads) is None
+    assert _release_page_reader('', downloads) is None
 
 
 # ---- test_swap_puts_the_new_app_in_place ---------------------------------------------
@@ -501,6 +651,58 @@ def test_temporary_copy_cannot_update(tmp_path: Path) -> None:
     app = tmp_path / 'Applications' / 'Portimao.app'
     _app_maker(app, '1.0')
     assert _blocker_finder(app) is None
+
+
+# ---- test_unanswered_ask_is_asked_again ----------------------------------------------
+@pytest.mark.skipif(not HAS_CURL, reason='no curl on this computer')
+def test_unanswered_ask_is_asked_again(tmp_path: Path,
+                                       monkeypatch: pytest.MonkeyPatch,
+                                       ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that when GitHub does not answer, the app asks once more,
+    then starts as it is, with curl's own reason in its update log each time.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+    monkeypatch : pytest.MonkeyPatch
+        Takes away the wait before asking again.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. The change lasts only for this test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _app_maker
+    update_installer
+    user_places_finder
+    """
+
+    monkeypatch.setattr(app_updater, 'RETRY_WAIT_S', 0)
+    app = tmp_path / 'Applications' / 'Portimao.app'
+    program = _app_maker(app, '2.4')
+    missing = (tmp_path / 'no_answer.json').as_uri()
+    places = user_places_finder(is_app=True, home=tmp_path, program_folder=ROOT)
+    assert not update_installer(places,
+                                executable=str(program),
+                                release_url=missing,
+                                shows_messages=False,
+                                )
+    log = (places.logs_folder / 'update.log').read_text(encoding='utf-8')
+    assert 'GitHub did not answer (curl ended with code 37' in log
+    assert 'asking again in 0 s' in log
+    assert 'GitHub did not answer again (curl ended with code 37' in log
+    assert 'starting as it is' in log
+    assert 'no internet?' not in log
 
 
 # ---- test_update_from_made_up_zip ----------------------------------------------------

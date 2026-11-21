@@ -14,6 +14,9 @@ COLUMNS = (('OD', 'OD'),
            )
 CELL_WIDTH = 11  # characters
 MAXIMUM_HEIGHT_PX = 300  # taller tables scroll
+# the mouse wheel: <MouseWheel> on Windows and the Mac, buttons 4 (up) and 5 (down) on
+# Linux
+WHEEL_EVENTS = ('<MouseWheel>', '<Button-4>', '<Button-5>')
 ERROR_BACKGROUND = '#6b2b33'
 HEADING_TEXT = '#808080'
 
@@ -42,6 +45,7 @@ class ODTable:
     _cell_mover
     _cell_revealer
     _size_follower
+    _wheel_binder
     _wheel_scroller
     problems_lister
     rows_reader
@@ -91,7 +95,7 @@ class ODTable:
 
         ---- Helpers ----
         _size_follower
-        _wheel_scroller
+        _wheel_binder
         """
 
         self._tk = tk
@@ -124,7 +128,7 @@ class ODTable:
                                                                width=e.width,
                                                                ),
                           )
-        self._canvas.bind('<MouseWheel>', self._wheel_scroller)
+        self._wheel_binder(self._canvas)
 
     # ---- TABLE HELPERS ---------------------------------------------------------------
 
@@ -279,6 +283,37 @@ class ODTable:
             height=min(needed, MAXIMUM_HEIGHT_PX),
             )
 
+    # ---- _wheel_binder ---------------------------------------------------------------
+    def _wheel_binder(self, widget: Any) -> None:
+        """
+        ---- Summary ----
+        Method to make the mouse wheel over a part of the table scroll it, on Windows,
+        the Mac and Linux alike.
+
+        ---- Inputs ----
+        widget : Any
+            The Tk widget (the table, a heading, a name or a cell).
+
+        ---- Globals read ----
+        WHEEL_EVENTS.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Binds the wheel events of the widget (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _wheel_scroller
+        """
+
+        for event in WHEEL_EVENTS:
+            widget.bind(event, self._wheel_scroller)
+
     # ---- _wheel_scroller -------------------------------------------------------------
     def _wheel_scroller(self, event: Any) -> None:
         """
@@ -287,7 +322,7 @@ class ODTable:
 
         ---- Inputs ----
         event : Any
-            The Tk mouse wheel event.
+            The Tk mouse wheel event, or the button 4 or 5 event of Linux.
 
         ---- Globals read ----
         None.
@@ -303,11 +338,12 @@ class ODTable:
         None.
 
         ---- Helpers ----
-        None.
+        wheel_step_finder
         """
 
-        if self._inner.winfo_height() > self._canvas.winfo_height():
-            self._canvas.yview_scroll(-1 if event.delta > 0 else 1, 'units')
+        step = wheel_step_finder(event)
+        if step and self._inner.winfo_height() > self._canvas.winfo_height():
+            self._canvas.yview_scroll(step, 'units')
 
     # ---- TABLE FUNCTIONS -------------------------------------------------------------
 
@@ -405,7 +441,7 @@ class ODTable:
         _cell_checker
         _cell_mover
         _cell_revealer
-        _wheel_scroller
+        _wheel_binder
         """
 
         # ---- 1 Clear the old rows ----------------------------------------------------
@@ -427,7 +463,7 @@ class ODTable:
                              anchor='w',
                              )
             label.grid(row=0, column=column, sticky='w', padx=(0, 6), pady=(0, 2))
-            label.bind('<MouseWheel>', self._wheel_scroller)
+            self._wheel_binder(label)
 
         # ---- 3 One row per file ------------------------------------------------------
         for row, name in enumerate(self._names):
@@ -439,7 +475,7 @@ class ODTable:
                              anchor='w',
                              )
             label.grid(row=row + 1, column=0, sticky='ew', padx=(0, 6), pady=1)
-            label.bind('<MouseWheel>', self._wheel_scroller)
+            self._wheel_binder(label)
             texts, variables, cells = {}, {}, {}
             for column, (key, _) in enumerate(COLUMNS, start=1):
                 value = rows[name].get(key)
@@ -462,7 +498,7 @@ class ODTable:
                 cell.bind('<Down>', lambda e, r=row, k=key: self._cell_mover(r, k, 1))
                 cell.bind('<Up>', lambda e, r=row, k=key: self._cell_mover(r, k, -1))
                 cell.bind('<FocusIn>', lambda e, r=row: self._cell_revealer(r))
-                cell.bind('<MouseWheel>', self._wheel_scroller)
+                self._wheel_binder(cell)
                 cells[key] = cell
             self._texts.append(texts)
             self._variables.append(variables)
@@ -519,3 +555,41 @@ def cell_reader(text: str) -> Tuple[Optional[float], bool]:
     if not 0 < value < float('inf'):
         return None, False
     return value, True
+
+
+# ---- wheel_step_finder ---------------------------------------------------------------
+def wheel_step_finder(event: Any) -> int:
+    """
+    ---- Summary ----
+    Main function to say which way a turn of the mouse wheel scrolls, whichever system
+    sent it: Windows and the Mac give a turn as a positive or negative amount, Linux as
+    a press of button 4 (up) or 5 (down).
+
+    ---- Inputs ----
+    event : Any
+        The Tk event, with ``num`` (the button) and ``delta`` (the amount turned).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    int
+        -1 to scroll up, 1 to scroll down, 0 when the event says neither.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    button = getattr(event, 'num', None)
+    if button in (4, 5):
+        return -1 if button == 4 else 1
+    delta = getattr(event, 'delta', 0) or 0
+    if delta == 0:
+        return 0
+    return -1 if delta > 0 else 1

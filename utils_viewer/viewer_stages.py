@@ -3,13 +3,12 @@ The steps of the experiment browser: ask, redraw the plot window, then accept or
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-import re
-import tempfile
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+from utils_shared.helpers import file_name_sanitiser
 from utils_shared.pca_fitter import (component_builder,
                                      component_classifier,
                                      component_count_suggester,
@@ -20,6 +19,7 @@ from utils_shared.pca_fitter import (component_builder,
                                      TYPE_NAMES,
                                      )
 from utils_shared.questions import (choice_asker,
+                                    enter_waiter,
                                     heading_printer,
                                     info_printer,
                                     number_asker,
@@ -45,9 +45,14 @@ from utils_shared.survey import (averaging_asker,
                                  od_scaling_asker,
                                  saved_values_reader,
                                  signal_asker,
-                                 size_asker,
-                                 trim_asker,
+                                 trim_layout_finder,
+                                 trim_limits_builder,
+                                 trim_minutes_builder,
+                                 trim_minutes_setter,
+                                 trim_pointer_reader,
                                  )
+from utils_shared.user_notices import problem_teller
+from utils_viewer.viewer_edges import EdgeChoice
 from utils_viewer.viewer_preview import (all_data_exporter,
                                          BROWSING_ANSWERS,
                                          pca_example_picture_builder,
@@ -60,21 +65,26 @@ from utils_viewer.viewer_preview import (all_data_exporter,
 from utils_viewer.viewer_gui import active_gui_getter
 from utils_viewer.viewer_od_table import COLUMNS
 from utils_viewer.viewer_strip import size_answers_builder, strip_values_builder
-from utils_viewer.viewer_window import PictureWindow
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-PREVIEW_FILE = Path(tempfile.gettempdir()) / 'Portimao_preview.png'
 WARNING_COLOUR = '\x1b[1;31m'  # bold red
 PCA_COMPONENTS_TITLE = 'PCA components'
 PCA_EXAMPLES_TITLE = 'PCA examples (smallest and largest residual)'
-DEFAULT_SMOOTHING_NM = 4.0  # offered width of the smoothing of the PCA components
-STAGE_TITLES = {'browser': 'Experiment browser',
-                'trim': 'Trimming and ignoring',
+STAGE_TITLES = {'trim': 'Trimming and ignoring',
                 'details': 'OD values and event labels',
                 'processing': 'Processing',
                 'plots': 'Individual experiment plots',
                 }
+# The boxes of the trimming step in the strip, in the order of survey.TRIM_KEYS.
+TRIM_FIELDS = [('trim_start', 'Trim start'),
+               ('trim_end', 'end'),
+               ('ignore_start', 'Ignore first'),
+               ('ignore_end', 'last'),
+               ]
+TRIM_KEY_TEXT = 'grey hatched = trimmed away, amber = ignored in calculations'
+TRIM_NUDGE = ('Type the times in the strip under the plot, or drag the edges; press '
+              'Enter with this box empty when every file looks right.')
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
@@ -273,8 +283,8 @@ def _averaging_reviewer(session: ViewerSession,
     ---- Summary ----
     Helper function to ask whether to average around the events and over which window,
     draw the windows, list in red those that do not fit, and ask whether to accept them
-    or answer again. In the window, a drag across the plot of a file gives the window
-    and the gap, from the additions of that file.
+    or answer again. A drag across the plot of a file gives the window and the gap,
+    from the additions of that file.
 
     ---- Inputs ----
     session : ViewerSession
@@ -312,77 +322,19 @@ def _averaging_reviewer(session: ViewerSession,
     averaging_asker
     """
 
-    additions = (_addition_time_lister(session.summaries, limits, details)
-                 if session.window.is_interactive
-                 else None
-                 )
+    additions = _addition_time_lister(session.summaries, limits, details)
     while True:
         averaging_asker(answers, defaults, additions=additions)
         if not answers['averaging']:
             return
         redraw()
         _skipped_lister(session, answers, limits, details)
-        if _review_asker(session,
-                         'Do you accept these averaging windows?',
+        if _review_asker('Do you accept these averaging windows?',
                          'No, change the window and gap',
-                         redraw,
                          ):
             return
         defaults = dict(defaults, averaging=True)
         defaults.update({k: answers[k] for k in ('window_minutes', 'gap_minutes')})
-
-
-# ---- _choice_reviewer ----------------------------------------------------------------
-def _choice_reviewer(session: ViewerSession,
-                     question: str,
-                     options: List[Tuple[str, str]],
-                     redraw: Callable[[], bool],
-                     ) -> str:
-    """
-    ---- Summary ----
-    Helper function to ask whether the user accepts what the plot window shows, with as
-    many answers as the step needs. In the browser window the user flicks through the
-    files while the question waits; with the picture fallback a last answer lets the
-    user look at another file, which redraws it, before the question is asked again.
-
-    ---- Inputs ----
-    session : ViewerSession
-        The browser session; its current file may be changed.
-    question : str
-        The accept question, for example 'Do you accept this figure?'.
-    options : List[Tuple[str, str]]
-        (key, label) of each answer; the first is the one Enter gives. The key 'file'
-        is kept for looking at another file.
-    redraw : Callable[[], bool]
-        Function that draws the preview of the current file.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    str
-        Key of the answer chosen (never 'file').
-
-    ---- Globals mutated ----
-    None. Reads from and prints to the terminal and redraws the window (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _file_chooser
-    choice_asker
-    """
-
-    options = list(options)
-    if len(session.summaries) > 1 and not session.window.is_interactive:
-        options.append(('file', 'Look at another file in the plot window first'))
-    while True:
-        choice = choice_asker(question, options, options[0][0])
-        if choice != 'file':
-            return choice
-        _file_chooser(session)
-        redraw()
 
 
 # ---- _component_namer ----------------------------------------------------------------
@@ -491,72 +443,28 @@ def _decomposition_storer(session: ViewerSession, answers: dict, chosen: tuple) 
     _strip_shower(session, answers)
 
 
-# ---- _empty_limits_builder -----------------------------------------------------------
-def _empty_limits_builder(summaries: List[dict]) -> Dict[str, dict]:
-    """
-    ---- Summary ----
-    Helper function to build limits that trim and ignore nothing, for drawing the data
-    before any question is answered.
-
-    ---- Inputs ----
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md).
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    Dict[str, dict]
-        {file name: {trim_start, trim_end, ignore_start, ignore_end}} with None for the
-        trims and 0.0 for the ignores.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    return {s['name']: {'trim_start': None,
-                        'trim_end': None,
-                        'ignore_start': 0.0,
-                        'ignore_end': 0.0,
-                        }
-            for s in summaries
-            }
-
-
 # ---- _figure_starter -----------------------------------------------------------------
-def _figure_starter(answers: dict,
-                    defaults: dict,
-                    fit: Optional[dict],
-                    is_strip: bool,
-                    ) -> None:
+def _figure_starter(answers: dict, defaults: dict, fit: Optional[dict]) -> None:
     """
     ---- Summary ----
     Helper function to set the figure of each file from the standard settings or the
     ones last saved for the dataset, keeping only what this run allows: the OCR per OD
     and the haems scaled by OD only when OD values were entered, and the haems only
     when they are decomposed, limited to those of the fit in use (all of them when none
-    of the saved ones is in it). The journal and size are left as the answers hold
-    them, which the settings strip may have changed.
+    of the saved ones is in it). The Haems box of the settings strip says whether the
+    haems are worked out and shown, so the figure has them whenever they are decomposed.
+    The journal and size are left as the answers hold them, which the settings strip
+    may have changed.
 
     ---- Inputs ----
     answers : dict
         Answers dictionary the figure settings are stored in; must hold normalise_od
         and decompose.
     defaults : dict
-        The standard or saved answers (plot_o2, plot_ocr, ocr_mode, plot_haems, haems,
-        haem_mode, haem_per_od, event_label_angle).
+        The standard or saved answers (plot_o2, plot_ocr, ocr_mode, haems, haem_mode,
+        haem_per_od, event_label_angle).
     fit : Optional[dict]
         Fit dictionary (haem_list), or None when the haems are not decomposed.
-    is_strip : bool
-        True in the window, where the Haems box of the settings strip says whether the
-        haems are worked out and shown: the figure then has them whenever they are
-        decomposed.
 
     ---- Globals read ----
     None.
@@ -579,61 +487,22 @@ def _figure_starter(answers: dict,
     has_haems = bool(answers['decompose'] and fit is not None)
     haem_list = list(fit['haem_list']) if has_haems else []
     haems = [name for name in defaults['haems'] if name in haem_list]
-    answers.update({
-        'plot_o2': defaults['plot_o2'],
-        'plot_ocr': defaults['plot_ocr'],
-        'ocr_mode': (defaults['ocr_mode']
-                     if defaults['ocr_mode'] in kinds
-                     else kinds[0]
-                     ),
-        'plot_haems': has_haems and (is_strip or bool(defaults['plot_haems'])),
-        'haems': haems or haem_list,
-        'haem_mode': defaults['haem_mode'],
-        'haem_per_od': bool(defaults['haem_per_od'] and
-                            answers['normalise_od'] and
-                            defaults['haem_mode'] != 'percent',
-                            ),
-        'event_label_angle': defaults['event_label_angle'],
-        },
+    answers.update({'plot_o2': defaults['plot_o2'],
+                    'plot_ocr': defaults['plot_ocr'],
+                    'ocr_mode': (defaults['ocr_mode']
+                                 if defaults['ocr_mode'] in kinds
+                                 else kinds[0]
+                                 ),
+                    'plot_haems': has_haems,
+                    'haems': haems or haem_list,
+                    'haem_mode': defaults['haem_mode'],
+                    'haem_per_od': bool(defaults['haem_per_od'] and
+                                        answers['normalise_od'] and
+                                        defaults['haem_mode'] != 'percent',
+                                        ),
+                    'event_label_angle': defaults['event_label_angle'],
+                    },
                    )
-
-
-# ---- _file_chooser -------------------------------------------------------------------
-def _file_chooser(session: ViewerSession) -> None:
-    """
-    ---- Summary ----
-    Helper function to ask which file to look at and make it the current one.
-
-    ---- Inputs ----
-    session : ViewerSession
-        The browser session; its current file is changed.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Sets session.current and reads from and prints to the terminal (side
-    effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    choice_asker
-    """
-
-    options = [(str(number), summary['name'])
-               for number, summary in enumerate(session.summaries)
-               ]
-    chosen = choice_asker('Which file would you like to look at?',
-                          options,
-                          str(session.current),
-                          )
-    session.current = int(chosen)
 
 
 # ---- _fit_file_saver -----------------------------------------------------------------
@@ -676,8 +545,10 @@ def _fit_file_saver(fit: dict,
     None.
 
     ---- Helpers ----
+    file_name_sanitiser
     fit_saver
     info_printer
+    problem_teller
     text_asker
     yes_no_asker
     """
@@ -694,9 +565,8 @@ def _fit_file_saver(fit: dict,
                           default,
                           depth=depth,
                           ) or '').strip()
-        stem = re.sub(r'[^A-Za-z0-9 _.\-]', '_', raw)
-        stem = stem[:-4] if stem.lower().endswith('.csv') else stem
-        stem = stem.strip('. ')
+        stem = raw[:-4] if raw.lower().endswith('.csv') else raw
+        stem = file_name_sanitiser(stem, default='')
         if not stem:
             info_printer('Please give the file a name.', depth=depth)
             continue
@@ -711,7 +581,9 @@ def _fit_file_saver(fit: dict,
             fits_folder.mkdir(parents=True, exist_ok=True)
             fit_saver(fit, path)
         except OSError as exc:
-            info_printer(f'The fit file could not be saved ({exc}).', depth=depth)
+            info_printer(problem_teller('The fit file could not be saved', exc),
+                         depth=depth,
+                         )
             return None
         info_printer(f'Saved {path.name} in the fits folder. It is in the list of fits '
                      f'from now on.',
@@ -847,7 +719,7 @@ def _od_table_filler(session: ViewerSession,
         The rows to start from (od_rows, DATA_FORMAT.md); None leaves a cell empty.
 
     ---- Globals read ----
-    COLUMNS (imported constant).
+    COLUMNS (imported constant); settings.OD_RESUSPENDED_ML.
 
     ---- Outputs ----
     Dict[str, Dict[str, Optional[float]]]
@@ -872,8 +744,8 @@ def _od_table_filler(session: ViewerSession,
             text_asker(
                 'Fill in the table under this text for each file: the OD of the '
                 'cells added, the volume of cells (mL) spun down and resuspended '
-                'in 5 mL, and the dilution factor if the cells were diluted mid '
-                'run. Then press Enter here.',
+                f'in {settings.OD_RESUSPENDED_ML:g} mL, and the dilution factor if '
+                'the cells were diluted mid run. Then press Enter here.',
                 )
             filled, wrong = window.od_table_reader()
             empty = [f'{name}: {heading}'
@@ -944,6 +816,7 @@ def _pca_pictures_publisher(session: ViewerSession,
     info_printer
     pca_example_picture_builder
     pca_picture_builder
+    problem_teller
     """
 
     session.window.drawing_sign_shower()
@@ -964,29 +837,24 @@ def _pca_pictures_publisher(session: ViewerSession,
                                                            ),
                                        )
     except Exception as exc:  # a drawing problem must never stop the questions
-        info_printer(f'The PCA pictures could not be drawn ({exc}).', depth=depth)
+        info_printer(problem_teller('The PCA pictures could not be drawn', exc),
+                     depth=depth,
+                     )
 
 
 # ---- _review_asker -------------------------------------------------------------------
-def _review_asker(session: ViewerSession,
-                  question: str,
-                  change_label: str,
-                  redraw: Callable[[], bool],
-                  ) -> bool:
+def _review_asker(question: str, change_label: str) -> bool:
     """
     ---- Summary ----
     Helper function to ask whether the user accepts what the plot window shows, with
-    the two answers yes and no (see _choice_reviewer).
+    the two answers yes and no; the user can flick through the files while the question
+    waits.
 
     ---- Inputs ----
-    session : ViewerSession
-        The browser session; its current file may be changed.
     question : str
         The accept question, for example 'Do you accept these limits?'.
     change_label : str
         Label of the answer that asks the questions of the step again.
-    redraw : Callable[[], bool]
-        Function that draws the preview of the current file.
 
     ---- Globals read ----
     None.
@@ -996,19 +864,19 @@ def _review_asker(session: ViewerSession,
         True when accepted, False when the user wants to answer the step again.
 
     ---- Globals mutated ----
-    None. Reads from and prints to the terminal and redraws the window (side effects).
+    None. Reads from and prints to the terminal (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    _choice_reviewer
+    choice_asker
     """
 
     options = [('yes', 'Yes, accept'),
                ('no', change_label),
                ]
-    return _choice_reviewer(session, question, options, redraw) == 'yes'
+    return choice_asker(question, options, 'yes') == 'yes'
 
 
 # ---- _skipped_lister -----------------------------------------------------------------
@@ -1114,6 +982,7 @@ def _standard_fit_loader(summaries: List[dict],
     ---- Helpers ----
     fit_importer
     info_printer
+    problem_teller
     """
 
     # ---- 1 Find the fit file ---------------------------------------------------------
@@ -1150,7 +1019,8 @@ def _standard_fit_loader(summaries: List[dict],
     try:
         return fit_importer(fits_folder / name), dataset
     except (OSError, ValueError) as exc:
-        info_printer(f'{lead}: the fit file {name} could not be read ({exc}). '
+        problem = problem_teller(f'{lead}: the fit file {name} could not be read', exc)
+        info_printer(f'{problem} '
                      f"{advice('You can choose another fit in the processing.')}",
                      )
         return None, None
@@ -1247,8 +1117,7 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     """
     ---- Summary ----
     Helper function to show in the settings strip what the run uses now: the haems
-    ticked when they are worked out, the fit, the journal and the size. Without a
-    window it does nothing.
+    ticked when they are worked out, the fit, the journal and the size.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1285,13 +1154,13 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
     ---- Summary ----
     Main function to show the standard plot of the files in the plot window (the set
     and measured O2, the OCR and, when the session has a fit, the haems, with the
-    events as written in the file) before any question is asked about them. In the
-    browser window the user can look through them while answering, so the questions
-    carry straight on; with the picture fallback a small menu steps through the files.
+    events as written in the file) before any question is asked about them. The user can
+    look through them in the window while answering, so the questions carry straight
+    on.
 
     ---- Inputs ----
     session : ViewerSession
-        The browser session; its current file is changed and its redraw set.
+        The browser session; its redraw is set.
     answers : dict
         Answers so far, used for the figure style of the preview.
 
@@ -1303,21 +1172,16 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
         Nothing.
 
     ---- Globals mutated ----
-    None. Reads from and prints to the terminal and draws the plot window (side
-    effects).
+    None. Draws the plot window (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _answers_previewer
-    _file_chooser
-    choice_asker
-    info_printer
     preview_drawer
     """
 
-    total = len(session.summaries)
     def redraw() -> bool:
         return preview_drawer(session,
                               _answers_previewer(answers, session.fit, 'standard'),
@@ -1327,32 +1191,7 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
                               show_ignored=False,
                               )
     session.redraw = redraw
-    if session.window.is_interactive:
-        redraw()
-        return
-    options = [('next', 'Next file'),
-               ('previous', 'Previous file'),
-               ('goto', 'Go to a specific file'),
-               ('continue', 'Continue to trimming and ignoring'),
-               ]
-    while True:
-        summary = session.summaries[session.current]
-        redraw()
-        info_printer(f'\nCurrent file: {session.current + 1} of {total}')
-        info_printer(f"Filename: {summary['name']} ({summary['duration_min']:.1f} "
-                     f"min, {len(summary['events'])} event(s))",
-                     )
-        choice = choice_asker('What would you like to do?', options, 'continue')
-        if choice == 'continue':
-            return
-        if choice == 'goto':
-            _file_chooser(session)
-        elif choice == 'next' and session.current + 1 < total:
-            session.current += 1
-        elif choice == 'previous' and session.current > 0:
-            session.current -= 1
-        else:
-            info_printer('There is no file in that direction.')
+    redraw()
 
 
 # ---- details_stage_runner ------------------------------------------------------------
@@ -1365,8 +1204,8 @@ def details_stage_runner(session: ViewerSession,
     """
     ---- Summary ----
     Main function to ask the last questions of the import, on the standard plot cut to
-    the limits: the OD values (in the table of the window, or with questions per file
-    and an accept question), then the event labels. The OD values are only checked:
+    the limits: the OD values (in the table of the window), then the event labels. The
+    OD values are only checked:
     the data is scaled by OD in the individual plots. The plot is redrawn with the
     labels once they are entered. The haems are those of the session's fit.
 
@@ -1378,7 +1217,7 @@ def details_stage_runner(session: ViewerSession,
     defaults : dict
         Default answers offered by the questions.
     limits : Dict[str, dict]
-        Trim and ignore limits of every file (trim_asker).
+        Trim and ignore limits of every file (trim_stage_runner).
     details_before : Optional[Dict[str, dict]]
         OD values and events from an earlier pass, offered as defaults when the step is
         asked again.
@@ -1424,30 +1263,13 @@ def details_stage_runner(session: ViewerSession,
     session.redraw = redraw
 
     # ---- 2 OD values -----------------------------------------------------------------
-    # Only checked here; the data is scaled by OD in the individual plots. In the window
-    # they are filled in in a table, which is its own check.
-    is_table = session.window.is_interactive
+    # Only checked here; the data is scaled by OD in the individual plots. They are
+    # filled in in a table, which is its own check.
     def table_filler(rows: Dict[str, dict]) -> Dict[str, dict]:
         return _od_table_filler(session, rows)
-    while True:
-        details = od_scaling_asker(summaries,
-                                   answers,
-                                   defaults,
-                                   saved,
-                                   table_filler=table_filler if is_table else None,
-                                   )
-        if not answers['normalise_od']:
-            break
+    details = od_scaling_asker(summaries, answers, defaults, saved, table_filler)
+    if answers['normalise_od']:
         _od_lister(details)
-        if is_table or _review_asker(session,
-                         'Do you accept these OD values?',
-                         'No, enter the OD values again',
-                         lambda: True,
-                         ):
-            break
-        defaults = dict(defaults, normalise_od=True)
-        for name, values in details.items():
-            saved[name] = dict(saved.get(name) or {}, **values)
 
     # ---- 3 Event labels --------------------------------------------------------------
     is_again = False
@@ -1456,10 +1278,8 @@ def details_stage_runner(session: ViewerSession,
             details[name]['events'] = events
             saved[name] = dict(saved.get(name) or {}, events=events)
         redraw()
-        if _review_asker(session,
-                         'Do you accept these event labels?',
+        if _review_asker('Do you accept these event labels?',
                          'No, change the labels again',
-                         redraw,
                          ):
             break
         is_again = True
@@ -1492,7 +1312,7 @@ def pca_stage_runner(session: ViewerSession,
     defaults : dict
         Default answers offered by the questions.
     limits : Dict[str, dict]
-        Trim and ignore limits of every file (trim_asker).
+        Trim and ignore limits of every file (trim_stage_runner).
     fits_folder : Path
         Folder holding the fit .csv files.
     dataset : str
@@ -1501,7 +1321,7 @@ def pca_stage_runner(session: ViewerSession,
         Numbering depth of the questions.
 
     ---- Globals read ----
-    None.
+    settings.PCA_WINDOW_NM, settings.PCA_SMOOTHING_NM.
 
     ---- Outputs ----
     Tuple[Optional[str], Optional[dict]]
@@ -1530,6 +1350,7 @@ def pca_stage_runner(session: ViewerSession,
     info_printer
     number_asker
     pca_spectra_gatherer
+    problem_teller
     progress_clearer
     progress_printer
     text_colourer
@@ -1545,11 +1366,11 @@ def pca_stage_runner(session: ViewerSession,
                  'than single ones.',
                  depth=depth,
                  )
-    start = float(defaults.get('pca_start') or 500.0)
-    end = float(defaults.get('pca_end') or 630.0)
+    start = float(defaults.get('pca_start') or settings.PCA_WINDOW_NM[0])
+    end = float(defaults.get('pca_end') or settings.PCA_WINDOW_NM[1])
     rotate = bool(defaults.get('pca_rotate', True))
     count = int(defaults.get('pca_count') or 0)
-    smoothing = float(defaults.get('pca_smoothing_nm', DEFAULT_SMOOTHING_NM))
+    smoothing = float(defaults.get('pca_smoothing_nm', settings.PCA_SMOOTHING_NM))
     while True:
         # ---- 1 Choose the window and read the spectra --------------------------------
         start = number_asker('Where should the spectral window start (nm)?',
@@ -1583,7 +1404,9 @@ def pca_stage_runner(session: ViewerSession,
                                         degree_of_scatter=settings.DEGREE_OF_SCATTER,
                                         )
         except ValueError as exc:
-            info_printer(text_colourer(f'The analysis could not be run: {exc}',
+            info_printer(text_colourer(problem_teller('The analysis could not be run',
+                                                      exc,
+                                                      ),
                                        WARNING_COLOUR,
                                        ),
                          depth=depth,
@@ -1638,7 +1461,9 @@ def pca_stage_runner(session: ViewerSession,
                                                         )
             except ValueError as exc:
                 examples = None
-                info_printer(f'No example decomposition could be made ({exc}).',
+                info_printer(problem_teller('No example decomposition could be made',
+                                            exc,
+                                            ),
                              depth=depth,
                              )
             _pca_pictures_publisher(session,
@@ -1715,11 +1540,11 @@ def plots_stage_runner(session: ViewerSession,
     Main function to show the figure saved for each file, drawn as it will be saved
     from the standard settings or the ones last saved for the dataset, and ask whether
     it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
-    how the haems are shown, the angle of the event labels, the journal and size): only
-    that part's questions are asked, with the current choices as the defaults, and the
-    figure is drawn and asked about again. In the window the settings strip turns the
-    haems on or off and sets the journal and size, so 'which haems' asks only which
-    ones in which order, and the journal and size are not asked.
+    how the haems are shown, the angle of the event labels): only that part's questions
+    are asked, with the current choices as the defaults, and the figure is drawn and
+    asked about again. The settings strip turns the haems on or off and sets the
+    journal and size, so 'which haems' asks only which ones in which order, and the
+    journal and size are not asked.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1749,9 +1574,9 @@ def plots_stage_runner(session: ViewerSession,
 
     ---- Helpers ----
     _answers_previewer
-    _choice_reviewer
     _figure_starter
     _strip_shower
+    choice_asker
     haem_choice_asker
     haem_form_asker
     haem_scaling_asker
@@ -1759,7 +1584,6 @@ def plots_stage_runner(session: ViewerSession,
     label_angle_asker
     preview_drawer
     signal_asker
-    size_asker
     """
 
     # ---- 1 Start from the standard or saved settings ---------------------------------
@@ -1767,8 +1591,7 @@ def plots_stage_runner(session: ViewerSession,
                  'or with the ones last saved for this dataset. Change only what you '
                  'want different; you can look at every file before accepting it.',
                  )
-    is_strip = session.window.is_interactive
-    _figure_starter(answers, defaults, session.fit, is_strip)
+    _figure_starter(answers, defaults, session.fit)
     _strip_shower(session, answers)
     def is_plotted() -> bool:
         return bool(answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems'])
@@ -1795,25 +1618,17 @@ def plots_stage_runner(session: ViewerSession,
                          )
 
         # ---- 2.2 Ask whether it is accepted, or which part to change -----------------
-        # In the window the Haems box turns the haems on and off, and the strip holds
-        # the journal and size.
-        has_haems = bool(answers['decompose'] and session.fit is not None)
+        # The Haems box turns the haems on and off, and the strip holds the journal and
+        # size.
         options = [('yes', 'Yes, accept'),
                    ('signals', 'No, change the oxygen and OCR'),
                    ]
-        if answers['plot_haems'] if is_strip else has_haems:
-            options.append(('haems', 'No, change which haems are shown'))
         if answers['plot_haems']:
+            options.append(('haems', 'No, change which haems are shown'))
             options.append(('form', 'No, change how the haems are shown'))
         if plotted:
             options.append(('angle', 'No, change the angle of the event labels'))
-        if not is_strip:
-            options.append(('size', 'No, change the journal or size'))
-        choice = _choice_reviewer(session,
-                                  'Do you accept this figure?',
-                                  options,
-                                  redraw,
-                                  )
+        choice = choice_asker('Do you accept this figure?', options, 'yes')
         if choice == 'yes':
             return is_plotted()
 
@@ -1822,26 +1637,12 @@ def plots_stage_runner(session: ViewerSession,
         if choice == 'signals':
             signal_asker(answers, current)
         elif choice == 'haems':
-            haem_choice_asker(answers,
-                              current,
-                              session.fit,
-                              is_shown_asked=not is_strip,
-                              )
+            haem_choice_asker(answers, current, session.fit)
         elif choice == 'form':
             haem_form_asker(answers, current)
             haem_scaling_asker(answers, current)
-        elif choice == 'angle':
-            label_angle_asker(answers, current)
         else:
-            size_asker(answers,
-                       current,
-                       {'journal': 'journal',
-                        'columns': 'columns',
-                        'height': 'height',
-                        'mode': 'size_mode',
-                        },
-                       (1, 0.5),
-                       )
+            label_angle_asker(answers, current)
 
 
 # ---- processing_stage_runner ---------------------------------------------------------
@@ -1856,12 +1657,11 @@ def processing_stage_runner(session: ViewerSession,
     """
     ---- Summary ----
     Main function to talk the user through the processing, with the plot redrawn after
-    each answer: first the haem fit (the fit already shown is accepted, another is
-    tried, or the haems are left out), then, now that the haems are seen, an offer to
-    change the trim and ignore times, and last the averaging around the events. In the
-    window the settings strip picks the fit and leaves the haems out, so the
-    decomposition question only offers to find the components from the data instead.
-    While those questions are asked the strip is greyed out.
+    each answer: first the haem fit, then, now that the haems are seen, an offer to
+    change the trim and ignore times, and last the averaging around the events. The
+    settings strip picks the fit and leaves the haems out, so the decomposition
+    question only offers to find the components from the data instead. While those
+    questions are asked the strip is greyed out.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1874,7 +1674,7 @@ def processing_stage_runner(session: ViewerSession,
         Default answers offered by the questions; whether to decompose and which fit
         follow the answers so far (the strip may have changed them).
     limits : Dict[str, dict]
-        Trim and ignore limits of every file (trim_asker).
+        Trim and ignore limits of every file (trim_stage_runner).
     fits_folder : Path
         Folder holding the fit .csv files.
     details : Dict[str, dict]
@@ -1901,10 +1701,10 @@ def processing_stage_runner(session: ViewerSession,
     ---- Helpers ----
     _answers_previewer
     _averaging_reviewer
-    _choice_reviewer
     _decomposition_storer
     _fit_names_lister
     _strip_shower
+    choice_asker
     decomposition_asker
     info_printer
     pca_stage_runner
@@ -1913,7 +1713,6 @@ def processing_stage_runner(session: ViewerSession,
     """
 
     summaries = session.summaries
-    is_strip = session.window.is_interactive
     def redraw() -> bool:
         return preview_drawer(session,
                               _answers_previewer(answers, session.fit, 'analysis'),
@@ -1958,50 +1757,20 @@ def processing_stage_runner(session: ViewerSession,
         answers['decompose'] = True
         info_printer(f"The haems are worked out with {answers['fit_file']}.")
 
-    # ---- 1.2 Accept the fit, try another or leave the haems out ----------------------
-    # In the window the strip picks the fit and leaves the haems out.
-    if is_strip:
-        options = [('yes', 'Yes, accept'),
-                   ('pca', 'No, find the components from the data'),
-                   ]
-    else:
-        options = [('yes', 'Yes, accept'),
-                   ('fit', 'No, try another fit'),
-                   ('none', 'No, do not decompose the haems'),
-                   ]
+    # ---- 1.2 Accept the fit or find the components from the data ---------------------
+    # The strip picks another fit and leaves the haems out.
+    options = [('yes', 'Yes, accept'),
+               ('pca', 'No, find the components from the data'),
+               ]
     while answers['decompose']:
         redraw()
-        choice = _choice_reviewer(session,
-                                  'Do you accept this decomposition?',
-                                  options,
-                                  redraw,
-                                  )
-        if choice == 'yes':
+        if choice_asker('Do you accept this decomposition?', options, 'yes') == 'yes':
             break
-        if choice == 'none':
-            answers['decompose'] = False
-            break
-        if choice == 'pca':
-            name, fit = pca_finder(answers['decomposition_dataset'], 2)
-            if fit is not None:
-                answers.update({'decompose': True, 'fit_file': name})
-                session.fit = fit
-                _strip_shower(session, answers)
-            continue
-        _decomposition_storer(session,
-                              answers,
-                              decomposition_asker(summaries,
-                                                  dict(defaults,
-                                                       fit_file=answers['fit_file'],
-                                                       decomposition_dataset=answers[
-                                                           'decomposition_dataset'],
-                                                       ),
-                                                  fits_folder,
-                                                  forced=True,
-                                                  depth=2,
-                                                  pca_runner=pca_finder,
-                                                  ),
-                              )
+        name, fit = pca_finder(answers['decomposition_dataset'], 2)
+        if fit is not None:
+            answers.update({'decompose': True, 'fit_file': name})
+            session.fit = fit
+            _strip_shower(session, answers)
     if not answers['decompose']:
         session.fit = None
         _strip_shower(session, answers)
@@ -2025,14 +1794,16 @@ def processing_stage_runner(session: ViewerSession,
 def trim_stage_runner(session: ViewerSession,
                       answers: dict,
                       remembered: Dict[str, dict],
+                      previous: Optional[Dict[str, dict]] = None,
                       ) -> Dict[str, dict]:
     """
     ---- Summary ----
-    Main function to ask the trim and ignore questions on the standard plot, adding the
-    shaded trimmed and ignored parts to the plot window after every answer, and ask
-    whether to accept them. When the limits are asked again, the earlier ones stay on
-    the plot as dashed lines. After they are accepted, it offers to export all the data
-    cut to them. The haems are those of the session's fit (none when it has none).
+    Main function to run the trimming step on the standard plot of the whole recording
+    of every file: the trimmed and ignored edges are dragged on the plot or typed in
+    the strip under it, and Enter accepts them. When the step is opened again, the
+    limits it had stay on the plot as red dashed lines. The limits are then listed, the
+    trimmed data is drawn, and the export of all the data cut to them is offered. The
+    haems are those of the session's fit (none when it has none).
 
     ---- Inputs ----
     session : ViewerSession
@@ -2040,15 +1811,18 @@ def trim_stage_runner(session: ViewerSession,
     answers : dict
         Answers so far, used for the figure style of the preview.
     remembered : Dict[str, dict]
-        {file name: {trim_start, trim_end, ignore_start, ignore_end}} offered as the
-        defaults (from the last run, or from the previous attempt).
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} the edges start
+        at (from the last run, or this run's when the step is opened again).
+    previous : Optional[Dict[str, dict]]
+        Limits in the same layout drawn as red dashed lines while the edges are
+        dragged; None for none.
 
     ---- Globals read ----
-    None.
+    TRIM_FIELDS, TRIM_KEY_TEXT, TRIM_NUDGE (module constants).
 
     ---- Outputs ----
     Dict[str, dict]
-        The limits of every file, exactly as trim_asker returns them.
+        The limits of every file, as trim_limits_builder gives them.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal and draws the plot window (side
@@ -2060,41 +1834,72 @@ def trim_stage_runner(session: ViewerSession,
     ---- Helpers ----
     _all_data_asker
     _answers_previewer
-    _empty_limits_builder
     _limits_lister
-    _review_asker
+    enter_waiter
+    info_printer
     preview_drawer
-    trim_asker
+    trim_layout_finder
+    trim_limits_builder
+    trim_minutes_builder
+    trim_minutes_setter
+    trim_pointer_reader
+    EdgeChoice
     """
 
-    previous: Dict[str, dict] = {}
-    shown = {'limits': _empty_limits_builder(session.summaries)}
-    def draw(limits: Dict[str, dict]) -> bool:
-        shown['limits'] = limits  # what a change in the strip redraws
+    # ---- draw ------------------------------------------------------------------------
+    def draw(limits: Optional[Dict[str, dict]] = None) -> bool:
+        # None: the whole recording, for the edges; limits: the data they keep
         return preview_drawer(session,
                               _answers_previewer(answers, session.fit, 'standard'),
-                              limits,
+                              limits or {},
                               session.fit,
                               {},
-                              show_trim=True,
-                              previous_limits=previous,
+                              show_trim=limits is None,
                               )
-    session.redraw = lambda: draw(shown['limits'])
-    while True:
-        draw(_empty_limits_builder(session.summaries))
-        limits = trim_asker(session.summaries, remembered, draw)
-        _limits_lister(session.summaries, limits)
-        draw(limits)
-        if _review_asker(session,
-                         'Do you accept these limits?',
-                         'No, enter the limits again',
-                         lambda: draw(limits),
-                         ):
-            _all_data_asker(session, limits)
-            return limits
-        remembered = dict(remembered, **limits)
-        previous.clear()
-        previous.update(limits)
+    session.redraw = draw
+    draw()
+
+    # ---- 2 Drag or type the edges until Enter ----------------------------------------
+    by_name = {s['name']: s for s in session.summaries}
+    choice = EdgeChoice(fields=list(TRIM_FIELDS),
+                        values=trim_minutes_builder(session.summaries, remembered),
+                        layout_finder=lambda name, minutes: trim_layout_finder(by_name[name],
+                                                                               minutes,
+                                                                               ),
+                        pointer_reader=lambda name, minutes, key, time_min: (
+                            trim_pointer_reader(by_name[name], minutes, key, time_min)),
+                        value_setter=lambda name, minutes, key, value: (
+                            trim_minutes_setter(by_name[name], minutes, key, value)),
+                        key_text=TRIM_KEY_TEXT,
+                        previous=(trim_minutes_builder(session.summaries, previous)
+                                  if previous
+                                  else {}
+                                  ),
+                        )
+    info_printer('TRIM: data that will not be imported, plotted or used.')
+    info_printer('IGNORE: data that will be imported and plotted, but not used for '
+                 'calculations (baselines, % ranges, axis limits).',
+                 )
+    session.window.edges_shower(choice)
+    try:
+        enter_waiter('Drag the edges on the plot: grey for the trimmed parts, amber '
+                     'for the ignored parts, or type the times in the strip under the '
+                     'plot. With "Every file" ticked, a change applies to every file; '
+                     'untick it to change only the file shown. Press Enter when every '
+                     'file looks right.',
+                     TRIM_NUDGE,
+                     )
+        minutes = session.window.edges_reader()
+    finally:
+        session.window.edges_hider()
+
+    # ---- 3 List the limits, draw what they keep and offer the export -----------------
+    limits = trim_limits_builder(session.summaries, minutes)
+    _limits_lister(session.summaries, limits)
+    session.redraw = lambda: draw(limits)
+    draw(limits)
+    _all_data_asker(session, limits)
+    return limits
 
 
 # ---- viewer_asker --------------------------------------------------------------------
@@ -2113,8 +1918,8 @@ def viewer_asker(summaries: List[dict],
     averaging) and the individual figures. The standard plot of every file (oxygen, OCR
     and the haems of the dataset's fit) is shown first, with no question asked. The
     plot window is redrawn after each answer, and at the end any step can be gone back
-    to. In the window the settings strip can be changed while these questions wait
-    (except those of the components found from the data); it is greyed out afterwards.
+    to. The settings strip can be changed while these questions wait (except those of
+    the components found from the data); it is greyed out afterwards.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -2131,12 +1936,13 @@ def viewer_asker(summaries: List[dict],
         Results folder.
 
     ---- Globals read ----
-    PREVIEW_FILE, STAGE_TITLES (module constants); settings.STANDARD_FIT.
+    STAGE_TITLES (module constant); settings.STANDARD_FIT.
 
     ---- Outputs ----
     Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
-        (limits, fit, details, plotted) as the same questions return them when they are
-        asked without the browser.
+        (limits, fit, details, plotted): the trim and ignore limits of every file, the
+        fit (None when the haems are not decomposed), the OD values and events of every
+        file, and whether the figure of each file has at least one panel.
 
     ---- Globals mutated ----
     None. Stores the answers in ``answers``, reads from and prints to the terminal,
@@ -2165,7 +1971,7 @@ def viewer_asker(summaries: List[dict],
     trim_stage_runner
     """
 
-    window = active_gui_getter() or PictureWindow(PREVIEW_FILE)
+    window = active_gui_getter()
     session = ViewerSession(summaries, export_root, window)
     window.session_attacher(session)
     names = [s['name'] for s in summaries]
@@ -2183,7 +1989,7 @@ def viewer_asker(summaries: List[dict],
     if session.fit is not None:
         answers['decomposition_dataset'] = dataset
 
-    # ---- 2 Set up the settings strip (the window only) -------------------------------
+    # ---- 2 Set up the settings strip -------------------------------------------------
     window.strip_fits_setter(_fit_names_lister(fits_folder))
     _strip_shower(session, answers)
     window.strip_listener_setter(lambda changes: _strip_change_applier(session,
@@ -2194,12 +2000,9 @@ def viewer_asker(summaries: List[dict],
                                  )
     window.strip_state_setter(True)
 
-    # ---- run_browser -----------------------------------------------------------------
-    def run_browser() -> None:
-        browser_stage_runner(session, answers)
     def run_trim() -> Dict[str, dict]:
         old = state.get('limits') or remembered
-        state['limits'] = trim_stage_runner(session, answers, old)
+        state['limits'] = trim_stage_runner(session, answers, old, state.get('limits'))
         answers['ignore_first_minutes'] = max(v['ignore_start']
                                               for v in state['limits'].values()
                                               )
@@ -2235,8 +2038,7 @@ def viewer_asker(summaries: List[dict],
                            state['details'],
                            )
         state['plots_asked'] = True
-    steps = [('browser', run_browser),
-             ('trim', run_trim),
+    steps = [('trim', run_trim),
              ('details', run_details),
              ('processing', run_processing),
              ('plots', run_plots),
@@ -2246,21 +2048,17 @@ def viewer_asker(summaries: List[dict],
     # Only the figure of each file is drawn at its size, so only there does a new
     # journal or size in the strip redraw the plot (the plots step sets it again).
     try:
+        session.is_figure = False
+        browser_stage_runner(session, answers)  # it asks nothing, so needs no section
         for key, runner in steps:
             session.is_figure = False
-            if key == 'browser' and window.is_interactive:
-                runner()  # the window needs no section of its own
-                continue
             section_starter(STAGE_TITLES[key])
             runner()
         last_section, last_question = numbering_getter(0), numbering_getter(1)
 
         # ---- 4 Go back to any step ---------------------------------------------------
-        visible = [key for key, _ in steps
-                   if not (key == 'browser' and window.is_interactive)
-                   ]
         options = [('done', 'No, continue')]
-        options += [(key, STAGE_TITLES[key]) for key in visible]
+        options += [(key, STAGE_TITLES[key]) for key, _ in steps]
         while True:
             numbering_setter(0, last_section)
             numbering_setter(1, last_question)
@@ -2271,7 +2069,7 @@ def viewer_asker(summaries: List[dict],
             if chosen == 'done':
                 break
             index = [key for key, _ in steps].index(chosen)
-            number = visible.index(chosen) + 2
+            number = index + 2  # section 1 is the files
             numbering_setter(0, number)
             heading_printer(f'{number}. {STAGE_TITLES[chosen]} (again)')
             session.is_figure = False

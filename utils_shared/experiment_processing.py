@@ -16,6 +16,7 @@ from utils_shared.spectral_decomposer import (BACKGROUND_LABELS,
                                               fit_range_finder,
                                               )
 from utils_shared.trimming import experiment_trimmer
+from utils_shared.user_notices import problem_shower, warning_shower
 
 
 # ---- EXPERIMENT PROCESSING HELPERS ---------------------------------------------------
@@ -32,35 +33,30 @@ def _skip_reporter(step: str, error: Exception) -> None:
     step : str
         The step in plain words, to complete "Warning: ... was skipped".
     error : Exception
-        The error that stopped the step. The ValueError and PafError messages of the
-        processing steps are written for the user and are shown as they are; a
-        KeyError or TypeError is a fault in the program, whose raw text is not shown.
+        The error that stopped the step. The messages the processing steps write for
+        the user are shown as they are; Python's own error text never is.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    None. Prints the warning (side effect).
+    None
+        Nothing.
 
     ---- Globals mutated ----
-    None.
+    None. Shows the warning; the details go to the log (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    None.
+    problem_shower
     """
 
-    if isinstance(error, (KeyError, TypeError)):
-        reason = ('A fault in the program stopped this step; please report it, with '
-                  'this file.'
-                  )
-    else:
-        reason = str(error)
-    print(f'  Warning: {step} was skipped for this file; the rest carries on without '
-          f'it. {reason}',
-          )
+    problem_shower(f'  Warning: {step} was skipped for this file; the rest carries on '
+                   f'without it',
+                   error,
+                   )
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -168,6 +164,7 @@ def experiment_data_processor(info: dict,
     percent_converter
     percent_need_checker
     source_chooser
+    warning_shower
     """
 
     # ---- 1 Set up the run ------------------------------------------------------------
@@ -215,9 +212,10 @@ def experiment_data_processor(info: dict,
     if a['normalise_od']:
         od_available = all(metadata.get(k) for k in ('OD', 'volume', 'dilution_factor'))
         if not od_available:
-            print('  Warning: OD, volume or dilution factor is missing, so this file '
-                  'is not scaled by OD (raw values are used instead).',
-                  )
+            warning_shower('  Warning: OD, volume or dilution factor is missing, so '
+                           'this file is not scaled by OD (raw values are used '
+                           'instead).',
+                           )
 
     # ---- 4.2 Decompose into haems ----------------------------------------------------
     # Attenuation and decomposition into haems.
@@ -258,7 +256,7 @@ def experiment_data_processor(info: dict,
                   f"({reference['window_seconds']:.3g} s) of each haem: {spans}",
                   )
             for note in fit.get('notes', []):
-                print(f'  {note}')
+                warning_shower(f'  {note}')
         except (KeyError, ValueError, PafError) as exc:
             _skip_reporter('the decomposition into haems', exc)
     elif a['export_spectra']:
@@ -301,7 +299,7 @@ def experiment_data_processor(info: dict,
     # Event-window averages.
     if a['averaging']:
         if not metadata['events']:
-            print('  Averaging skipped: this file has no events.')
+            warning_shower('  Averaging skipped: this file has no events.')
         else:
             try:
                 average_haem_source = (haem_source
@@ -323,16 +321,17 @@ def experiment_data_processor(info: dict,
                       )
                 skipped = dict(experiment['averages']['skipped'])
                 if skipped.pop('average0', None):
-                    print(f'  Warning: there is less than {minimum_seconds:g} s of '
-                          'data before the first addition, so this run has no '
-                          'baseline and its changes from baseline are left empty. '
-                          'Trim less of the start, or shorten the gap before the '
-                          'additions.',
-                          )
+                    warning_shower(f'  Warning: there is less than {minimum_seconds:g} '
+                                   's of data before the first addition, so this run '
+                                   'has no baseline and its changes from baseline are '
+                                   'left empty. Trim less of the start, or shorten the '
+                                   'gap before the additions.',
+                                   )
                 if skipped:
-                    print(f"  Warning: averaging skipped for {', '.join(skipped)} "
-                          '(not enough time for the window and gap)',
-                          )
+                    warning_shower(f'  Warning: averaging skipped for '
+                                   f"{', '.join(skipped)} (not enough time for the "
+                                   f'window and gap)',
+                                   )
             except (KeyError, ValueError, TypeError) as exc:
                 _skip_reporter('the averaging around the additions', exc)
 

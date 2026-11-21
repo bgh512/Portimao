@@ -4,38 +4,84 @@ environment, makes the icon, starts Portimao.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import hashlib
 import os
 import queue
 import shutil
+import socket
 import subprocess
 import sys
 import threading
 import time
 import traceback
+from datetime import datetime
 from pathlib import Path
 from types import ModuleType
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, TextIO, Tuple
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 APP_NAME = 'Portimao'
 ROOT = Path(__file__).resolve().parent.parent
 IS_WINDOWS = sys.platform == 'win32'
+IS_LINUX = sys.platform.startswith('linux')
 ENVIRONMENT = ROOT / ('.venv' if IS_WINDOWS else '.venv_unix')
 ENVIRONMENT_PYTHON = ENVIRONMENT / ('Scripts/python.exe'
                                     if IS_WINDOWS
                                     else 'bin/python'
                                     )
 ENVIRONMENT_WINDOWLESS = ENVIRONMENT / 'Scripts/pythonw.exe'
+# holds the fingerprint of the package list the environment was last installed from
+PACKAGE_STAMP = ENVIRONMENT / '.complete'
+REQUIREMENTS = ROOT / 'requirements.txt'
 LOG_FILE = ROOT / 'logs' / 'launch.log'
+# Portimao's window makes this file once it is up (utils_viewer/viewer_gui.py), told
+# where by this switch, so the small window closes then
+OPENED_FILE = ROOT / 'logs' / 'window_opened'
+OPENED_SWITCH = 'PORTIMAO_OPENED_FILE'
 SHORTCUT_MARK = ROOT / '.portimao_shortcut'  # git-ignored: each computer makes its own
-OLD_SHORTCUT_MARK = '.shortcut_made_portimao'  # was tracked; reset before updates
-OLD_NAMES = ('DePalencify', 'Albufeira')  # the names the program had before
-REPOSITORY_NAME = 'Portimao'  # the name of the GitHub repository after it is renamed
 HIDDEN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 REQUIRED_IMPORTS = 'import numpy, pandas, scipy, matplotlib, xlsxwriter, openpyxl, PIL'
-WAIT_SECONDS = 8.0
+# the update check holds up every start, so a computer with no connection is found in
+# a few seconds; git waits longer only once GitHub has answered
+GITHUB_ADDRESS = ('github.com', 443)
+KNOCK_TIMEOUT_S = 5
+ASK_TIMEOUT_S = 15
+FETCH_TIMEOUT_S = 120
+OPEN_WAIT_S = 60.0  # the small window closes by then even if Portimao's has not opened
 MINIMUM_TK = 8.6  # Tk 8.5 (the one Apple's own Python uses) draws blank windows
+# the end of every message that asks for the details to be sent
+SEND_LOG = ('send the file logs/launch.log from the Portimao folder through the Issues '
+            'page (see Feedback at the top of the README)')
+APT_LINE = 'type {} in a terminal (on Ubuntu or Debian), then open Portimao again'
+# Why this git copy cannot update itself, handed to Portimao in this switch so it is
+# said beside the version (utils_shared/helpers.py says it for a copy from a zip).
+UPDATE_NOTE_SWITCH = 'PORTIMAO_UPDATE_NOTE'
+NO_GIT_NOTE = ('This copy cannot update itself, as git is not installed: install git '
+               '(README, section 1.2), then open Portimao again.')
+NO_BRANCH_NOTE = ('This copy cannot update itself, as it follows no branch on GitHub: '
+                  'install Portimao again (README, section 1).')
+REFUSED_NOTE = 'A newer Portimao is out, but this copy could not update itself ({}): {}.'
+SHOWN_FILES = 3  # changed files named in the note; the others are counted
+
+
+# ---- LaunchProblemError ----
+class LaunchProblemError(Exception):
+    """
+    ---- Summary ----
+    A problem that stops the launcher, with one plain sentence for the user saying
+    what went wrong and what to do; the details are already in logs/launch.log.
+
+    ---- Attributes ----
+    args : tuple
+        The sentence, as the only item.
+
+    ---- Globals read ----
+    None.
+
+    ---- Methods ----
+    None.
+    """
 
 
 # ---- LAUNCHER HELPERS ----------------------------------------------------------------
@@ -84,6 +130,44 @@ def _app_move_trier(show: Callable[[str], None]) -> bool:
         return False
 
 
+# ---- _changed_files_lister -----------------------------------------------------------
+def _changed_files_lister() -> List[str]:
+    """
+    ---- Summary ----
+    Helper function to list the program files changed by hand in this git copy (files
+    git does not know are left out), which stop an update that changes them too.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[str]
+        The changed files, as paths inside the Portimao folder; empty when there are
+        none or git cannot say.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _command_runner
+    """
+
+    asked = _command_runner(['git', 'status', '--porcelain', '--untracked-files=no'])
+    if asked.returncode != 0:
+        return []
+    # each line is two status letters, a space and the path ("old -> new" when renamed)
+    return [line[3:].split(' -> ')[-1].strip('"')
+            for line in asked.stdout.splitlines()
+            if len(line) > 3
+            ]
+
+
 # ---- _command_runner -----------------------------------------------------------------
 def _command_runner(command: List[str],
                     timeout: Optional[float] = None,
@@ -122,6 +206,115 @@ def _command_runner(command: List[str],
                           timeout=timeout,
                           creationflags=HIDDEN,
                           )
+
+
+# ---- _details_writer ----
+def _details_writer(text: str) -> None:
+    """
+    ---- Summary ----
+    Helper function to add the details of a launcher problem to logs/launch.log, after
+    the starts before, so the message to the user can stay one plain sentence.
+
+    ---- Inputs ----
+    text : str
+        The details: a program's own error text, or a traceback.
+
+    ---- Globals read ----
+    LOG_FILE (module constant).
+
+    ---- Outputs ----
+    None
+        Nothing. Details that cannot be written are lost, the message still shows.
+
+    ---- Globals mutated ----
+    None. Writes the log file (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOG_FILE, 'a', encoding='utf-8', errors='replace') as log:
+            log.write(f'\nThe launcher stopped, {datetime.now():%Y-%m-%d %H:%M:%S}:\n'
+                      f'{text.strip()}\n',
+                      )
+    except OSError:
+        pass
+
+
+# ---- _github_knocker ----
+def _github_knocker() -> bool:
+    """
+    ---- Summary ----
+    Helper function to find out within a few seconds whether GitHub can be reached, by
+    opening a plain connection to it (no certificates needed, so any Python can).
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    GITHUB_ADDRESS, KNOCK_TIMEOUT_S (module constants).
+
+    ---- Outputs ----
+    bool
+        True when GitHub answered.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    try:
+        with socket.create_connection(GITHUB_ADDRESS, timeout=KNOCK_TIMEOUT_S):
+            return True
+    except OSError:
+        return False
+
+
+# ---- _launch_log_opener --------------------------------------------------------------
+def _launch_log_opener() -> TextIO:
+    """
+    ---- Summary ----
+    Helper function to open logs/launch.log for this start with the program's own
+    opener (launch_log_opener), so it keeps the starts before as the Mac app's does.
+    If the opener cannot be loaded, the log is opened for adding text without it.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    LOG_FILE (module constant).
+
+    ---- Outputs ----
+    TextIO
+        The log, open for adding text. Raises OSError when it cannot be opened.
+
+    ---- Globals mutated ----
+    None. Makes the logs folder and writes the start line (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _user_places_loader
+    launch_log_opener
+    """
+
+    try:
+        opener = _user_places_loader().launch_log_opener
+    except Exception:  # a log without its start line still takes the output
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        return open(LOG_FILE, 'a', encoding='utf-8', errors='replace')
+    return opener(LOG_FILE)
 
 
 # ---- _mac_mover_loader ---------------------------------------------------------------
@@ -210,56 +403,41 @@ def _message_shower(title: str, text: str) -> None:
     print(f'{title}: {text}', file=sys.stderr)
 
 
-# ---- _old_shortcut_remover -----------------------------------------------------------
-def _old_shortcut_remover() -> None:
+# ---- _package_list_stamper ----
+def _package_list_stamper(requirements: Path) -> str:
     """
     ---- Summary ----
-    Helper function to delete the shortcuts of the program under its old name, so only
-    the Portimao ones are left after an update.
+    Helper function to make a fingerprint of the package list, so a change in it (a
+    new package, or a newer version asked for) is seen at the next start.
 
     ---- Inputs ----
-    None.
+    requirements : Path
+        The package list (requirements.txt).
 
     ---- Globals read ----
-    OLD_NAMES, IS_WINDOWS (module constants).
+    None.
 
     ---- Outputs ----
-    None
-        Nothing. Anything that cannot be deleted is left.
+    str
+        The fingerprint (64 hexadecimal characters); empty when the list cannot be
+        read.
 
     ---- Globals mutated ----
-    None. Deletes shortcut files (side effect).
+    None.
 
     ---- Equations ----
-    None.
+    SHA-256 of the list's text, with Windows line endings made plain, so a copy
+    checked out on Windows gives the same fingerprint.
 
     ---- Helpers ----
     None.
     """
 
-    home = Path.home()
-    places = [home / 'Desktop']
-    if IS_WINDOWS:
-        appdata = Path(os.environ.get('APPDATA', home / 'AppData/Roaming'))
-        places += [appdata / 'Microsoft/Windows/Start Menu/Programs']
-        names = [f'{old}.lnk' for old in OLD_NAMES]
-    else:
-        data_home = Path(os.environ.get('XDG_DATA_HOME', home / '.local/share'))
-        places += [data_home / 'applications']
-        names = [f'{old}{ending}'
-                 for old in OLD_NAMES
-                 for ending in ('.desktop', '.app')
-                 ]
-    for place in places:
-        for name in names:
-            target = place / name
-            try:
-                if target.is_dir():
-                    shutil.rmtree(target)
-                elif target.exists():
-                    target.unlink()
-            except OSError:
-                pass
+    try:
+        text = requirements.read_text(encoding='utf-8')
+    except OSError:
+        return ''
+    return hashlib.sha256(text.replace('\r\n', '\n').encode('utf-8')).hexdigest()
 
 
 # ---- _tk_version_getter --------------------------------------------------------------
@@ -354,49 +532,48 @@ def _python_finder() -> Optional[str]:
     return usable[0] if usable else None
 
 
-# ---- _remote_renamer -----------------------------------------------------------------
-def _remote_renamer() -> None:
+# ---- _refused_note_maker -------------------------------------------------------------
+def _refused_note_maker() -> str:
     """
     ---- Summary ----
-    Helper function to point the git remote of an old install at the renamed
-    repository, so updates no longer depend on GitHub's redirect from the old name. The
-    remote is only changed when the new address answers.
+    Helper function to say why git refused this copy's update, and what to do: the
+    files changed here, when there are some, or else that the copy has changes of its
+    own.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    OLD_NAMES, REPOSITORY_NAME (module constants).
+    REFUSED_NOTE, SHOWN_FILES (module constants).
 
     ---- Outputs ----
-    None
-        Nothing. Any problem leaves the remote as it was.
+    str
+        The sentence for the user, for example "A newer Portimao is out, but this copy
+        could not update itself (changed here: config.py): put that file back as it
+        was, or install Portimao again (README, section 1)."
 
     ---- Globals mutated ----
-    None. May change the git remote of the folder (side effect).
+    None.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    _command_runner
+    _changed_files_lister
     """
 
-    try:
-        shown = _command_runner(['git', 'remote', 'get-url', 'origin'])
-        url = shown.stdout.strip()
-        old = next((o for o in OLD_NAMES if o.lower() in url.lower()), None)
-        if shown.returncode != 0 or old is None:
-            return
-        start = url.lower().rindex(old.lower())
-        new_url = url[:start] + REPOSITORY_NAME + url[start + len(old):]
-        answered = _command_runner(['git', 'ls-remote', new_url, 'HEAD'],
-                                   timeout=20,
-                                   )
-        if answered.returncode == 0:
-            _command_runner(['git', 'remote', 'set-url', 'origin', new_url])
-    except Exception:
-        pass
+    again = 'install Portimao again (README, section 1)'
+    changed = _changed_files_lister()
+    if not changed:
+        return REFUSED_NOTE.format('it has changes of its own', again)
+    names = ', '.join(changed[:SHOWN_FILES])
+    if len(changed) > SHOWN_FILES:
+        names += f' and {len(changed) - SHOWN_FILES} more'
+    back = ('put that file back as it was'
+            if len(changed) == 1
+            else 'put those files back as they were'
+            )
+    return REFUSED_NOTE.format(f'changed here: {names}', f'{back}, or {again}')
 
 
 # ---- _status_window_maker ------------------------------------------------------------
@@ -466,6 +643,81 @@ def _status_window_maker() -> Optional[Callable[[str], None]]:
     return show
 
 
+# ---- _user_places_loader -------------------------------------------------------------
+def _user_places_loader() -> ModuleType:
+    """
+    ---- Summary ----
+    Helper function to load the program's module of the user's places
+    (utils_shared/user_places.py, standard library only), for the launch log's opener.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    ROOT (module constant).
+
+    ---- Outputs ----
+    ModuleType
+        The module user_places.
+
+    ---- Globals mutated ----
+    sys.path: the Portimao folder is put first when it is missing.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    folder = str(ROOT)
+    if folder not in sys.path:
+        sys.path.insert(0, folder)
+    from utils_shared import user_places
+    return user_places
+
+
+# ---- _window_waiter ----
+def _window_waiter(process: 'subprocess.Popen') -> Optional[int]:
+    """
+    ---- Summary ----
+    Helper function to wait until Portimao's window is up (it makes the file the
+    launcher named), Portimao has stopped, or the longest wait has passed.
+
+    ---- Inputs ----
+    process : subprocess.Popen
+        The running program.
+
+    ---- Globals read ----
+    OPEN_WAIT_S, OPENED_FILE (module constants).
+
+    ---- Outputs ----
+    Optional[int]
+        Portimao's exit code when it stopped before its window opened; None while it
+        runs.
+
+    ---- Globals mutated ----
+    None. Deletes the file the window made (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    deadline = time.time() + OPEN_WAIT_S
+    while (time.time() < deadline
+           and process.poll() is None
+           and not OPENED_FILE.exists()):
+        time.sleep(0.2)
+    try:
+        OPENED_FILE.unlink(missing_ok=True)
+    except OSError:
+        pass
+    return process.poll()
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -474,32 +726,39 @@ def environment_builder(show: Callable[[str], None]) -> None:
     """
     ---- Summary ----
     Main function to make sure the private Python environment exists and has every
-    package the program needs, installing them the first time (needs internet).
+    package on the package list, installing them the first time and again whenever the
+    list has changed (needs internet). When an update of the packages fails but the
+    ones it has still load, Portimao opens with them and the next start tries again.
 
     ---- Inputs ----
     show : Callable[[str], None]
         Function that shows a line of progress text.
 
     ---- Globals read ----
-    ROOT, ENVIRONMENT, ENVIRONMENT_PYTHON, MINIMUM_TK, REQUIRED_IMPORTS (module
-    constants).
+    APP_NAME, APT_LINE, ENVIRONMENT, ENVIRONMENT_PYTHON, IS_LINUX, MINIMUM_TK,
+    PACKAGE_STAMP, REQUIRED_IMPORTS, REQUIREMENTS, SEND_LOG (module constants).
 
     ---- Outputs ----
     None
-        Nothing. Raises RuntimeError with a readable message when it fails.
+        Nothing. Raises LaunchProblemError with a plain sentence when it fails, after
+        writing the details to logs/launch.log.
 
     ---- Globals mutated ----
-    None. Creates the environment folder and installs packages (side effects).
+    None. Creates the environment folder, installs packages and writes the package
+    fingerprint (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _command_runner
+    _details_writer
+    _package_list_stamper
     _python_finder
     _tk_version_getter
     """
 
+    # ---- 1 Rebuild an environment whose Python draws blank windows -------------------
     if ENVIRONMENT_PYTHON.exists() and (
         (_tk_version_getter(str(ENVIRONMENT_PYTHON)) or 0) < MINIMUM_TK
     ):
@@ -507,26 +766,46 @@ def environment_builder(show: Callable[[str], None]) -> None:
         if better and (_tk_version_getter(better) or 0) >= MINIMUM_TK:
             show('Rebuilding the environment with a newer Python ...')
             shutil.rmtree(ENVIRONMENT, ignore_errors=True)
-    if ENVIRONMENT_PYTHON.exists():
-        ready = _command_runner([str(ENVIRONMENT_PYTHON), '-c', REQUIRED_IMPORTS])
-        if ready.returncode == 0:
-            return
-        show('Updating the packages ...')
-    else:
+
+    # ---- 2 Make the environment the first time ---------------------------------------
+    if not ENVIRONMENT_PYTHON.exists():
         show('First run: setting things up (a minute or two, needs internet) ...')
         python = _python_finder()
         if python is None:
-            raise RuntimeError('Python 3.9 or newer was not found. Install it from '
-                               'https://www.python.org/downloads/ and open '
-                               f'{APP_NAME} again.',
-                               )
+            fix = (APT_LINE.format('sudo apt install python3 python3-venv python3-tk')
+                   if IS_LINUX
+                   else 'install it from https://www.python.org/downloads/, then open '
+                   f'{APP_NAME} again'
+                   )
+            raise LaunchProblemError(f'{APP_NAME} needs Python 3.9 or newer, and none '
+                                     f'was found: {fix}.',
+                                     )
         made = _command_runner([python, '-m', 'venv', str(ENVIRONMENT)])
         if made.returncode != 0:
             shutil.rmtree(ENVIRONMENT, ignore_errors=True)
-            raise RuntimeError('The private Python environment could not be created.\n'
-                               + made.stderr[-600:],
-                               )
-    show('Installing the packages ...')
+            _details_writer(f'Making the environment with {python} failed:\n'
+                            f'{made.stdout}\n{made.stderr}',
+                            )
+            fix = (APT_LINE.format('sudo apt install python3-venv')
+                   if IS_LINUX
+                   else f'open {APP_NAME} again; if this message comes back, {SEND_LOG}'
+                   )
+            raise LaunchProblemError(f'{APP_NAME} could not make its own copy of '
+                                     f'Python: {fix}.',
+                                     )
+
+    # ---- 3 Install the packages when the list has changed ----------------------------
+    stamp = _package_list_stamper(REQUIREMENTS)
+    try:
+        is_listed = PACKAGE_STAMP.read_text(encoding='utf-8').strip() == stamp
+    except OSError:
+        is_listed = False
+    if is_listed:
+        ready = _command_runner([str(ENVIRONMENT_PYTHON), '-c', REQUIRED_IMPORTS])
+        if ready.returncode == 0:
+            return
+    is_installed = PACKAGE_STAMP.exists()
+    show('Updating the packages ...' if is_installed else 'Installing the packages ...')
     command = [str(ENVIRONMENT_PYTHON),
                '-m',
                'pip',
@@ -534,32 +813,46 @@ def environment_builder(show: Callable[[str], None]) -> None:
                '--quiet',
                '--disable-pip-version-check',
                '-r',
-               str(ROOT / 'requirements.txt'),
+               str(REQUIREMENTS),
                ]
     installed = _command_runner(command)
-    if installed.returncode != 0:
-        if not (ENVIRONMENT / '.complete').exists():
-            shutil.rmtree(ENVIRONMENT, ignore_errors=True)
-        raise RuntimeError('The packages could not be installed. Check the internet '
-                           'connection and try again.\n' + installed.stderr[-600:],
-                           )
-    (ENVIRONMENT / '.complete').write_text('ok')
+    if installed.returncode == 0:
+        PACKAGE_STAMP.write_text(stamp, encoding='utf-8')
+        return
+
+    # ---- 4 Open with the packages it has, or stop ------------------------------------
+    ready = _command_runner([str(ENVIRONMENT_PYTHON), '-c', REQUIRED_IMPORTS])
+    if is_installed and ready.returncode == 0:
+        show(f'The packages could not be updated, so {APP_NAME} opens with the ones it '
+             f'has.',
+             )
+        return
+    if not is_installed:
+        shutil.rmtree(ENVIRONMENT, ignore_errors=True)
+    _details_writer(f'Installing the packages failed:\n{installed.stdout}\n'
+                    f'{installed.stderr}',
+                    )
+    raise LaunchProblemError(f'{APP_NAME} could not download the packages it needs. '
+                             f'Check the internet connection, then open {APP_NAME} '
+                             f'again; if this message comes back, {SEND_LOG}.',
+                             )
 
 
 # ---- launcher_runner -----------------------------------------------------------------
 def launcher_runner(show: Callable[[str], None]) -> int:
     """
     ---- Summary ----
-    Main function to do every launcher step in order and report a failure in a
-    message box.
+    Main function to do every launcher step in order, close the small window once
+    Portimao's own window is up, and report a failure in a message box of one plain
+    sentence, with the details in logs/launch.log.
 
     ---- Inputs ----
     show : Callable[[str], None]
         Function that shows a line of progress text.
 
     ---- Globals read ----
-    APP_NAME, ENVIRONMENT, ENVIRONMENT_PYTHON, LOG_FILE, MINIMUM_TK, WAIT_SECONDS
-    (module constants).
+    APP_NAME, APT_LINE, ENVIRONMENT, ENVIRONMENT_PYTHON, IS_LINUX, MINIMUM_TK,
+    SEND_LOG (module constants).
 
     ---- Outputs ----
     int
@@ -574,17 +867,22 @@ def launcher_runner(show: Callable[[str], None]) -> int:
 
     ---- Helpers ----
     _app_move_trier
+    _details_writer
     _message_shower
     _tk_version_getter
+    _window_waiter
     environment_builder
     program_starter
     shortcut_maker
     update_checker
     """
 
+    title = f'{APP_NAME} could not start'
     try:
+        # ---- 1 Update, or move a Mac install to the app ------------------------------
         show('Checking for updates ...')
-        if update_checker():
+        is_updated, update_note = update_checker()
+        if is_updated:
             environment = dict(os.environ, PORTIMAO_UPDATED='1')
             subprocess.Popen([sys.executable, str(Path(__file__).resolve())],
                              env=environment,
@@ -592,39 +890,50 @@ def launcher_runner(show: Callable[[str], None]) -> int:
             return 0
         if sys.platform == 'darwin' and _app_move_trier(show):
             return 0  # the Mac app is opening in place of this folder
+
+        # ---- 2 Check the environment can draw the window -----------------------------
         environment_builder(show)
         tk_version = _tk_version_getter(str(ENVIRONMENT_PYTHON))
+        if tk_version is None and IS_LINUX:
+            raise LaunchProblemError('The Python on this computer cannot draw windows '
+                                     '(it has no Tk): '
+                                     + APT_LINE.format('sudo apt install python3-tk')
+                                     + '.',
+                                     )
         if tk_version is None or tk_version < MINIMUM_TK:
             reason = ('has no Tk (its window toolkit)'
                       if tk_version is None
                       else f'uses Tk {tk_version:g}, which draws blank windows'
                       )
-            _message_shower(f'{APP_NAME} needs a newer Python',
-                            f'The Python found on this computer {reason}. Install '
-                            f'Python 3.12 or newer from '
-                            f'https://www.python.org/downloads/ (it includes a good '
-                            f'Tk), then delete the hidden folder '
-                            f'{ENVIRONMENT.name} inside the {APP_NAME} folder and open '
-                            f'{APP_NAME} again.',
-                            )
-            return 1
+            raise LaunchProblemError(f'The Python found on this computer {reason}. '
+                                     f'Install Python 3.12 or newer from '
+                                     f'https://www.python.org/downloads/ (it includes '
+                                     f'a good Tk), then delete the hidden folder '
+                                     f'{ENVIRONMENT.name} inside the {APP_NAME} '
+                                     f'folder and open {APP_NAME} again.',
+                                     )
+
+        # ---- 3 Open Portimao and wait for its window ---------------------------------
         shortcut_maker()
-        show(f'Opening {APP_NAME} ...')
-        process = program_starter()
-        deadline = time.time() + WAIT_SECONDS
-        while time.time() < deadline and process.poll() is None:
-            time.sleep(0.2)
-        if process.poll() not in (None, 0):
-            tail = LOG_FILE.read_text(encoding='utf-8', errors='replace')[-700:]
-            _message_shower(f'{APP_NAME} could not start',
-                            f'The program stopped straight away.\n\n{tail}',
-                            )
-            return 1
+        opening = f'Opening {APP_NAME} ...'
+        if is_updated is None:
+            opening = f'No connection to GitHub, so updates were not checked. {opening}'
+        show(opening)
+        code = _window_waiter(program_starter(update_note))
+        if code not in (None, 0):  # what it printed is already in logs/launch.log
+            raise LaunchProblemError(f'{APP_NAME} stopped as it opened. Open it again; '
+                                     f'if it stops again, {SEND_LOG}.',
+                                     )
         return 0
-    except Exception as exc:
-        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        LOG_FILE.write_text(traceback.format_exc(), encoding='utf-8')
-        _message_shower(f'{APP_NAME} could not start', str(exc))
+    except LaunchProblemError as problem:
+        _message_shower(title, str(problem))
+        return 1
+    except Exception:  # anything unforeseen still ends in a plain message
+        _details_writer(traceback.format_exc())
+        _message_shower(title,
+                        f"{APP_NAME}'s launcher stopped because of a problem. Open "
+                        f'{APP_NAME} again; if it happens again, {SEND_LOG}.',
+                        )
         return 1
 
 
@@ -669,36 +978,48 @@ def main() -> int:
 
 
 # ---- program_starter -----------------------------------------------------------------
-def program_starter() -> 'subprocess.Popen':
+def program_starter(update_note: str = '') -> 'subprocess.Popen':
     """
     ---- Summary ----
     Main function to start the program in the private environment, with no terminal
-    window. What it prints goes to logs/launch.log.
+    window. What it prints goes to logs/launch.log, after the starts before; it is
+    told which file to make once its window is up, and why this copy cannot update
+    itself, if it cannot.
 
     ---- Inputs ----
-    None.
+    update_note : str
+        Why this copy cannot update itself, from update_checker; empty when it can.
 
     ---- Globals read ----
-    ROOT, LOG_FILE, ENVIRONMENT_PYTHON, ENVIRONMENT_WINDOWLESS, IS_WINDOWS.
+    ROOT, ENVIRONMENT_PYTHON, ENVIRONMENT_WINDOWLESS, IS_WINDOWS, OPENED_FILE,
+    OPENED_SWITCH, UPDATE_NOTE_SWITCH (module constants).
 
     ---- Outputs ----
     subprocess.Popen
         The running program.
 
     ---- Globals mutated ----
-    None. Starts a process and writes the log file (side effects).
+    None. Starts a process, writes the log file and deletes a window file left from
+    before (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    None.
+    _launch_log_opener
     """
 
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    log = open(LOG_FILE, 'w', encoding='utf-8')
+    log = _launch_log_opener()
+    OPENED_FILE.unlink(missing_ok=True)
     program = str(ROOT / 'main.py')
-    environment = dict(os.environ, PYTHONIOENCODING='utf-8', PYTHONUTF8='1')
+    environment = dict(os.environ,
+                       PYTHONIOENCODING='utf-8',
+                       PYTHONUTF8='1',
+                       **{OPENED_SWITCH: str(OPENED_FILE)},
+                       )
+    environment.pop(UPDATE_NOTE_SWITCH, None)
+    if update_note:
+        environment[UPDATE_NOTE_SWITCH] = update_note
     if IS_WINDOWS:
         python = ENVIRONMENT_WINDOWLESS
         if not python.exists():
@@ -751,7 +1072,6 @@ def shortcut_maker() -> None:
     ---- Helpers ----
     _command_runner
     _mac_mover_loader
-    _old_shortcut_remover
     desktop_file_maker
     """
 
@@ -766,7 +1086,6 @@ def shortcut_maker() -> None:
                                                    )
         if is_made:
             return
-        _old_shortcut_remover()
         if IS_WINDOWS:
             script = ROOT / 'launchers' / 'make_shortcut.ps1'
             windowless = Path(sys.executable).with_name('pythonw.exe')
@@ -814,22 +1133,30 @@ def shortcut_maker() -> None:
 
 
 # ---- update_checker ------------------------------------------------------------------
-def update_checker() -> bool:
+def update_checker() -> Tuple[Optional[bool], str]:
     """
     ---- Summary ----
     Main function to install a newer version from GitHub when this folder is a git
-    clone and one is available. Anything that goes wrong (no internet, files edited
-    here) is ignored and the current version runs.
+    clone and one is available. It first finds out within a few seconds whether GitHub
+    can be reached, then asks only for GitHub's newest commit, and downloads only when
+    that is new. When this copy cannot update (git missing, no branch followed, files
+    changed here that the update changes too) the current version runs, and the reason
+    is given for Portimao to say beside its version. A copy from a zip has no reason
+    here: Portimao finds that out itself.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    ROOT, OLD_SHORTCUT_MARK (module constants); os.environ['PORTIMAO_UPDATED'].
+    ASK_TIMEOUT_S, FETCH_TIMEOUT_S, NO_BRANCH_NOTE, NO_GIT_NOTE, ROOT (module
+    constants); os.environ['PORTIMAO_UPDATED'].
 
     ---- Outputs ----
-    bool
-        True when an update was installed, so the launcher must start again.
+    Tuple[Optional[bool], str]
+        (True when an update was installed, so the launcher must start again; False
+        when there is nothing newer, or this copy cannot update; None when GitHub
+        could not be reached. Why this copy cannot update, in one sentence for the
+        user; empty when it can.)
 
     ---- Globals mutated ----
     None. May change the files of the program (side effect).
@@ -839,25 +1166,57 @@ def update_checker() -> bool:
 
     ---- Helpers ----
     _command_runner
-    _remote_renamer
+    _github_knocker
+    _refused_note_maker
     """
 
+    # ---- 1 Check this copy can update and GitHub can be reached ----------------------
     if not (ROOT / '.git').exists() or os.environ.get('PORTIMAO_UPDATED'):
-        return False
+        return False, ''
     if shutil.which('git') is None:
-        return False
+        return False, NO_GIT_NOTE
+    if not _github_knocker():
+        return None, ''
     try:
-        _remote_renamer()
-        if _command_runner(['git', 'fetch', '--quiet'], timeout=20).returncode != 0:
-            return False
+        # ---- 2 Ask for GitHub's newest commit of this copy's branch ------------------
+        upstream = _command_runner(['git',
+                                    'rev-parse',
+                                    '--abbrev-ref',
+                                    '--symbolic-full-name',
+                                    '@{u}',
+                                    ])
+        remote, _, branch = upstream.stdout.strip().partition('/')
+        if upstream.returncode != 0 or not branch:
+            return False, NO_BRANCH_NOTE
+        asked = _command_runner(['git', 'ls-remote', remote, f'refs/heads/{branch}'],
+                                timeout=ASK_TIMEOUT_S,
+                                )
+        words = asked.stdout.split()
+        if asked.returncode != 0 or not words:
+            return None, ''
+        is_current = _command_runner(['git',
+                                      'merge-base',
+                                      '--is-ancestor',
+                                      words[0],
+                                      'HEAD',
+                                      ]).returncode == 0
+        if is_current:
+            return False, ''
+
+        # ---- 3 Download and install it -----------------------------------------------
+        fetched = _command_runner(['git', 'fetch', '--quiet'], timeout=FETCH_TIMEOUT_S)
+        if fetched.returncode != 0:
+            return None, ''
         behind = _command_runner(['git', 'rev-list', '--count', 'HEAD..@{u}'])
         if behind.returncode != 0 or int(behind.stdout.strip() or 0) == 0:
-            return False
-        # older launchers rewrote this tracked file, which would block the pull
-        _command_runner(['git', 'checkout', '--', OLD_SHORTCUT_MARK])
-        return _command_runner(['git', 'pull', '--ff-only', '--quiet']).returncode == 0
-    except Exception:
-        return False
+            return False, ''
+        if _command_runner(['git', 'pull', '--ff-only', '--quiet']).returncode == 0:
+            return True, ''
+        return False, _refused_note_maker()
+    except subprocess.TimeoutExpired:
+        return None, ''
+    except (OSError, ValueError):
+        return False, ''
 
 
 if __name__ == '__main__':

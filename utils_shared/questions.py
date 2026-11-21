@@ -1,12 +1,14 @@
 """
-Helpers for asking numbered questions in the terminal.
+Helpers for asking numbered questions in the terminal of the window.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import os
 import re
-import sys
 from typing import Callable, List, Optional, Sequence, Tuple
+
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.run_logging import answer_logger
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -17,10 +19,9 @@ RESET = '\x1b[0m'
 INDENT = '   '
 MAX_DEPTH = 6
 _counters = [0] * MAX_DEPTH  # [section, question, sub question, ...]
-_colour_ready = False
 _tight_next = False  # True: the next question follows its heading line directly
 # What is told when a question can be answered with the mouse (the window, which then
-# takes clicks or drags on the plot); None in the terminal.
+# takes clicks or drags on the plot); None while no window is open.
 _time_requester: Optional[Callable[[Optional[str], Optional[Callable]], None]] = None
 
 
@@ -28,8 +29,7 @@ _time_requester: Optional[Callable[[Optional[str], Optional[Callable]], None]] =
 class UserQuitError(Exception):
     """
     ---- Summary ----
-    Raised when the input ends (window closed, Ctrl+Z / Ctrl+D) so the program can stop
-    cleanly.
+    Raised when the input ends (the window closed) so the program can stop cleanly.
 
     ---- Attributes ----
     None.
@@ -49,7 +49,10 @@ class UserQuitError(Exception):
 def _input_reader(text: str, indent: str = '') -> str:
     """
     ---- Summary ----
-    Helper function to show the answer prompt and read what the user types.
+    Helper function to show the answer prompt and read what the user types in the
+    window's answer box (the window puts its own reader in place of input while it
+    runs). Every answer, typed or given with the mouse, passes here, and is added to
+    the run's log once it has started.
 
     ---- Inputs ----
     text : str
@@ -59,28 +62,29 @@ def _input_reader(text: str, indent: str = '') -> str:
         Indent placed before the "> " prompt.
 
     ---- Globals read ----
-    input_flusher.
+    None.
 
     ---- Outputs ----
     str
         The typed answer with surrounding spaces removed.
 
     ---- Globals mutated ----
-    None. Reads from the terminal; raises UserQuitError when the input ends (side
-    effect).
+    None. Reads from the terminal and writes the answer to the run's log; raises
+    UserQuitError when the input ends (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    input_flusher
+    answer_logger
     """
 
-    input_flusher()
     try:
-        return input(f'{indent}> ').strip()
+        answer = input(f'{indent}> ').strip()
     except EOFError:
         raise UserQuitError()
+    answer_logger(f'{indent}> {answer}')
+    return answer
 
 
 # ---- _number_builder -----------------------------------------------------------------
@@ -164,16 +168,15 @@ def _time_announcer(kind: Optional[str], reader: Optional[Callable]) -> None:
     """
     ---- Summary ----
     Helper function to tell the window, when there is one, that the question being
-    asked can be answered with the mouse (a click or a drag on the plot, turned into
-    the answer by ``reader``), or no longer can.
+    asked can be answered with the mouse (a drag across the plot, turned into the
+    answer by ``reader``), or no longer can.
 
     ---- Inputs ----
     kind : Optional[str]
-        'point' (a click), 'span' (a drag), or None once the question has its answer.
+        'span' (a drag), or None once the question has its answer.
     reader : Optional[Callable]
-        Turns what the mouse gave into the answer: reader(file name, time_min) for a
-        click, reader(file name, start_min, end_min) for a drag; it returns None when
-        that file or place gives no answer. None with kind None.
+        Turns the drag into the answer: reader(file name, start_min, end_min); it
+        returns None when that file or place gives no answer. None with kind None.
 
     ---- Globals read ----
     _time_requester (module state).
@@ -262,41 +265,45 @@ def choice_asker(question: str,
         print(f'{indent}Please type a number from 1 to {len(options)}.')
 
 
-# ---- colour_checker ------------------------------------------------------------------
-def colour_checker() -> bool:
+# ---- enter_waiter --------------------------------------------------------------------
+def enter_waiter(question: str, nudge: str, depth: int = 1) -> None:
     """
     ---- Summary ----
-    Main function to say whether the terminal can show colour; it also switches on
-    colour codes in the Windows console the first time.
+    Main function to give a numbered instruction that is carried out in the window (on
+    the plot or in the strip under it) and wait until Enter is pressed with the answer
+    box empty. Anything typed in the box instead is answered with ``nudge`` and the
+    instruction goes on waiting.
 
     ---- Inputs ----
-    None.
+    question : str
+        The instruction, without its number.
+    nudge : str
+        One sentence saying where to do it instead of typing in the answer box.
+    depth : int
+        Numbering depth of the instruction (1 = 3.1, 2 = 3.1.1, ...).
 
     ---- Globals read ----
-    os.environ, sys.stdout; _colour_ready (module state).
+    None.
 
     ---- Outputs ----
-    bool
-        True when colour can be used (a terminal, and NO_COLOR is not set).
+    None
+        Nothing.
 
     ---- Globals mutated ----
-    Sets the module state _colour_ready; may run an empty os.system call on Windows.
+    None. Reads from and prints to the terminal (side effect); advances the question
+    numbering counters.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    None.
+    _input_reader
+    _question_printer
     """
 
-    global _colour_ready
-    if 'NO_COLOR' in os.environ or not sys.stdout.isatty():
-        return False
-    if not _colour_ready:
-        if os.name == 'nt':
-            os.system('')  # switches on colour codes in the Windows console
-        _colour_ready = True
-    return True
+    indent = _question_printer(question, depth)
+    while _input_reader(question, indent):
+        print(f'{indent}{nudge}')
 
 
 # ---- heading_printer -----------------------------------------------------------------
@@ -364,46 +371,6 @@ def info_printer(text: str, depth: int = 1, tight: bool = False) -> None:
     global _tight_next
     print(f'{INDENT * (depth - 1)}{text}')
     _tight_next = tight
-
-
-# ---- input_flusher -------------------------------------------------------------------
-def input_flusher() -> None:
-    """
-    ---- Summary ----
-    Main function to throw away keys pressed while the program was busy, so a stray
-    Enter cannot answer a question.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    os.name, sys.stdin.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Empties the keyboard input buffer; does nothing when the input is not a
-    terminal (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    try:
-        if os.name == 'nt':
-            import msvcrt
-            while msvcrt.kbhit():
-                msvcrt.getwch()
-        else:
-            import termios
-            termios.tcflush(sys.stdin, termios.TCIFLUSH)
-    except Exception:  # not a real terminal (a pipe, a test): nothing to flush
-        pass
 
 
 # ---- multi_asker ---------------------------------------------------------------------
@@ -496,8 +463,6 @@ def number_asker(question: str,
                  allow_blank: bool = False,
                  depth: int = 1,
                  blank_label: str = 'none',
-                 time_reader: Optional[Callable[[str, float],
-                                                Optional[float]]] = None,
                  span_reader: Optional[Callable[[str, float, float],
                                                 Optional[float]]] = None,
                  ) -> Optional[float]:
@@ -505,8 +470,8 @@ def number_asker(question: str,
     ---- Summary ----
     Main function to ask a question answered with a number, asking again until the value
     is valid. A question that can be answered with the mouse says so to the window,
-    where a click (``time_reader``) or a drag (``span_reader``) on the plot then writes
-    the answer it gives into the answer box; in the terminal nothing changes.
+    where a drag (``span_reader``) across the plot then writes the answer it gives into
+    the answer box.
 
     ---- Inputs ----
     question : str
@@ -525,12 +490,10 @@ def number_asker(question: str,
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
     blank_label : str
         Word shown in [brackets] for an empty answer.
-    time_reader : Optional[Callable[[str, float], Optional[float]]]
-        Turns a click on the plot into the answer: (file shown, time clicked in min) ->
-        answer, or None when that click gives none. None when a click gives nothing.
     span_reader : Optional[Callable[[str, float, float], Optional[float]]]
         Turns a drag across the plot into the answer: (file shown, start min, end min)
-        -> answer, or None. Used only when there is no ``time_reader``.
+        -> answer, or None when that drag gives none. None when the mouse gives
+        nothing.
 
     ---- Globals read ----
     None.
@@ -562,9 +525,7 @@ def number_asker(question: str,
     indent = _question_printer(question, depth, hint)
 
     # ---- 3 Read and check the answer -------------------------------------------------
-    if time_reader is not None:
-        _time_announcer('point', time_reader)
-    elif span_reader is not None:
+    if span_reader is not None:
         _time_announcer('span', span_reader)
     try:
         while True:
@@ -593,7 +554,7 @@ def number_asker(question: str,
                 continue
             return value
     finally:
-        if time_reader is not None or span_reader is not None:
+        if span_reader is not None:
             _time_announcer(None, None)
 
 
@@ -626,37 +587,6 @@ def numbering_getter(depth: int) -> int:
     """
 
     return _counters[depth]
-
-
-# ---- numbering_restarter -------------------------------------------------------------
-def numbering_restarter(depth: int) -> None:
-    """
-    ---- Summary ----
-    Main function to make the next question at a depth (and deeper) start again from 1.
-
-    ---- Inputs ----
-    depth : int
-        Numbering depth to restart; deeper levels restart too.
-
-    ---- Globals read ----
-    MAX_DEPTH (module constant).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Resets entries of the module counters _counters (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    for level in range(depth, MAX_DEPTH):
-        _counters[level] = 0
 
 
 # ---- numbering_setter ----------------------------------------------------------------
@@ -920,7 +850,7 @@ def text_asker(question: str,
 def text_colourer(text: str, code: str = COLOUR_QUESTION) -> str:
     """
     ---- Summary ----
-    Main function to wrap text in a colour code when colour is available.
+    Main function to wrap text in a colour code, which the window's terminal shows.
 
     ---- Inputs ----
     text : str
@@ -929,11 +859,11 @@ def text_colourer(text: str, code: str = COLOUR_QUESTION) -> str:
         ANSI colour code (COLOUR_QUESTION by default).
 
     ---- Globals read ----
-    COLOUR_QUESTION, RESET (module constants); colour_checker.
+    COLOUR_QUESTION, RESET (module constants).
 
     ---- Outputs ----
     str
-        The coloured text, or the text unchanged without colour.
+        The coloured text.
 
     ---- Globals mutated ----
     None.
@@ -942,28 +872,28 @@ def text_colourer(text: str, code: str = COLOUR_QUESTION) -> str:
     None.
 
     ---- Helpers ----
-    colour_checker
+    None.
     """
 
-    return f'{code}{text}{RESET}' if colour_checker() else text
+    return f'{code}{text}{RESET}'
 
 
 # ---- text_italiser -------------------------------------------------------------------
 def text_italiser(text: str) -> str:
     """
     ---- Summary ----
-    Main function to write text in italics when the terminal supports it.
+    Main function to write text in italics, which the window's terminal shows.
 
     ---- Inputs ----
     text : str
         Text to put in italics.
 
     ---- Globals read ----
-    ITALIC, RESET (module constants); colour_checker.
+    ITALIC, RESET (module constants).
 
     ---- Outputs ----
     str
-        The italic text, or the text unchanged without colour support.
+        The italic text.
 
     ---- Globals mutated ----
     None.
@@ -972,10 +902,10 @@ def text_italiser(text: str) -> str:
     None.
 
     ---- Helpers ----
-    colour_checker
+    None.
     """
 
-    return f'{ITALIC}{text}{RESET}' if colour_checker() else text
+    return f'{ITALIC}{text}{RESET}'
 
 
 # ---- time_request_setter -------------------------------------------------------------
@@ -988,14 +918,14 @@ def time_request_setter(requester: Optional[Callable[[Optional[str],
     """
     ---- Summary ----
     Main function to register what is told when a question can be answered with the
-    mouse: the window registers itself while it is open, so a click or a drag on its
-    plot can give the answer.
+    mouse: the window registers itself while it is open, so a drag across its plot can
+    give the answer.
 
     ---- Inputs ----
     requester : Optional[Callable[[Optional[str], Optional[Callable]], None]]
-        Function called with ('point' or 'span', reader) when a question starts waiting
-        for an answer the mouse can give, and with (None, None) when it has its answer
-        (see _time_announcer); None to register nothing (the terminal).
+        Function called with ('span', reader) when a question starts waiting for an
+        answer the mouse can give, and with (None, None) when it has its answer (see
+        _time_announcer); None to register nothing (when the window closes).
 
     ---- Globals read ----
     None.

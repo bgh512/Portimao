@@ -109,6 +109,23 @@ REFERENCE_WINDOW_POINTS = 50
 BASELINE_MINIMUM_SECONDS = 10
 # an averaging window dragged across the plot is rounded to whole steps of this
 DRAG_STEP_SECONDS = 5
+# The window. Resolution of its plots, in dots per inch.
+PREVIEW_DPI = 200
+# files the window keeps read in memory and redraws after each answer: the one shown and
+# the nearest ones beside it, so the arrows lead to a drawn file (any other is drawn when
+# it is looked at); a big file takes several hundred MB
+WINDOW_KEPT_FILES = 3
+# time axis title of each file's plot in the window: while trimming, and afterwards for
+# a file trimmed at its start (its 0 is then where the kept part starts); the saved
+# figures use TIME_AXIS_LABEL
+PREVIEW_TIME_TITLES = {'recording': 'Time in the recording (minutes)',
+                       'trimmed': 'Time from the trimmed start (minutes)',
+                       }
+# spectral window (nm) and smoothing (nm) first offered by the component finder (PCA)
+PCA_WINDOW_NM = (500.0, 630.0)
+PCA_SMOOTHING_NM = 4.0
+# volume (mL) the spun-down cells are resuspended in, as the OD questions say
+OD_RESUSPENDED_ML = 5
 # axis-label size. Tick labels, legends and event labels are 1 pt smaller and titles 1
 # pt larger; panel letters follow the journal.
 BASE_FONT_PT = 6

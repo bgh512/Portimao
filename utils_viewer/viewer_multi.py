@@ -15,15 +15,13 @@ from utils_custom.custom_runner import experiment_preparer
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.helpers import figure_capture_setter
 from utils_shared.questions import choice_asker, info_printer
+from utils_shared.user_notices import problem_shower
 from utils_viewer.viewer_gui import active_gui_getter
-from utils_viewer.viewer_preview import PREVIEW_DPI, preview_info_builder
-from utils_viewer.viewer_stages import PREVIEW_FILE
-from utils_viewer.viewer_window import PictureWindow
+from utils_viewer.viewer_preview import preview_info_builder
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 SUMMARY_KINDS = ('time_response', 'haem_ocr')
-WARNING_WORDS = ('Not made', 'not made', 'skipped', 'Warning')
 
 
 # ---- MULTI-FIGURE HELPERS ------------------------------------------------------------
@@ -130,19 +128,20 @@ def _pictures_builder(kind: str,
     makers : Dict[str, Callable]
         {'comparison': comparison_maker, 'special': special_figures_maker} of main.py.
     window : Any
-        The browser window (or the picture fallback), which captures the printed text.
+        The browser window, which captures the printed text.
 
     ---- Globals read ----
-    PREVIEW_DPI, WARNING_WORDS (module constants).
+    settings.PREVIEW_DPI.
 
     ---- Outputs ----
     Tuple[List[Tuple[str, bytes]], str]
-        ([(title, PNG bytes)], notes). The notes are the lines saying why a figure was
-        not made, and may be empty.
+        ([(title, PNG bytes)], notes). The notes are the warnings shown while the
+        figure was made (why it, or a part of it, was not made), one per line, and may
+        be empty.
 
     ---- Globals mutated ----
     None. Reads the files, switches figure saving to preview mode while it runs and
-    puts it back (side effects).
+    puts it back; the details of a problem go to the log (side effects).
 
     ---- Equations ----
     None.
@@ -150,6 +149,7 @@ def _pictures_builder(kind: str,
     ---- Helpers ----
     _kept_builder
     figure_capture_setter
+    problem_shower
     """
 
     # ---- 1 Decide the files and the settings -----------------------------------------
@@ -181,7 +181,7 @@ def _pictures_builder(kind: str,
     pictures: List[Tuple[str, bytes]] = []
     def capture(figure: Any, stem: str) -> None:
         buffer = io.BytesIO()
-        figure.savefig(buffer, format='png', dpi=PREVIEW_DPI)
+        figure.savefig(buffer, format='png', dpi=settings.PREVIEW_DPI)
         pictures.append((stem.replace('_', ' '), buffer.getvalue()))
     cfg = settings.Config(answers)
     plt.rcParams.update(cfg.RC_PARAMS)
@@ -200,15 +200,11 @@ def _pictures_builder(kind: str,
                                   True,
                                   )
         except Exception as exc:  # a preview problem must never stop the questions
-            print(f'Not made: {type(exc).__name__}: {exc}')
+            problem_shower('Not made', exc)
         finally:
             figure_capture_setter(None)
             plt.close('all')
-    notes = '\n'.join(line.strip()
-                      for line in printed.getvalue().splitlines()
-                      if any(word in line for word in WARNING_WORDS)
-                      )
-    return pictures, notes
+    return pictures, '\n'.join(printed.warnings)
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -232,7 +228,7 @@ def multi_figure_checker_builder(context: dict,
         {'comparison': comparison_maker, 'special': special_figures_maker} of main.py.
 
     ---- Globals read ----
-    PREVIEW_FILE (imported constant).
+    None.
 
     ---- Outputs ----
     Callable[[str, dict], bool]
@@ -255,7 +251,7 @@ def multi_figure_checker_builder(context: dict,
     """
 
     def checker(kind: str, payload: dict) -> bool:
-        window = active_gui_getter() or PictureWindow(PREVIEW_FILE)
+        window = active_gui_getter()
         info_printer('Drawing the figure from the data (this can take a moment) ...',
                      depth=2,
                      )

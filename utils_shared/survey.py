@@ -1,5 +1,5 @@
 """
-Numbered terminal questions of the main program (sections 1 to 5).
+Numbered terminal questions of the main program (sections 1 to 5) and the trimming rules.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -18,7 +18,6 @@ from utils_shared.questions import (choice_asker,
                                     info_printer,
                                     multi_asker,
                                     number_asker,
-                                    numbering_restarter,
                                     numbering_setter,
                                     numbers_asker,
                                     path_cleaner,
@@ -29,6 +28,7 @@ from utils_shared.questions import (choice_asker,
                                     yes_no_asker,
                                     )
 from utils_shared.spectral_decomposer import fit_importer
+from utils_shared.user_notices import problem_teller
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -45,6 +45,8 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
 PCA_CHOICE = '__pca__'
 # raised form of the characters of an exponent typed as -1 or ^2
 SUPERSCRIPT_TABLE = str.maketrans('-+0123456789', '⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹')
+# the four edges of the trimming step, in the order they are shown
+TRIM_KEYS = ('trim_start', 'trim_end', 'ignore_start', 'ignore_end')
 # the units a label is tidied around; a name with numbers (nd-011992) is none of them
 UNIT_PATTERN = r'(?:[mµnpk]?(?:M|L|g|mol)|min|s|h|OD)'
 
@@ -309,186 +311,6 @@ def _limit_maximum_getter(summary: dict,
     return max(summary['duration_min'] - kept_from, 0.0)
 
 
-# ---- _limits_asker -------------------------------------------------------------------
-def _limits_asker(summaries: List[dict],
-                  remembered: dict,
-                  kind: str,
-                  edge: str,
-                  collected: dict,
-                  progress: Callable[[Dict[str, dict]], None],
-                  ) -> None:
-    """
-    ---- Summary ----
-    Helper function to ask the questions for one edge of the data (trim start, trim end,
-    ignore start or ignore end): whether to do it at all, how many minutes for ALL the
-    files, and then optionally how many for each file. The limits are stored and passed
-    to ``progress`` after every answer, so a plot can show them building up. In the
-    window a click on the plot of a file gives the minutes that put the cut there.
-
-    ---- Inputs ----
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md).
-    remembered : dict
-        {file name: {key: value}} from the last run, offered as the defaults.
-    kind : str
-        'trim' or 'ignore'.
-    edge : str
-        'start' or 'end'.
-    collected : dict
-        {file name: {key: value}} of the limits asked so far; this question adds its
-        own key.
-    progress : Callable[[Dict[str, dict]], None]
-        Function called with the limits of every file after each answer.
-
-    ---- Globals read ----
-    config.DEFAULT_ANSWERS (default ignore time at the start).
-
-    ---- Outputs ----
-    None
-        Nothing; the answers are stored in ``collected``.
-
-    ---- Globals mutated ----
-    collected (adds the key of this question for every file). Reads from and prints to
-    the terminal (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _file_focuser
-    _first_event_finder
-    _last_event_finder
-    _limit_converter
-    _limit_maximum_getter
-    _limits_filler
-    _minutes_recaller
-    info_printer
-    limit_minutes_finder
-    number_asker
-    yes_no_asker
-    """
-
-    key = f'{kind}_{edge}'
-    verb, place = kind.upper(), edge.upper()
-    past = 'TRIMMED' if kind == 'trim' else 'IGNORED'
-    by_name = {s['name']: s for s in summaries}
-    def clicked(name: str, time_min: float) -> Optional[float]:
-        # the minutes a click on the plot of a file gives, for this edge
-        if name not in by_name:
-            return None
-        return limit_minutes_finder(by_name[name],
-                                    collected[name],
-                                    kind,
-                                    edge,
-                                    time_min,
-                                    )
-    fallback = (settings.DEFAULT_ANSWERS['ignore_first_minutes']
-                if key == 'ignore_start' else 0.0
-                )
-    old = {s['name']: _minutes_recaller(s, remembered, key) for s in summaries}
-    known = [value for value in old.values() if value is not None]
-    default_yes = any(known) or (fallback > 0 and not known)
-    if not yes_no_asker(f'Do you want to {verb} the {place} of any of the data?',
-                        default_yes,
-                        ):
-        for summary in summaries:
-            collected[summary['name']][key] = _limit_converter(summary, kind, edge, 0)
-        return
-
-    # ---- 1 One value for ALL the data ------------------------------------------------
-    maxima = {s['name']: _limit_maximum_getter(s, kind, edge, collected[s['name']])
-              for s in summaries
-              }
-    caps = [value for value in maxima.values() if value is not None]
-    common_default = max(set(known), key=known.count) if known else fallback
-    if caps:
-        common_default = min(common_default, min(caps))
-    common = number_asker(f'How many minutes should be {past} from the {place} of '
-                          'ALL the data?',
-                          common_default,
-                          minimum=0,
-                          maximum=min(caps, default=None),
-                          depth=2,
-                          time_reader=clicked,
-                          )
-    for summary in summaries:
-        collected[summary['name']][key] = _limit_converter(summary, kind, edge, common)
-    progress(_limits_filler(summaries, collected))
-    differs = any(value != common for value in known)
-    if not yes_no_asker('Do you want to adjust this for any specific file?',
-                        differs,
-                        depth=2,
-                        ):
-        return
-
-    # ---- 2 One value per file, drawn as it is answered -------------------------------
-    for summary in summaries:
-        name = summary['name']
-        _file_focuser(name)
-        if kind == 'trim':
-            event = (_first_event_finder(summary) if edge == 'start'
-                     else _last_event_finder(summary)
-                     )
-            which = 'first' if edge == 'start' else 'last'
-            info_printer(f'{name}: {which} event at {event:.1f} min, recording '
-                         f"{summary['duration_min']:.1f} min",
-                         depth=2,
-                         )
-        default = old[name] if old[name] is not None else common
-        if maxima[name] is not None:
-            default = min(default, maxima[name])
-        minutes = number_asker(f'How many minutes should be {past} from the {place} '
-                               f'of {name}?',
-                               default,
-                               minimum=0,
-                               maximum=maxima[name],
-                               depth=2,
-                               time_reader=clicked,
-                               )
-        collected[name][key] = _limit_converter(summary, kind, edge, minutes)
-        progress(_limits_filler(summaries, collected))
-
-
-# ---- _limits_filler ------------------------------------------------------------------
-def _limits_filler(summaries: List[dict], collected: dict) -> Dict[str, dict]:
-    """
-    ---- Summary ----
-    Helper function to give every file all four limits, using "none" for the ones not
-    asked yet.
-
-    ---- Inputs ----
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md).
-    collected : dict
-        {file name: {key: value}} of the limits asked so far.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    Dict[str, dict]
-        {file name: {trim_start, trim_end, ignore_start, ignore_end}}; the trim limits
-        are None and the ignore limits 0.0 when not set.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    return {s['name']: {'trim_start': collected[s['name']].get('trim_start'),
-                        'trim_end': collected[s['name']].get('trim_end'),
-                        'ignore_start': collected[s['name']].get('ignore_start') or 0.0,
-                        'ignore_end': collected[s['name']].get('ignore_end') or 0.0,
-                        }
-            for s in summaries
-            }
-
-
 # ---- _maths_converter ----------------------------------------------------------------
 def _maths_converter(match: 're.Match') -> str:
     """
@@ -681,6 +503,64 @@ def _tidy_labels_offerer(with_events: List[dict],
     if yes_no_asker('Do you want to use these tidy forms?', True):
         for _, _, entry, tidy in found:
             entry['label'] = tidy
+
+
+# ---- _trim_minutes_clamper -----------------------------------------------------------
+def _trim_minutes_clamper(summary: dict,
+                          minutes: Dict[str, float],
+                          key: str,
+                          ) -> Dict[str, float]:
+    """
+    ---- Summary ----
+    Helper function to keep the four edges of one file within its limits: no edge below
+    0 minutes, a trimmed edge never cutting off an event, and the ignored parts inside
+    the kept part without crossing. When the ignored parts no longer fit, the one on
+    the side of ``key`` gives way first, so an edge pushed against another stops there.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with events and duration_min.
+    minutes : Dict[str, float]
+        {trim_start, trim_end, ignore_start, ignore_end} in minutes taken off each edge.
+    key : str
+        The edge just set (one of TRIM_KEYS); its side gives way first.
+
+    ---- Globals read ----
+    TRIM_KEYS.
+
+    ---- Outputs ----
+    Dict[str, float]
+        The minutes kept within the limits; the dictionary given is not changed.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Kept length = duration - trim start - trim end; the ignore time on the side of
+    ``key`` is at most kept length - the other ignore time.
+
+    ---- Helpers ----
+    _limit_maximum_getter
+    """
+
+    # ---- 1 The trimmed edges stop at the first and last event ------------------------
+    kept = {name: max(float(minutes[name]), 0.0) for name in TRIM_KEYS}
+    kept['trim_start'] = min(kept['trim_start'],
+                             _limit_maximum_getter(summary, 'trim', 'start', {}),
+                             )
+    kept['trim_end'] = min(kept['trim_end'],
+                           _limit_maximum_getter(summary, 'trim', 'end', kept),
+                           )
+
+    # ---- 2 The ignored parts fit inside the kept part --------------------------------
+    length = max(float(summary['duration_min']) - kept['trim_start'] - kept['trim_end'],
+                 0.0,
+                 )
+    near = 'ignore_end' if key.endswith('_end') else 'ignore_start'
+    far = 'ignore_start' if near == 'ignore_end' else 'ignore_end'
+    kept[near] = min(kept[near], max(length - kept[far], 0.0))
+    kept[far] = min(kept[far], length - kept[near])
+    return kept
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -964,6 +844,7 @@ def decomposition_asker(summaries: List[dict],
     choice_asker
     fit_importer
     info_printer
+    problem_teller
     yes_no_asker
     """
 
@@ -1033,8 +914,8 @@ def decomposition_asker(summaries: List[dict],
         try:
             fit = fit_importer(fits_folder / fit_file)
         except Exception as exc:
-            info_printer(f'The fit file could not be read ({exc}); haems will not be '
-                         f'decomposed.',
+            info_printer(f"{problem_teller('The fit file could not be read', exc)} The "
+                         f'haems will not be decomposed.',
                          )
             return none_chosen
         break
@@ -1291,7 +1172,9 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
         summaries.append(summary)
     progress_clearer()
     if not summaries:
-        raise SystemExit('None of the .paf files could be read.')
+        raise SystemExit('None of the .paf files could be read (the reason for each is '
+                         'above). Open Portimao again and choose another folder.',
+                         )
     info_printer(f'\nFound {len(summaries)} readable file(s):')
     for summary in summaries:
         info_printer(f"  {summary['name']}: {summary['duration_min']:.1f} min, "
@@ -1311,14 +1194,12 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
 
 
 # ---- haem_choice_asker ---------------------------------------------------------------
-def haem_choice_asker(answers: dict,
-                      defaults: dict,
-                      fit: Optional[dict],
-                      is_shown_asked: bool = True,
-                      ) -> bool:
+def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
     """
     ---- Summary ----
-    Main function to ask whether the haems are plotted, and which ones in which order.
+    Main function to ask which haems are plotted, and in which order, when they are
+    plotted: whether they are is answered by the Haems box of the window's settings
+    strip, in answers['plot_haems'].
 
     ---- Inputs ----
     answers : dict
@@ -1327,10 +1208,6 @@ def haem_choice_asker(answers: dict,
         Default answers.
     fit : Optional[dict]
         Fit dictionary (haem_list) used to list the haems, or None.
-    is_shown_asked : bool
-        False when whether the haems are plotted is already answered (the Haems box
-        of the window's settings strip, in answers['plot_haems']): only which ones and
-        in which order are asked, and only when they are plotted.
 
     ---- Globals read ----
     None.
@@ -1349,16 +1226,11 @@ def haem_choice_asker(answers: dict,
     haem_name_formatter
     haem_name_sorter
     multi_asker
-    yes_no_asker
     """
 
     if not (answers['decompose'] and fit is not None):
         answers['plot_haems'] = False
         return False
-    if is_shown_asked:
-        answers['plot_haems'] = yes_no_asker('Do you want to plot the haems?',
-                                             defaults['plot_haems'],
-                                             )
     if answers['plot_haems']:
         answers['haems'] = multi_asker('Which haems would you like to plot, and in '
                                        'which order?',
@@ -1644,61 +1516,6 @@ def label_tidier(text: str) -> str:
                   )
 
 
-# ---- limit_minutes_finder ------------------------------------------------------------
-def limit_minutes_finder(summary: dict,
-                         limits: dict,
-                         kind: str,
-                         edge: str,
-                         time_min: float,
-                         ) -> float:
-    """
-    ---- Summary ----
-    Main function to turn a time clicked on the plot of the whole recording into the
-    minutes a trim or ignore question asks for: how much is taken off that edge so the
-    cut falls at the click.
-
-    ---- Inputs ----
-    summary : dict
-        Experiment summary with duration_min.
-    limits : dict
-        The limits of this file asked so far: 'trim_start' and 'trim_end' as times on
-        the original recording (None or missing for no trim).
-    kind : str
-        'trim' or 'ignore'.
-    edge : str
-        'start' or 'end'.
-    time_min : float
-        The time clicked, on the original recording (min).
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    float
-        Minutes to take off that edge; 0 when the click is beyond the edge.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    Trim start = t. Trim end = duration - t. Ignore start = t - trim start (ignore
-    times count from the new 0 after trimming). Ignore end = (trim end, or the
-    duration) - t.
-
-    ---- Helpers ----
-    None.
-    """
-
-    duration = float(summary['duration_min'])
-    if kind == 'trim':
-        minutes = time_min if edge == 'start' else duration - time_min
-    elif edge == 'start':
-        minutes = time_min - (limits.get('trim_start') or 0.0)
-    else:
-        minutes = (limits.get('trim_end') or duration) - time_min
-    return max(float(minutes), 0.0)
-
-
 # ---- multi_experiment_asker ----------------------------------------------------------
 def multi_experiment_asker(summaries: List[dict],
                            answers: dict,
@@ -1924,89 +1741,18 @@ def ocr_option_builder(keys: List[str]) -> List[Tuple[str, str]]:
     return [(key, OCR_LABELS[key]) for key in keys]
 
 
-# ---- od_asker ------------------------------------------------------------------------
-def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
-    """
-    ---- Summary ----
-    Main function to ask the OD, volume and dilution factor of every file, offering the
-    values saved in each experiment's workbook.
-
-    ---- Inputs ----
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md).
-    saved : dict
-        {file name: values read from its workbook} (read_saved_settings).
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    Dict[str, dict]
-        {file name: {'OD', 'volume', 'dilution_factor'}}.
-
-    ---- Globals mutated ----
-    None. Reads from and prints to the terminal (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _file_focuser
-    info_printer
-    number_asker
-    numbering_restarter
-    """
-
-    # ---- 1 Set up the answers --------------------------------------------------------
-    values = {}
-
-    # ---- 2 Ask for each experiment ---------------------------------------------------
-    for summary in summaries:
-        name = summary['name']
-        _file_focuser(name)
-        old = saved.get(name) or {}
-        info_printer(f'\n{name}:', depth=2, tight=True)
-        numbering_restarter(2)
-        values[name] = {'OD': number_asker('What was the OD of the cells added?',
-                                           old.get('OD'),
-                                           minimum=0,
-                                           exclusive_minimum=True,
-                                           depth=2,
-                                           ),
-                        'volume': number_asker('What volume of cells (mL) were spun '
-                                               'down '
-                                               'and resuspended in 5 mL?',
-                                               old.get('volume'),
-                                               minimum=0,
-                                               exclusive_minimum=True,
-                                               depth=2,
-                                               ),
-                        'dilution_factor': number_asker('What is the dilution factor, '
-                                                        'if '
-                                                        'the cells were diluted mid '
-                                                        'run?',
-                                                        old.get('dilution_factor', 1.0),
-                                                        minimum=0,
-                                                        exclusive_minimum=True,
-                                                        depth=2,
-                                                        ),
-                        }
-    return values
-
-
 # ---- od_scaling_asker ----------------------------------------------------------------
 def od_scaling_asker(summaries: List[dict],
                      answers: dict,
                      defaults: dict,
                      saved: dict,
-                     table_filler: Optional[Callable[[Dict[str, dict]],
-                                                     Dict[str, dict]]] = None,
+                     table_filler: Callable[[Dict[str, dict]], Dict[str, dict]],
                      ) -> Dict[str, dict]:
     """
     ---- Summary ----
-    Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
-    factor of every file, offering the stored values: in a table when one is given,
-    otherwise with three questions per file.
+    Main function to ask whether to scale by OD and, if so, have the OD, volume and
+    dilution factor of every file filled in in the table, starting from the stored
+    values.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -2017,10 +1763,9 @@ def od_scaling_asker(summaries: List[dict],
         Default answers (normalise_od).
     saved : dict
         {file name: values read from its workbook} (saved_values_reader).
-    table_filler : Optional[Callable[[Dict[str, dict]], Dict[str, dict]]]
+    table_filler : Callable[[Dict[str, dict]], Dict[str, dict]]
         Function that shows the OD table filled in with the given rows (od_rows,
-        DATA_FORMAT.md), waits until every cell is right, and returns the rows; None
-        to ask the questions instead.
+        DATA_FORMAT.md), waits until every cell is right, and returns the rows.
 
     ---- Globals read ----
     None.
@@ -2038,8 +1783,6 @@ def od_scaling_asker(summaries: List[dict],
     None.
 
     ---- Helpers ----
-    info_printer
-    od_asker
     yes_no_asker
     """
 
@@ -2052,57 +1795,16 @@ def od_scaling_asker(summaries: List[dict],
     if not answers['normalise_od']:
         return details
 
-    # ---- 2 Fill in the table, when there is one --------------------------------------
-    if table_filler is not None:
-        rows = {}
-        for summary in summaries:
-            old = saved.get(summary['name']) or {}
-            rows[summary['name']] = {'OD': old.get('OD'),
-                                     'volume': old.get('volume'),
-                                     'dilution_factor': (old.get('dilution_factor')
-                                                         or 1.0
-                                                         ),
-                                     }
-        for name, values in table_filler(rows).items():
-            details[name].update(values)
-        return details
-
-    # ---- 3 List what is stored -------------------------------------------------------
-    # List what is already stored for each run and only ask about the rest unless
-    # the user wants to change them.
-    stored_keys = ('OD', 'volume', 'dilution_factor')
-    complete = [s for s in summaries
-                if all((saved.get(s['name']) or {}).get(k) for k in stored_keys[:2])
-                ]
-    if complete:
-        info_printer('\nStored OD information:', depth=2, tight=True)
-        for summary in summaries:
-            old = saved.get(summary['name']) or {}
-            if summary in complete:
-                text = (f"OD {old['OD']:g}, volume {old['volume']:g} mL, dilution "
-                        f"factor {old.get('dilution_factor', 1.0):g}"
-                        )
-            else:
-                text = 'nothing stored'
-            info_printer(f"  {summary['name']}: {text}", depth=2, tight=True)
-
-    # ---- 4 Ask for the values --------------------------------------------------------
-    change = (not complete) or yes_no_asker('Do you want to change any of these?',
-                                            False,
-                                            )
-    to_ask = summaries if change else [s for s in summaries if s not in complete]
-    for summary in complete:
-        if summary not in to_ask:
-            old = saved[summary['name']]
-            dilution = old.get('dilution_factor', 1.0)
-            details[summary['name']].update({'OD': old['OD'],
-                                             'volume': old['volume'],
-                                             'dilution_factor': dilution,
-                                             },
-                                            )
-    if to_ask:
-        for name, values in od_asker(to_ask, saved).items():
-            details[name].update(values)
+    # ---- 2 Fill in the table ---------------------------------------------------------
+    rows = {}
+    for summary in summaries:
+        old = saved.get(summary['name']) or {}
+        rows[summary['name']] = {'OD': old.get('OD'),
+                                 'volume': old.get('volume'),
+                                 'dilution_factor': old.get('dilution_factor') or 1.0,
+                                 }
+    for name, values in table_filler(rows).items():
+        details[name].update(values)
     return details
 
 
@@ -2339,61 +2041,251 @@ def size_asker(answers: dict,
                                            )
 
 
-# ---- trim_asker ----------------------------------------------------------------------
-def trim_asker(summaries: List[dict],
-               remembered: dict,
-               progress: Optional[Callable[[Dict[str, dict]], None]] = None,
-               ) -> Dict[str, dict]:
+# ---- trim_layout_finder --------------------------------------------------------------
+def trim_layout_finder(summary: dict,
+                       minutes: Dict[str, float],
+                       ) -> Tuple[List[Tuple[str, float, str, str]],
+                                  List[Tuple[float, float, str]],
+                                  ]:
     """
     ---- Summary ----
-    Main function to ask section 2: which data is trimmed away (start, end) and which
-    is ignored in the calculations (start, end). Each edge is asked in turn with the
-    same questions: do it at all, how many minutes for ALL the data, and optionally how
-    many for each file.
+    Main function to say where the four edges of one file sit on the plot of its whole
+    recording, with the words by each handle, and which parts are shaded.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with duration_min.
+    minutes : Dict[str, float]
+        {trim_start, trim_end, ignore_start, ignore_end}: the minutes taken off each
+        edge (trim end from the end of the recording, ignore times from the trimmed
+        edges), as kept by trim_minutes_setter.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
+        (edges, parts): edges as [(key, time_min, words, kind)] with kind 'trim' or
+        'ignore', in the order of TRIM_KEYS; parts as [(start_min, end_min, kind)],
+        times on the whole recording.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Kept start = trim start; kept end = duration - trim end; ignore start edge = kept
+    start + ignore start; ignore end edge = kept end - ignore end.
+
+    ---- Helpers ----
+    None.
+    """
+
+    duration = float(summary['duration_min'])
+    start = minutes['trim_start']
+    end = duration - minutes['trim_end']
+    first = start + minutes['ignore_start']
+    last = end - minutes['ignore_end']
+    words = {key: f"{'trimmed' if key.startswith('trim') else 'ignored'} "
+                  f'{round(minutes[key], 2):g} min'
+             for key in TRIM_KEYS
+             }
+    edges = [('trim_start', start, words['trim_start'], 'trim'),
+             ('trim_end', end, words['trim_end'], 'trim'),
+             ('ignore_start', first, words['ignore_start'], 'ignore'),
+             ('ignore_end', last, words['ignore_end'], 'ignore'),
+             ]
+    parts = [(0.0, start, 'trim'),
+             (end, duration, 'trim'),
+             (start, first, 'ignore'),
+             (last, end, 'ignore'),
+             ]
+    return edges, parts
+
+
+# ---- trim_limits_builder -------------------------------------------------------------
+def trim_limits_builder(summaries: List[dict],
+                        minutes: Dict[str, Dict[str, float]],
+                        ) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Main function to turn the minutes chosen for every file into the trim and ignore
+    limits the rest of the program uses and saves.
 
     ---- Inputs ----
     summaries : List[dict]
         File summaries (DATA_FORMAT.md).
-    remembered : dict
-        {file name: {trim_start, trim_end, ignore_start, ignore_end}} from the last
-        run; offered as the defaults.
-    progress : Optional[Callable[[Dict[str, dict]], None]]
-        Function called with the limits of every file after each answer (so a plot can
-        show them building up), or None.
+    minutes : Dict[str, Dict[str, float]]
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes taken
+        off each edge (trim_minutes_builder).
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     Dict[str, dict]
-        {file name: {'trim_start', 'trim_end' (minutes on the original recording, or
-        None), 'ignore_start', 'ignore_end' (minutes, counted from the new 0 time)}}.
+        {file name: {'trim_start', 'trim_end' (times on the original recording, or None
+        for no trim), 'ignore_start', 'ignore_end' (minutes, counted from the trimmed
+        edges)}}.
 
     ---- Globals mutated ----
-    None. Reads from and prints to the terminal (side effect).
+    None.
+
+    ---- Equations ----
+    Trim start = minutes; trim end = duration - minutes.
+
+    ---- Helpers ----
+    _limit_converter
+    """
+
+    limits = {}
+    for summary in summaries:
+        own = minutes[summary['name']]
+        limits[summary['name']] = {
+            'trim_start': _limit_converter(summary, 'trim', 'start', own['trim_start']),
+            'trim_end': _limit_converter(summary, 'trim', 'end', own['trim_end']),
+            'ignore_start': float(own['ignore_start']),
+            'ignore_end': float(own['ignore_end']),
+            }
+    return limits
+
+
+# ---- trim_minutes_builder ------------------------------------------------------------
+def trim_minutes_builder(summaries: List[dict],
+                         remembered: Dict[str, dict],
+                         ) -> Dict[str, Dict[str, float]]:
+    """
+    ---- Summary ----
+    Main function to give the minutes each file starts the trimming step with: those
+    remembered for it, otherwise the standard settings (only the start ignored), kept
+    within the file's own limits.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    remembered : Dict[str, dict]
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} as the limits are
+        kept (trim_limits_builder), from the last run or the last time the step was
+        answered; a file or key may be missing.
+
+    ---- Globals read ----
+    config.DEFAULT_ANSWERS (the minutes ignored at the start); TRIM_KEYS.
+
+    ---- Outputs ----
+    Dict[str, Dict[str, float]]
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes taken
+        off each edge.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Trim end minutes = duration - remembered end time.
+
+    ---- Helpers ----
+    _minutes_recaller
+    _trim_minutes_clamper
+    """
+
+    standard = {key: 0.0 for key in TRIM_KEYS}
+    standard['ignore_start'] = float(settings.DEFAULT_ANSWERS['ignore_first_minutes'])
+    minutes = {}
+    for summary in summaries:
+        own = {}
+        for key in TRIM_KEYS:
+            recalled = _minutes_recaller(summary, remembered, key)
+            own[key] = standard[key] if recalled is None else float(recalled)
+        minutes[summary['name']] = _trim_minutes_clamper(summary, own, 'trim_start')
+    return minutes
+
+
+# ---- trim_minutes_setter -------------------------------------------------------------
+def trim_minutes_setter(summary: dict,
+                        minutes: Dict[str, float],
+                        key: str,
+                        value: float,
+                        ) -> Dict[str, float]:
+    """
+    ---- Summary ----
+    Main function to set one edge of one file to a number of minutes, kept within the
+    file's limits: a trimmed edge never cuts off an event, and the ignored parts stay
+    inside the kept part without crossing. When the ignored parts no longer fit, the
+    one on the side of the edge being set gives way first.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with events and duration_min.
+    minutes : Dict[str, float]
+        {trim_start, trim_end, ignore_start, ignore_end} of the file, in minutes taken
+        off each edge.
+    key : str
+        The edge set: one of TRIM_KEYS.
+    value : float
+        Minutes wanted for it; below 0 counts as 0.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, float]
+        New minutes of the file; the dictionary given is not changed.
+
+    ---- Globals mutated ----
+    None.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    _limits_asker
-    _limits_filler
-    info_printer
+    _trim_minutes_clamper
     """
 
-    # ---- 1 Explain the two words -----------------------------------------------------
-    info_printer('TRIM: data that will not be imported, plotted or used.')
-    info_printer('IGNORE: data that will be imported and plotted, but not used for '
-                 'calculations (baselines, % ranges, axis limits).',
-                 )
+    return _trim_minutes_clamper(summary, {**minutes, key: float(value)}, key)
 
-    # ---- 2 Ask the four edges in turn ------------------------------------------------
-    collected: Dict[str, dict] = {s['name']: {} for s in summaries}
-    reporter = progress or (lambda limits: None)
-    for kind, edge in (('trim', 'start'),
-                       ('trim', 'end'),
-                       ('ignore', 'start'),
-                       ('ignore', 'end'),
-                       ):
-        _limits_asker(summaries, remembered, kind, edge, collected, reporter)
-    return _limits_filler(summaries, collected)
+
+# ---- trim_pointer_reader -------------------------------------------------------------
+def trim_pointer_reader(summary: dict,
+                        minutes: Dict[str, float],
+                        key: str,
+                        time_min: float,
+                        ) -> float:
+    """
+    ---- Summary ----
+    Main function to turn a time pointed at on the plot of the whole recording into the
+    minutes that put one edge there, in steps of 0.1 min.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with duration_min.
+    minutes : Dict[str, float]
+        {trim_start, trim_end, ignore_start, ignore_end} of the file now, in minutes
+        taken off each edge; the ignore times count from the trimmed edges.
+    key : str
+        The edge being moved: one of TRIM_KEYS.
+    time_min : float
+        The time pointed at, on the original recording (min).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        Minutes for that edge, rounded to 0.1; 0 when the time is beyond the edge.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Trim start = t. Trim end = duration - t. Ignore start = t - trim start. Ignore end
+    = (duration - trim end) - t.
+
+    ---- Helpers ----
+    None.
+    """
+
+    duration = float(summary['duration_min'])
+    found = {'trim_start': time_min,
+             'trim_end': duration - time_min,
+             'ignore_start': time_min - minutes['trim_start'],
+             'ignore_end': duration - minutes['trim_end'] - time_min,
+             }[key]
+    return round(max(float(found), 0.0), 1)

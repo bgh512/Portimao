@@ -10,6 +10,7 @@ import numpy as np
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import condition_grouper
+from utils_shared.user_notices import warning_shower
 
 
 # ---- TRIPLICATE AVERAGER HELPERS -----------------------------------------------------
@@ -157,7 +158,7 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
         settings and, for vo2 and haem, per-window statistics (DATA_FORMAT.md).
 
     ---- Globals mutated ----
-    None.
+    None. Shows a warning for each condition skipped (side effect).
 
     ---- Equations ----
     None.
@@ -167,6 +168,7 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
     _run_value_getter
     _window_sorter
     condition_grouper
+    warning_shower
     """
 
     # ---- 1 Prepare the results -------------------------------------------------------
@@ -177,7 +179,9 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
         # ---- 2.1 Select the usable runs ----------------------------------------------
         usable = {run: exp for run, exp in sorted(runs.items()) if exp.get('averages')}
         if len(usable) < min_runs:
-            print(f'  Skipping {condition}: fewer than {min_runs} runs with averages.')
+            warning_shower(f'  Skipping {condition}: fewer than {min_runs} runs with '
+                           f'averages.',
+                           )
             continue
 
         # ---- 2.2 Collect the window times --------------------------------------------

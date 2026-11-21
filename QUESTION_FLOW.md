@@ -1,20 +1,22 @@
-# Portimao question flow (V2.3.2)
+# Portimao question flow (V2.4)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
 **How to read it**
 
+- The questions are asked in Portimao's window. If the window cannot open, nothing is asked: a message says why and what to do (in the Mac app, with a **Copy details** button to send the details with the Mac problem form).
 - `(Y/n)` and `(y/N)` questions: the capital letter is what Enter gives. The letters shown are the standard settings, offered for a dataset you have never run. Once you have started a run, your answers are saved in a small file inside the data folder (`portimao_settings.json`), and that dataset offers them instead, on this computer or on another one the folder is copied to. Press Enter on any question to use the value in `[brackets]`.
 - **Yes → / No →** says which question comes next. **Next** means the next question in this list.
 - The numbers here are for reference. On screen the numbers are given in the order the questions are asked, so when a branch is skipped the later numbers move up, and every "Do you accept...?" question takes a number of its own.
 - Every "Do you accept...?" question starts with **1 (Yes, accept)**, which moves on. Its other answers (**2 (No, ...)**, and **3**, **4** ... where there are more) each say what is asked again, with your last answers as the defaults.
-- The plot on the right is redrawn after each step marked **(plot)**. You can flick through the files with the arrows or the drop-down at any time while a question waits.
+- The plot on the right is redrawn after each step marked **(plot)**. You can flick through the files with the arrows or the drop-down at any time while a question waits. The file shown and the one on each side of it are redrawn at once; any other file is drawn when you go to it, with its last plot under the **Drawing ...** sign meanwhile. From section 6 on, a file you did not look at after your last change says it was not drawn with your final settings.
 - The **strip** under the plot shows what the run uses: **Haems** (ticked when the haems are worked out and shown), the **Fit**, the **Journal**, the **Width** and the **Height** of the figure of each file.
     - While your files are on the plot (sections 2 to 5), you can change it whenever a question waits. The plot is redrawn at once, the run uses the change, and the question goes on waiting.
     - Unticking Haems leaves the haems out of the run. Ticking it, or picking a fit, works them out with the fit shown and ticks the box.
     - If a fit cannot be used, one line says why and the strip goes back to what it showed.
     - A new journal, width or height redraws the plot only in section 5, the one plot drawn at the figure's size. Before that the change is kept for section 5.
     - The strip is greyed out while you choose the folder, during the questions of 4.A.1, and from section 6 on.
+    - In section 2 the strip has one more row, above the others: the times of the trimmed and ignored edges of the file shown, and **Every file** (see section 2).
 - While the program draws a picture of its own (the components found from the data, the figures of sections 6 and 7), a yellow **Drawing ...** sign is on the plot. It goes when the picture is shown or the next question is asked.
 - Sections **1** to **3** are the import: your files, the parts of them that are used, and what is known about each run (the OD values and the labels). The processing starts with section **4**.
 
@@ -33,39 +35,21 @@ The standard plot of every file is then drawn with no question asked: the set an
 
 ## 2. Trimming and ignoring
 
-TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted but not used for calculations. Ignore times count from the new 0 after trimming. All four edges are asked in the same way, in this order: TRIM + START, TRIM + END, IGNORE + START, IGNORE + END. The plot shows the standard plot of the whole recording first (with the haems, when they are shown; the strip turns them on and off and picks their fit), and **after every answer in this section the shaded regions are added to the plot**: trimmed parts grey and hatched, ignored parts amber. An answer for ALL the data shades every file; an answer for one file shades just that file, and the plot switches to the file being asked about.
+TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted but not used for calculations. The plot shows the standard plot of the whole recording of each file (with the haems, when they are shown; the strip turns them on and off and picks their fit), with four edges on it: the trimmed start and end in grey (the parts trimmed away grey and hatched) and the ignored start and end in amber (the parts ignored amber). Each edge has a handle above the plot with its minutes beside it, the trimmed ones in the top row and the ignored ones just under them. Moving an edge never draws the plot again.
 
-You can answer every "How many minutes ...?" question below with the mouse: click on the plot where the cut should fall, and the answer box shows how many minutes that takes off the edge being asked about (for ALL the data, measured on the file shown). For an IGNORE question the minutes count from the trimmed edge, and a click inside the trimmed part gives 0. You can change the number before pressing Enter, or type one instead.
+- **Drag** an edge by its handle or by its line; over an edge the mouse becomes a two-way arrow. The shading follows at once, and the edge moves in steps of 0.1 min. A trimmed edge stops at the first or the last event, so no addition is cut away, and the ignored parts stay inside the kept part without crossing. Where two edges meet, the line takes the ignored one; the trimmed one is still taken by its handle.
+- **Type** the minutes in the row of the strip under the plot: **Trim start** and **end** (from the start and the end of the recording), **Ignore first** and **last** (from the trimmed edges). Press Enter or leave the box. A number that cannot be used turns the box red, with what to type beside it; a number beyond a limit is kept at the limit.
+- **Every file**, ticked when the step opens: an edge moved or typed on the file shown moves on every file, to the same minutes from its own start or end, within that file's limits. Unticked, only the file shown changes. A file whose times differ from most files is marked **(own times)** in the drop-down.
+- The edges start where they were left the last time the dataset was run; for a dataset never run, the first 5 minutes are ignored and nothing else. When this step is opened again (**4.3**, or going back at **5.8**), the limits it had are drawn as red dashed lines, so you can see how far you moved them.
 
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 2.1 | Do you want to TRIM the START of any of the data? `(y/N)` | **2.1.1** | **2.2** (nothing trimmed at the start) |
-| 2.1.1 | How many minutes should be TRIMMED from the START of ALL the data? `[0]` Every file is shaded **(plot)**. | **2.1.2** | |
-| 2.1.2 | Do you want to adjust this for any specific file? `(y/N)` | **2.1.3** | **2.2** (every file uses 2.1.1) |
-| 2.1.3 | How many minutes should be TRIMMED from the START of *file*? Asked once for each file; the plot switches to that file and its shading is updated **(plot)**. | the next file, then **2.2** | |
-| 2.2 | Do you want to TRIM the END of any of the data? `(y/N)` | **2.2.1** | **2.3** (nothing trimmed at the end) |
-| 2.2.1 | How many minutes should be TRIMMED from the END of ALL the data? `[0]` Every file is shaded **(plot)**. | **2.2.2** | |
-| 2.2.2 | Do you want to adjust this for any specific file? `(y/N)` | **2.2.3** | **2.3** (every file uses 2.2.1) |
-| 2.2.3 | How many minutes should be TRIMMED from the END of *file*? Asked once for each file; the plot switches to that file and its shading is updated **(plot)**. | the next file, then **2.3** | |
-| 2.3 | Do you want to IGNORE the START of any of the data? `(Y/n)` | **2.3.1** | **2.4** (nothing ignored at the start) |
-| 2.3.1 | How many minutes should be IGNORED from the START of ALL the data? `[5]` Every file is shaded **(plot)**. | **2.3.2** | |
-| 2.3.2 | Do you want to adjust this for any specific file? `(y/N)` | **2.3.3** | **2.4** (every file uses 2.3.1) |
-| 2.3.3 | How many minutes should be IGNORED from the START of *file*? Asked once for each file; the plot switches to that file and its shading is updated **(plot)**. | the next file, then **2.4** | |
-| 2.4 | Do you want to IGNORE the END of any of the data? `(y/N)` | **2.4.1** | **2.5** (nothing ignored at the end) |
-| 2.4.1 | How many minutes should be IGNORED from the END of ALL the data? `[0]` Every file is shaded **(plot)**. | **2.4.2** | |
-| 2.4.2 | Do you want to adjust this for any specific file? `(y/N)` | **2.4.3** | **2.5** (every file uses 2.4.1) |
-| 2.4.3 | How many minutes should be IGNORED from the END of *file*? Asked once for each file; the plot switches to that file and its shading is updated **(plot)**. | the next file, then **2.5** | |
-
-The limits of every file are then listed and drawn **(plot)** one last time.
-
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 2.5 | Do you accept these limits? | **2.6** | **2.1** (the limits you entered are drawn as red dashed lines while you enter the new ones, so you can see how far to move them) |
+| # | Question | Leads to |
+|---|---|---|
+| 2.1 | Drag the edges on the plot: grey for the trimmed parts, amber for the ignored parts, or type the times in the strip under the plot. With "Every file" ticked, a change applies to every file; untick it to change only the file shown. Press Enter when every file looks right. | Enter with the answer box empty: the limits of every file are listed, the plot shows the data they keep **(plot)**, then **2.2**. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 2.1 goes on waiting. |
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 2.6 | Do you want to export all the data now, cut to these limits, so you can plot it yourself? `(y/N)` | **2.6.1** | **3.1** |
-| 2.6.1 | Do you want to include the spectra as csv files (large, and it takes a while)? `(y/N)` | the data is exported to `<results>/all_data/<file>/` (a workbook per file with every sheet, plus the spectra csv files if chosen), then **3.1** | |
+| 2.2 | Do you want to export all the data now, cut to these limits, so you can plot it yourself? `(y/N)` | **2.2.1** | **3.1** |
+| 2.2.1 | Do you want to include the spectra as csv files (large, and it takes a while)? `(y/N)` | the data is exported to `<results>/all_data/<file>/` (a workbook per file with every sheet, plus the spectra csv files if chosen), then **3.1** | |
 
 The export is not scaled by OD, decomposed or averaged; event labels are the ones in the files, and the ignored parts are included.
 
@@ -167,7 +151,7 @@ Asked when the last choice of 4.1.1, or answer 2 of 4.2, is taken. The strip is 
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.3 | *(only when the haems are decomposed)* Do you want to change the trim and ignore times now that the haems are shown? `(y/N)` | the questions of section 2 (**2.1** to **2.6**, the offer to export all the data included) are asked again, numbered on from here, with your limits as the defaults and the haems of the chosen fit on the plot; then the plot is redrawn **(plot)** and **4.4** | **4.4** |
+| 4.3 | *(only when the haems are decomposed)* Do you want to change the trim and ignore times now that the haems are shown? `(y/N)` | section 2 (**2.1** to **2.2.1**, the offer to export all the data included) is asked again, numbered on from here, with the edges where you left them, your limits as red dashed lines and the haems of the chosen fit on the plot; then the plot is redrawn **(plot)** and **4.4** | **4.4** |
 
 ### 4.C Averaging around the events
 
@@ -239,13 +223,13 @@ Whether the haems are plotted at all is the Haems box in the strip; this questio
 
 ### 5.E Journal and size
 
-In the window the strip sets the journal, width and height of this figure, so these questions are not asked here. They are listed because the figures of sections 6 and 7 ask their own size in the same way (and terminal mode asks them here).
+The strip sets the journal, width and height of this figure, so these questions are not asked here. They are listed because the figures of sections 6 and 7 ask their own size with them, each with its own default size; each of those sections says what comes next.
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.7 | Which journal format would you like? 1) None (use the default: Nature, 1 column wide, 0.5 of a page tall) 2) Nature 3) Science 4) Cell 5) PNAS | **None**: the default size is used, the figure is drawn **(plot)**, then **5.1**. **A journal**: **5.7.1** |
+| 5.7 | Which journal format would you like? 1) None (use the default: Nature, *the figure's default width and height*) 2) Nature 3) Science 4) Cell 5) PNAS | **None**: the default size is used. **A journal**: **5.7.1** |
 | 5.7.1 | How wide should the figure be? (the widths that journal allows) | **5.7.2** |
-| 5.7.2 | How tall should the figure be, as a fraction of the page height (1 = a full page = *X* mm)? | the figure is drawn at its real size **(plot)**, then **5.1** |
+| 5.7.2 | How tall should the figure be, as a fraction of the page height (1 = a full page = *X* mm)? | the figure is drawn at its real size **(plot)** |
 
 ### 5.F Going back
 
@@ -383,42 +367,3 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 | # | Question | Yes → | No → |
 |---|---|---|---|
 | 9.1 | Do you want to start? `(Y/n)` | Your answers are saved in the data folder (`portimao_settings.json`) for the next time this dataset is opened, and the run starts. If the data folder cannot be written to, a message says the dataset will start from the standard settings next time. Every file is processed, plotted and exported, then the multi-experiment figures and summaries are made. | The program stops and nothing is changed. |
-
----
-
-## If the window cannot open (terminal mode)
-
-The Mac app has no terminal: when its window cannot open, a message says so, with a **Copy details** button to send the details with the Mac problem form, and nothing is asked. Started any other way, the questions and their order are the same, apart from the OD values and what the strip does in the window. These differ:
-
-- In **2** to **5** the picture of the current file is saved to `Portimao_preview.png` and opened in your picture viewer. Nothing can be clicked or dragged on it: every number is typed.
-- In **3.A** there is no table. The values stored for some files are listed, the OD values are asked one file at a time, and then accepted, so the event label questions are numbered one higher on screen (3.3 to 3.6):
-
-| # | Question | Leads to |
-|---|---|---|
-| 3.1.1 | *(only when some files already have OD values stored)* The stored values are listed, then: Do you want to change any of these? `(y/N)` | **Yes**: all files are asked **3.1.2**. **No**: only the files without stored values are asked **3.1.2**. If every file has stored values and you say No, no OD questions are asked and the next step is **3.2**. |
-| 3.1.2 | For each file in turn: What was the OD of the cells added? | **3.1.3** |
-| 3.1.3 | What volume of cells (mL) were spun down and resuspended in 5 mL? | **3.1.4** |
-| 3.1.4 | What is the dilution factor, if the cells were diluted mid run? `[1]` | the next file, then the values of every file are listed and **3.2** |
-
-| # | Question | 1 → | 2 → |
-|---|---|---|---|
-| 3.2 | Do you accept these OD values? | the event labels | **3.1** (asked again, then the OD values) |
-
-- There is no strip and no **Drawing ...** sign, so the haems, the fit, the journal and the size are asked as questions:
-    - **4.1** has the dataset's saved answer as its default.
-    - **4.2** has three answers:
-
-| # | Question | 1 → | 2 → | 3 → |
-|---|---|---|---|---|
-| 4.2 | Do you accept this decomposition? | **4.3** | **4.1.1** (*No, try another fit*: the plot is redrawn with each fit you try, then 4.2 again; finding the components from the data is the last choice of 4.1.1) | **4.4** (*No, do not decompose the haems*: no haems anywhere in the run) |
-
-- In **4.1.1.6**, *No, choose a fit file instead* always goes to **4.1.1**.
-- In **5.1**, answer 3 (*No, change which haems are shown*) is offered whenever the haems were decomposed, and asks **5.4** first. A last answer, **No, change the journal or size**, asks **5.7**. The figure has the haems when you said Yes to 5.4 (or to the saved answer):
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 5.4 | Do you want to plot the haems? `(Y/n)` | **5.4.1** | the figure is drawn **(plot)**, then **5.1** |
-
-- After **1.2** comes a section of its own, **2. Experiment browser**, where the standard plot is shown, with a small menu that steps through the files: "What would you like to do?" 1) Next file 2) Previous file 3) Go to a specific file 4) Continue to trimming and ignoring. Every later section is therefore numbered one higher on screen than in this list (trimming and ignoring is 3, the OD values and event labels are 4, and so on), and the going back question (**5.8**) offers the experiment browser as well.
-- Every "Do you accept...?" question of sections 2 to 5 has one more answer at the end, **Look at another file in the plot window first**, which asks "Which file would you like to look at?" and redraws the picture, then asks the accept question again.
-- There is no **Symbols** row: a symbol is typed or pasted from the keyboard.

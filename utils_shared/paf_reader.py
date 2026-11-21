@@ -18,6 +18,7 @@ import pandas as pd
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.ocr_checking import ocr_check_describer, ocr_checker, OCR_TRACES
 from utils_shared.schema import TIME_COLUMN
+from utils_shared.user_notices import warning_shower
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -1947,7 +1948,8 @@ def u32_reader(buf: Union[bytes, mmap.mmap], off: int) -> int:
 def warning_printer(msg: str, file_name: str = '') -> None:
     """
     ---- Summary ----
-    Main function to print a reader warning.
+    Main function to show a reader warning, in the terminal and, while a preview is
+    drawn, under the plot.
 
     ---- Inputs ----
     msg : str
@@ -1964,13 +1966,13 @@ def warning_printer(msg: str, file_name: str = '') -> None:
         Nothing.
 
     ---- Globals mutated ----
-    None. Prints to the terminal (side effect).
+    None. Shows the warning (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    None.
+    warning_shower
     """
 
-    print(f"  WARNING: {file_name + ': ' if file_name else ''}{msg}")
+    warning_shower(f"  WARNING: {file_name + ': ' if file_name else ''}{msg}")

@@ -79,7 +79,7 @@ Git and Python 3.9 or newer must be installed first. If they are not, follow the
 1. Open a terminal (Ctrl + Alt + T on most distributions). On Debian or Ubuntu, install the requirements first:
 
     ```bash
-    sudo apt install git python3 python3-venv python3-pip
+    sudo apt install git python3 python3-venv python3-pip python3-tk
     ```
 
 2. Go to the folder where the project should be installed:
@@ -114,6 +114,8 @@ No git is needed.
 - Python 3.9 or newer: <https://www.python.org/downloads/> (on Windows, tick "Add python.exe to PATH" in the installer).
 
 #### Install from the .zip
+
+A copy installed this way does not update itself (its window title says so): download it again for a newer version, or install with git (section 1.2), which updates at each start.
 
 1. On the project's GitHub page, click **Code**, then **Download ZIP**.
 2. Extract the .zip to the desired location.
@@ -166,7 +168,7 @@ Activate the environment first (see section 1), then run:
 python main.py
 ```
 
-The program has no command-line options. It asks numbered questions in the terminal (Enter accepts the default in square brackets); the answers are saved with each dataset, in `portimao_settings.json` inside its data folder, and offered the next time that dataset is opened (a dataset never run starts from the standard settings in `config.py`); `last_answers.json` remembers only the folder used last.
+The program has no command-line options. It opens its window and asks numbered questions in the window's terminal (Enter accepts the default in square brackets); if the window cannot open, it says why and what to do, and stops. The answers are saved with each dataset, in `portimao_settings.json` inside its data folder, and offered the next time that dataset is opened (a dataset never run starts from the standard settings in `config.py`); `last_answers.json` remembers only the folder used last.
 
 ### 2.2 Using the launcher
 
@@ -176,7 +178,7 @@ The launchers open Portimao without leaving a terminal window open.
 - macOS: open the Portimao app from Launchpad, Spotlight (Cmd + Space, type `Portimao`) or the Applications folder. Each start looks for a newer version on the Releases page; when there is one, a small "Updating Portimao" window shows it being downloaded (a few seconds to a minute), then the new version opens. Without internet it starts as it is. If Portimao does not start, see section 2.3.
 - Linux: run `./run.sh`; the first time it adds Portimao to the applications menu and the Desktop.
 
-On Windows and Linux, a small "Starting Portimao" window shows what the launcher is doing. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet). Each start checks GitHub for updates when the folder is a git clone (and, if the repository was renamed, points the folder at the new address once it answers). If something goes wrong a message box says what, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way; the Mac app writes it to `logs/launch.log` in the Portimao folder in your home folder.
+On Windows and Linux, a small "Starting Portimao" window shows what the launcher is doing, and closes as Portimao's own window opens. The first run creates the program's own Python environment and installs what is needed (a minute or two, needs internet); when an update changes the list of packages (`requirements.txt`), the next start installs them again, and if that fails Portimao opens with the ones it has. Each start checks GitHub for updates when the folder is a git clone; without a connection it says so within a few seconds and opens Portimao as it is. When the update cannot be installed (for example because a program file such as `config.py` was changed here), Portimao opens as it is and says why under its version. If something goes wrong, a message box says in one sentence what to do, and `logs/launch.log` has the details. Everything the program prints goes to that file when it is started this way, each start after the ones before (only the newest part is kept once it passes 1 MB); the Mac app writes it to `logs/launch.log` in the Portimao folder in your home folder. Each run also has its own log in the `logs` folder of its results folder, with every answer, started as soon as the results folder is chosen.
 
 Windows may show a "do you trust this software" warning the first time, because the files were downloaded and are not signed. Right-click the downloaded zip, choose Properties, tick *Unblock* and extract it (once); cloning with git avoids the warning. For the Mac, see section 2.3, entry 1.
 
@@ -212,7 +214,7 @@ Find what you see below and do what its entry says. If nothing here helps, run t
 ### 2.5 The questions
 
 1. **Your files:** the `.paf` folder and the results folder. The plots of the files then appear on the right. As the folder is read, the instrument's OCR of each file is checked against our own calculation from its oxygen traces. A file whose numbers do not agree gets a warning naming the part that differs, and its figures still use the instrument's OCR (how the check works is in `DATA_FORMAT.md`, under "Our OCR check").
-2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. The four questions (trim start, trim end, ignore start, ignore end) all work the same way: yes/no, how many minutes for ALL the data, then optionally how many minutes for each specific file. In the window you can click on the plot where a cut should fall instead, and the minutes are filled in for you. Ignore times count from the new 0 after trimming. Once the limits are accepted you can export all the data now, cut to them (a workbook per file in `<results>/all_data/`, optionally with the spectra), to plot it yourself.
+2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. Drag the four edges on the plot, or type their minutes in the strip under it, then press Enter when every file looks right. Ignore times count from the trimmed edges. Once the limits are set you can export all the data now, cut to them (a workbook per file in `<results>/all_data/`, optionally with the spectra), to plot it yourself.
 3. **OD values and event labels:** fill in the OD values in a table, one row per file (they are only checked here), then change the event labels. Write `ignore` as an event's label to ignore an event that was not an addition. A label whose units could be written more tidily (`8 ug ml-1` as `8 µg mL⁻¹`) is offered in its tidy form: the labels in the files all at once, then each label as you type or keep it. This ends the import.
 4. **Processing:** accept the haems shown, or find components from your own data instead (section 2.8); another fit, or no haems, is chosen in the strip under the plot (section 2.6); then, now that the haems are seen, change the trim and ignore times if you want; then average around the events: how long a window, and how long before the next addition it ends, in seconds. Drag across one window on the plot to fill both in.
 5. **Individual experiment plots:** the figure saved for each file is drawn with the standard settings, or with the ones last saved for the dataset, and you change only what you want different: oxygen and OCR, which haems in which order, how the haems are shown and whether they are scaled by OD, the angle of the event labels. The haems on or off, the journal and the size are in the strip.
@@ -220,17 +222,17 @@ Find what you see below and do what its entry says. If nothing here helps, run t
 7. **Experiment summaries:** time response (waterfall time points to skip, two kinetic traces, three decomposition plots), OCR and haem response (OCR, haem form, haems and order).
 8. **Data export**, then a summary and the start question.
 
-The figure of each file takes its journal and size from the strip; every other figure asks for its own. `None` uses Nature with the default size. Without the window (terminal mode) every one of these is asked as a question.
+The figure of each file takes its journal and size from the strip; every other figure asks for its own. `None` uses Nature with the default size.
 
 ### 2.6 The experiment browser
 
 The program runs in one window. The left side is a text terminal that asks the questions, with a box at the bottom to type your answers in (press Enter to send; the up and down keys recall earlier answers). If you type nothing, the value in [brackets] is used. The right side shows the plots of your files, with **< Prev** and **Next >** buttons and a drop-down list of the files under the plot. The arrows loop round, and Page Up and Page Down do the same from the keyboard. The window and the taskbar show the Portimao icon (on macOS the Dock icon needs the optional `pyobjc` package).
 
-Under the answer box is a row of **Symbols** (µ, superscript and subscript digits such as ⁻¹ and ₂, ±, °, Δ, Greek letters and more): click one to type it at the cursor, for example for event labels like `8 µg ml⁻¹`. The plot stays usable while a question waits. You can flick through every file at any time without answering, and the accept questions wait while you look. All files are drawn in the background with the latest answers, so flicking between them is quick. The plot can also answer some questions, and the hint under the answer box says when: a click gives the trim and ignore minutes, and a drag across one averaging window gives its length and gap (rounded to whole 5 s, for you to tidy before pressing Enter). You can always type the answer instead.
+Under the answer box is a row of **Symbols** (µ, superscript and subscript digits such as ⁻¹ and ₂, ±, °, Δ, Greek letters and more): click one to type it at the cursor, for example for event labels like `8 µg ml⁻¹`. The plot stays usable while a question waits. You can flick through every file at any time without answering, and the accept questions wait while you look. All files are drawn in the background with the latest answers, so flicking between them is quick. The plot can also answer some questions, and the hint under the answer box says when: the trimmed and ignored parts are chosen by dragging their edges, and a drag across one averaging window gives its length and gap (rounded to whole 5 s, for you to tidy before pressing Enter). You can always type instead.
 
 Under the plot is the **strip**: **Haems** (ticked when the haems are worked out and shown), the **Fit**, the **Journal**, the **Width** and the **Height** of the figure of each file. From the trimming to the individual plots you can change it whenever a question waits: the plot is redrawn at once and the run uses the change. Unticking Haems leaves the haems out of the run; ticking it, or picking a fit, works them out with that fit. The journal and size show in the individual plots, the only plots drawn at the figure's size. The strip is greyed out when it cannot be used: while you choose the folder, while components are found from your data, and from the multi-experiment plots on. While the program makes a picture of its own (the components, the multi-experiment figures and the summaries), a yellow **Drawing ...** sign is on the plot.
 
-- **Trimming and ignoring:** the plot shows the raw data, and after every answer the TRIMMED part (grey, hatched) or IGNORED part (amber) is added, so the shading builds up as you answer; for a specific file the plot switches to that file. If you choose *No, enter the limits again*, the limits you entered before stay on the plot as red dashed lines while you enter the new ones. Answer *Yes, accept* or *No, enter the limits again* (your answers are offered as the defaults).
+- **Trimming and ignoring:** the plot shows the whole recording of each file with four edges: the trimmed start and end (grey; the part trimmed away grey and hatched) and the ignored start and end (amber). Drag an edge by its handle above the plot or by its line; the shading follows at once and the minutes show by the handle. A trimmed edge stops at the first or last event, so no addition is cut away. The strip gets a row with the four times of the file shown (trim start and end, ignore first and last) to type exact minutes, and **Every file**: ticked, a change applies to every file (the same minutes from each file's own start or end); unticked, only to the file shown, which is then marked *(own times)* in the drop-down. Press Enter when every file looks right. When you change them again later, the limits from before stay on the plot as red dashed lines.
 - **OD values and event labels:** the OD values are filled in in a table under the terminal, with the values stored for each file already in, and checked when you press Enter (an empty cell or one that is not a number above 0 is named and the table stays), but the data is not scaled by OD yet; that is chosen in the individual plots. The event labels are drawn for every file and accepted or asked again. Questions about one file (OD values, event labels) show that file.
 - **Processing:** the decomposition is drawn for every file with each fit you pick in the strip, and the averaging windows once they are chosen; each is accepted or asked again in the same way. If you change the trim and ignore times here, the plot shows the haems of the fit you chose while you answer. An averaging window that does not fit between two additions (or after the last one) is skipped: it is drawn in red with a warning sign, and the terminal lists the files and windows affected so you can check it is OK.
 - **Individual experiment plots:** the figure is drawn at once, as it will be saved. One question, *Do you accept this figure?*, either accepts it or names the part to change: oxygen and OCR (and which OCR), which haems in which order, how the haems are shown (and whether they are scaled by OD), or the angle of the event labels. The haems on or off, the journal and the size are changed in the strip, and the figure is redrawn at once. Only that part's questions are asked, then the figure is redrawn and the question asked again.
@@ -241,7 +243,7 @@ The previews use the same processing as the final run, so what is shown is what 
 
 Closing the window while the program is still running stops it (a file that is being written may be left incomplete).
 
-**If the window cannot open.** The window needs Python's tkinter. It is included with the python.org installers for Windows and macOS. On Linux install it with your package manager (for example `sudo apt install python3-tk`), and a display is needed. When the window cannot open, the program says why and runs in the terminal as before: each preview is saved as a picture (`Portimao_preview.png` in the temporary folder) and opened in the default picture viewer, and the file is chosen by a question instead of the arrows. To use the terminal on purpose, set the environment variable `PORTIMAO_NO_GUI` to any value.
+**If the window cannot open.** The window needs Python's tkinter. It is included with the python.org installers for Windows and macOS. On Linux install it with your package manager (for example `sudo apt install python3-tk`), and a display is needed. Portimao needs its window: when it cannot open, the program says why and what to do, and stops without asking anything.
 
 The full list of questions, with where each answer leads, is in [QUESTION_FLOW.md](QUESTION_FLOW.md).
 
@@ -258,13 +260,13 @@ Everything goes into the results folder you chose:
 | `ocr_and_haem_response.xlsx` | Run values, averages, SEM and every significance test, written so the maths can be checked by hand |
 | `time_response.*` | The 3 x 3 time response figure (`.png`, `.svg`) |
 | `time_response.xlsx` | Difference spectra, haem percentages and the waterfall baseline, written so the maths can be checked by hand |
-| `logs/YYYY_MM_DD-HH_MM_SS.log` | Everything printed during the run, with the version, seed and settings |
+| `logs/YYYY_MM_DD-HH_MM_SS.log` | The version, the questions and your answers (from the results folder question on, kept even if Portimao is closed before the run), the settings, then everything printed during the run |
 
 Both summary figures need a haem fit in `fits/`. File names must carry the information the figure needs: `knockdown_kcn_then_bd_run1` (strain, addition order, run) for the OCR and haem response, and `control_7hours` (group, hours) for the time response. Files whose names do not fit are listed and left out of that figure only.
 
 ### 2.8 Finding the haem components from the data (PCA)
 
-Instead of a fit file, the haem decomposition can use components found from your own spectra with a principal component analysis (PCA). In the window, answer *No, find the components from the data* to *Do you accept this decomposition?*; in the fit question (asked when no haems are shown, and in terminal mode), choose *Find the components from the data (principal component analysis)*, the last in the list of fits. Then:
+Instead of a fit file, the haem decomposition can use components found from your own spectra with a principal component analysis (PCA). In the window, answer *No, find the components from the data* to *Do you accept this decomposition?*; in the fit question (asked when no haems are shown), choose *Find the components from the data (principal component analysis)*, the last in the list of fits. Then:
 
 1. **Spectral window:** the start and end wavelength (nm) the analysis runs over. Choose where the haems you care about absorb (the default is 500 to 630 nm).
 2. **The data:** every spectrum of every file is analysed together, after trimming and without the ignored start and end. A flat offset and a 1/wavelength scatter term are taken out of each spectrum first, and each file's average spectrum is removed, so the components describe how the spectra change and differences between preparations do not become components.
@@ -314,11 +316,11 @@ Portimao/
     utils_viewer/           the experiment browser (window with the questions and the plots)
         __init__.py
         viewer_gui.py       the browser window: terminal, plot, file selector and arrows
-        viewer_strip.py     the settings strip under the plot: haems, fit, journal and size
+        viewer_strip.py     the settings strip under the plot: haems, fit, journal, size and the times of the edges
+        viewer_edges.py     the edges dragged on the plot (the trimmed and ignored parts)
         viewer_od_table.py  the OD table of the window: OD, volume and dilution per file
         viewer_terminal.py  colour codes and the output streams that feed the terminal
         viewer_renderer.py  the thread that draws the previews of every file
-        viewer_window.py    the preview picture used when the window cannot open
         viewer_preview.py   processes and draws one file as a preview
         viewer_stages.py    the trim, processing and plot steps and going back
         viewer_multi.py     previews of the multi-experiment figures

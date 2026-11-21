@@ -1,16 +1,27 @@
 """
-Tests of the parts of the settings strip and the OD table that need no window: the
-widths a journal allows, the check of a typed height, the check of values meant for the
-strip, the answers shown in the strip and taken back from it, and the reading of one
-cell of the table.
+Tests of the parts of the window that need no window: the widths a journal allows, the
+check of a typed height, the check of values meant for the strip, the answers shown in
+the strip and taken back from it, the reading of one cell of the OD table, the way a
+turn of the mouse wheel scrolls, the time axis title of a preview and which files the
+window keeps read and redraws.
 """
+
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
+from pathlib import Path
+from types import SimpleNamespace
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_viewer.viewer_od_table import cell_reader
+import utils_viewer.viewer_preview as viewer_preview
+from utils_viewer.viewer_od_table import cell_reader, wheel_step_finder
+from utils_viewer.viewer_preview import (_loaded_experiment_getter,
+                                         kept_file_lister,
+                                         time_title_chooser,
+                                         ViewerSession,
+                                         )
 from utils_viewer.viewer_strip import (height_checker,
                                        NO_JOURNAL,
                                        size_answers_builder,
@@ -262,3 +273,176 @@ def test_widths_of_each_journal() -> None:
             assert f'({width_mm:g} mm)' in text
     with pytest.raises(ValueError):
         width_choices_lister('lancet')
+
+
+# ---- test_time_title_of_a_preview ----------------------------------------------------
+def test_time_title_of_a_preview() -> None:
+    """
+    ---- Summary ----
+    Main function to check that a preview's time axis says "in the recording" while
+    trimming and for a file whose start is not trimmed, and "from the trimmed start"
+    once a file trimmed at its start is drawn trimmed.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    settings.PREVIEW_TIME_TITLES.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    recording = settings.PREVIEW_TIME_TITLES['recording']
+    trimmed = settings.PREVIEW_TIME_TITLES['trimmed']
+    assert time_title_chooser(True, 3.0) == recording
+    assert time_title_chooser(True, None) == recording
+    assert time_title_chooser(False, 3.0) == trimmed
+    assert time_title_chooser(False, None) == recording
+    assert time_title_chooser(False, 0.0) == recording
+
+
+# ---- test_files_drawn_beside_the_one_shown -------------------------------------------
+def test_files_drawn_beside_the_one_shown() -> None:
+    """
+    ---- Summary ----
+    Main function to check which files the window keeps read and redraws after an
+    answer: the file shown, then the nearest ones around the list, the next one before
+    the previous one, never more than there are files.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    assert kept_file_lister(0, 12, 3) == [0, 1, 11]
+    assert kept_file_lister(5, 12, 3) == [5, 6, 4]
+    assert kept_file_lister(11, 12, 3) == [11, 0, 10]
+    assert kept_file_lister(3, 12, 4) == [3, 4, 2, 5]
+    assert kept_file_lister(0, 2, 3) == [0, 1]
+    assert kept_file_lister(1, 2, 3) == [1, 0]
+    assert kept_file_lister(0, 1, 3) == [0]
+    assert kept_file_lister(0, 0, 3) == []
+
+
+# ---- test_files_kept_in_memory -------------------------------------------------------
+def test_files_kept_in_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the window keeps the three files around the one shown
+    read: a file read for every file at once (as the component finder does) is let go
+    without dropping them, a kept file is not read again, and moving on by one reads
+    only the new neighbour. The reading of a file is stood in.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the file reader and sets the number of files kept.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. The stand-ins are undone after the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Twelve made-up files, read by a stand-in that counts the reads ------------
+    read = []
+    def loader(path: Path, spectral_datasets: tuple = ()) -> dict:
+        read.append(path.stem)
+        return {'raw_spectra': {}}
+    monkeypatch.setattr(viewer_preview, 'experiment_paf_loader', loader)
+    monkeypatch.setattr(settings, 'WINDOW_KEPT_FILES', 3)
+    summaries = [{'name': f'run{i}', 'path': Path(f'run{i}.paf')} for i in range(12)]
+    session = ViewerSession(summaries=summaries, export_root=Path('.'), window=None)
+
+    # ---- 2 The file shown and the ones beside it -------------------------------------
+    session.current = 5
+    for i in (5, 6, 4):
+        _loaded_experiment_getter(session, summaries[i], None)
+    assert set(session.cache) == {'run4', 'run5', 'run6'}
+
+    # ---- 3 A far file is read and let go; the kept ones are not read again -----------
+    assert _loaded_experiment_getter(session, summaries[9], None) == {'raw_spectra': {}}
+    assert set(session.cache) == {'run4', 'run5', 'run6'}
+    _loaded_experiment_getter(session, summaries[5], None)
+    assert read == ['run5', 'run6', 'run4', 'run9']
+
+    # ---- 4 One step on reads only the new neighbour ----------------------------------
+    session.current = 6
+    for i in (6, 7, 5):
+        _loaded_experiment_getter(session, summaries[i], None)
+    assert set(session.cache) == {'run5', 'run6', 'run7'}
+    assert read == ['run5', 'run6', 'run4', 'run9', 'run7']
+
+
+# ---- test_wheel_turn_on_each_system --------------------------------------------------
+def test_wheel_turn_on_each_system() -> None:
+    """
+    ---- Summary ----
+    Main function to check that a turn of the mouse wheel scrolls the OD table the
+    right way on Windows (steps of 120), the Mac (small steps) and Linux (buttons 4 and
+    5), and not at all for an event that says neither.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # Tk gives "??" as the button of a wheel event on Windows and the Mac.
+    assert wheel_step_finder(SimpleNamespace(num='??', delta=120)) == -1
+    assert wheel_step_finder(SimpleNamespace(num='??', delta=-240)) == 1
+    assert wheel_step_finder(SimpleNamespace(num='??', delta=1)) == -1
+    assert wheel_step_finder(SimpleNamespace(num='??', delta=-3)) == 1
+    assert wheel_step_finder(SimpleNamespace(num=4, delta=0)) == -1
+    assert wheel_step_finder(SimpleNamespace(num=5, delta=0)) == 1
+    assert wheel_step_finder(SimpleNamespace(num='??', delta=0)) == 0

@@ -7,8 +7,9 @@ in the home folder in the Mac app.
 import shutil
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TextIO
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -17,6 +18,11 @@ FITS_FOLDER_NAME = 'fits'
 LOGS_FOLDER_NAME = 'logs'
 LAST_ANSWERS_NAME = 'last_answers.json'
 LAUNCH_LOG_NAME = 'launch.log'  # the name the launcher gives its log, so both read alike
+# The launch log keeps the starts before, so a problem met before the run's own log
+# starts is still there when Portimao is opened again; past this size only the newest
+# half is kept.
+LAUNCH_LOG_MAX_BYTES = 1_000_000
+LAUNCH_LOG_START = '==== Portimao started'  # begins the line each start adds
 _app_log = None  # the app's log file, kept open while the program runs
 
 
@@ -38,6 +44,52 @@ class UserPlaces:
     is_app: bool
 
 
+# ---- LAUNCH LOG HELPERS --------------------------------------------------------------
+
+
+# ---- _launch_log_shortener -----------------------------------------------------------
+def _launch_log_shortener(path: Path, max_bytes: int) -> None:
+    """
+    ---- Summary ----
+    Helper function to cut the launch log to its newest half once it is bigger than the
+    limit, from the first start line in that half (or the first whole line when the
+    half holds none).
+
+    ---- Inputs ----
+    path : Path
+        The launch log; nothing is done when it is missing.
+    max_bytes : int
+        Size in bytes past which the log is cut.
+
+    ---- Globals read ----
+    LAUNCH_LOG_START (module constant).
+
+    ---- Outputs ----
+    None
+        Nothing. A log that cannot be read or written is left as it is.
+
+    ---- Globals mutated ----
+    None. Rewrites the log (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    try:
+        if path.stat().st_size <= max_bytes:
+            return
+        newest = path.read_bytes()[-(max_bytes // 2):]
+        start = newest.find(f'\n{LAUNCH_LOG_START}'.encode('utf-8'))
+        if start < 0:
+            start = newest.find(b'\n')
+        path.write_bytes(newest[start + 1:])
+    except OSError:  # a long log is better than none
+        pass
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -46,9 +98,9 @@ def app_output_logger(places: UserPlaces) -> None:
     """
     ---- Summary ----
     Main function to send everything the Mac app prints to logs/launch.log in its own
-    folder, as the launcher does for a program run from source. The app has no launcher
-    and no terminal, so without this its messages would be lost. Run from source,
-    nothing changes.
+    folder, after the starts before, as the launcher does for a program run from
+    source. The app has no launcher and no terminal, so without this its messages
+    would be lost. Run from source, nothing changes.
 
     ---- Inputs ----
     places : UserPlaces
@@ -69,22 +121,60 @@ def app_output_logger(places: UserPlaces) -> None:
     None.
 
     ---- Helpers ----
-    None.
+    launch_log_opener
     """
 
     global _app_log
     if not places.is_app:
         return
     try:
-        _app_log = open(places.logs_folder / LAUNCH_LOG_NAME,
-                        'w',
-                        encoding='utf-8',
-                        errors='replace',
-                        buffering=1,
-                        )
+        _app_log = launch_log_opener(places.logs_folder / LAUNCH_LOG_NAME)
     except OSError:  # the program still runs; only its log is missing
         return
     sys.stdout = sys.stderr = _app_log
+
+
+# ---- launch_log_opener ---------------------------------------------------------------
+def launch_log_opener(path: Path, max_bytes: int = LAUNCH_LOG_MAX_BYTES) -> TextIO:
+    """
+    ---- Summary ----
+    Main function to open the launch log for a new start: the starts before are kept
+    (cut to the newest half once the log passes the limit), and a line with the date
+    and time marks where this start begins. The launcher and the Mac app both open it
+    here, so it reads alike.
+
+    ---- Inputs ----
+    path : Path
+        The launch log (logs/launch.log); its folder is made when missing.
+    max_bytes : int
+        Size in bytes past which the starts before are cut to the newest half.
+
+    ---- Globals read ----
+    LAUNCH_LOG_START (module constant).
+
+    ---- Outputs ----
+    TextIO
+        The log, open for adding text (UTF-8, line by line), its start line already
+        written. Raises OSError when it cannot be opened.
+
+    ---- Globals mutated ----
+    None. Makes the folder, may cut the log and writes the start line (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _launch_log_shortener
+    """
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _launch_log_shortener(path, max_bytes)
+    log = open(path, 'a', encoding='utf-8', errors='replace', buffering=1)
+    gap = '\n' if log.tell() else ''  # a blank line after the start before
+    log.write(f'{gap}{LAUNCH_LOG_START} {datetime.now():%Y-%m-%d %H:%M:%S} ====\n')
+    # written out now: the launcher hands the same file to Portimao, which writes after
+    log.flush()
+    return log
 
 
 # ---- user_folder_preparer ------------------------------------------------------------

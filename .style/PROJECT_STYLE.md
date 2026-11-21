@@ -28,5 +28,4 @@ This project's own rules for its own kinds of file. They add to the shared style
     - **(plot)** wherever the plot is redrawn.
 - A question that is asked only sometimes says when, in italics in its row or in a sentence above its table.
 - Plain sentences between the tables give what the program says or does without asking: messages, steps that are skipped and why, and what is written to the results folder.
-- The last section, "If the window cannot open (terminal mode)", lists only what differs from the window.
 - Plain words throughout: no function, file or variable names from the code, apart from the files and folders a user sees.

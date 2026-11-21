@@ -32,6 +32,7 @@ from utils_custom.time_response_exporter import time_response_exporter
 from utils_custom.time_response_plotter import time_response_figure_plotter
 from utils_custom.triplicate_averager import triplicate_averager
 from utils_shared.averaging import experiment_averages_calculator
+from utils_shared.user_notices import problem_shower, warning_shower
 
 
 # ---- CUSTOM RUNNER HELPERS -----------------------------------------------------------
@@ -64,7 +65,7 @@ def _ocr_and_haem_response_preparer(experiment: dict,
         values the chosen sources need (it would not be comparable with the others).
 
     ---- Globals mutated ----
-    None.
+    None. Shows a warning when the experiment is left out (side effect).
 
     ---- Equations ----
     None.
@@ -72,14 +73,16 @@ def _ocr_and_haem_response_preparer(experiment: dict,
     ---- Helpers ----
     experiment_averages_calculator
     source_selector
+    warning_shower
     """
 
     # ---- 1 Check the inputs ----------------------------------------------------------
     needs_od = answers['ho_ocr_mode'] == 'od' or answers['ho_per_od']
     if needs_od and not od_available:
-        print('  Left out of the haem and OCR response: OD, volume or dilution '
-              'factor is missing, and the other runs are scaled by OD.',
-              )
+        warning_shower('  Left out of the haem and OCR response: OD, volume or '
+                       'dilution factor is missing, and the other runs are scaled by '
+                       'OD.',
+                       )
         return None
 
     # ---- 2 Select the data sources ---------------------------------------------------
@@ -270,7 +273,8 @@ def experiment_preparer(experiment: dict,
         experiment or None}.
 
     ---- Globals mutated ----
-    None.
+    None. Shows a warning for a figure this experiment is left out of; the details of
+    a problem go to the log (side effects).
 
     ---- Equations ----
     None.
@@ -278,6 +282,7 @@ def experiment_preparer(experiment: dict,
     ---- Helpers ----
     _ocr_and_haem_response_preparer
     _time_response_preparer
+    problem_shower
     """
 
     # ---- 1 Set up the result ---------------------------------------------------------
@@ -294,7 +299,7 @@ def experiment_preparer(experiment: dict,
                                                                 )
             print('  Time response: spectra averaged, difference spectrum decomposed')
         except (KeyError, ValueError, TypeError) as exc:
-            print(f'  Time response skipped for this file: {exc}')
+            problem_shower('  Time response skipped for this file', exc)
 
     # ---- 3 Prepare the haem and OCR response -----------------------------------------
     if custom.get('haem_ocr'):
@@ -306,7 +311,7 @@ def experiment_preparer(experiment: dict,
             if prepared['haem_ocr'] is not None:
                 print('  Haem and OCR response: event averages calculated')
         except (KeyError, ValueError, TypeError) as exc:
-            print(f'  Haem and OCR response skipped for this file: {exc}')
+            problem_shower('  Haem and OCR response skipped for this file', exc)
     return prepared
 
 
@@ -347,8 +352,9 @@ def ocr_and_haem_response_runner(experiments: dict,
         Nothing; files are written.
 
     ---- Globals mutated ----
-    None. Writes ocr_and_haem_response.xlsx and the figure files to ``export_root``
-    (side effect).
+    None. Writes ocr_and_haem_response.xlsx and the figure files to ``export_root``;
+    shows a warning for what is not made, with the details of a problem in the log
+    (side effects).
 
     ---- Equations ----
     None.
@@ -358,13 +364,17 @@ def ocr_and_haem_response_runner(experiments: dict,
     ocr_and_haem_response_config_builder
     ocr_and_haem_response_exporter
     ocr_and_haem_response_figure_plotter
+    problem_shower
     triplicate_averager
+    warning_shower
     """
 
     # ---- 1 Combine the runs of each condition ----------------------------------------
     triplicates = triplicate_averager(experiments)
     if not triplicates:
-        print('  Not made: every condition needs at least two runs with averages.')
+        warning_shower('  Not made: every condition needs at least two runs with '
+                       'averages.',
+                       )
         return
 
     # ---- 2 Draw and save the figure --------------------------------------------------
@@ -377,7 +387,7 @@ def ocr_and_haem_response_runner(experiments: dict,
         custom_figure_saver(fig, export_root, config)
         plt.close(fig)
     except Exception as exc:  # keep the workbook and the 2x2 figure going
-        print(f'  OCR and haem response figure not made: {type(exc).__name__}: {exc}')
+        problem_shower('  OCR and haem response figure not made', exc)
         plt.close('all')
 
     # ---- 3 Write the workbook --------------------------------------------------------

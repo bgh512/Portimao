@@ -20,6 +20,7 @@ from utils_shared.individual_experiment_plotter import (experiment_drawer,
                                                         watermark_style_builder,
                                                         )
 from utils_shared.schema import TIME_COLUMN, time_getter
+from utils_shared.user_notices import warning_shower
 
 
 # ---- EXEMPLAR HELPERS ----------------------------------------------------------------
@@ -350,7 +351,8 @@ def exemplar_figure_plotter(experiments: dict,
         {letter: experiment name}.
 
     ---- Globals mutated ----
-    None.
+    None. Shows a warning for an empty quadrant or columns whose additions differ (side
+    effect).
 
     ---- Equations ----
     None.
@@ -364,6 +366,7 @@ def exemplar_figure_plotter(experiments: dict,
     experiment_title_builder
     figure_finisher
     stack_legend_drawer
+    warning_shower
     watermark_style_builder
     """
 
@@ -417,10 +420,11 @@ def exemplar_figure_plotter(experiments: dict,
              any(abs(a - b) > 0.3 for t in times[1:] for a, b in zip(times[0], t))
              )
             ):
-            print(f'Warning: the additions in the {ORDER_TITLES[order]} column are not'
-                  f' at the same times in both rows ({times}); '
-                  f'the event labels above the column are those of {strains[0]}.',
-                  )
+            warning_shower(f'Warning: the additions in the {ORDER_TITLES[order]} '
+                           f'column are not at the same times in both rows ({times}); '
+                           f'the event labels above the column are those of '
+                           f'{strains[0]}.',
+                           )
 
     # ---- 4 Draw the quadrants --------------------------------------------------------
     fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
@@ -441,10 +445,10 @@ def exemplar_figure_plotter(experiments: dict,
         for c, order in enumerate(orders):
             experiment = exemplars.get((strain, order))
             if experiment is None:
-                print(f"Warning: no run{config['EXEMPLAR_RUN']} experiment found for "
-                      f'{strain}, '
-                      f'{ORDER_TITLES[order]}; that quadrant is empty.',
-                      )
+                warning_shower(f"Warning: no run{config['EXEMPLAR_RUN']} experiment "
+                               f'found for {strain}, {ORDER_TITLES[order]}; that '
+                               f'quadrant is empty.',
+                               )
                 continue
             quadrant_config = (individual_config
                                if r == 0

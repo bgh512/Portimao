@@ -6,6 +6,9 @@ Experiment (run) name parsing: conditions, run numbers, groups and hours.
 import re
 from typing import Optional, Sequence
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.user_notices import warning_shower
+
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 ORDER_TITLES = {'kcn_then_bd': 'KCN → BD', 'bd_then_kcn': 'BD → KCN'}
@@ -195,16 +198,17 @@ def condition_grouper(experiments: dict) -> dict:
     ---- Outputs ----
     dict
         {condition: {run number: experiment}}. Experiments without a run suffix are
-        skipped with a message; a duplicate run number raises ValueError.
+        skipped with a warning; a duplicate run number raises ValueError.
 
     ---- Globals mutated ----
-    None.
+    None. Shows a warning for each experiment skipped (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     run_name_parser
+    warning_shower
     """
 
     # ---- 1 Prepare the groups --------------------------------------------------------
@@ -214,7 +218,7 @@ def condition_grouper(experiments: dict) -> dict:
     for name, experiment in experiments.items():
         parsed = run_name_parser(name)
         if parsed is None:
-            print(f"  Skipping {name}: name does not end in 'run<number>'.")
+            warning_shower(f"  Skipping {name}: name does not end in 'run<number>'.")
             continue
         condition, run = parsed
         if run in groups.setdefault(condition, {}):
@@ -283,10 +287,11 @@ def group_assigner(experiments: dict, groups: Sequence[str]) -> dict:
     ---- Outputs ----
     dict
         Same experiments, ordered, each with a 'group' key added. Experiments that
-        match no group are left out with a message.
+        match no group are left out with a warning.
 
     ---- Globals mutated ----
-    None. Adds the 'group' key to the experiment dictionaries (side effect).
+    None. Adds the 'group' key to the experiment dictionaries and shows a warning for
+    each experiment left out (side effects).
 
     ---- Equations ----
     None.
@@ -294,6 +299,7 @@ def group_assigner(experiments: dict, groups: Sequence[str]) -> dict:
     ---- Helpers ----
     _group_matcher
     _order_sorter
+    warning_shower
     """
 
     # ---- 1 Match the groups ----------------------------------------------------------
@@ -301,9 +307,9 @@ def group_assigner(experiments: dict, groups: Sequence[str]) -> dict:
     for name, experiment in experiments.items():
         group = _group_matcher(name, groups)
         if group is None:
-            print(f'  Skipping {name}: its name does not contain any of the groups '
-                  f'{list(groups)}.',
-                  )
+            warning_shower(f'  Skipping {name}: its name does not contain any of the '
+                           f'groups {list(groups)}.',
+                           )
             continue
         experiment['group'] = group
         found.append((group, name, experiment))

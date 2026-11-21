@@ -25,6 +25,7 @@ from utils_shared.figure_layout import (figure_canvas_fitter,
                                         )
 from utils_shared.helpers import concentration_formatter, name_simplifier
 from utils_shared.individual_experiment_plotter import experiment_drawer
+from utils_shared.user_notices import warning_shower
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -643,16 +644,17 @@ def group_collector(experiments: dict, config: dict) -> dict:
     ---- Outputs ----
     dict
         {group: [(time label, experiment), ...]}. Experiments without a difference
-        decomposition are reported and left out; ValueError if a group is empty.
+        decomposition are left out with a warning; ValueError if a group is empty.
 
     ---- Globals mutated ----
-    None.
+    None. Shows a warning for each experiment left out (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     time_label_builder
+    warning_shower
     """
 
     # ---- 1 Prepare the groups --------------------------------------------------------
@@ -664,9 +666,9 @@ def group_collector(experiments: dict, config: dict) -> dict:
         if group not in groups:
             continue
         if 'difference_decomposition' not in experiment:
-            print(f'  Skipping {name} in the time response figure: no difference '
-                  f'decomposition.',
-                  )
+            warning_shower(f'  Skipping {name} in the time response figure: no '
+                           f'difference decomposition.',
+                           )
             continue
         groups[group].append((time_label_builder(name, config['TIME_LABEL_FORMAT']),
                               experiment,

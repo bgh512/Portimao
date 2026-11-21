@@ -1,15 +1,62 @@
 """
-Tests that the program finds its version on dev and on main, where the release leaves .style/ out.
+Tests that the program finds its version on dev and on main, where the release leaves .style/ out, and says beside it when its copy does not update itself.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
 
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import pytest
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.helpers import program_version_reader
+from utils_shared.helpers import (program_version_reader,
+                                  UPDATE_NOTE_SWITCH,
+                                  update_note_finder,
+                                  )
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- test_update_note_beside_the_version ---------------------------------------------
+def test_update_note_beside_the_version(tmp_path: Path,
+                                        monkeypatch: pytest.MonkeyPatch,
+                                        ) -> None:
+    """
+    ---- Summary ----
+    Main function to check the note beside the version: a copy from a zip always says
+    it does not update itself, a git copy says what the launcher found (nothing when it
+    updates), and the Mac app says nothing here.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder given by pytest, standing in for the program folder.
+    monkeypatch : pytest.MonkeyPatch
+        Sets and clears the launcher's note.
+
+    ---- Globals read ----
+    UPDATE_NOTE_SWITCH (imported constant).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    update_note_finder
+    """
+
+    monkeypatch.delenv(UPDATE_NOTE_SWITCH, raising=False)
+    assert 'downloaded as a zip' in update_note_finder(tmp_path, False)
+    assert update_note_finder(tmp_path, True) == ''
+    (tmp_path / '.git').mkdir()
+    assert update_note_finder(tmp_path, False) == ''
+    monkeypatch.setenv(UPDATE_NOTE_SWITCH, 'This copy cannot update itself.')
+    assert update_note_finder(tmp_path, False) == 'This copy cannot update itself.'
 
 
 # ---- test_version_from_style_folder --------------------------------------------------

@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared import questions
-from utils_shared.survey import averaging_drag_reader, limit_minutes_finder
+from utils_shared.survey import averaging_drag_reader
 from utils_viewer.viewer_gui import pointed_time_finder
 from utils_viewer.viewer_preview import time_axis_finder, TimeAxis
 
@@ -34,58 +34,6 @@ TIME_AXIS = TimeAxis(left=0.125,
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
-
-
-# ---- test_click_gives_the_minutes_of_each_edge ---------------------------------------
-def test_click_gives_the_minutes_of_each_edge() -> None:
-    """
-    ---- Summary ----
-    Main function to check that a click on the plot of the whole recording gives the
-    minutes each trim and ignore question asks for, worked out by hand for a 60 min
-    recording, and 0 for a click beyond the edge.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    Trim start: click at 4 -> 4. Trim end: click at 55 -> 60 - 55 = 5. Ignore start
-    after a trim start at 4: click at 9.5 -> 9.5 - 4 = 5.5. Ignore end before a trim
-    end at 55: click at 50 -> 55 - 50 = 5; with no trim end, 60 - 50 = 10. Ignore start
-    clicked at 2, in the trimmed part: 0.
-
-    ---- Helpers ----
-    None.
-    """
-
-    summary = {'duration_min': 60.0}
-    trimmed = {'trim_start': 4.0, 'trim_end': 55.0}
-    assert limit_minutes_finder(summary, {}, 'trim', 'start', 4.0) == pytest.approx(4.0)
-    assert limit_minutes_finder(summary, {}, 'trim', 'end', 55.0) == pytest.approx(5.0)
-    assert (limit_minutes_finder(summary, trimmed, 'ignore', 'start', 9.5)
-            == pytest.approx(5.5)
-            )
-    assert (limit_minutes_finder(summary, trimmed, 'ignore', 'end', 50.0)
-            == pytest.approx(5.0)
-            )
-    assert (limit_minutes_finder(summary,
-                                 {'trim_start': None, 'trim_end': None},
-                                 'ignore',
-                                 'end',
-                                 50.0,
-                                 )
-            == pytest.approx(10.0)
-            )
-    assert limit_minutes_finder(summary, trimmed, 'ignore', 'start', 2.0) == 0.0
 
 
 # ---- test_drag_gives_the_window_and_gap ----------------------------------------------
@@ -242,9 +190,10 @@ def test_question_wanting_a_time_tells_the_window(monkeypatch: pytest.MonkeyPatc
     """
     ---- Summary ----
     Main function to check that a number question the mouse can answer hands its rule
-    to the registered window before it reads (a click rule as 'point', a drag rule as
-    'span') and takes it back once it has a valid answer, that other number questions
-    leave the window alone, and that nothing is needed in the terminal.
+    to the registered window before it reads (a drag rule as 'span') and takes it back
+    once it has a valid answer, that other number questions leave the window alone,
+    and that a question still works when no window is registered (the window has
+    closed).
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
@@ -267,31 +216,27 @@ def test_question_wanting_a_time_tells_the_window(monkeypatch: pytest.MonkeyPatc
     None.
     """
 
-    # ---- 1 Answers typed: one that is not a number, then a time ----------------------
-    typed = ['abc', '12,5', '4', '7', '3']
+    # ---- 1 Answers typed: one that is not a number, then numbers ---------------------
+    typed = ['abc', '4,5', '7', '3']
     monkeypatch.setattr(questions, '_input_reader', lambda text, indent='': typed.pop(0))
     monkeypatch.setattr(questions, '_time_requester', None)
     calls: List[tuple] = []
     questions.time_request_setter(lambda kind, reader: calls.append((kind, reader)))
-    def click(name: str, time_min: float) -> float:
-        return time_min
     def drag(name: str, start_min: float, end_min: float) -> float:
         return end_min - start_min
 
-    # ---- 2 A question a click answers, then one a drag answers -----------------------
-    assert questions.number_asker('Where?', time_reader=click) == pytest.approx(12.5)
-    assert calls == [('point', click), (None, None)]
-    assert questions.number_asker('How long?', span_reader=drag) == pytest.approx(4.0)
-    assert calls[2:] == [('span', drag), (None, None)]
+    # ---- 2 A question a drag answers -------------------------------------------------
+    assert questions.number_asker('How long?', span_reader=drag) == pytest.approx(4.5)
+    assert calls == [('span', drag), (None, None)]
 
     # ---- 3 A question the mouse cannot answer ----------------------------------------
     assert questions.number_asker('How many?') == pytest.approx(7.0)
-    assert len(calls) == 4
+    assert len(calls) == 2
 
-    # ---- 4 No window registered (the terminal) ---------------------------------------
+    # ---- 4 No window registered ------------------------------------------------------
     questions.time_request_setter(None)
-    assert questions.number_asker('Where?', time_reader=click) == pytest.approx(3.0)
-    assert len(calls) == 4
+    assert questions.number_asker('How long?', span_reader=drag) == pytest.approx(3.0)
+    assert len(calls) == 2
 
 
 # ---- test_time_axis_of_a_figure ------------------------------------------------------

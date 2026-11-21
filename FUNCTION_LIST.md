@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.3.1
-- **Date:** 20/11/2026
+- **Version:** V2.3.2
+- **Date:** 21/11/2026
 
 ## Contents
 
@@ -55,12 +55,16 @@
     - [`_release_writer`](#_release_writer)
     - [`_swap_folder_maker`](#_swap_folder_maker)
     - [`test_app_only_waits_for_a_newer_release`](#test_app_only_waits_for_a_newer_release)
+    - [`test_ask_problem_is_described`](#test_ask_problem_is_described)
     - [`test_failed_swap_keeps_the_app`](#test_failed_swap_keeps_the_app)
     - [`test_newer_release_is_found`](#test_newer_release_is_found)
+    - [`test_refused_ask_uses_the_release_page`](#test_refused_ask_uses_the_release_page)
     - [`test_release_answer_is_read`](#test_release_answer_is_read)
+    - [`test_release_page_address_is_read`](#test_release_page_address_is_read)
     - [`test_swap_puts_the_new_app_in_place`](#test_swap_puts_the_new_app_in_place)
     - [`test_swap_waits_for_the_app_to_close`](#test_swap_waits_for_the_app_to_close)
     - [`test_temporary_copy_cannot_update`](#test_temporary_copy_cannot_update)
+    - [`test_unanswered_ask_is_asked_again`](#test_unanswered_ask_is_asked_again)
     - [`test_update_from_made_up_zip`](#test_update_from_made_up_zip)
 - [`tests/test_dataset_settings.py`](#teststest_dataset_settingspy)
     - [`_program_folder_maker`](#_program_folder_maker)
@@ -72,6 +76,10 @@
     - [`test_results_folder_outside_is_kept_whole`](#test_results_folder_outside_is_kept_whole)
     - [`test_settings_are_read_back`](#test_settings_are_read_back)
     - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
+- [`tests/test_file_names.py`](#teststest_file_namespy)
+    - [`test_dots_and_spaces_at_the_ends_go`](#test_dots_and_spaces_at_the_ends_go)
+    - [`test_forbidden_characters_become_underscores`](#test_forbidden_characters_become_underscores)
+    - [`test_nothing_left_gives_the_default`](#test_nothing_left_gives_the_default)
 - [`tests/test_haem_decomposition.py`](#teststest_haem_decompositionpy)
     - [`_background_builder`](#_background_builder)
     - [`_background_shape_builder`](#_background_shape_builder)
@@ -120,6 +128,17 @@
     - [`test_number_and_unit_get_a_space`](#test_number_and_unit_get_a_space)
     - [`test_symbols_can_be_drawn_in_the_figures`](#test_symbols_can_be_drawn_in_the_figures)
     - [`test_tidy_label_stays_as_it_is`](#test_tidy_label_stays_as_it_is)
+- [`tests/test_launcher.py`](#teststest_launcherpy)
+    - [`_git_stand_in_maker`](#_git_stand_in_maker)
+    - [`_launcher_loader`](#_launcher_loader)
+    - [`_stand_in_maker`](#_stand_in_maker)
+    - [`test_changed_package_list_is_installed`](#test_changed_package_list_is_installed)
+    - [`test_failed_install_stops_with_a_plain_message`](#test_failed_install_stops_with_a_plain_message)
+    - [`test_failed_update_keeps_working_packages`](#test_failed_update_keeps_working_packages)
+    - [`test_package_fingerprint_ignores_line_endings`](#test_package_fingerprint_ignores_line_endings)
+    - [`test_update_note_reaches_portimao`](#test_update_note_reaches_portimao)
+    - [`test_update_reasons_are_given`](#test_update_reasons_are_given)
+    - [`test_update_reasons_without_git`](#test_update_reasons_without_git)
 - [`tests/test_mac_app_builder.py`](#teststest_mac_app_builderpy)
     - [`_plist_maker`](#_plist_maker)
     - [`test_app_carries_program_files`](#test_app_carries_program_files)
@@ -222,6 +241,7 @@
     - [`test_trimming_never_cuts_an_addition`](#test_trimming_never_cuts_an_addition)
     - [`test_trimming_the_end_only`](#test_trimming_the_end_only)
 - [`tests/test_program_version.py`](#teststest_program_versionpy)
+    - [`test_update_note_beside_the_version`](#test_update_note_beside_the_version)
     - [`test_version_from_style_folder`](#test_version_from_style_folder)
     - [`test_version_from_question_flow`](#test_version_from_question_flow)
     - [`test_version_unknown_without_either_file`](#test_version_unknown_without_either_file)
@@ -235,6 +255,13 @@
     - [`_tree_reader`](#_tree_reader)
     - [`test_question_texts_can_be_read`](#test_question_texts_can_be_read)
     - [`test_questions_are_in_the_list`](#test_questions_are_in_the_list)
+- [`tests/test_run_logging.py`](#teststest_run_loggingpy)
+    - [`_typist_maker`](#_typist_maker)
+    - [`_fresh_numbering`](#_fresh_numbering)
+    - [`test_answers_are_logged_as_they_come`](#test_answers_are_logged_as_they_come)
+    - [`test_closed_window_keeps_the_log`](#test_closed_window_keeps_the_log)
+    - [`test_launch_log_keeps_the_starts_before`](#test_launch_log_keeps_the_starts_before)
+    - [`test_launch_log_is_cut_past_its_limit`](#test_launch_log_is_cut_past_its_limit)
 - [`tests/test_summary_maths.py`](#teststest_summary_mathspy)
     - [`_run_builder`](#_run_builder)
     - [`_spectra_experiment_builder`](#_spectra_experiment_builder)
@@ -244,13 +271,32 @@
     - [`test_average_over_three_runs`](#test_average_over_three_runs)
     - [`test_average_needs_two_runs`](#test_average_needs_two_runs)
 - [`tests/test_time_pointer.py`](#teststest_time_pointerpy)
-    - [`test_click_gives_the_minutes_of_each_edge`](#test_click_gives_the_minutes_of_each_edge)
     - [`test_drag_gives_the_window_and_gap`](#test_drag_gives_the_window_and_gap)
     - [`test_pointed_time_inside_the_panels`](#test_pointed_time_inside_the_panels)
     - [`test_pointed_time_off_the_panels`](#test_pointed_time_off_the_panels)
     - [`test_pointed_time_on_a_scaled_picture`](#test_pointed_time_on_a_scaled_picture)
     - [`test_question_wanting_a_time_tells_the_window`](#test_question_wanting_a_time_tells_the_window)
     - [`test_time_axis_of_a_figure`](#test_time_axis_of_a_figure)
+- [`tests/test_trim_edges.py`](#teststest_trim_edgespy)
+    - [`test_edge_under_the_mouse`](#test_edge_under_the_mouse)
+    - [`test_every_file_or_one_file`](#test_every_file_or_one_file)
+    - [`test_ignored_parts_stay_inside_the_kept_part`](#test_ignored_parts_stay_inside_the_kept_part)
+    - [`test_layout_of_the_edges_and_parts`](#test_layout_of_the_edges_and_parts)
+    - [`test_minutes_and_places_on_the_plot`](#test_minutes_and_places_on_the_plot)
+    - [`test_minutes_typed_in_the_strip`](#test_minutes_typed_in_the_strip)
+    - [`test_minutes_to_limits_and_back`](#test_minutes_to_limits_and_back)
+    - [`test_pointer_gives_the_minutes_of_each_edge`](#test_pointer_gives_the_minutes_of_each_edge)
+    - [`test_shaded_picture`](#test_shaded_picture)
+    - [`test_trimmed_edges_stop_at_the_events`](#test_trimmed_edges_stop_at_the_events)
+- [`tests/test_user_notices.py`](#teststest_user_noticespy)
+    - [`_caught_getter`](#_caught_getter)
+    - [`_quiet_details`](#_quiet_details)
+    - [`test_details_go_to_the_log_only`](#test_details_go_to_the_log_only)
+    - [`test_own_message_is_shown_as_it_is`](#test_own_message_is_shown_as_it_is)
+    - [`test_python_text_is_never_shown`](#test_python_text_is_never_shown)
+    - [`test_file_problems_say_what_to_do`](#test_file_problems_say_what_to_do)
+    - [`test_run_log_takes_the_details`](#test_run_log_takes_the_details)
+    - [`test_warnings_are_kept_whatever_their_words`](#test_warnings_are_kept_whatever_their_words)
 - [`tests/test_user_places.py`](#teststest_user_placespy)
     - [`_app_places_maker`](#_app_places_maker)
     - [`test_app_keeps_things_in_home_folder`](#test_app_keeps_things_in_home_folder)
@@ -263,6 +309,10 @@
     - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
     - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
     - [`test_widths_of_each_journal`](#test_widths_of_each_journal)
+    - [`test_time_title_of_a_preview`](#test_time_title_of_a_preview)
+    - [`test_files_drawn_beside_the_one_shown`](#test_files_drawn_beside_the_one_shown)
+    - [`test_files_kept_in_memory`](#test_files_kept_in_memory)
+    - [`test_wheel_turn_on_each_system`](#test_wheel_turn_on_each_system)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
     - [`exemplar_config_builder`](#exemplar_config_builder)
     - [`haem_labeller`](#haem_labeller)
@@ -440,14 +490,18 @@
 - [`utils_shared/app_updater.py`](#utils_sharedapp_updaterpy)
     - [`_app_finder`](#_app_finder)
     - [`_app_unpacker`](#_app_unpacker)
+    - [`_ask_problem_describer`](#_ask_problem_describer)
     - [`_blocker_finder`](#_blocker_finder)
     - [`_leftover_cleaner`](#_leftover_cleaner)
     - [`_log_opener`](#_log_opener)
     - [`_new_app_checker`](#_new_app_checker)
     - [`_new_app_fetcher`](#_new_app_fetcher)
     - [`_newer_checker`](#_newer_checker)
+    - [`_newest_release_finder`](#_newest_release_finder)
     - [`_own_version_reader`](#_own_version_reader)
     - [`_release_asker`](#_release_asker)
+    - [`_release_page_asker`](#_release_page_asker)
+    - [`_release_page_reader`](#_release_page_reader)
     - [`_release_reader`](#_release_reader)
     - [`_start_command_maker`](#_start_command_maker)
     - [`_status_window_maker`](#_status_window_maker)
@@ -497,6 +551,7 @@
     - [`name_simplifier`](#name_simplifier)
     - [`program_title_builder`](#program_title_builder)
     - [`program_version_reader`](#program_version_reader)
+    - [`update_note_finder`](#update_note_finder)
 - [`utils_shared/individual_experiment_exporter.py`](#utils_sharedindividual_experiment_exporterpy)
     - [`_frame_writer`](#_frame_writer)
     - [`_name_lister`](#_name_lister)
@@ -538,6 +593,7 @@
     - [`ocr_check_describer`](#ocr_check_describer)
     - [`ocr_checker`](#ocr_checker)
 - [`utils_shared/output_capture.py`](#utils_sharedoutput_capturepy)
+    - [`CapturedOutput`](#capturedoutput)
     - [`captured_buffer_getter`](#captured_buffer_getter)
     - [`output_capturer`](#output_capturer)
 - [`utils_shared/paf_reader.py`](#utils_sharedpaf_readerpy)
@@ -586,14 +642,12 @@
     - [`_question_printer`](#_question_printer)
     - [`_time_announcer`](#_time_announcer)
     - [`choice_asker`](#choice_asker)
-    - [`colour_checker`](#colour_checker)
+    - [`enter_waiter`](#enter_waiter)
     - [`heading_printer`](#heading_printer)
     - [`info_printer`](#info_printer)
-    - [`input_flusher`](#input_flusher)
     - [`multi_asker`](#multi_asker)
     - [`number_asker`](#number_asker)
     - [`numbering_getter`](#numbering_getter)
-    - [`numbering_restarter`](#numbering_restarter)
     - [`numbering_setter`](#numbering_setter)
     - [`numbers_asker`](#numbers_asker)
     - [`path_cleaner`](#path_cleaner)
@@ -610,8 +664,12 @@
     - [`window_seconds_calculator`](#window_seconds_calculator)
 - [`utils_shared/run_logging.py`](#utils_sharedrun_loggingpy)
     - [`_Tee`](#_tee)
+    - [`answer_logger`](#answer_logger)
+    - [`details_place_setter`](#details_place_setter)
+    - [`details_writer`](#details_writer)
     - [`logging_starter`](#logging_starter)
     - [`logging_stopper`](#logging_stopper)
+    - [`settings_logger`](#settings_logger)
 - [`utils_shared/schema.py`](#utils_sharedschemapy)
     - [`finite_float_converter`](#finite_float_converter)
     - [`measurement_column_finder`](#measurement_column_finder)
@@ -650,13 +708,12 @@
     - [`_last_event_finder`](#_last_event_finder)
     - [`_limit_converter`](#_limit_converter)
     - [`_limit_maximum_getter`](#_limit_maximum_getter)
-    - [`_limits_asker`](#_limits_asker)
-    - [`_limits_filler`](#_limits_filler)
     - [`_maths_converter`](#_maths_converter)
     - [`_minutes_recaller`](#_minutes_recaller)
     - [`_natural_sorter`](#_natural_sorter)
     - [`_subscript_stripper`](#_subscript_stripper)
     - [`_tidy_labels_offerer`](#_tidy_labels_offerer)
+    - [`_trim_minutes_clamper`](#_trim_minutes_clamper)
     - [`averaging_asker`](#averaging_asker)
     - [`averaging_drag_reader`](#averaging_drag_reader)
     - [`data_folder_lister`](#data_folder_lister)
@@ -673,24 +730,45 @@
     - [`haem_scaling_asker`](#haem_scaling_asker)
     - [`label_angle_asker`](#label_angle_asker)
     - [`label_tidier`](#label_tidier)
-    - [`limit_minutes_finder`](#limit_minutes_finder)
     - [`multi_experiment_asker`](#multi_experiment_asker)
     - [`ocr_kind_lister`](#ocr_kind_lister)
     - [`ocr_option_builder`](#ocr_option_builder)
-    - [`od_asker`](#od_asker)
     - [`od_scaling_asker`](#od_scaling_asker)
     - [`paf_finder`](#paf_finder)
     - [`saved_values_reader`](#saved_values_reader)
     - [`signal_asker`](#signal_asker)
     - [`size_asker`](#size_asker)
-    - [`trim_asker`](#trim_asker)
+    - [`trim_layout_finder`](#trim_layout_finder)
+    - [`trim_limits_builder`](#trim_limits_builder)
+    - [`trim_minutes_builder`](#trim_minutes_builder)
+    - [`trim_minutes_setter`](#trim_minutes_setter)
+    - [`trim_pointer_reader`](#trim_pointer_reader)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
+- [`utils_shared/user_notices.py`](#utils_shareduser_noticespy)
+    - [`_file_namer`](#_file_namer)
+    - [`_own_sentence_finder`](#_own_sentence_finder)
+    - [`problem_describer`](#problem_describer)
+    - [`problem_shower`](#problem_shower)
+    - [`problem_teller`](#problem_teller)
+    - [`warning_shower`](#warning_shower)
 - [`utils_shared/user_places.py`](#utils_shareduser_placespy)
     - [`UserPlaces`](#userplaces)
+    - [`_launch_log_shortener`](#_launch_log_shortener)
     - [`app_output_logger`](#app_output_logger)
+    - [`launch_log_opener`](#launch_log_opener)
     - [`user_folder_preparer`](#user_folder_preparer)
     - [`user_places_finder`](#user_places_finder)
+- [`utils_viewer/viewer_edges.py`](#utils_viewerviewer_edgespy)
+    - [`EdgeChoice`](#edgechoice)
+    - [`EdgeOverlay`](#edgeoverlay)
+    - [`edge_hit_finder`](#edge_hit_finder)
+    - [`every_file_setter`](#every_file_setter)
+    - [`minute_x_finder`](#minute_x_finder)
+    - [`own_value_lister`](#own_value_lister)
+    - [`photo_maker`](#photo_maker)
+    - [`shaded_picture_maker`](#shaded_picture_maker)
+    - [`x_minute_finder`](#x_minute_finder)
 - [`utils_viewer/viewer_gui.py`](#utils_viewerviewer_guipy)
     - [`GuiUnavailableError`](#guiunavailableerror)
     - [`ViewerGui`](#viewergui)
@@ -706,6 +784,7 @@
 - [`utils_viewer/viewer_od_table.py`](#utils_viewerviewer_od_tablepy)
     - [`ODTable`](#odtable)
     - [`cell_reader`](#cell_reader)
+    - [`wheel_step_finder`](#wheel_step_finder)
 - [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
     - [`PreviewSpec`](#previewspec)
     - [`TimeAxis`](#timeaxis)
@@ -713,8 +792,8 @@
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
     - [`preview_info_builder`](#preview_info_builder)
-    - [`_previous_limit_drawer`](#_previous_limit_drawer)
     - [`all_data_exporter`](#all_data_exporter)
+    - [`kept_file_lister`](#kept_file_lister)
     - [`pca_example_picture_builder`](#pca_example_picture_builder)
     - [`pca_picture_builder`](#pca_picture_builder)
     - [`pca_spectra_gatherer`](#pca_spectra_gatherer)
@@ -722,6 +801,7 @@
     - [`preview_figure_builder`](#preview_figure_builder)
     - [`skipped_windows_finder`](#skipped_windows_finder)
     - [`time_axis_finder`](#time_axis_finder)
+    - [`time_title_chooser`](#time_title_chooser)
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
     - [`PreviewRenderer`](#previewrenderer)
 - [`utils_viewer/viewer_self_test.py`](#utils_viewerviewer_self_testpy)
@@ -734,12 +814,9 @@
     - [`_all_data_asker`](#_all_data_asker)
     - [`_answers_previewer`](#_answers_previewer)
     - [`_averaging_reviewer`](#_averaging_reviewer)
-    - [`_choice_reviewer`](#_choice_reviewer)
     - [`_component_namer`](#_component_namer)
     - [`_decomposition_storer`](#_decomposition_storer)
-    - [`_empty_limits_builder`](#_empty_limits_builder)
     - [`_figure_starter`](#_figure_starter)
-    - [`_file_chooser`](#_file_chooser)
     - [`_fit_file_saver`](#_fit_file_saver)
     - [`_fit_names_lister`](#_fit_names_lister)
     - [`_limits_lister`](#_limits_lister)
@@ -759,10 +836,12 @@
     - [`trim_stage_runner`](#trim_stage_runner)
     - [`viewer_asker`](#viewer_asker)
 - [`utils_viewer/viewer_strip.py`](#utils_viewerviewer_strippy)
+    - [`EdgeRow`](#edgerow)
     - [`SettingsStrip`](#settingsstrip)
     - [`_number_reader`](#_number_reader)
     - [`_page_journal_finder`](#_page_journal_finder)
     - [`height_checker`](#height_checker)
+    - [`minutes_checker`](#minutes_checker)
     - [`size_answers_builder`](#size_answers_builder)
     - [`strip_values_builder`](#strip_values_builder)
     - [`strip_values_checker`](#strip_values_checker)
@@ -772,8 +851,6 @@
     - [`ansi_colour_getter`](#ansi_colour_getter)
     - [`ansi_splitter`](#ansi_splitter)
     - [`ansi_style_updater`](#ansi_style_updater)
-- [`utils_viewer/viewer_window.py`](#utils_viewerviewer_windowpy)
-    - [`PictureWindow`](#picturewindow)
 
 ## `config.py`
 
@@ -1911,26 +1988,36 @@ None.
 comparison_figure_plotter
 figure_size_calculator
 plot_config_builder
+problem_shower
+warning_shower
 ```
 
 #### `everything_asker`
 
 ```text
 ---- Summary ----
-Main function to ask every question of the run in numbered sections (files, trimming
-and ignoring, analysis, plots, summary figures, export) and to build the per-file
-information.
+Main function to ask every question of the run after the files, in numbered
+sections (trimming and ignoring, analysis, plots, summary figures, export), and to
+build the per-file information.
 
 ---- Inputs ----
-None.
+folder : Path
+    Data folder, from files_asker.
+summaries : List[dict]
+    Summary of each readable file, from files_asker.
+export_root : Path
+    Results folder, from files_asker.
+saved : dict
+    Settings saved with the dataset, from files_asker; empty for a dataset never
+    run.
 
 ---- Globals read ----
 PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
 
 ---- Outputs ----
-Tuple[dict, Path, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
-    (answers, results folder, per-experiment info dictionaries, fit, side-by-side
-    comparison settings or None, names of the 2x2 grid experiments or None). Raises
+Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
+    (answers, per-experiment info dictionaries, fit, side-by-side comparison
+    settings or None, names of the 2x2 grid experiments or None). Raises
     UserQuitError if the user declines to start.
 
 ---- Globals mutated ----
@@ -1942,12 +2029,9 @@ dataset_settings_saver (side effects).
 None.
 
 ---- Helpers ----
-active_gui_getter
 comparison_maker
 dataset_settings_saver
-files_asker
 haem_name_formatter
-last_answers_loader
 last_answers_saver
 multi_experiment_asker
 multi_figure_checker_builder
@@ -1997,6 +2081,7 @@ experiment_plotter
 experiment_preparer
 experiment_workbook_exporter
 plot_config_builder
+problem_shower
 ```
 
 #### `last_answers_loader`
@@ -2060,36 +2145,38 @@ None.
 ```text
 ---- Summary ----
 Main function of the program: run it in the experiment browser window (terminal on
-the left, plots on the right), or in the terminal when the window cannot open. With
-the check switch (PORTIMAO_SELF_TEST set to any value) it only checks that the
-window opens and shows a made-up preview, then closes by itself. The Mac app first
-makes its own folder and sends what it prints to its log; it has no terminal, so
-when its folder cannot be made or the window cannot open, a message says what to
-do.
+the left, plots on the right). Portimao needs its window: when it cannot open, one
+sentence says why and what to do, and nothing is asked. With the check switch
+(PORTIMAO_SELF_TEST set to any value) it only checks that the window opens and shows
+a made-up preview, then closes by itself. The Mac app first makes its own folder and
+sends what it prints to its log; it has no terminal, so when its folder cannot be
+made or the window cannot open, a message says what to do.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-PLACES, PROGRAM_TITLE (shown in the window title);
+PLACES, PROGRAM_TITLE, WINDOW_TITLE (module constants);
 os.environ['PORTIMAO_SELF_TEST'].
 
 ---- Outputs ----
 int
     0 when every file finished, 1 when the run was cancelled, a file failed, the
-    app's own folder could not be made or the app's window could not open. With the
-    check switch: 0 when the check passed, 1 when it failed.
+    app's own folder could not be made or the window could not open. With the check
+    switch: 0 when the check passed, 1 when it failed.
 
 ---- Globals mutated ----
-None. Opens the window or runs in the terminal; the app makes its own folder and
-replaces sys.stdout and sys.stderr by its log; the app may show a message (side
-effects).
+None. Opens the window, or prints why it could not; the app makes its own folder
+and replaces sys.stdout and sys.stderr by its log; the app may show a message; the
+details of a problem met before a run is logged go to the error stream it starts
+with (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 app_output_logger
+details_place_setter
 gui_runner
 program_runner
 self_test_runner
@@ -2101,14 +2188,16 @@ user_folder_preparer
 
 ```text
 ---- Summary ----
-Main function to run the program: ask the questions, process every file, then draw
-the comparison and special figures, logging the output to a file.
+Main function to run the program: ask for the files, start the log in the results
+folder, ask the other questions, process every file, then draw the comparison and
+special figures. The log keeps each answer from the results folder on, also when
+the run is cancelled or the window closed part way.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-PROGRAM_TITLE (written to the log).
+PLACES, PROGRAM_TITLE (written to the log), UPDATE_NOTE (module constants).
 
 ---- Outputs ----
 int
@@ -2126,9 +2215,15 @@ None.
 comparison_maker
 everything_asker
 experiment_processor
+files_asker
+last_answers_loader
 logging_starter
 logging_stopper
+problem_shower
+section_starter
+settings_logger
 special_figures_maker
+warning_shower
 ```
 
 #### `special_figures_maker`
@@ -2171,7 +2266,9 @@ None.
 ---- Helpers ----
 exemplar_runner
 ocr_and_haem_response_runner
+problem_shower
 time_response_runner
+warning_shower
 ```
 
 ## `tests/test_app_updater.py`
@@ -2331,6 +2428,32 @@ update_installer
 user_places_finder
 ```
 
+#### `test_ask_problem_is_described`
+
+```text
+---- Summary ----
+Main function to check that each way of getting no answer from GitHub is said in
+plain words, and that only GitHub's refusals are taken as refusals.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_ask_problem_describer
+```
+
 #### `test_failed_swap_keeps_the_app`
 
 ```text
@@ -2386,6 +2509,38 @@ None.
 _newer_checker
 ```
 
+#### `test_refused_ask_uses_the_release_page`
+
+```text
+---- Summary ----
+Main function to check that when GitHub refuses the question, the app finds the
+newest release from the Releases page instead, and starts as it is when that page
+does not answer either; the reasons are in its update log.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Stands in for GitHub's two answers.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. The stand-ins last only for this test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_maker
+update_installer
+user_places_finder
+```
+
 #### `test_release_answer_is_read`
 
 ```text
@@ -2410,6 +2565,33 @@ None.
 
 ---- Helpers ----
 _release_reader
+```
+
+#### `test_release_page_address_is_read`
+
+```text
+---- Summary ----
+Main function to check that the version is read from the address the Releases page
+leads to, that both zips are found under its tag, and that any other address is
+refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+APPLE_SILICON_ZIP, INTEL_ZIP (imported constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_release_page_reader
 ```
 
 #### `test_swap_puts_the_new_app_in_place`
@@ -2495,6 +2677,37 @@ None.
 ---- Helpers ----
 _app_maker
 _blocker_finder
+```
+
+#### `test_unanswered_ask_is_asked_again`
+
+```text
+---- Summary ----
+Main function to check that when GitHub does not answer, the app asks once more,
+then starts as it is, with curl's own reason in its update log each time.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Takes away the wait before asking again.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. The change lasts only for this test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_maker
+update_installer
+user_places_finder
 ```
 
 #### `test_update_from_made_up_zip`
@@ -2765,6 +2978,90 @@ and does not raise.
 ---- Inputs ----
 tmp_path : Path
     Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_file_names.py`
+
+Tests of the one rule that cleans every file name the program writes.
+
+### MAIN FUNCTIONS
+
+#### `test_dots_and_spaces_at_the_ends_go`
+
+```text
+---- Summary ----
+Main function to check that dots and spaces at either end of a name are taken off,
+and that those inside it stay.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_forbidden_characters_become_underscores`
+
+```text
+---- Summary ----
+Main function to check that each character a file name cannot hold on Windows, Mac
+or Linux becomes an underscore, and that other characters (µ, brackets) stay.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_nothing_left_gives_the_default`
+
+```text
+---- Summary ----
+Main function to check that a name with nothing left after cleaning gives the
+default, which may be empty so the caller can ask again.
+
+---- Inputs ----
+None.
 
 ---- Globals read ----
 None.
@@ -4128,6 +4425,317 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_launcher.py`
+
+Tests the launcher: a changed package list installs the packages again, a failed install
+
+### HELPERS
+
+#### `_git_stand_in_maker`
+
+```text
+---- Summary ----
+Helper function to load the launcher in a made-up git copy, with GitHub reachable
+and git stood in: it answers as GIT_ANSWERS says, except where changes says
+otherwise.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest; it becomes the git copy.
+monkeypatch : pytest.MonkeyPatch
+    Says git is installed, and that this start is not the one after an update.
+changes : Dict[str, Tuple[int, str]]
+    {git command: (return code, output)} in place of GIT_ANSWERS.
+
+---- Globals read ----
+GIT_ANSWERS (module constant).
+
+---- Outputs ----
+ModuleType
+    The launcher.
+
+---- Globals mutated ----
+None. Makes the .git folder (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_launcher_loader
+```
+
+#### `_launcher_loader`
+
+```text
+---- Summary ----
+Helper function to load a fresh copy of the launcher from its file, which Python
+does not import by name (it ends in .pyw).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LAUNCHER (module constant).
+
+---- Outputs ----
+ModuleType
+    The launcher; its start (main) is not run.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_stand_in_maker`
+
+```text
+---- Summary ----
+Helper function to load the launcher with its environment and package list in an
+empty folder, and with pip and the check that the packages load stood in.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+PACKAGES, PIP_TEXT (module constants).
+
+---- Outputs ----
+Tuple[ModuleType, List[str], Dict[str, bool]]
+    (the launcher; the stand-ins run, in order, each 'pip' or 'imports'; whether
+    each stand-in works, {'pip': ..., 'imports': ...}, which a test may change).
+
+---- Globals mutated ----
+None. Writes the made-up environment and package list (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_launcher_loader
+```
+
+### MAIN FUNCTIONS
+
+#### `test_changed_package_list_is_installed`
+
+```text
+---- Summary ----
+Main function to check that the packages are installed the first time, only
+checked at a start with the same list, and installed again when the list changes,
+as after an update; an environment made before the fingerprint was kept gets them
+installed once.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+NEWER_PACKAGES (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_stand_in_maker
+environment_builder
+```
+
+#### `test_failed_install_stops_with_a_plain_message`
+
+```text
+---- Summary ----
+Main function to check that when the packages cannot be installed and none load,
+the launcher stops with one plain sentence and keeps pip's text for the log; a
+first install that failed leaves no half-made environment.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+PIP_TEXT (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_stand_in_maker
+environment_builder
+```
+
+#### `test_failed_update_keeps_working_packages`
+
+```text
+---- Summary ----
+Main function to check that when the list has changed but the packages cannot be
+installed (no internet), Portimao opens with the packages it has, and the next
+start tries again.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+NEWER_PACKAGES (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_stand_in_maker
+environment_builder
+```
+
+#### `test_package_fingerprint_ignores_line_endings`
+
+```text
+---- Summary ----
+Main function to check that the package list gives the same fingerprint with
+Windows line endings, a different one when a package changes, and none when it
+cannot be read.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+NEWER_PACKAGES, PACKAGES (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_launcher_loader
+_package_list_stamper
+```
+
+#### `test_update_note_reaches_portimao`
+
+```text
+---- Summary ----
+Main function to check that Portimao is told why its copy cannot update, and told
+nothing when it can, and that its output goes to the launch log after the start
+before.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Stands in for starting Portimao, and sets a note left from before.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_launcher_loader
+program_starter
+```
+
+#### `test_update_reasons_are_given`
+
+```text
+---- Summary ----
+Main function to check what the update check gives in a git copy: an update
+installed, nothing newer, or no update with the reason and what to do.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Stands in for git.
+changes : Dict[str, Tuple[int, str]]
+    What git answers differently from an update that installs.
+expected : Tuple[bool, List[str]]
+    (whether the update was installed, the words the reason must hold; none for
+    no reason).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_git_stand_in_maker
+update_checker
+```
+
+#### `test_update_reasons_without_git`
+
+```text
+---- Summary ----
+Main function to check that a git copy on a computer without git says so, and that
+a copy from a zip gives no reason here (Portimao says it itself).
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Says git is not installed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_git_stand_in_maker
+_launcher_loader
+update_checker
 ```
 
 ## `tests/test_mac_app_builder.py`
@@ -6810,9 +7418,39 @@ _ramp_experiment_builder
 
 ## `tests/test_program_version.py`
 
-Tests that the program finds its version on dev and on main, where the release leaves .style/ out.
+Tests that the program finds its version on dev and on main, where the release leaves .style/ out, and says beside it when its copy does not update itself.
 
 ### MAIN FUNCTIONS
+
+#### `test_update_note_beside_the_version`
+
+```text
+---- Summary ----
+Main function to check the note beside the version: a copy from a zip always says
+it does not update itself, a git copy says what the launcher found (nothing when it
+updates), and the Mac app says nothing here.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder given by pytest, standing in for the program folder.
+monkeypatch : pytest.MonkeyPatch
+    Sets and clears the launcher's note.
+
+---- Globals read ----
+UPDATE_NOTE_SWITCH (imported constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+update_note_finder
+```
 
 #### `test_version_from_style_folder`
 
@@ -7168,6 +7806,195 @@ _question_collector
 _question_matcher
 ```
 
+## `tests/test_run_logging.py`
+
+Tests the run's log, which keeps the answers from the results folder on, and the
+
+### TEST HELPERS
+
+#### `_typist_maker`
+
+```text
+---- Summary ----
+Helper function to make a stand-in for the window's answer box: it gives the typed
+answers in turn, then ends the input as closing the window does.
+
+---- Inputs ----
+typed : List[str]
+    The answers, in order; the list is emptied as they are given.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Callable[..., str]
+    Function that takes the place of input.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_fresh_numbering`
+
+```text
+---- Summary ----
+Helper function (a pytest fixture) to give the questions their own numbering while
+a test runs, so other tests keep theirs.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Puts the numbering back after the test.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Replaces the questions' counters while the test runs.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_answers_are_logged_as_they_come`
+
+```text
+---- Summary ----
+Main function to check that the log starts with the version and the folders, then
+holds each question with its answer under it, without the window's colour codes,
+then the settings, and only then what the run prints.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the answer box.
+_fresh_numbering : None
+    Gives the questions their own numbering.
+
+---- Globals read ----
+TITLE (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_typist_maker
+answer_logger
+logging_starter
+logging_stopper
+settings_logger
+yes_no_asker
+```
+
+#### `test_closed_window_keeps_the_log`
+
+```text
+---- Summary ----
+Main function to check that when the window is closed part way through the
+questions, the answers given so far stay in the log, which is closed and gives the
+terminal back.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the answer box.
+_fresh_numbering : None
+    Gives the questions their own numbering.
+
+---- Globals read ----
+TITLE (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_typist_maker
+logging_starter
+logging_stopper
+yes_no_asker
+```
+
+#### `test_launch_log_keeps_the_starts_before`
+
+```text
+---- Summary ----
+Main function to check that each start is added to the launch log under its own
+start line, after the starts before.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+launch_log_opener
+```
+
+#### `test_launch_log_is_cut_past_its_limit`
+
+```text
+---- Summary ----
+Main function to check that a launch log past its limit keeps only its newest
+half, from a start line, before the new start is added.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+launch_log_opener
+```
+
 ## `tests/test_summary_maths.py`
 
 Tests that the averaged spectra, their difference and the averages over repeated runs
@@ -7380,37 +8207,6 @@ Tests that the mouse over a preview gives the times and answers worked out by ha
 
 ### MAIN FUNCTIONS
 
-#### `test_click_gives_the_minutes_of_each_edge`
-
-```text
----- Summary ----
-Main function to check that a click on the plot of the whole recording gives the
-minutes each trim and ignore question asks for, worked out by hand for a 60 min
-recording, and 0 for a click beyond the edge.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-Trim start: click at 4 -> 4. Trim end: click at 55 -> 60 - 55 = 5. Ignore start
-after a trim start at 4: click at 9.5 -> 9.5 - 4 = 5.5. Ignore end before a trim
-end at 55: click at 50 -> 55 - 50 = 5; with no trim end, 60 - 50 = 10. Ignore start
-clicked at 2, in the trimmed part: 0.
-
----- Helpers ----
-None.
-```
-
 #### `test_drag_gives_the_window_and_gap`
 
 ```text
@@ -7530,9 +8326,10 @@ None.
 ```text
 ---- Summary ----
 Main function to check that a number question the mouse can answer hands its rule
-to the registered window before it reads (a click rule as 'point', a drag rule as
-'span') and takes it back once it has a valid answer, that other number questions
-leave the window alone, and that nothing is needed in the terminal.
+to the registered window before it reads (a drag rule as 'span') and takes it back
+once it has a valid answer, that other number questions leave the window alone,
+and that a question still works when no window is registered (the window has
+closed).
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -7581,6 +8378,545 @@ of the height, showing 0 to 45 min; a small panel with its own x axis is left ou
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_trim_edges.py`
+
+Tests that the edges of the trimming step move, stop and shade as worked out by hand.
+
+### MAIN FUNCTIONS
+
+#### `test_edge_under_the_mouse`
+
+```text
+---- Summary ----
+Main function to check which edge the mouse takes: by its handle in either row, by
+its line, the inner edge where two lines meet, and none away from the lines or
+below the panels.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Handles from y = 10: the top row to 32, the lower row to 54; a handle is 9 px wide,
+so it is taken within 4.5 + 2 px. A line is taken within 6 px, from y = 10 to the
+bottom of the panels at 300.
+
+---- Helpers ----
+None.
+```
+
+#### `test_every_file_or_one_file`
+
+```text
+---- Summary ----
+Main function to check that an edge set on every file gives each file the same
+minutes within its own limits, that one set on one file leaves the others alone,
+and that the files whose minutes differ from most files are found.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LONG, SHORT, NOTHING (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+8 min trimmed from the start: the 60 min files keep 8, the 40 min one stops at its
+first addition, 5. Only on 'long': the others keep 0.
+
+---- Helpers ----
+None.
+```
+
+#### `test_ignored_parts_stay_inside_the_kept_part`
+
+```text
+---- Summary ----
+Main function to check that the ignored parts never cross, that the one on the side
+of the edge being set gives way, and that minutes below 0 count as 0.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LONG (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trimmed 4 and 6 min: 50 min kept. Ignore the first 45: allowed. Ignore the last 10:
+only 50 - 45 = 5 fit. Trim 10 from the start: 44 min kept, so the first ignored
+part gives way to 44 - 5 = 39 and the last keeps 5.
+
+---- Helpers ----
+None.
+```
+
+#### `test_layout_of_the_edges_and_parts`
+
+```text
+---- Summary ----
+Main function to check where the four edges sit on the whole recording, the words
+by their handles, and the parts shaded.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LONG (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trimmed 4 and 5, ignored 6 and 3 on 60 min: edges at 4, 60 - 5 = 55, 4 + 6 = 10
+and 55 - 3 = 52.
+
+---- Helpers ----
+None.
+```
+
+#### `test_minutes_and_places_on_the_plot`
+
+```text
+---- Summary ----
+Main function to check that a time is turned into its place across the plot area
+and back, and that a place beyond the panels gives the time at their edge.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PICTURE_BOX, TIME_AXIS (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The axis runs from x = 200 to 800 for 0 to 60 min: 30 min at x = 500, 12.3 min at
+200 + 12.3 / 60 * 600 = 323.
+
+---- Helpers ----
+None.
+```
+
+#### `test_minutes_typed_in_the_strip`
+
+```text
+---- Summary ----
+Main function to check which numbers of minutes the boxes of the strip take.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_minutes_to_limits_and_back`
+
+```text
+---- Summary ----
+Main function to check that the starting minutes come from the limits remembered,
+or from the standard settings, kept within the file's limits, and that minutes
+turned into limits give the same minutes back.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+config.DEFAULT_ANSWERS (5 min ignored at the start, checked first); LONG, SHORT
+(module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+'long' remembered as kept from 3 to 57 min: 3 and 60 - 57 = 3 trimmed. 'short'
+remembered with 20 min trimmed from its start: it stops at its first addition, 5.
+'other' has nothing remembered: the standard settings. Back as limits: a trim of 0
+is None, the trim end is 60 - 3 = 57.
+
+---- Helpers ----
+None.
+```
+
+#### `test_pointer_gives_the_minutes_of_each_edge`
+
+```text
+---- Summary ----
+Main function to check that a time pointed at on the whole recording gives the
+minutes that put each edge there, in steps of 0.1 min, and 0 beyond the edge.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LONG, NOTHING (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trimmed 4 and 5 min of 60. Trim start at 4.04 -> 4.0. Trim end at 55 -> 60 - 55 =
+5. Ignore start at 9.5 -> 9.5 - 4 = 5.5. Ignore end at 50 -> 55 - 50 = 5. Ignore
+start at 2, in the trimmed part: 0. Trim end at 61, past the end: 0.
+
+---- Helpers ----
+None.
+```
+
+#### `test_shaded_picture`
+
+```text
+---- Summary ----
+Main function to check that a shaded part is see-through amber on a white picture,
+that the rest of the picture is untouched, and that a part narrower than a pixel is
+left out.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Amber #e8a317 = (232, 163, 23) at 22 % (56 of 255) over white:
+255 - (255 - channel) * 56 / 255 = (249.95, 234.8, 204.05), so (250, 235, 204).
+
+---- Helpers ----
+None.
+```
+
+#### `test_trimmed_edges_stop_at_the_events`
+
+```text
+---- Summary ----
+Main function to check that a trimmed edge never cuts off an addition.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LONG, NOTHING (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Additions at 10 and 50 of 60 min: at most 10 min trimmed from the start and 60 - 50
+= 10 from the end.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_user_notices.py`
+
+Tests of the plain sentences for warnings and problems, with their details in the log.
+
+### TEST HELPERS
+
+#### `_caught_getter`
+
+```text
+---- Summary ----
+Helper function to run an action that fails and give its error, with its traceback.
+
+---- Inputs ----
+action : Callable[[], object]
+    Function without inputs that raises.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+BaseException
+    The error it raised.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_quiet_details`
+
+```text
+---- Summary ----
+Helper function (a pytest fixture) to send the details of a problem to a made-up
+log while a test runs, and to send them nowhere afterwards.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The made-up log, named "the test log" for the user.
+
+---- Globals mutated ----
+None. Sets the place for the details, and clears it after the test (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+details_place_setter
+```
+
+### MAIN FUNCTIONS
+
+#### `test_details_go_to_the_log_only`
+
+```text
+---- Summary ----
+Main function to check that a problem Portimao did not expect gives one sentence
+naming the log, with Python's report of it in the log and nowhere else.
+
+---- Inputs ----
+_quiet_details : io.StringIO
+    The made-up log.
+capsys : pytest.CaptureFixture
+    What the test printed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_caught_getter
+problem_teller
+```
+
+#### `test_own_message_is_shown_as_it_is`
+
+```text
+---- Summary ----
+Main function to check that a message Portimao's own code wrote for the user (here
+the trimming's, raised over several lines) is shown as it is.
+
+---- Inputs ----
+_quiet_details : io.StringIO
+    The made-up log.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_caught_getter
+experiment_trimmer
+problem_describer
+```
+
+#### `test_python_text_is_never_shown`
+
+```text
+---- Summary ----
+Main function to check that Python's own error text is never shown: neither for a
+plain step in Portimao's code that fails (a time that is not a number, a missing
+name) nor for an error raised inside a package or in a test.
+
+---- Inputs ----
+_quiet_details : io.StringIO
+    The made-up log.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_caught_getter
+experiment_trimmer
+problem_describer
+```
+
+#### `test_file_problems_say_what_to_do`
+
+```text
+---- Summary ----
+Main function to check the sentences for a file open in another program, a missing
+file, another file problem and a lack of memory: each names the file, without its
+folders, and says what to do.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+_quiet_details : io.StringIO
+    The made-up log.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_caught_getter
+problem_describer
+```
+
+#### `test_run_log_takes_the_details`
+
+```text
+---- Summary ----
+Main function to check that while a run is logged the details go to its log, which
+is named for the user, and that afterwards they go back to the start-up place.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest, standing in for the results folder.
+_quiet_details : io.StringIO
+    The made-up start-up log.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+details_writer
+logging_starter
+logging_stopper
+```
+
+#### `test_warnings_are_kept_whatever_their_words`
+
+```text
+---- Summary ----
+Main function to check that while the output is captured (a preview) every warning
+is kept as a warning, whatever its words, ordinary lines are not, and the details of
+a problem are never printed.
+
+---- Inputs ----
+_quiet_details : io.StringIO
+    The made-up log.
+capsys : pytest.CaptureFixture
+    What the test printed (pytest's own stream does not honour the capture).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_caught_getter
+output_capturer
+problem_shower
+warning_shower
 ```
 
 ## `tests/test_user_places.py`
@@ -7731,7 +9067,7 @@ user_places_finder
 
 ## `tests/test_window_parts.py`
 
-Tests of the parts of the settings strip and the OD table that need no window: the
+Tests of the parts of the window that need no window: the widths a journal allows, the
 
 ### MAIN FUNCTIONS
 
@@ -7872,6 +9208,120 @@ None.
 
 ---- Equations ----
 Nature allows 1 column (89 mm), 1.5 columns (120 mm) and 2 columns (183 mm).
+
+---- Helpers ----
+None.
+```
+
+#### `test_time_title_of_a_preview`
+
+```text
+---- Summary ----
+Main function to check that a preview's time axis says "in the recording" while
+trimming and for a file whose start is not trimmed, and "from the trimmed start"
+once a file trimmed at its start is drawn trimmed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.PREVIEW_TIME_TITLES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_files_drawn_beside_the_one_shown`
+
+```text
+---- Summary ----
+Main function to check which files the window keeps read and redraws after an
+answer: the file shown, then the nearest ones around the list, the next one before
+the previous one, never more than there are files.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_files_kept_in_memory`
+
+```text
+---- Summary ----
+Main function to check that the window keeps the three files around the one shown
+read: a file read for every file at once (as the component finder does) is let go
+without dropping them, a kept file is not read again, and moving on by one reads
+only the new neighbour. The reading of a file is stood in.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the file reader and sets the number of files kept.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The stand-ins are undone after the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_wheel_turn_on_each_system`
+
+```text
+---- Summary ----
+Main function to check that a turn of the mouse wheel scrolls the OD table the
+right way on Windows (steps of 120), the Mac (small steps) and Linux (buttons 4 and
+5), and not at all for an event that says neither.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
@@ -8522,7 +9972,7 @@ Optional[dict]
     values the chosen sources need (it would not be comparable with the others).
 
 ---- Globals mutated ----
-None.
+None. Shows a warning when the experiment is left out (side effect).
 
 ---- Equations ----
 None.
@@ -8530,6 +9980,7 @@ None.
 ---- Helpers ----
 experiment_averages_calculator
 source_selector
+warning_shower
 ```
 
 #### `_time_response_preparer`
@@ -8640,7 +10091,8 @@ dict
     experiment or None}.
 
 ---- Globals mutated ----
-None.
+None. Shows a warning for a figure this experiment is left out of; the details of
+a problem go to the log (side effects).
 
 ---- Equations ----
 None.
@@ -8648,6 +10100,7 @@ None.
 ---- Helpers ----
 _ocr_and_haem_response_preparer
 _time_response_preparer
+problem_shower
 ```
 
 #### `ocr_and_haem_response_runner`
@@ -8681,8 +10134,9 @@ None
     Nothing; files are written.
 
 ---- Globals mutated ----
-None. Writes ocr_and_haem_response.xlsx and the figure files to ``export_root``
-(side effect).
+None. Writes ocr_and_haem_response.xlsx and the figure files to ``export_root``;
+shows a warning for what is not made, with the details of a problem in the log
+(side effects).
 
 ---- Equations ----
 None.
@@ -8692,7 +10146,9 @@ custom_figure_saver
 ocr_and_haem_response_config_builder
 ocr_and_haem_response_exporter
 ocr_and_haem_response_figure_plotter
+problem_shower
 triplicate_averager
+warning_shower
 ```
 
 #### `time_response_runner`
@@ -8938,7 +10394,8 @@ tuple
     {letter: experiment name}.
 
 ---- Globals mutated ----
-None.
+None. Shows a warning for an empty quadrant or columns whose additions differ (side
+effect).
 
 ---- Equations ----
 None.
@@ -8952,6 +10409,7 @@ _experiment_cropper
 experiment_title_builder
 figure_finisher
 stack_legend_drawer
+warning_shower
 watermark_style_builder
 ```
 
@@ -9322,6 +10780,7 @@ _significance_bar_drawer
 _significance_formatter
 experiment_classifier
 finite_float_converter
+warning_shower
 ```
 
 #### `_block_gap_calculator`
@@ -9507,6 +10966,7 @@ _response_window_tester
 _row_ylim_sharer
 _tick_label_builder
 _window_orderer
+warning_shower
 ```
 
 #### `_haem_label_finder`
@@ -9830,6 +11290,7 @@ _response_window_tester
 _row_ylim_sharer
 _tick_label_builder
 _window_orderer
+warning_shower
 ```
 
 #### `_offset_transformer`
@@ -10435,6 +11896,7 @@ _reference_selector
 _response_metric_checker
 experiment_classifier
 figure_finisher
+warning_shower
 ```
 
 ## `utils_custom/publication_plotter.py`
@@ -11974,16 +13436,17 @@ None.
 ---- Outputs ----
 dict
     {condition: {run number: experiment}}. Experiments without a run suffix are
-    skipped with a message; a duplicate run number raises ValueError.
+    skipped with a warning; a duplicate run number raises ValueError.
 
 ---- Globals mutated ----
-None.
+None. Shows a warning for each experiment skipped (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 run_name_parser
+warning_shower
 ```
 
 #### `experiment_classifier`
@@ -12036,10 +13499,11 @@ None.
 ---- Outputs ----
 dict
     Same experiments, ordered, each with a 'group' key added. Experiments that
-    match no group are left out with a message.
+    match no group are left out with a warning.
 
 ---- Globals mutated ----
-None. Adds the 'group' key to the experiment dictionaries (side effect).
+None. Adds the 'group' key to the experiment dictionaries and shows a warning for
+each experiment left out (side effects).
 
 ---- Equations ----
 None.
@@ -12047,6 +13511,7 @@ None.
 ---- Helpers ----
 _group_matcher
 _order_sorter
+warning_shower
 ```
 
 #### `hours_parser`
@@ -12240,12 +13705,14 @@ dict
     The experiment, with spectral_averages added (DATA_FORMAT.md).
 
 ---- Globals mutated ----
-None. Adds ``spectral_averages`` to the experiment (side effect).
+None. Adds ``spectral_averages`` to the experiment and shows a warning for each
+window skipped (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+warning_shower
 window_definer
 ```
 
@@ -12862,16 +14329,17 @@ None.
 ---- Outputs ----
 dict
     {group: [(time label, experiment), ...]}. Experiments without a difference
-    decomposition are reported and left out; ValueError if a group is empty.
+    decomposition are left out with a warning; ValueError if a group is empty.
 
 ---- Globals mutated ----
-None.
+None. Shows a warning for each experiment left out (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 time_label_builder
+warning_shower
 ```
 
 #### `shared_baseline_subtracter`
@@ -13154,7 +14622,7 @@ dict
     settings and, for vo2 and haem, per-window statistics (DATA_FORMAT.md).
 
 ---- Globals mutated ----
-None.
+None. Shows a warning for each condition skipped (side effect).
 
 ---- Equations ----
 None.
@@ -13164,6 +14632,7 @@ _run_summariser
 _run_value_getter
 _window_sorter
 condition_grouper
+warning_shower
 ```
 
 ## `utils_custom/triplicate_exporter.py`
@@ -13541,6 +15010,41 @@ None.
 None.
 ```
 
+#### `_ask_problem_describer`
+
+```text
+---- Summary ----
+Helper function to say in plain words why a question to GitHub got no answer, and
+whether GitHub refused it.
+
+---- Inputs ----
+curl_code : int
+    curl's exit code; 0 when it had an answer of any kind.
+http_status : int
+    GitHub's status code (200 when it answered); 0 when there was none, as for a
+    file:// address.
+body : str
+    GitHub's answer; a refusal says why in it.
+errors : str
+    What curl printed as its error.
+
+---- Globals read ----
+CURL_REASONS, REFUSED_STATUSES (module constants).
+
+---- Outputs ----
+Tuple[str, bool]
+    (the reason, empty when there is an answer to read; True when GitHub refused).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_blocker_finder`
 
 ```text
@@ -13725,6 +15229,41 @@ Versions are compared number by number from the left: 2.10 > 2.9, 2.3.1 > 2.3,
 _version_splitter
 ```
 
+#### `_newest_release_finder`
+
+```text
+---- Summary ----
+Helper function to find GitHub's newest release. With no answer it asks once more
+after a few seconds; when GitHub refuses, it asks the Releases page instead, which
+GitHub does not count in the same way. Each try and its reason go to the log.
+
+---- Inputs ----
+release_url : str
+    The address of GitHub's answer (a file:// address in the tests).
+log : Callable[[str], None]
+    Adds a line to the update log.
+
+---- Globals read ----
+RELEASE_DOWNLOAD_URL, RELEASES_LINK, RETRY_WAIT_S (module constants).
+
+---- Outputs ----
+Optional[Tuple[str, Dict[str, Tuple[str, int]]]]
+    (the version without its V, {zip name: (address, size in bytes, 0 when not
+    known)}), or None when no release was found, so the app starts as it is.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_release_asker
+_release_page_asker
+_release_page_reader
+_release_reader
+```
+
 #### `_own_version_reader`
 
 ```text
@@ -13758,7 +15297,8 @@ None.
 ```text
 ---- Summary ----
 Helper function to ask GitHub for its newest release with macOS's own curl, which
-uses the Mac's certificates (the app's Python cannot find any).
+uses the Mac's certificates (the app's Python cannot find any), keeping the reason
+when there is no answer.
 
 ---- Inputs ----
 url : str
@@ -13768,8 +15308,70 @@ url : str
 ASK_TIMEOUT_S, HIDDEN (module constants).
 
 ---- Outputs ----
-Optional[str]
-    GitHub's answer (JSON text), or None when it did not answer in time.
+Tuple[Optional[str], str, bool]
+    (GitHub's answer as JSON text, or None when there is none; why there is none,
+    empty when there is one; True when GitHub refused the question).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_ask_problem_describer
+```
+
+#### `_release_page_asker`
+
+```text
+---- Summary ----
+Helper function to ask the Releases page where its newest release is, with macOS's
+own curl. The page leads to the release's own page, whose address ends in its tag.
+
+---- Inputs ----
+page_url : str
+    The Releases page's address for the newest release.
+
+---- Globals read ----
+ASK_TIMEOUT_S, HIDDEN (module constants).
+
+---- Outputs ----
+Tuple[Optional[str], str]
+    (the address the page leads to, or None when there is none; why there is none,
+    empty when there is one).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_ask_problem_describer
+```
+
+#### `_release_page_reader`
+
+```text
+---- Summary ----
+Helper function to read the newest release's version from the address the Releases
+page leads to, and to make the addresses of its zips.
+
+---- Inputs ----
+address : str
+    The newest release's own page, ending in /releases/tag/V<version>.
+download_url : str
+    Where the releases' zips are, each under its tag.
+
+---- Globals read ----
+APPLE_SILICON_ZIP, INTEL_ZIP, TAG_ADDRESS_PATTERN, VERSION_PATTERN (module
+constants).
+
+---- Outputs ----
+Optional[Tuple[str, Dict[str, Tuple[str, int]]]]
+    (the version without its V, {zip name: (address, 0 as the size is not
+    known)}), or None when the address does not end in a release's tag.
 
 ---- Globals mutated ----
 None.
@@ -14039,10 +15641,12 @@ None.
 Main function to update the Mac app at its start. It asks GitHub for the newest
 release (a few seconds at most) and, when it is newer, downloads the zip for this
 kind of Mac with a small "Updating Portimao" window, and starts the swap, which puts
-it in place once this app has closed and opens it. With no internet it starts as it
-is and says nothing; when it cannot replace itself, or the download fails, it starts
-as it is with a message saying where to download the new one. Run from source,
-nothing is done. Every step is written to logs/update.log.
+it in place once this app has closed and opens it. When GitHub does not answer it
+asks once more, and when GitHub refuses it asks the Releases page; with no answer at
+all it starts as it is and says nothing. When it cannot replace itself, or the
+download fails, it starts as it is with a message saying where to download the new
+one. Run from source, nothing is done. Every step, with the reason for any failure,
+is written to logs/update.log.
 
 ---- Inputs ----
 places : UserPlaces
@@ -14081,9 +15685,8 @@ _leftover_cleaner
 _log_opener
 _new_app_fetcher
 _newer_checker
+_newest_release_finder
 _own_version_reader
-_release_asker
-_release_reader
 _start_command_maker
 _status_window_maker
 _translation_checker
@@ -14155,7 +15758,7 @@ dict
 
 ---- Globals mutated ----
 experiment: adds raw_spectra[dataset]["attenuation"] (n_spectra x n_wavelengths) for
-each converted dataset; prints a warning with the number of blank values inside
+each converted dataset; shows a warning with the number of blank values inside
 checked_range_nm (side effect).
 
 ---- Equations ----
@@ -14163,6 +15766,7 @@ None.
 
 ---- Helpers ----
 attenuation_converter
+warning_shower
 ```
 
 ## `utils_shared/averaging.py`
@@ -14568,24 +16172,24 @@ file, why, and what to do.
 step : str
     The step in plain words, to complete "Warning: ... was skipped".
 error : Exception
-    The error that stopped the step. The ValueError and PafError messages of the
-    processing steps are written for the user and are shown as they are; a
-    KeyError or TypeError is a fault in the program, whose raw text is not shown.
+    The error that stopped the step. The messages the processing steps write for
+    the user are shown as they are; Python's own error text never is.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-None. Prints the warning (side effect).
+None
+    Nothing.
 
 ---- Globals mutated ----
-None.
+None. Shows the warning; the details go to the log (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-None.
+problem_shower
 ```
 
 ### MAIN FUNCTIONS
@@ -14670,6 +16274,7 @@ fit_range_finder
 percent_converter
 percent_need_checker
 source_chooser
+warning_shower
 ```
 
 ## `utils_shared/figure_layout.py`
@@ -15188,7 +16793,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to replace the characters that are illegal in file names.
+Main function to clean a file name: the one rule every file the program names goes
+through.
 
 ---- Inputs ----
 name : Any
@@ -15201,7 +16807,9 @@ None.
 
 ---- Outputs ----
 str
-    File name with the characters < > : " / backslash | ? * replaced by underscores.
+    File name with the characters < > : " / backslash | ? * replaced by underscores,
+    and without dots or spaces at either end (a leading dot hides a file on a Mac
+    or Linux, and Windows drops a trailing one).
 
 ---- Globals mutated ----
 None.
@@ -15291,6 +16899,40 @@ VERSION_TITLE_PATTERN (module constant).
 ---- Outputs ----
 str
     For example "2.7"; "unknown" when neither file gives a version.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `update_note_finder`
+
+```text
+---- Summary ----
+Main function to say why this copy does not update itself, to be shown beside its
+version: a copy from a zip never can; a git copy says what the launcher found when
+it tried. The Mac app updates itself, and says so in its own message when it
+cannot.
+
+---- Inputs ----
+root : Path
+    Program folder.
+is_app : bool
+    True when running as the Mac app.
+
+---- Globals read ----
+UPDATE_NOTE_SWITCH, ZIP_FIXES, ZIP_NOTE (module constants);
+os.environ['PORTIMAO_UPDATE_NOTE']; sys.platform.
+
+---- Outputs ----
+str
+    One sentence saying why, and what to do; empty when this copy updates itself
+    (or was not started by the launcher, which alone tries).
 
 ---- Globals mutated ----
 None.
@@ -15713,12 +17355,13 @@ Tuple[Optional[pd.DataFrame], Optional[str]]
     source is missing from the experiment (a warning is printed).
 
 ---- Globals mutated ----
-None. Prints a warning when the source is missing (side effect).
+None. Shows a warning when the source is missing (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+problem_shower
 source_resolver
 ```
 
@@ -15810,7 +17453,7 @@ List[dict]
     selected.
 
 ---- Globals mutated ----
-None. Prints a warning for haems missing from the data (side effect).
+None. Shows a warning for haems missing from the data (side effect).
 
 ---- Equations ----
 None.
@@ -15818,6 +17461,7 @@ None.
 ---- Helpers ----
 measurement_column_finder
 name_simplifier
+warning_shower
 ```
 
 #### `_vo2_ymax_calculator`
@@ -16625,6 +18269,53 @@ ocr_calculator
 
 Per-thread capture of printed output, kept out of the terminal and the log file.
 
+### CLASSES
+
+#### `CapturedOutput`
+
+```text
+---- Summary ----
+The text a thread printed while its output was captured, with the warnings among
+it also kept apart (user_notices.warning_shower), so the window can show them
+without picking them out by their words.
+
+---- Attributes ----
+warnings : List[str]
+    Each warning shown during the capture, without its indent, in order.
+
+---- Globals read ----
+None.
+
+---- Methods ----
+__init__
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to start an empty capture with no warnings.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the warnings attribute on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `captured_buffer_getter`
@@ -16641,7 +18332,7 @@ None.
 _local (module state).
 
 ---- Outputs ----
-Optional[io.StringIO]
+Optional[CapturedOutput]
     The buffer of the current thread, or None when its output is not captured.
 
 ---- Globals mutated ----
@@ -16669,8 +18360,9 @@ None.
 _local (module state).
 
 ---- Outputs ----
-Iterator[io.StringIO]
-    The buffer the output is collected in; read it with getvalue().
+Iterator[CapturedOutput]
+    The buffer the output is collected in; read it with getvalue(), and its
+    warnings with .warnings.
 
 ---- Globals mutated ----
 None. Sets and clears the capture of the current thread (side effect).
@@ -17819,7 +19511,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to print a reader warning.
+Main function to show a reader warning, in the terminal and, while a preview is
+drawn, under the plot.
 
 ---- Inputs ----
 msg : str
@@ -17836,13 +19529,13 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Prints to the terminal (side effect).
+None. Shows the warning (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-None.
+warning_shower
 ```
 
 ## `utils_shared/pca_fitter.py`
@@ -18444,7 +20137,7 @@ _reference_line_drawer
 
 ## `utils_shared/questions.py`
 
-Helpers for asking numbered questions in the terminal.
+Helpers for asking numbered questions in the terminal of the window.
 
 ### CLASSES
 
@@ -18452,8 +20145,7 @@ Helpers for asking numbered questions in the terminal.
 
 ```text
 ---- Summary ----
-Raised when the input ends (window closed, Ctrl+Z / Ctrl+D) so the program can stop
-cleanly.
+Raised when the input ends (the window closed) so the program can stop cleanly.
 
 ---- Attributes ----
 None.
@@ -18471,7 +20163,10 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to show the answer prompt and read what the user types.
+Helper function to show the answer prompt and read what the user types in the
+window's answer box (the window puts its own reader in place of input while it
+runs). Every answer, typed or given with the mouse, passes here, and is added to
+the run's log once it has started.
 
 ---- Inputs ----
 text : str
@@ -18481,21 +20176,21 @@ indent : str
     Indent placed before the "> " prompt.
 
 ---- Globals read ----
-input_flusher.
+None.
 
 ---- Outputs ----
 str
     The typed answer with surrounding spaces removed.
 
 ---- Globals mutated ----
-None. Reads from the terminal; raises UserQuitError when the input ends (side
-effect).
+None. Reads from the terminal and writes the answer to the run's log; raises
+UserQuitError when the input ends (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-input_flusher
+answer_logger
 ```
 
 #### `_number_builder`
@@ -18563,16 +20258,15 @@ text_colourer
 ```text
 ---- Summary ----
 Helper function to tell the window, when there is one, that the question being
-asked can be answered with the mouse (a click or a drag on the plot, turned into
-the answer by ``reader``), or no longer can.
+asked can be answered with the mouse (a drag across the plot, turned into the
+answer by ``reader``), or no longer can.
 
 ---- Inputs ----
 kind : Optional[str]
-    'point' (a click), 'span' (a drag), or None once the question has its answer.
+    'span' (a drag), or None once the question has its answer.
 reader : Optional[Callable]
-    Turns what the mouse gave into the answer: reader(file name, time_min) for a
-    click, reader(file name, start_min, end_min) for a drag; it returns None when
-    that file or place gives no answer. None with kind None.
+    Turns the drag into the answer: reader(file name, start_min, end_min); it
+    returns None when that file or place gives no answer. None with kind None.
 
 ---- Globals read ----
 _time_requester (module state).
@@ -18628,31 +20322,40 @@ _input_reader
 _question_printer
 ```
 
-#### `colour_checker`
+#### `enter_waiter`
 
 ```text
 ---- Summary ----
-Main function to say whether the terminal can show colour; it also switches on
-colour codes in the Windows console the first time.
+Main function to give a numbered instruction that is carried out in the window (on
+the plot or in the strip under it) and wait until Enter is pressed with the answer
+box empty. Anything typed in the box instead is answered with ``nudge`` and the
+instruction goes on waiting.
 
 ---- Inputs ----
-None.
+question : str
+    The instruction, without its number.
+nudge : str
+    One sentence saying where to do it instead of typing in the answer box.
+depth : int
+    Numbering depth of the instruction (1 = 3.1, 2 = 3.1.1, ...).
 
 ---- Globals read ----
-os.environ, sys.stdout; _colour_ready (module state).
+None.
 
 ---- Outputs ----
-bool
-    True when colour can be used (a terminal, and NO_COLOR is not set).
+None
+    Nothing.
 
 ---- Globals mutated ----
-Sets the module state _colour_ready; may run an empty os.system call on Windows.
+None. Reads from and prints to the terminal (side effect); advances the question
+numbering counters.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-None.
+_input_reader
+_question_printer
 ```
 
 #### `heading_printer`
@@ -18714,34 +20417,6 @@ None.
 None.
 ```
 
-#### `input_flusher`
-
-```text
----- Summary ----
-Main function to throw away keys pressed while the program was busy, so a stray
-Enter cannot answer a question.
-
----- Inputs ----
-None.
-
----- Globals read ----
-os.name, sys.stdin.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Empties the keyboard input buffer; does nothing when the input is not a
-terminal (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `multi_asker`
 
 ```text
@@ -18789,8 +20464,8 @@ _question_printer
 ---- Summary ----
 Main function to ask a question answered with a number, asking again until the value
 is valid. A question that can be answered with the mouse says so to the window,
-where a click (``time_reader``) or a drag (``span_reader``) on the plot then writes
-the answer it gives into the answer box; in the terminal nothing changes.
+where a drag (``span_reader``) across the plot then writes the answer it gives into
+the answer box.
 
 ---- Inputs ----
 question : str
@@ -18809,12 +20484,10 @@ depth : int
     Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
 blank_label : str
     Word shown in [brackets] for an empty answer.
-time_reader : Optional[Callable[[str, float], Optional[float]]]
-    Turns a click on the plot into the answer: (file shown, time clicked in min) ->
-    answer, or None when that click gives none. None when a click gives nothing.
 span_reader : Optional[Callable[[str, float, float], Optional[float]]]
     Turns a drag across the plot into the answer: (file shown, start min, end min)
-    -> answer, or None. Used only when there is no ``time_reader``.
+    -> answer, or None when that drag gives none. None when the mouse gives
+    nothing.
 
 ---- Globals read ----
 None.
@@ -18856,33 +20529,6 @@ int
 
 ---- Globals mutated ----
 None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `numbering_restarter`
-
-```text
----- Summary ----
-Main function to make the next question at a depth (and deeper) start again from 1.
-
----- Inputs ----
-depth : int
-    Numbering depth to restart; deeper levels restart too.
-
----- Globals read ----
-MAX_DEPTH (module constant).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Resets entries of the module counters _counters (side effect).
 
 ---- Equations ----
 None.
@@ -19102,7 +20748,7 @@ _question_printer
 
 ```text
 ---- Summary ----
-Main function to wrap text in a colour code when colour is available.
+Main function to wrap text in a colour code, which the window's terminal shows.
 
 ---- Inputs ----
 text : str
@@ -19111,11 +20757,11 @@ code : str
     ANSI colour code (COLOUR_QUESTION by default).
 
 ---- Globals read ----
-COLOUR_QUESTION, RESET (module constants); colour_checker.
+COLOUR_QUESTION, RESET (module constants).
 
 ---- Outputs ----
 str
-    The coloured text, or the text unchanged without colour.
+    The coloured text.
 
 ---- Globals mutated ----
 None.
@@ -19124,25 +20770,25 @@ None.
 None.
 
 ---- Helpers ----
-colour_checker
+None.
 ```
 
 #### `text_italiser`
 
 ```text
 ---- Summary ----
-Main function to write text in italics when the terminal supports it.
+Main function to write text in italics, which the window's terminal shows.
 
 ---- Inputs ----
 text : str
     Text to put in italics.
 
 ---- Globals read ----
-ITALIC, RESET (module constants); colour_checker.
+ITALIC, RESET (module constants).
 
 ---- Outputs ----
 str
-    The italic text, or the text unchanged without colour support.
+    The italic text.
 
 ---- Globals mutated ----
 None.
@@ -19151,7 +20797,7 @@ None.
 None.
 
 ---- Helpers ----
-colour_checker
+None.
 ```
 
 #### `time_request_setter`
@@ -19159,14 +20805,14 @@ colour_checker
 ```text
 ---- Summary ----
 Main function to register what is told when a question can be answered with the
-mouse: the window registers itself while it is open, so a click or a drag on its
-plot can give the answer.
+mouse: the window registers itself while it is open, so a drag across its plot can
+give the answer.
 
 ---- Inputs ----
 requester : Optional[Callable[[Optional[str], Optional[Callable]], None]]
-    Function called with ('point' or 'span', reader) when a question starts waiting
-    for an answer the mouse can give, and with (None, None) when it has its answer
-    (see _time_announcer); None to register nothing (the terminal).
+    Function called with ('span', reader) when a question starts waiting for an
+    answer the mouse can give, and with (None, None) when it has its answer (see
+    _time_announcer); None to register nothing (when the window closes).
 
 ---- Globals read ----
 None.
@@ -19302,7 +20948,7 @@ None.
 
 ## `utils_shared/run_logging.py`
 
-Mirror console output to a timestamped log file for the duration of a run.
+Mirror console output to a timestamped log file from the results folder question to the
 
 ### CLASSES
 
@@ -19310,14 +20956,15 @@ Mirror console output to a timestamped log file for the duration of a run.
 
 ```text
 ---- Summary ----
-File-like object that writes everything to several streams at once.
+File-like object that writes everything to several streams at once: to the first
+as it is, to the others without the terminal's colour codes.
 
 ---- Attributes ----
 streams : Tuple[Any, ...]
     File-like objects every write is copied to.
 
 ---- Globals read ----
-None.
+COLOUR_CODE_PATTERN (module constant).
 
 ---- Methods ----
 __init__
@@ -19441,14 +21088,15 @@ None.
 ---- Summary ----
 Method to write text to every stream and flush it, unless the current thread is
 capturing its output (see output_capture), in which case it is kept by the
-capture. The name is fixed by the file-like protocol.
+capture. Every stream after the first gets the text without colour codes. The
+name is fixed by the file-like protocol.
 
 ---- Inputs ----
 text : str
     Text to write.
 
 ---- Globals read ----
-None.
+COLOUR_CODE_PATTERN (module constant).
 
 ---- Outputs ----
 int
@@ -19466,11 +21114,103 @@ captured_buffer_getter
 
 ### MAIN FUNCTIONS
 
+#### `answer_logger`
+
+```text
+---- Summary ----
+Main function to add an answer the user gave to the log of the run being logged,
+under its question; the window shows the answer itself. Nothing is done while no
+run is being logged.
+
+---- Inputs ----
+text : str
+    The answer as it is to read in the log, for example "   > 12".
+
+---- Globals read ----
+_details_targets (module state).
+
+---- Outputs ----
+None
+    Nothing. An answer that cannot be written (a full disk) is left out.
+
+---- Globals mutated ----
+None. Writes to the log (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `details_place_setter`
+
+```text
+---- Summary ----
+Main function to set where the details of a problem go while no run is being
+logged: the error stream the program had before its window took the output over
+(the start-up log, or the terminal it was started from).
+
+---- Inputs ----
+stream : Any
+    File-like object for the details, or None for nowhere.
+place : str
+    That place in words for the user, to complete "The details are in ...".
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+_details_targets (module state).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `details_writer`
+
+```text
+---- Summary ----
+Main function to write the details of a problem where the user does not see them:
+the log of the run being logged, or else the place set by details_place_setter.
+Never to the window, even while a thread's output is captured.
+
+---- Inputs ----
+text : str
+    The details, for example Python's own report of an error.
+
+---- Globals read ----
+_details_targets (module state).
+
+---- Outputs ----
+str
+    Where they were written, in words for the user; empty when they could not be
+    written anywhere.
+
+---- Globals mutated ----
+None. Writes to the log or the stream (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `logging_starter`
 
 ```text
 ---- Summary ----
-Main function to start copying everything printed to a timestamped log file.
+Main function to start copying everything printed to a timestamped log file, as
+soon as the results folder is known, so the questions and their answers are kept
+even when Portimao is closed before the run.
 
 ---- Inputs ----
 export_root : Path
@@ -19478,8 +21218,8 @@ export_root : Path
 title : str
     Program name, branch and version (program_title_builder), written on the first
     line of the log.
-settings : dict
-    Terminal answers of the run, written at the top of the log.
+data_folder : Path
+    Folder of the .paf files, written at the top of the log.
 
 ---- Globals read ----
 None.
@@ -19487,12 +21227,14 @@ None.
 ---- Outputs ----
 dict
     Session dictionary {log_path, log_file, original_stdout, original_stderr,
-    tee_stdout, tee_stderr, closed}, to be passed to logging_stopper.
+    tee_stdout, tee_stderr, closed}, to be passed to settings_logger and
+    logging_stopper.
 
 ---- Globals mutated ----
-None. Creates the log folder and file, writes the title, seed and settings to
-its first lines, replaces sys.stdout and sys.stderr with copying streams and
-prints the log location (side effects).
+_details_targets (module state), so the details of a problem and the answers go to
+this log. Creates the log folder and file, writes the title, seed and folders to
+its first lines, replaces sys.stdout and sys.stderr with copying streams and prints
+the log location (side effects).
 
 ---- Equations ----
 None.
@@ -19512,15 +21254,46 @@ session : Optional[dict]
     Session dictionary from logging_starter, or None.
 
 ---- Globals read ----
-None.
+_details_targets (module state).
 
 ---- Outputs ----
 None
     Nothing.
 
 ---- Globals mutated ----
-None. Restores sys.stdout and sys.stderr, closes the log file and marks the session
+_details_targets (module state), so the details of a problem no longer go to this
+log. Restores sys.stdout and sys.stderr, closes the log file and marks the session
 closed (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `settings_logger`
+
+```text
+---- Summary ----
+Main function to write every setting of the run to its log, once all the questions
+are answered and before anything is processed. The window does not show them.
+
+---- Inputs ----
+session : Optional[dict]
+    Session dictionary from logging_starter, or None.
+settings : dict
+    The answers of the run, by name.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing. Settings that cannot be written (a full disk) are left out.
+
+---- Globals mutated ----
+None. Writes to the log (side effect).
 
 ---- Equations ----
 None.
@@ -20542,7 +22315,7 @@ s_array_generator
 
 ## `utils_shared/survey.py`
 
-Numbered terminal questions of the main program (sections 1 to 5).
+Numbered terminal questions of the main program (sections 1 to 5) and the trimming rules.
 
 ### SURVEY HELPERS
 
@@ -20757,90 +22530,6 @@ _first_event_finder
 _last_event_finder
 ```
 
-#### `_limits_asker`
-
-```text
----- Summary ----
-Helper function to ask the questions for one edge of the data (trim start, trim end,
-ignore start or ignore end): whether to do it at all, how many minutes for ALL the
-files, and then optionally how many for each file. The limits are stored and passed
-to ``progress`` after every answer, so a plot can show them building up. In the
-window a click on the plot of a file gives the minutes that put the cut there.
-
----- Inputs ----
-summaries : List[dict]
-    File summaries (DATA_FORMAT.md).
-remembered : dict
-    {file name: {key: value}} from the last run, offered as the defaults.
-kind : str
-    'trim' or 'ignore'.
-edge : str
-    'start' or 'end'.
-collected : dict
-    {file name: {key: value}} of the limits asked so far; this question adds its
-    own key.
-progress : Callable[[Dict[str, dict]], None]
-    Function called with the limits of every file after each answer.
-
----- Globals read ----
-config.DEFAULT_ANSWERS (default ignore time at the start).
-
----- Outputs ----
-None
-    Nothing; the answers are stored in ``collected``.
-
----- Globals mutated ----
-collected (adds the key of this question for every file). Reads from and prints to
-the terminal (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_file_focuser
-_first_event_finder
-_last_event_finder
-_limit_converter
-_limit_maximum_getter
-_limits_filler
-_minutes_recaller
-info_printer
-limit_minutes_finder
-number_asker
-yes_no_asker
-```
-
-#### `_limits_filler`
-
-```text
----- Summary ----
-Helper function to give every file all four limits, using "none" for the ones not
-asked yet.
-
----- Inputs ----
-summaries : List[dict]
-    File summaries (DATA_FORMAT.md).
-collected : dict
-    {file name: {key: value}} of the limits asked so far.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Dict[str, dict]
-    {file name: {trim_start, trim_end, ignore_start, ignore_end}}; the trim limits
-    are None and the ignore limits 0.0 when not set.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `_maths_converter`
 
 ```text
@@ -20993,6 +22682,41 @@ None.
 info_printer
 label_tidier
 yes_no_asker
+```
+
+#### `_trim_minutes_clamper`
+
+```text
+---- Summary ----
+Helper function to keep the four edges of one file within its limits: no edge below
+0 minutes, a trimmed edge never cutting off an event, and the ignored parts inside
+the kept part without crossing. When the ignored parts no longer fit, the one on
+the side of ``key`` gives way first, so an edge pushed against another stops there.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with events and duration_min.
+minutes : Dict[str, float]
+    {trim_start, trim_end, ignore_start, ignore_end} in minutes taken off each edge.
+key : str
+    The edge just set (one of TRIM_KEYS); its side gives way first.
+
+---- Globals read ----
+TRIM_KEYS.
+
+---- Outputs ----
+Dict[str, float]
+    The minutes kept within the limits; the dictionary given is not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Kept length = duration - trim start - trim end; the ignore time on the side of
+``key`` is at most kept length - the other ignore time.
+
+---- Helpers ----
+_limit_maximum_getter
 ```
 
 ### MAIN FUNCTIONS
@@ -21183,6 +22907,7 @@ None.
 choice_asker
 fit_importer
 info_printer
+problem_teller
 yes_no_asker
 ```
 
@@ -21309,7 +23034,9 @@ text_asker
 
 ```text
 ---- Summary ----
-Main function to ask whether the haems are plotted, and which ones in which order.
+Main function to ask which haems are plotted, and in which order, when they are
+plotted: whether they are is answered by the Haems box of the window's settings
+strip, in answers['plot_haems'].
 
 ---- Inputs ----
 answers : dict
@@ -21318,10 +23045,6 @@ defaults : dict
     Default answers.
 fit : Optional[dict]
     Fit dictionary (haem_list) used to list the haems, or None.
-is_shown_asked : bool
-    False when whether the haems are plotted is already answered (the Haems box
-    of the window's settings strip, in answers['plot_haems']): only which ones and
-    in which order are asked, and only when they are plotted.
 
 ---- Globals read ----
 None.
@@ -21340,7 +23063,6 @@ None.
 haem_name_formatter
 haem_name_sorter
 multi_asker
-yes_no_asker
 ```
 
 #### `haem_form_asker`
@@ -21550,46 +23272,6 @@ None.
 None.
 ```
 
-#### `limit_minutes_finder`
-
-```text
----- Summary ----
-Main function to turn a time clicked on the plot of the whole recording into the
-minutes a trim or ignore question asks for: how much is taken off that edge so the
-cut falls at the click.
-
----- Inputs ----
-summary : dict
-    Experiment summary with duration_min.
-limits : dict
-    The limits of this file asked so far: 'trim_start' and 'trim_end' as times on
-    the original recording (None or missing for no trim).
-kind : str
-    'trim' or 'ignore'.
-edge : str
-    'start' or 'end'.
-time_min : float
-    The time clicked, on the original recording (min).
-
----- Globals read ----
-None.
-
----- Outputs ----
-float
-    Minutes to take off that edge; 0 when the click is beyond the edge.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-Trim start = t. Trim end = duration - t. Ignore start = t - trim start (ignore
-times count from the new 0 after trimming). Ignore end = (trim end, or the
-duration) - t.
-
----- Helpers ----
-None.
-```
-
 #### `multi_experiment_asker`
 
 ```text
@@ -21694,46 +23376,13 @@ None.
 None.
 ```
 
-#### `od_asker`
-
-```text
----- Summary ----
-Main function to ask the OD, volume and dilution factor of every file, offering the
-values saved in each experiment's workbook.
-
----- Inputs ----
-summaries : List[dict]
-    File summaries (DATA_FORMAT.md).
-saved : dict
-    {file name: values read from its workbook} (read_saved_settings).
-
----- Globals read ----
-None.
-
----- Outputs ----
-Dict[str, dict]
-    {file name: {'OD', 'volume', 'dilution_factor'}}.
-
----- Globals mutated ----
-None. Reads from and prints to the terminal (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_file_focuser
-info_printer
-number_asker
-numbering_restarter
-```
-
 #### `od_scaling_asker`
 
 ```text
 ---- Summary ----
-Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
-factor of every file, offering the stored values: in a table when one is given,
-otherwise with three questions per file.
+Main function to ask whether to scale by OD and, if so, have the OD, volume and
+dilution factor of every file filled in in the table, starting from the stored
+values.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -21744,10 +23393,9 @@ defaults : dict
     Default answers (normalise_od).
 saved : dict
     {file name: values read from its workbook} (saved_values_reader).
-table_filler : Optional[Callable[[Dict[str, dict]], Dict[str, dict]]]
+table_filler : Callable[[Dict[str, dict]], Dict[str, dict]]
     Function that shows the OD table filled in with the given rows (od_rows,
-    DATA_FORMAT.md), waits until every cell is right, and returns the rows; None
-    to ask the questions instead.
+    DATA_FORMAT.md), waits until every cell is right, and returns the rows.
 
 ---- Globals read ----
 None.
@@ -21765,8 +23413,6 @@ None. Stores normalise_od in ``answers`` and reads from and prints to the termin
 None.
 
 ---- Helpers ----
-info_printer
-od_asker
 yes_no_asker
 ```
 
@@ -21901,43 +23547,180 @@ choice_asker
 number_asker
 ```
 
-#### `trim_asker`
+#### `trim_layout_finder`
 
 ```text
 ---- Summary ----
-Main function to ask section 2: which data is trimmed away (start, end) and which
-is ignored in the calculations (start, end). Each edge is asked in turn with the
-same questions: do it at all, how many minutes for ALL the data, and optionally how
-many for each file.
+Main function to say where the four edges of one file sit on the plot of its whole
+recording, with the words by each handle, and which parts are shaded.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with duration_min.
+minutes : Dict[str, float]
+    {trim_start, trim_end, ignore_start, ignore_end}: the minutes taken off each
+    edge (trim end from the end of the recording, ignore times from the trimmed
+    edges), as kept by trim_minutes_setter.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
+    (edges, parts): edges as [(key, time_min, words, kind)] with kind 'trim' or
+    'ignore', in the order of TRIM_KEYS; parts as [(start_min, end_min, kind)],
+    times on the whole recording.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Kept start = trim start; kept end = duration - trim end; ignore start edge = kept
+start + ignore start; ignore end edge = kept end - ignore end.
+
+---- Helpers ----
+None.
+```
+
+#### `trim_limits_builder`
+
+```text
+---- Summary ----
+Main function to turn the minutes chosen for every file into the trim and ignore
+limits the rest of the program uses and saves.
 
 ---- Inputs ----
 summaries : List[dict]
     File summaries (DATA_FORMAT.md).
-remembered : dict
-    {file name: {trim_start, trim_end, ignore_start, ignore_end}} from the last
-    run; offered as the defaults.
-progress : Optional[Callable[[Dict[str, dict]], None]]
-    Function called with the limits of every file after each answer (so a plot can
-    show them building up), or None.
+minutes : Dict[str, Dict[str, float]]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes taken
+    off each edge (trim_minutes_builder).
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 Dict[str, dict]
-    {file name: {'trim_start', 'trim_end' (minutes on the original recording, or
-    None), 'ignore_start', 'ignore_end' (minutes, counted from the new 0 time)}}.
+    {file name: {'trim_start', 'trim_end' (times on the original recording, or None
+    for no trim), 'ignore_start', 'ignore_end' (minutes, counted from the trimmed
+    edges)}}.
 
 ---- Globals mutated ----
-None. Reads from and prints to the terminal (side effect).
+None.
+
+---- Equations ----
+Trim start = minutes; trim end = duration - minutes.
+
+---- Helpers ----
+_limit_converter
+```
+
+#### `trim_minutes_builder`
+
+```text
+---- Summary ----
+Main function to give the minutes each file starts the trimming step with: those
+remembered for it, otherwise the standard settings (only the start ignored), kept
+within the file's own limits.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+remembered : Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} as the limits are
+    kept (trim_limits_builder), from the last run or the last time the step was
+    answered; a file or key may be missing.
+
+---- Globals read ----
+config.DEFAULT_ANSWERS (the minutes ignored at the start); TRIM_KEYS.
+
+---- Outputs ----
+Dict[str, Dict[str, float]]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes taken
+    off each edge.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim end minutes = duration - remembered end time.
+
+---- Helpers ----
+_minutes_recaller
+_trim_minutes_clamper
+```
+
+#### `trim_minutes_setter`
+
+```text
+---- Summary ----
+Main function to set one edge of one file to a number of minutes, kept within the
+file's limits: a trimmed edge never cuts off an event, and the ignored parts stay
+inside the kept part without crossing. When the ignored parts no longer fit, the
+one on the side of the edge being set gives way first.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with events and duration_min.
+minutes : Dict[str, float]
+    {trim_start, trim_end, ignore_start, ignore_end} of the file, in minutes taken
+    off each edge.
+key : str
+    The edge set: one of TRIM_KEYS.
+value : float
+    Minutes wanted for it; below 0 counts as 0.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, float]
+    New minutes of the file; the dictionary given is not changed.
+
+---- Globals mutated ----
+None.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-_limits_asker
-_limits_filler
-info_printer
+_trim_minutes_clamper
+```
+
+#### `trim_pointer_reader`
+
+```text
+---- Summary ----
+Main function to turn a time pointed at on the plot of the whole recording into the
+minutes that put one edge there, in steps of 0.1 min.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with duration_min.
+minutes : Dict[str, float]
+    {trim_start, trim_end, ignore_start, ignore_end} of the file now, in minutes
+    taken off each edge; the ignore times count from the trimmed edges.
+key : str
+    The edge being moved: one of TRIM_KEYS.
+time_min : float
+    The time pointed at, on the original recording (min).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    Minutes for that edge, rounded to 0.1; 0 when the time is beyond the edge.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim start = t. Trim end = duration - t. Ignore start = t - trim start. Ignore end
+= (duration - trim end) - t.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_shared/trimming.py`
@@ -21984,6 +23767,177 @@ t_new = t - start_time; rows kept where start_time <= t <= end_time.
 None.
 ```
 
+## `utils_shared/user_notices.py`
+
+One plain sentence for each warning and problem the user meets, with the details of a
+
+### NOTICE HELPERS
+
+#### `_file_namer`
+
+```text
+---- Summary ----
+Helper function to name the file a file problem is about, without its folders.
+
+---- Inputs ----
+error : OSError
+    The problem; its filename is None when the system did not say which file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The file's name, or "A file" when it is not known.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_own_sentence_finder`
+
+```text
+---- Summary ----
+Helper function to give the message of an error that Portimao's own code raised
+with a message of its own, which is written for the user. An error that Python or
+a package raised has none: its last step is not a raise statement in one of
+Portimao's modules (a failed float() in Portimao's code, for example, is Python's).
+
+---- Inputs ----
+error : BaseException
+    The problem, with its traceback.
+
+---- Globals read ----
+OWN_MODULES, RAISE_OPCODE (module constants).
+
+---- Outputs ----
+Optional[str]
+    The message, or None when the error is not one of Portimao's own or has no
+    text.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `problem_describer`
+
+```text
+---- Summary ----
+Main function to say in plain words what went wrong and what to do, never with
+Python's own error text: Portimao's own message when it wrote one, a sentence of
+its own for a file that is open elsewhere, missing or unreadable and for a lack of
+memory, and otherwise that Portimao met a problem it did not expect, with where the
+details are.
+
+---- Inputs ----
+error : BaseException
+    The problem, with its traceback.
+place : str
+    Where the details were written, in words (details_writer); empty when they
+    could not be written anywhere.
+
+---- Globals read ----
+SEND_LOG (module constant).
+
+---- Outputs ----
+str
+    One or two sentences, ending in a full stop.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_namer
+_own_sentence_finder
+```
+
+#### `problem_shower`
+
+```text
+Main function to show a problem as a warning, in plain words, with its details in
+the log only. See problem_teller.
+```
+
+#### `problem_teller`
+
+```text
+---- Summary ----
+Main function to write the details of a problem (Python's own report of it) to the
+log only, and give the sentence the user sees instead.
+
+---- Inputs ----
+lead : str
+    What could not be done, for example "Preview not drawn for run1"; it starts the
+    sentence and heads the details in the log. Leading spaces are kept in the
+    sentence, for the indent of the terminal.
+error : BaseException
+    The problem, with its traceback.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    "<lead>: <what went wrong and what to do>" (problem_describer).
+
+---- Globals mutated ----
+None. Writes the details to the log (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+details_writer
+problem_describer
+```
+
+#### `warning_shower`
+
+```text
+---- Summary ----
+Main function to show a warning: it is printed as it is, and while the window
+captures the output of a preview it is also kept as a warning, so the window shows
+it under the plot whatever its words.
+
+---- Inputs ----
+text : str
+    The warning, in plain words; leading spaces indent it in the terminal only.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints the warning and adds it to the capture of the thread, if any (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+captured_buffer_getter
+```
+
 ## `utils_shared/user_places.py`
 
 Where the program keeps the user's own things: the program folder from source, a folder
@@ -21999,6 +23953,39 @@ fits, the folder used last, the logs and the data folders offered by number.
 Detailed structure can be found in DATA_FORMAT.md.
 ```
 
+### LAUNCH LOG HELPERS
+
+#### `_launch_log_shortener`
+
+```text
+---- Summary ----
+Helper function to cut the launch log to its newest half once it is bigger than the
+limit, from the first start line in that half (or the first whole line when the
+half holds none).
+
+---- Inputs ----
+path : Path
+    The launch log; nothing is done when it is missing.
+max_bytes : int
+    Size in bytes past which the log is cut.
+
+---- Globals read ----
+LAUNCH_LOG_START (module constant).
+
+---- Outputs ----
+None
+    Nothing. A log that cannot be read or written is left as it is.
+
+---- Globals mutated ----
+None. Rewrites the log (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `app_output_logger`
@@ -22006,9 +23993,9 @@ Detailed structure can be found in DATA_FORMAT.md.
 ```text
 ---- Summary ----
 Main function to send everything the Mac app prints to logs/launch.log in its own
-folder, as the launcher does for a program run from source. The app has no launcher
-and no terminal, so without this its messages would be lost. Run from source,
-nothing changes.
+folder, after the starts before, as the launcher does for a program run from
+source. The app has no launcher and no terminal, so without this its messages
+would be lost. Run from source, nothing changes.
 
 ---- Inputs ----
 places : UserPlaces
@@ -22029,7 +24016,40 @@ _app_log (module state); sys.stdout and sys.stderr are replaced by the log file.
 None.
 
 ---- Helpers ----
+launch_log_opener
+```
+
+#### `launch_log_opener`
+
+```text
+---- Summary ----
+Main function to open the launch log for a new start: the starts before are kept
+(cut to the newest half once the log passes the limit), and a line with the date
+and time marks where this start begins. The launcher and the Mac app both open it
+here, so it reads alike.
+
+---- Inputs ----
+path : Path
+    The launch log (logs/launch.log); its folder is made when missing.
+max_bytes : int
+    Size in bytes past which the starts before are cut to the newest half.
+
+---- Globals read ----
+LAUNCH_LOG_START (module constant).
+
+---- Outputs ----
+TextIO
+    The log, open for adding text (UTF-8, line by line), its start line already
+    written. Raises OSError when it cannot be opened.
+
+---- Globals mutated ----
+None. Makes the folder, may cut the log and writes the start line (side effects).
+
+---- Equations ----
 None.
+
+---- Helpers ----
+_launch_log_shortener
 ```
 
 #### `user_folder_preparer`
@@ -22099,6 +24119,771 @@ None.
 None.
 ```
 
+## `utils_viewer/viewer_edges.py`
+
+Edges dragged on the plot of a file to choose parts of it, such as the trimmed and
+
+### CLASSES
+
+#### `EdgeChoice`
+
+```text
+---- Summary ----
+What the window needs to let the user choose parts of the plot of every file by
+dragging edges, or typing them in the strip: the fields shown, the value of each
+field for each file, and the rules of the step that uses it.
+Detailed structure can be found in DATA_FORMAT.md.
+```
+
+#### `EdgeOverlay`
+
+```text
+---- Summary ----
+The edges over the plot of the file shown, while a step lets the user choose parts
+of the plot with them: the parts are shaded into the picture (see-through, so the
+data stays readable), each edge is a line with a handle and its words above the
+plot, and the edges entered before are red dashed lines. An edge is dragged by its
+handle or its line, and the shading follows the drag without the plot being drawn
+again. Every method runs on the window thread, except values_reader.
+
+---- Attributes ----
+choice : Optional[EdgeChoice]
+    The choice being made, or None while there is none.
+values : Dict[str, Dict[str, float]]
+    {file name: {field: value}} as the user has set them so far; replaced, never
+    changed in place, at each change.
+is_every_file : bool
+    True: a moved or typed edge moves on every file; False: on the file shown only.
+
+---- Globals read ----
+The module constants.
+
+---- Methods ----
+__init__
+_edges_drawer
+_picture_shader
+_update_runner
+_values_changer
+choice_setter
+field_setter
+hit_layout_finder
+hover_handler
+is_on
+key_teller
+motion_handler
+picture_placer
+press_handler
+release_handler
+values_reader
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to set up the overlay, with no choice being made.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+canvas : Any
+    The Tk canvas the plot is shown on.
+family : str
+    Font family of the words by the handles.
+on_change : Callable[[], None]
+    Called after every change of the values, so the window can show them.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_edges_drawer`
+
+```text
+---- Summary ----
+Method to draw the edges of the file shown over its picture: the edges entered
+before as red dashed lines, then each edge as a line from its handle above the
+plot to the bottom of the panels, with its words beside the handle, towards
+the middle of the plot.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PART_STYLES, PREVIOUS_COLOUR, HANDLE_BAND_PX, HANDLE_ROW_PX, HANDLE_SIZE_PX,
+EDGE_WIDTH_PX, WORDS_COLOUR.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the canvas, tagged 'edges' (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+minute_x_finder
+```
+
+##### `_picture_shader`
+
+```text
+---- Summary ----
+Method to show the picture of the file shown with its parts shaded, in place of
+the picture on the canvas.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the picture on the canvas (side effect).
+
+---- Equations ----
+x in the picture = minute_x_finder with the picture at (0, 0).
+
+---- Helpers ----
+minute_x_finder
+photo_maker
+shaded_picture_maker
+```
+
+##### `_update_runner`
+
+```text
+---- Summary ----
+Method to move the edge being dragged to where the mouse last was, at most
+every DRAG_PAUSE_MS while the mouse moves.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Moves the edge (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_values_changer
+x_minute_finder
+```
+
+##### `_values_changer`
+
+```text
+---- Summary ----
+Method to set one field of the file shown, or of every file, through the rules
+of the step, then show the result.
+
+---- Inputs ----
+key : str
+    The field set.
+value : float
+    Its new value, before the rules of each file are applied.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces values, redraws the overlay and tells the window (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_edges_drawer
+_picture_shader
+every_file_setter
+```
+
+##### `choice_setter`
+
+```text
+---- Summary ----
+Method to start a choice with its starting values, or end it (None), taking the
+edges off the plot.
+
+---- Inputs ----
+choice : Optional[EdgeChoice]
+    The choice, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces the choice and values and clears the edges (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `field_setter`
+
+```text
+---- Summary ----
+Method to take a value typed in the strip for one field of the file shown (of
+every file when is_every_file).
+
+---- Inputs ----
+key : str
+    The field typed in.
+value : float
+    The number typed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the values and redraws (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_values_changer
+```
+
+##### `hit_layout_finder`
+
+```text
+---- Summary ----
+Method to give where the edges of the file shown sit on the canvas, for
+edge_hit_finder.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PART_STYLES, HANDLE_BAND_PX.
+
+---- Outputs ----
+Tuple[List[Tuple[str, float, int]], float, Tuple[float, float]]
+    ([(key, x in pixels, row of its handle)], top of the handles in pixels,
+    (top, bottom) of the panels in pixels).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+minute_x_finder
+```
+
+##### `hover_handler`
+
+```text
+---- Summary ----
+Method to show the mouse as a two-way arrow over an edge it can take.
+
+---- Inputs ----
+event : Any
+    The Tk motion event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the cursor of the canvas (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+edge_hit_finder
+hit_layout_finder
+```
+
+##### `is_on`
+
+```text
+---- Summary ----
+Whether a choice is being made.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True while a choice is being made.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `key_teller`
+
+```text
+---- Summary ----
+Method to give the words that explain the colours on the plot.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PREVIOUS_KEY_TEXT.
+
+---- Outputs ----
+str
+    The key of the choice, with the red dashed lines when they are drawn; empty
+    when there is no choice.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `motion_handler`
+
+```text
+---- Summary ----
+Method to follow the mouse while an edge is dragged; the edge moves at most
+every DRAG_PAUSE_MS.
+
+---- Inputs ----
+event : Any
+    The Tk motion event.
+
+---- Globals read ----
+DRAG_PAUSE_MS.
+
+---- Outputs ----
+bool
+    True when an edge is being dragged (the window then does nothing else
+    with the drag).
+
+---- Globals mutated ----
+None. Schedules the move (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_update_runner
+```
+
+##### `picture_placer`
+
+```text
+---- Summary ----
+Method to take the picture of a file just put on the canvas, shade it and draw
+its edges; with no picture (a message, a figure, a picture without a time
+axis) nothing is drawn until the next one.
+
+---- Inputs ----
+name : Optional[str]
+    Name of the file shown, or None.
+picture : Optional[Image.Image]
+    The picture at the size shown, without shading.
+item : Optional[int]
+    The canvas item showing the picture; its picture is replaced.
+box : Optional[Tuple[float, float, float, float]]
+    (left, top, width, height) of the picture on the canvas, in pixels.
+axis : Optional[TimeAxis]
+    Where the time axis sits in the picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the picture, changes it on the canvas and draws the edges (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_edges_drawer
+_picture_shader
+```
+
+##### `press_handler`
+
+```text
+---- Summary ----
+Method to take the edge under the mouse when the button is pressed.
+
+---- Inputs ----
+event : Any
+    The Tk click event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when an edge was taken (the window then does nothing else with the
+    click).
+
+---- Globals mutated ----
+None. Notes the edge taken and redraws the edges (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_edges_drawer
+edge_hit_finder
+hit_layout_finder
+```
+
+##### `release_handler`
+
+```text
+---- Summary ----
+Method to put the edge being dragged where the button is let go.
+
+---- Inputs ----
+event : Any
+    The Tk release event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when an edge was being dragged.
+
+---- Globals mutated ----
+None. Moves the edge and redraws (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_edges_drawer
+_update_runner
+```
+
+##### `values_reader`
+
+```text
+---- Summary ----
+Method to give a copy of the values as they are now; safe to call from the
+program thread, as the values are replaced, never changed in place.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Dict[str, float]]
+    {file name: {field: value}}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `edge_hit_finder`
+
+```text
+---- Summary ----
+Main function to find the edge the mouse is on: on its handle, or near its line
+between the handles and the bottom of the panels. Where two lines meet, the edge
+whose handle is in the lower row (the inner one) is taken; the other is still taken
+by its handle.
+
+---- Inputs ----
+x : float
+    Distance of the mouse from the left of the canvas, in pixels.
+y : float
+    Distance of the mouse from the top of the canvas, in pixels.
+edges : List[Tuple[str, float, int]]
+    [(key, x of its line in pixels, row of its handle, 0 the top)].
+band_top : float
+    Top of the first row of handles, in pixels.
+panel : Tuple[float, float]
+    (top, bottom) of the panels, in pixels.
+
+---- Globals read ----
+GRAB_DISTANCE_PX, HANDLE_ROW_PX, HANDLE_SIZE_PX.
+
+---- Outputs ----
+Optional[str]
+    The key of the edge, or None when the mouse is on none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+On a handle: row top <= y <= row top + row height and |x - line| <= half a handle
++ 2 px. On a line: band top <= y <= panel bottom and |x - line| <= grab distance.
+
+---- Helpers ----
+None.
+```
+
+#### `every_file_setter`
+
+```text
+---- Summary ----
+Main function to set one field to the same value on some files, each kept within
+its own limits by the rules of the step.
+
+---- Inputs ----
+values : Dict[str, Dict[str, float]]
+    {file name: {field: value}} now; not changed.
+names : List[str]
+    The files to set.
+key : str
+    The field set.
+value : float
+    The value wanted, the same for each file.
+setter : Callable[[str, Dict[str, float], str, float], Dict[str, float]]
+    The rule of the step: (file name, its values, field, value) -> its new values.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Dict[str, float]]
+    New {file name: {field: value}}; the files not named keep their values.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `minute_x_finder`
+
+```text
+---- Summary ----
+Main function to find where a time falls across the plot area: the inverse of
+pointed_time_finder (utils_viewer/viewer_gui.py).
+
+---- Inputs ----
+time_min : float
+    The time, in minutes on the time axis of the picture.
+picture_box : Tuple[float, float, float, float]
+    (left, top, width, height) of the picture in the plot area, in pixels.
+time_axis : TimeAxis
+    Where the time axis sits in the picture, and the times at its ends.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    Distance from the left edge of the plot area, in pixels; outside the panels for
+    a time outside the axis.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+share = (time - start) / (end - start);
+x = left + (axis left + share * (axis right - axis left)) * width.
+
+---- Helpers ----
+None.
+```
+
+#### `own_value_lister`
+
+```text
+---- Summary ----
+Main function to list the files whose values differ from those most files have, so
+the window can mark them.
+
+---- Inputs ----
+values : Dict[str, Dict[str, float]]
+    {file name: {field: value}}, every file with the same fields.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    The files with a value of their own in any field, in the order given; empty
+    for fewer than two files.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `photo_maker`
+
+```text
+---- Summary ----
+Main function to turn a picture into one Tk can show, quickly enough to follow a
+drag: as raw pixels (PPM), or as PNG where this Tk cannot read those.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+picture : Image.Image
+    The picture, in RGB.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Any
+    A tk.PhotoImage of the picture.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `shaded_picture_maker`
+
+```text
+---- Summary ----
+Main function to shade parts of a picture, see-through so what is under them stays
+readable, each in the colour of its kind and hatched where its kind is.
+
+---- Inputs ----
+picture : Image.Image
+    The picture; not changed.
+parts : List[Tuple[float, float, float, float, str]]
+    [(left, right, top, bottom, kind)] in pixels of the picture, kind a key of
+    PART_STYLES; a part narrower than a pixel is left out.
+
+---- Globals read ----
+PART_STYLES, HATCH_SPACING_PX, HATCH_STRENGTH.
+
+---- Outputs ----
+Image.Image
+    A new RGB picture of the same size.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Shaded pixel = (1 - strength) * pixel + strength * colour.
+
+---- Helpers ----
+None.
+```
+
+#### `x_minute_finder`
+
+```text
+---- Summary ----
+Main function to find the time at a place across the plot area, kept within the
+time axis, so an edge dragged past the end of the panels stops at their edge.
+
+---- Inputs ----
+x : float
+    Distance from the left edge of the plot area, in pixels.
+picture_box : Tuple[float, float, float, float]
+    (left, top, width, height) of the picture in the plot area, in pixels.
+time_axis : TimeAxis
+    Where the time axis sits in the picture, and the times at its ends.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    The time in minutes, between the times at the two ends of the axis.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+share = ((x - left) / width - axis left) / (axis right - axis left);
+time = start + share * (end - start).
+
+---- Helpers ----
+None.
+```
+
 ## `utils_viewer/viewer_gui.py`
 
 The experiment browser window: question terminal on the left, plots on the right.
@@ -22109,8 +24894,8 @@ The experiment browser window: question terminal on the left, plots on the right
 
 ```text
 ---- Summary ----
-Raised when the browser window cannot be opened (no Tkinter, no display, or the
-window was switched off), so the program can use the terminal instead.
+Raised when the browser window cannot be opened (no Tkinter, no display, or a Tk
+that draws blank windows); its text says why, and what to do, in plain words.
 
 ---- Attributes ----
 None.
@@ -22131,8 +24916,6 @@ their text and answers pass through the terminal on the left, so the plot on the
 right stays usable while a question waits. Previews are drawn by a third thread.
 
 ---- Attributes ----
-is_interactive : bool
-    Always True: the window has its own file controls.
 logic_thread : Optional[threading.Thread]
     The thread running the program, whose output belongs in the terminal.
 exit_code : int
@@ -22157,7 +24940,9 @@ _drag_ender
 _dragger
 _drain_runner
 _drawing_sign_drawer
+_edges_refresher
 _event_handler
+_every_file_taker
 _history_stepper
 _icon_setter
 _image_deliverer
@@ -22167,21 +24952,26 @@ _logic_runner
 _message_shower
 _nav_state_setter
 _navigator
+_opened_teller
 _pane_writer
 _picture_shower
 _pointer_mover
 _resizer
+_screen_filler
 _step_taker
 _strip_change_runner
 _strip_change_teller
 _symbol_inserter
 _time_clicker
 _time_line_drawer
+_typed_edge_taker
 _widgets_builder
 _window_raiser
 drawing_sign_shower
+edges_hider
+edges_reader
+edges_shower
 extra_publisher
-figure_shower
 file_focuser
 input_reader
 od_table_hider
@@ -22420,7 +25210,8 @@ None.
 ```text
 ---- Summary ----
 Method to give the names for the drop-down: the experiment files are marked as
-locked once the figures built from them are shown.
+locked once the figures built from them are shown, and, while edges are dragged
+on the plot, the files whose edges differ from most files are marked.
 
 ---- Inputs ----
 None.
@@ -22439,16 +25230,17 @@ None.
 None.
 
 ---- Helpers ----
-None.
+own_value_lister
 ```
 
 ##### `_drag_ender`
 
 ```text
 ---- Summary ----
-Method to end a drag across the plot: the times where it started and ended
-(kept within the time axis) are turned into the answer, which is written into
-the answer box. The band stays until the answer is sent.
+Method to end a drag across the plot: an edge being dragged is put where the
+button is let go; otherwise the times where the drag started and ended (kept
+within the time axis) are turned into the answer, which is written into the
+answer box. The band stays until the answer is sent.
 
 ---- Inputs ----
 event : Any
@@ -22478,7 +25270,8 @@ pointed_time_finder
 ```text
 ---- Summary ----
 Method to follow the mouse while the button is held: the time line moves with
-it and, during a drag, the band is drawn to it.
+it and the edge being dragged follows it; during any other drag, the band is
+drawn to it.
 
 ---- Inputs ----
 event : Any
@@ -22558,6 +25351,34 @@ None.
 None.
 ```
 
+##### `_edges_refresher`
+
+```text
+---- Summary ----
+Method to show where the edges dragged on the plot are: the row of the strip
+holds the values of the file shown, and the drop-down marks the files whose
+edges differ from most files.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the drop-down and the row (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_display_name_lister
+```
+
 ##### `_event_handler`
 
 ```text
@@ -22567,10 +25388,10 @@ Method to carry out one message from the other threads, on the window thread.
 ---- Inputs ----
 event : tuple
     (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-    'extra', 'image', 'time', 'strip', 'strip_fits', 'strip_state', 'busy',
-    'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..." sign of
-    'busy' stays until the next question, preview or picture shown. With
-    close_after_s, 'finished' also closes the window after that time.
+    'extra', 'image', 'time', 'edges', 'strip', 'strip_fits', 'strip_state',
+    'busy', 'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..."
+    sign of 'busy' stays until the next question, preview or picture shown.
+    With close_after_s, 'finished' also closes the window after that time.
 
 ---- Globals read ----
 None.
@@ -22588,12 +25409,42 @@ None.
 ---- Helpers ----
 _closing_handler
 _display_name_lister
+_edges_refresher
+_hint_chooser
 _image_deliverer
 _image_receiver
 _nav_state_setter
 _navigator
 _pane_writer
 _picture_shower
+```
+
+##### `_every_file_taker`
+
+```text
+---- Summary ----
+Method to take the "Every file" tick box of the edges row: ticked, a moved or
+typed edge moves on every file; unticked, on the file shown only.
+
+---- Inputs ----
+is_every_file : bool
+    The new state of the tick box.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the overlay (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_history_stepper`
@@ -22753,6 +25604,8 @@ None.
 ```text
 ---- Summary ----
 Method that runs the program in its own thread and reports when it is done.
+When the program stops with a reason, or with a problem, one plain sentence in
+the terminal says so; the details of a problem go to the log only.
 
 ---- Inputs ----
 None.
@@ -22765,13 +25618,14 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Sets exit_code and queues the finished message (side effects).
+None. Sets exit_code, prints why the program stopped, if it did, and queues the
+finished message (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-None.
+problem_shower
 ```
 
 ##### `_message_shower`
@@ -22854,7 +25708,36 @@ None. Updates the selector, the plot and the renderer's order (side effects).
 None.
 
 ---- Helpers ----
+_edges_refresher
 _picture_shower
+```
+
+##### `_opened_teller`
+
+```text
+---- Summary ----
+Helper method to tell the launcher that the window is up, by making the file
+it named, so its small "Opening Portimao" window closes now.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+OPENED_SWITCH (module constant); os.environ[OPENED_SWITCH], set only by the
+launcher.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes an empty file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_pane_writer`
@@ -22893,16 +25776,19 @@ ansi_style_updater
 ```text
 ---- Summary ----
 Method to show the picture of the current file, scaled to fit the plot area, or
-say why there is none yet. While the picture for the latest settings is still
-being made, or the program is making pictures of its own (drawing_sign_shower),
-the "Drawing ..." sign is on the plot (over the previous picture when there is
-one).
+say why there is none yet. While edges are dragged on the plot, room is kept
+above the picture for their handles, and the overlay shades the picture and
+draws them. While the picture for the latest settings is still being made, or
+the program is making pictures of its own (drawing_sign_shower), the
+"Drawing ..." sign is on the plot (over the previous picture when there is
+one). Once the questions about each file are over, a file not drawn with the
+last settings says so instead.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-None.
+NOT_DRAWN_TEXT, HANDLE_BAND_PX (module constants).
 
 ---- Outputs ----
 None
@@ -22912,7 +25798,8 @@ None
 None. Redraws the plot area and the status line (side effect).
 
 ---- Equations ----
-scale = min(width / picture width, height / picture height), at most 1.5.
+scale = min(width / picture width, (height - handle band) / picture height),
+at most 1.5.
 
 ---- Helpers ----
 _drawing_sign_drawer
@@ -22926,7 +25813,8 @@ _time_line_drawer
 ```text
 ---- Summary ----
 Method to note where the mouse is over the plot area and move the time line
-there; the line goes when the mouse leaves.
+there; the line goes when the mouse leaves. Over an edge that can be dragged,
+the mouse becomes a two-way arrow.
 
 ---- Inputs ----
 event : Any
@@ -22975,6 +25863,34 @@ None.
 
 ---- Helpers ----
 _picture_shower
+```
+
+##### `_screen_filler`
+
+```text
+---- Summary ----
+Helper method to open the window maximised, as its maximise button does, so the
+answer box is never off a small screen. Un-maximised, it takes its usual size,
+made smaller to fit the screen.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+WINDOW_SIZE_PX, MINIMUM_SIZE_PX, SCREEN_MARGIN_PX (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sizes and maximises the window (side effect).
+
+---- Equations ----
+size = max(minimum, min(usual, screen - margin)), for the width and the height.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_step_taker`
@@ -23097,11 +26013,10 @@ None.
 
 ```text
 ---- Summary ----
-Method to act on a click on the plot of a file while the question waiting can
-be answered with the mouse: for a click question, the answer the time gives
-is written into the answer box; for a drag question, the drag starts here. The
-answer replaces what was in the box, can still be edited, and is accepted with
-Enter.
+Method to act on a click on the plot of a file: an edge under the mouse is
+taken, to be dragged; otherwise, while the question waiting can be answered
+with a drag, the drag starts here. Its answer replaces what was in the answer
+box, can still be edited, and is accepted with Enter.
 
 ---- Inputs ----
 event : Any
@@ -23121,7 +26036,6 @@ None. Changes the text of the answer box or starts a drag (side effects).
 None.
 
 ---- Helpers ----
-_answer_writer
 _band_drawer
 pointed_time_finder
 ```
@@ -23155,13 +26069,45 @@ y = picture top + (1 - fraction from the bottom) * picture height.
 pointed_time_finder
 ```
 
+##### `_typed_edge_taker`
+
+```text
+---- Summary ----
+Method to take a number typed in the edges row: the edge moves there (on every
+file when "Every file" is ticked), within the limits of each file, and the row
+shows where it went.
+
+---- Inputs ----
+key : str
+    The field typed in.
+value : float
+    The number typed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Moves the edge and redraws (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_edges_refresher
+```
+
 ##### `_widgets_builder`
 
 ```text
 ---- Summary ----
 Method to build the terminal, the answer box and the OD table (hidden until it
-is asked for) on the left, and the plot, its file controls and the settings
-strip on the right.
+is asked for) on the left, and the plot with the overlay of its edges, its file
+controls, the settings strip and the edges row (hidden until edges are dragged)
+on the right.
 
 ---- Inputs ----
 None.
@@ -23182,16 +26128,22 @@ None.
 ---- Helpers ----
 _answer_sender
 _closing_handler
+_edges_refresher
+_every_file_taker
 _history_stepper
 _message_shower
 _nav_state_setter
 _navigator
 _pointer_mover
 _resizer
+_screen_filler
 _step_taker
 _strip_change_teller
 _symbol_inserter
 _time_clicker
+_typed_edge_taker
+EdgeOverlay
+EdgeRow
 ODTable
 SettingsStrip
 ```
@@ -23253,6 +26205,92 @@ None.
 None.
 ```
 
+##### `edges_hider`
+
+```text
+---- Summary ----
+Method to take the edges off the plot and the edges row out of the strip, once
+the choice made with them is read. It is called from the question thread.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `edges_reader`
+
+```text
+---- Summary ----
+Method to give the values of the edges as the user has set them. It is meant
+to be called once the user has answered the instruction given after
+edges_shower, which is when the window is sure to hold the choice that was
+sent.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Dict[str, float]]
+    {file name: {field: value}} (EdgeChoice in DATA_FORMAT.md); empty when no
+    choice is being made.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `edges_shower`
+
+```text
+---- Summary ----
+Method to put edges on the plot of every file, to be dragged, with a row of
+typing boxes for them in the strip. It is called from the question thread; the
+rules in the choice run on the window thread.
+
+---- Inputs ----
+choice : EdgeChoice
+    The fields, the starting values and the rules (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the choice for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `extra_publisher`
 
 ```text
@@ -23279,34 +26317,6 @@ None
 
 ---- Globals mutated ----
 None. Queues the picture for the window (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `figure_shower`
-
-```text
----- Summary ----
-Method that is never needed: the window draws its own previews from the
-settings (spec_publisher).
-
----- Inputs ----
-figure : Any
-    A drawn figure (ignored).
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
 
 ---- Equations ----
 None.
@@ -23473,8 +26483,8 @@ None.
 None.
 
 ---- Outputs ----
-Iterator[io.StringIO]
-    The buffer the output is collected in.
+Iterator[CapturedOutput]
+    The buffer the output is collected in, with the warnings kept apart.
 
 ---- Globals mutated ----
 None. Captures the output of the current thread (side effect).
@@ -23543,6 +26553,7 @@ None.
 ---- Helpers ----
 _drain_runner
 _logic_runner
+_opened_teller
 _window_raiser
 input_reader
 text_sender
@@ -23779,17 +26790,15 @@ None.
 ```text
 ---- Summary ----
 Method to say that the question being asked can be answered with the mouse, so
-a click (or a drag) on the plot of a file writes the answer it gives into the
-answer box, or that it no longer can. It is called from the question thread.
+a drag across the plot of a file writes the answer it gives into the answer
+box, or that it no longer can. It is called from the question thread.
 
 ---- Inputs ----
 kind : Optional[str]
-    'point' (a click), 'span' (a drag), or None once the question has its
-    answer.
+    'span' (a drag), or None once the question has its answer.
 reader : Optional[Callable]
-    Turns what the mouse gave into the answer: reader(file name, time_min) for a
-    click, reader(file name, start_min, end_min) for a drag; None with kind
-    None. It is called on the window thread.
+    Turns the drag into the answer: reader(file name, start_min, end_min); None
+    with kind None. It is called on the window thread.
 
 ---- Globals read ----
 None.
@@ -23814,7 +26823,8 @@ None.
 ---- Summary ----
 Method to end the previews when the browser steps are over: the preview thread
 is stopped (so it cannot clash with the processing that follows) and the file
-controls are switched off. The last picture stays on show.
+controls are switched off. The pictures drawn with the last settings stay; a
+file without one says it was not drawn with them.
 
 ---- Inputs ----
 None.
@@ -23847,10 +26857,12 @@ do for the question waiting, if anything.
 
 ---- Inputs ----
 time_kind : Optional[str]
-    'point' (a click gives the answer), 'span' (a drag gives it) or None.
+    'span' (a drag gives the answer) or None.
+is_edged : bool
+    True while edges are dragged on the plot.
 
 ---- Globals read ----
-ANSWER_HINT, SPAN_HINT, TIME_HINT (module constants).
+ANSWER_HINT, EDGES_HINT, SPAN_HINT (module constants).
 
 ---- Outputs ----
 str
@@ -23880,7 +26892,7 @@ _active_gui (module state).
 
 ---- Outputs ----
 Optional[ViewerGui]
-    The open window, or None when the program runs in the terminal.
+    The open window, or None when none is open (outside a run).
 
 ---- Globals mutated ----
 None.
@@ -23896,9 +26908,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to run the whole program inside the browser window. It returns None
-without running anything when the window cannot be opened, so the caller can run
-the program in the terminal instead.
+Main function to run the whole program inside the browser window, which the program
+needs: nothing is run when the window cannot open.
 
 ---- Inputs ----
 program : Callable[[], int]
@@ -23910,12 +26921,12 @@ title : str
 None.
 
 ---- Outputs ----
-Optional[int]
-    The exit code of the program, or None when the window could not be opened.
+int
+    The exit code of the program. Raises GuiUnavailableError, with the reason in
+    plain words, when the window cannot open.
 
 ---- Globals mutated ----
-None. Opens the window and runs the program (side effects); prints why the window
-could not open when it could not.
+None. Opens the window and runs the program (side effects).
 
 ---- Equations ----
 None.
@@ -23971,24 +26982,23 @@ window.
 None.
 
 ---- Globals read ----
-MINIMUM_TK (module constant); os.environ["PORTIMAO_NO_GUI"] (set to anything to
-keep the terminal), os.environ["DISPLAY"] and os.environ["WAYLAND_DISPLAY"] (on
-Linux).
+MINIMUM_TK (module constant); os.environ["DISPLAY"] and
+os.environ["WAYLAND_DISPLAY"] (on Linux).
 
 ---- Outputs ----
 Tuple[Any, Any]
     (the tkinter module, the Tk root window). Raises GuiUnavailableError, with the
-    reason in plain words, when the window cannot open.
+    reason and what to do in plain words, when the window cannot open.
 
 ---- Globals mutated ----
-None. On Windows, makes the text sharp and gives the program its own taskbar group
-(side effects).
+None. On Windows, makes the text sharp and gives the program its own taskbar group;
+when Tk will not start, what it said goes to the log (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-None.
+details_writer
 ```
 
 ## `utils_viewer/viewer_multi.py`
@@ -24055,19 +27065,20 @@ context : dict
 makers : Dict[str, Callable]
     {'comparison': comparison_maker, 'special': special_figures_maker} of main.py.
 window : Any
-    The browser window (or the picture fallback), which captures the printed text.
+    The browser window, which captures the printed text.
 
 ---- Globals read ----
-PREVIEW_DPI, WARNING_WORDS (module constants).
+settings.PREVIEW_DPI.
 
 ---- Outputs ----
 Tuple[List[Tuple[str, bytes]], str]
-    ([(title, PNG bytes)], notes). The notes are the lines saying why a figure was
-    not made, and may be empty.
+    ([(title, PNG bytes)], notes). The notes are the warnings shown while the
+    figure was made (why it, or a part of it, was not made), one per line, and may
+    be empty.
 
 ---- Globals mutated ----
 None. Reads the files, switches figure saving to preview mode while it runs and
-puts it back (side effects).
+puts it back; the details of a problem go to the log (side effects).
 
 ---- Equations ----
 None.
@@ -24075,6 +27086,7 @@ None.
 ---- Helpers ----
 _kept_builder
 figure_capture_setter
+problem_shower
 ```
 
 ### MAIN FUNCTIONS
@@ -24095,7 +27107,7 @@ makers : Dict[str, Callable]
     {'comparison': comparison_maker, 'special': special_figures_maker} of main.py.
 
 ---- Globals read ----
-PREVIEW_FILE (imported constant).
+None.
 
 ---- Outputs ----
 Callable[[str, dict], bool]
@@ -24147,6 +27159,7 @@ _cell_checker
 _cell_mover
 _cell_revealer
 _size_follower
+_wheel_binder
 _wheel_scroller
 problems_lister
 rows_reader
@@ -24189,7 +27202,7 @@ None.
 
 ---- Helpers ----
 _size_follower
-_wheel_scroller
+_wheel_binder
 ```
 
 ##### `_cell_checker`
@@ -24310,6 +27323,34 @@ None.
 None.
 ```
 
+##### `_wheel_binder`
+
+```text
+---- Summary ----
+Method to make the mouse wheel over a part of the table scroll it, on Windows,
+the Mac and Linux alike.
+
+---- Inputs ----
+widget : Any
+    The Tk widget (the table, a heading, a name or a cell).
+
+---- Globals read ----
+WHEEL_EVENTS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Binds the wheel events of the widget (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_wheel_scroller
+```
+
 ##### `_wheel_scroller`
 
 ```text
@@ -24318,7 +27359,7 @@ Method to scroll a long table with the mouse wheel.
 
 ---- Inputs ----
 event : Any
-    The Tk mouse wheel event.
+    The Tk mouse wheel event, or the button 4 or 5 event of Linux.
 
 ---- Globals read ----
 None.
@@ -24334,7 +27375,7 @@ None. Scrolls the table (side effect).
 None.
 
 ---- Helpers ----
-None.
+wheel_step_finder
 ```
 
 ##### `problems_lister`
@@ -24421,7 +27462,7 @@ None.
 _cell_checker
 _cell_mover
 _cell_revealer
-_wheel_scroller
+_wheel_binder
 ```
 
 ### MAIN FUNCTIONS
@@ -24444,6 +27485,35 @@ None.
 Tuple[Optional[float], bool]
     (value, is_valid): (the number, True) for a number above 0; (None, True) for
     an empty cell; (None, False) for anything else.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `wheel_step_finder`
+
+```text
+---- Summary ----
+Main function to say which way a turn of the mouse wheel scrolls, whichever system
+sent it: Windows and the Mac give a turn as a positive or negative amount, Linux as
+a press of button 4 (up) or 5 (down).
+
+---- Inputs ----
+event : Any
+    The Tk event, with ``num`` (the button) and ``delta`` (the amount turned).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    -1 to scroll up, 1 to scroll down, 0 when the event says neither.
 
 ---- Globals mutated ----
 None.
@@ -24495,8 +27565,9 @@ Detailed structure can be found in DATA_FORMAT.md.
 ```text
 ---- Summary ----
 Helper function to give a fresh copy of an experiment read from its file. The file
-is read once and kept for the next previews (the last few files only), and read
-again when the spectra of a dataset are needed that were not read before.
+is read once and kept for the next previews while it is one of the files nearest
+the one shown (kept_file_lister), and read again when the spectra of a dataset are
+needed that were not read before.
 
 ---- Inputs ----
 session : ViewerSession
@@ -24507,7 +27578,7 @@ dataset : Optional[str]
     Spectral dataset needed for the haem decomposition, or None for no spectra.
 
 ---- Globals read ----
-MAX_CACHED_FILES (module constant).
+settings.WINDOW_KEPT_FILES.
 
 ---- Outputs ----
 dict
@@ -24521,35 +27592,31 @@ None.
 
 ---- Helpers ----
 experiment_paf_loader
+kept_file_lister
 ```
 
 #### `_overlay_drawer`
 
 ```text
 ---- Summary ----
-Helper function to shade regions of the time axis on every panel of the preview.
+Helper function to shade the ignored parts of the time axis in amber on every panel
+of the preview.
 
 ---- Inputs ----
-fig : Figure
-    The preview figure.
 axes : list
     Panels of the preview, top to bottom.
-regions : list
-    [(start_min, end_min, kind)] with kind 'trim' (grey hatched) or 'ignore'
-    (amber).
-note : str
-    Short explanation of the shading, written in the corner of the figure; may be
-    empty.
+regions : List[Tuple[float, float]]
+    [(start_min, end_min)] of the ignored parts; an empty one is left out.
 
 ---- Globals read ----
-IGNORE_COLOUR, TRIM_COLOUR (module constants).
+IGNORE_COLOUR (module constant).
 
 ---- Outputs ----
 None
     Nothing.
 
 ---- Globals mutated ----
-None. Adds shaded regions and the note to the figure (side effects).
+None. Adds shaded regions to the figure (side effect).
 
 ---- Equations ----
 None.
@@ -24586,40 +27653,6 @@ None.
 
 ---- Equations ----
 None.
-
----- Helpers ----
-None.
-```
-
-#### `_previous_limit_drawer`
-
-```text
----- Summary ----
-Helper function to draw the limits entered before as dashed lines on every panel
-while new limits are being entered, so the user can see how far to move them.
-
----- Inputs ----
-axes : list
-    Panels of the preview.
-previous : dict
-    {trim_start, trim_end, ignore_start, ignore_end} of this file in minutes, as
-    entered before (the trim times are on the original recording).
-duration : float
-    Length of the whole recording in minutes.
-
----- Globals read ----
-PREVIOUS_COLOUR (module constant).
-
----- Outputs ----
-bool
-    True when at least one line was drawn.
-
----- Globals mutated ----
-None. Adds lines to the panels (side effect).
-
----- Equations ----
-Trim edges at trim_start and trim_end; ignore edges at trim_start + ignore_start and
-(trim_end or duration) - ignore_end.
 
 ---- Helpers ----
 None.
@@ -24665,6 +27698,40 @@ None.
 experiment_data_processor
 experiment_workbook_exporter
 preview_info_builder
+problem_teller
+```
+
+#### `kept_file_lister`
+
+```text
+---- Summary ----
+Main function to list the files the window keeps read and draws after each answer:
+the file shown, then the nearest ones around the list (the arrows go round it), the
+next one before the previous one at the same distance.
+
+---- Inputs ----
+current : int
+    Position of the file shown in the list of files.
+total : int
+    Number of files.
+count : int
+    How many files to list (settings.WINDOW_KEPT_FILES); at least 1.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[int]
+    Positions of the files, nearest first, at most count and at most total.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Distance of file i = min((i - current) mod total, (current - i) mod total).
+
+---- Helpers ----
+None.
 ```
 
 #### `pca_example_picture_builder`
@@ -24684,7 +27751,8 @@ types : List[str]
     Haem type of each component (component_classifier).
 
 ---- Globals read ----
-settings.pca_colour_mapper; PREVIEW_DPI, BROWSING_ANSWERS (module constants).
+settings.pca_colour_mapper, settings.PREVIEW_DPI; BROWSING_ANSWERS (module
+constant).
 
 ---- Outputs ----
 bytes
@@ -24719,8 +27787,8 @@ types : List[str]
     Haem type of each component (component_classifier).
 
 ---- Globals read ----
-settings.PCA_TYPE_COLOURS, settings.pca_colour_mapper; PREVIEW_DPI,
-BROWSING_ANSWERS (module constants).
+settings.PCA_TYPE_COLOURS, settings.pca_colour_mapper, settings.PREVIEW_DPI;
+BROWSING_ANSWERS (module constant).
 
 ---- Outputs ----
 bytes
@@ -24776,16 +27844,16 @@ _loaded_experiment_getter
 experiment_attenuation_adder
 experiment_trimmer
 preview_info_builder
+problem_teller
 ```
 
 #### `preview_drawer`
 
 ```text
 ---- Summary ----
-Main function to show the answers given so far in the window. A window with its own
-controls (the experiment browser window) is given the settings and draws every file
-the user looks at with them; otherwise the current file is drawn and saved as a
-picture. Problems are reported, never raised, so the questions carry on.
+Main function to show the answers given so far in the window: the window is given
+the settings and draws every file the user looks at with them. Problems are
+reported, never raised, so the questions carry on.
 
 ---- Inputs ----
 session : ViewerSession
@@ -24799,32 +27867,29 @@ fit : Optional[dict]
 details : dict
     {file name: {OD, volume, dilution_factor, events}}.
 show_trim : bool
-    True to draw the whole recording and shade the part that would be trimmed, so
-    the trim limits can be judged. False draws the trimmed data.
+    True to draw the whole recording without shading, for the trimming step, where
+    the window draws the edges and the shading over it (viewer_edges). False draws
+    the trimmed data.
 show_ignored : bool
-    True to shade the ignored start and end in amber.
+    True to shade the ignored start and end in amber (not with show_trim).
 name : Optional[str]
     File to show; None keeps the file being looked at.
-previous_limits : Optional[dict]
-    Limits entered before, drawn as dashed lines while new ones are entered (only
-    with show_trim); None draws none.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 bool
-    True when the preview was drawn (or handed to the window), False when it could
-    not be.
+    True: the settings were handed to the window, which draws them.
 
 ---- Globals mutated ----
-None. Draws in the window or writes the preview picture (side effects).
+None. Draws in the window (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-preview_figure_builder
+None.
 ```
 
 #### `preview_figure_builder`
@@ -24843,18 +27908,20 @@ name : str
     Name of the file to draw.
 
 ---- Globals read ----
-settings.Config; PREVIEW_DPI (module constant).
+settings.Config, settings.PREVIEW_DPI.
 
 ---- Outputs ----
 Tuple[Optional[Figure], str]
     (figure, notes). The figure is None when the preview could not be drawn, and
-    the notes then say why. Otherwise the notes are the warnings of the processing
-    (a skipped step, a missing OD), one per line, and may be empty. A line starting
-    with KEY_PREFIX explains the shading and belongs by the controls.
+    the notes then say why in one sentence. Otherwise the notes are the warnings
+    shown while it was drawn (a skipped step, a missing OD), one per line, and may
+    be empty. A line starting with KEY_PREFIX explains the shading and belongs by
+    the controls.
 
 ---- Globals mutated ----
-None. Sets the matplotlib rcParams of the figure style (side effect). Nothing is
-printed; the caller decides where the notes go.
+None. Sets the matplotlib rcParams of the figure style; the details of a problem
+go to the log (side effects). Nothing is printed; the caller decides where the
+notes go.
 
 ---- Equations ----
 None.
@@ -24862,10 +27929,11 @@ None.
 ---- Helpers ----
 _loaded_experiment_getter
 _overlay_drawer
-_previous_limit_drawer
 experiment_data_processor
 experiment_plotter
 preview_info_builder
+problem_teller
+time_title_chooser
 ```
 
 #### `skipped_windows_finder`
@@ -24936,6 +28004,39 @@ figure measured from its bottom left corner.
 None.
 ```
 
+#### `time_title_chooser`
+
+```text
+---- Summary ----
+Main function to choose the time axis title of a file's preview, so the user knows
+which time it shows: while trimming the whole recording is drawn, and afterwards 0
+is where the kept part starts.
+
+---- Inputs ----
+show_trim : bool
+    True while trimming (the whole recording is drawn).
+trim_start_min : Optional[float]
+    Where the kept part of the file starts in the recording, in minutes; None or 0
+    when its start is not trimmed.
+
+---- Globals read ----
+settings.PREVIEW_TIME_TITLES.
+
+---- Outputs ----
+str
+    "Time from the trimmed start" for a file trimmed at its start, once trimming is
+    over; otherwise "Time in the recording" (the two times are then the same).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `utils_viewer/viewer_renderer.py`
 
 The background thread of the experiment browser window that draws the previews.
@@ -24946,15 +28047,17 @@ The background thread of the experiment browser window that draws the previews.
 
 ```text
 ---- Summary ----
-Thread that draws the preview of every file with the latest settings, the file being
-looked at first and then its neighbours, so the files can be flicked through while a
-question waits. A newer request makes it drop the work for the older one.
+Thread that draws the previews with the latest settings: the file being looked at
+first, then the ones beside it (the files the window keeps read), so the arrows lead
+to a drawn file. Any other file is drawn when it is looked at, so a big dataset is
+not read from disk again after every answer. A newer request makes it drop the work
+for the older one.
 
 ---- Attributes ----
 None public.
 
 ---- Globals read ----
-PREVIEW_DPI (imported constant).
+settings.PREVIEW_DPI, settings.WINDOW_KEPT_FILES.
 
 ---- Methods ----
 __init__
@@ -25002,17 +28105,18 @@ None.
 ```text
 ---- Summary ----
 Method to pick the file to draw next: the nearest one to the file being looked
-at that has not been drawn with the current settings. The caller holds the lock.
+at, among the files the window keeps read, that has not been drawn with the
+current settings. The caller holds the lock.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-None.
+settings.WINDOW_KEPT_FILES.
 
 ---- Outputs ----
 Optional[str]
-    File name, or None when every file is drawn.
+    File name, or None when those files are drawn.
 
 ---- Globals mutated ----
 None.
@@ -25021,7 +28125,7 @@ None.
 None.
 
 ---- Helpers ----
-None.
+kept_file_lister
 ```
 
 ##### `_picture_maker`
@@ -25037,22 +28141,24 @@ name : str
     Name of the file.
 
 ---- Globals read ----
-PREVIEW_DPI (imported constant).
+settings.PREVIEW_DPI.
 
 ---- Outputs ----
 Tuple[Optional[bytes], str, Optional[TimeAxis]]
     (PNG bytes, notes, time axis); the bytes are None when the preview could
-    not be drawn and the notes then say why. The time axis says where the
-    shared time axis sits in the picture, and is None when there is none.
+    not be drawn and the notes then say why in one sentence. The time axis says
+    where the shared time axis sits in the picture, and is None when there is
+    none.
 
 ---- Globals mutated ----
-None.
+None. The details of a problem go to the log (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 preview_figure_builder
+problem_teller
 time_axis_finder
 ```
 
@@ -25060,7 +28166,8 @@ time_axis_finder
 
 ```text
 ---- Summary ----
-Method to ask for every file to be drawn again with new settings.
+Method to ask for the files to be drawn again with new settings: the file being
+looked at and the ones beside it now, any other when it is looked at.
 
 ---- Inputs ----
 spec : PreviewSpec
@@ -25145,7 +28252,8 @@ None.
 
 ```text
 ---- Summary ----
-Method to say which file is being looked at, so it is drawn next.
+Method to say which file is being looked at, so it and the ones beside it are
+drawn next if they have not been drawn with the current settings.
 
 ---- Inputs ----
 wanted : int
@@ -25247,8 +28355,8 @@ log_folder : Path
     written to it).
 
 ---- Globals read ----
-settings.DEFAULT_ANSWERS; DRAWN_WAIT_S, PREVIEW_DPI, SHOW_S, SHOWN_MARK (module
-constants).
+settings.DEFAULT_ANSWERS, settings.PREVIEW_DPI; DRAWN_WAIT_S, SHOW_S, SHOWN_MARK
+(module constants).
 
 ---- Outputs ----
 int
@@ -25422,8 +28530,8 @@ None.
 ---- Summary ----
 Helper function to ask whether to average around the events and over which window,
 draw the windows, list in red those that do not fit, and ask whether to accept them
-or answer again. In the window, a drag across the plot of a file gives the window
-and the gap, from the additions of that file.
+or answer again. A drag across the plot of a file gives the window and the gap,
+from the additions of that file.
 
 ---- Inputs ----
 session : ViewerSession
@@ -25459,44 +28567,6 @@ _addition_time_lister
 _review_asker
 _skipped_lister
 averaging_asker
-```
-
-#### `_choice_reviewer`
-
-```text
----- Summary ----
-Helper function to ask whether the user accepts what the plot window shows, with as
-many answers as the step needs. In the browser window the user flicks through the
-files while the question waits; with the picture fallback a last answer lets the
-user look at another file, which redraws it, before the question is asked again.
-
----- Inputs ----
-session : ViewerSession
-    The browser session; its current file may be changed.
-question : str
-    The accept question, for example 'Do you accept this figure?'.
-options : List[Tuple[str, str]]
-    (key, label) of each answer; the first is the one Enter gives. The key 'file'
-    is kept for looking at another file.
-redraw : Callable[[], bool]
-    Function that draws the preview of the current file.
-
----- Globals read ----
-None.
-
----- Outputs ----
-str
-    Key of the answer chosen (never 'file').
-
----- Globals mutated ----
-None. Reads from and prints to the terminal and redraws the window (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_file_chooser
-choice_asker
 ```
 
 #### `_component_namer`
@@ -25568,35 +28638,6 @@ None.
 _strip_shower
 ```
 
-#### `_empty_limits_builder`
-
-```text
----- Summary ----
-Helper function to build limits that trim and ignore nothing, for drawing the data
-before any question is answered.
-
----- Inputs ----
-summaries : List[dict]
-    File summaries (DATA_FORMAT.md).
-
----- Globals read ----
-None.
-
----- Outputs ----
-Dict[str, dict]
-    {file name: {trim_start, trim_end, ignore_start, ignore_end}} with None for the
-    trims and 0.0 for the ignores.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `_figure_starter`
 
 ```text
@@ -25605,22 +28646,20 @@ Helper function to set the figure of each file from the standard settings or the
 ones last saved for the dataset, keeping only what this run allows: the OCR per OD
 and the haems scaled by OD only when OD values were entered, and the haems only
 when they are decomposed, limited to those of the fit in use (all of them when none
-of the saved ones is in it). The journal and size are left as the answers hold
-them, which the settings strip may have changed.
+of the saved ones is in it). The Haems box of the settings strip says whether the
+haems are worked out and shown, so the figure has them whenever they are decomposed.
+The journal and size are left as the answers hold them, which the settings strip
+may have changed.
 
 ---- Inputs ----
 answers : dict
     Answers dictionary the figure settings are stored in; must hold normalise_od
     and decompose.
 defaults : dict
-    The standard or saved answers (plot_o2, plot_ocr, ocr_mode, plot_haems, haems,
-    haem_mode, haem_per_od, event_label_angle).
+    The standard or saved answers (plot_o2, plot_ocr, ocr_mode, haems, haem_mode,
+    haem_per_od, event_label_angle).
 fit : Optional[dict]
     Fit dictionary (haem_list), or None when the haems are not decomposed.
-is_strip : bool
-    True in the window, where the Haems box of the settings strip says whether the
-    haems are worked out and shown: the figure then has them whenever they are
-    decomposed.
 
 ---- Globals read ----
 None.
@@ -25637,34 +28676,6 @@ None.
 
 ---- Helpers ----
 ocr_kind_lister
-```
-
-#### `_file_chooser`
-
-```text
----- Summary ----
-Helper function to ask which file to look at and make it the current one.
-
----- Inputs ----
-session : ViewerSession
-    The browser session; its current file is changed.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Sets session.current and reads from and prints to the terminal (side
-effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-choice_asker
 ```
 
 #### `_fit_file_saver`
@@ -25702,8 +28713,10 @@ effects).
 None.
 
 ---- Helpers ----
+file_name_sanitiser
 fit_saver
 info_printer
+problem_teller
 text_asker
 yes_no_asker
 ```
@@ -25810,7 +28823,7 @@ rows : Dict[str, Dict[str, Optional[float]]]
     The rows to start from (od_rows, DATA_FORMAT.md); None leaves a cell empty.
 
 ---- Globals read ----
-COLUMNS (imported constant).
+COLUMNS (imported constant); settings.OD_RESUSPENDED_ML.
 
 ---- Outputs ----
 Dict[str, Dict[str, Optional[float]]]
@@ -25869,6 +28882,7 @@ None.
 info_printer
 pca_example_picture_builder
 pca_picture_builder
+problem_teller
 ```
 
 #### `_review_asker`
@@ -25876,17 +28890,14 @@ pca_picture_builder
 ```text
 ---- Summary ----
 Helper function to ask whether the user accepts what the plot window shows, with
-the two answers yes and no (see _choice_reviewer).
+the two answers yes and no; the user can flick through the files while the question
+waits.
 
 ---- Inputs ----
-session : ViewerSession
-    The browser session; its current file may be changed.
 question : str
     The accept question, for example 'Do you accept these limits?'.
 change_label : str
     Label of the answer that asks the questions of the step again.
-redraw : Callable[[], bool]
-    Function that draws the preview of the current file.
 
 ---- Globals read ----
 None.
@@ -25896,13 +28907,13 @@ bool
     True when accepted, False when the user wants to answer the step again.
 
 ---- Globals mutated ----
-None. Reads from and prints to the terminal and redraws the window (side effects).
+None. Reads from and prints to the terminal (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-_choice_reviewer
+choice_asker
 ```
 
 #### `_skipped_lister`
@@ -25982,6 +28993,7 @@ None.
 ---- Helpers ----
 fit_importer
 info_printer
+problem_teller
 ```
 
 #### `_strip_change_applier`
@@ -26031,8 +29043,7 @@ size_answers_builder
 ```text
 ---- Summary ----
 Helper function to show in the settings strip what the run uses now: the haems
-ticked when they are worked out, the fit, the journal and the size. Without a
-window it does nothing.
+ticked when they are worked out, the fit, the journal and the size.
 
 ---- Inputs ----
 session : ViewerSession
@@ -26065,13 +29076,13 @@ strip_values_builder
 ---- Summary ----
 Main function to show the standard plot of the files in the plot window (the set
 and measured O2, the OCR and, when the session has a fit, the haems, with the
-events as written in the file) before any question is asked about them. In the
-browser window the user can look through them while answering, so the questions
-carry straight on; with the picture fallback a small menu steps through the files.
+events as written in the file) before any question is asked about them. The user can
+look through them in the window while answering, so the questions carry straight
+on.
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session; its current file is changed and its redraw set.
+    The browser session; its redraw is set.
 answers : dict
     Answers so far, used for the figure style of the preview.
 
@@ -26083,17 +29094,13 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Reads from and prints to the terminal and draws the plot window (side
-effects).
+None. Draws the plot window (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _answers_previewer
-_file_chooser
-choice_asker
-info_printer
 preview_drawer
 ```
 
@@ -26102,8 +29109,8 @@ preview_drawer
 ```text
 ---- Summary ----
 Main function to ask the last questions of the import, on the standard plot cut to
-the limits: the OD values (in the table of the window, or with questions per file
-and an accept question), then the event labels. The OD values are only checked:
+the limits: the OD values (in the table of the window), then the event labels. The
+OD values are only checked:
 the data is scaled by OD in the individual plots. The plot is redrawn with the
 labels once they are entered. The haems are those of the session's fit.
 
@@ -26115,7 +29122,7 @@ answers : dict
 defaults : dict
     Default answers offered by the questions.
 limits : Dict[str, dict]
-    Trim and ignore limits of every file (trim_asker).
+    Trim and ignore limits of every file (trim_stage_runner).
 details_before : Optional[Dict[str, dict]]
     OD values and events from an earlier pass, offered as defaults when the step is
     asked again.
@@ -26164,7 +29171,7 @@ answers : dict
 defaults : dict
     Default answers offered by the questions.
 limits : Dict[str, dict]
-    Trim and ignore limits of every file (trim_asker).
+    Trim and ignore limits of every file (trim_stage_runner).
 fits_folder : Path
     Folder holding the fit .csv files.
 dataset : str
@@ -26173,7 +29180,7 @@ depth : int
     Numbering depth of the questions.
 
 ---- Globals read ----
-None.
+settings.PCA_WINDOW_NM, settings.PCA_SMOOTHING_NM.
 
 ---- Outputs ----
 Tuple[Optional[str], Optional[dict]]
@@ -26202,6 +29209,7 @@ fit_table_builder
 info_printer
 number_asker
 pca_spectra_gatherer
+problem_teller
 progress_clearer
 progress_printer
 text_colourer
@@ -26215,11 +29223,11 @@ yes_no_asker
 Main function to show the figure saved for each file, drawn as it will be saved
 from the standard settings or the ones last saved for the dataset, and ask whether
 it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
-how the haems are shown, the angle of the event labels, the journal and size): only
-that part's questions are asked, with the current choices as the defaults, and the
-figure is drawn and asked about again. In the window the settings strip turns the
-haems on or off and sets the journal and size, so 'which haems' asks only which
-ones in which order, and the journal and size are not asked.
+how the haems are shown, the angle of the event labels): only that part's questions
+are asked, with the current choices as the defaults, and the figure is drawn and
+asked about again. The settings strip turns the haems on or off and sets the
+journal and size, so 'which haems' asks only which ones in which order, and the
+journal and size are not asked.
 
 ---- Inputs ----
 session : ViewerSession
@@ -26249,9 +29257,9 @@ None.
 
 ---- Helpers ----
 _answers_previewer
-_choice_reviewer
 _figure_starter
 _strip_shower
+choice_asker
 haem_choice_asker
 haem_form_asker
 haem_scaling_asker
@@ -26259,7 +29267,6 @@ info_printer
 label_angle_asker
 preview_drawer
 signal_asker
-size_asker
 ```
 
 #### `processing_stage_runner`
@@ -26267,12 +29274,11 @@ size_asker
 ```text
 ---- Summary ----
 Main function to talk the user through the processing, with the plot redrawn after
-each answer: first the haem fit (the fit already shown is accepted, another is
-tried, or the haems are left out), then, now that the haems are seen, an offer to
-change the trim and ignore times, and last the averaging around the events. In the
-window the settings strip picks the fit and leaves the haems out, so the
-decomposition question only offers to find the components from the data instead.
-While those questions are asked the strip is greyed out.
+each answer: first the haem fit, then, now that the haems are seen, an offer to
+change the trim and ignore times, and last the averaging around the events. The
+settings strip picks the fit and leaves the haems out, so the decomposition
+question only offers to find the components from the data instead. While those
+questions are asked the strip is greyed out.
 
 ---- Inputs ----
 session : ViewerSession
@@ -26285,7 +29291,7 @@ defaults : dict
     Default answers offered by the questions; whether to decompose and which fit
     follow the answers so far (the strip may have changed them).
 limits : Dict[str, dict]
-    Trim and ignore limits of every file (trim_asker).
+    Trim and ignore limits of every file (trim_stage_runner).
 fits_folder : Path
     Folder holding the fit .csv files.
 details : Dict[str, dict]
@@ -26312,10 +29318,10 @@ None.
 ---- Helpers ----
 _answers_previewer
 _averaging_reviewer
-_choice_reviewer
 _decomposition_storer
 _fit_names_lister
 _strip_shower
+choice_asker
 decomposition_asker
 info_printer
 pca_stage_runner
@@ -26327,11 +29333,12 @@ yes_no_asker
 
 ```text
 ---- Summary ----
-Main function to ask the trim and ignore questions on the standard plot, adding the
-shaded trimmed and ignored parts to the plot window after every answer, and ask
-whether to accept them. When the limits are asked again, the earlier ones stay on
-the plot as dashed lines. After they are accepted, it offers to export all the data
-cut to them. The haems are those of the session's fit (none when it has none).
+Main function to run the trimming step on the standard plot of the whole recording
+of every file: the trimmed and ignored edges are dragged on the plot or typed in
+the strip under it, and Enter accepts them. When the step is opened again, the
+limits it had stay on the plot as red dashed lines. The limits are then listed, the
+trimmed data is drawn, and the export of all the data cut to them is offered. The
+haems are those of the session's fit (none when it has none).
 
 ---- Inputs ----
 session : ViewerSession
@@ -26339,15 +29346,18 @@ session : ViewerSession
 answers : dict
     Answers so far, used for the figure style of the preview.
 remembered : Dict[str, dict]
-    {file name: {trim_start, trim_end, ignore_start, ignore_end}} offered as the
-    defaults (from the last run, or from the previous attempt).
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} the edges start
+    at (from the last run, or this run's when the step is opened again).
+previous : Optional[Dict[str, dict]]
+    Limits in the same layout drawn as red dashed lines while the edges are
+    dragged; None for none.
 
 ---- Globals read ----
-None.
+TRIM_FIELDS, TRIM_KEY_TEXT, TRIM_NUDGE (module constants).
 
 ---- Outputs ----
 Dict[str, dict]
-    The limits of every file, exactly as trim_asker returns them.
+    The limits of every file, as trim_limits_builder gives them.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal and draws the plot window (side
@@ -26359,11 +29369,16 @@ None.
 ---- Helpers ----
 _all_data_asker
 _answers_previewer
-_empty_limits_builder
 _limits_lister
-_review_asker
+enter_waiter
+info_printer
 preview_drawer
-trim_asker
+trim_layout_finder
+trim_limits_builder
+trim_minutes_builder
+trim_minutes_setter
+trim_pointer_reader
+EdgeChoice
 ```
 
 #### `viewer_asker`
@@ -26376,8 +29391,8 @@ the processing (the haem fit, the trim and ignore times again if wanted, the
 averaging) and the individual figures. The standard plot of every file (oxygen, OCR
 and the haems of the dataset's fit) is shown first, with no question asked. The
 plot window is redrawn after each answer, and at the end any step can be gone back
-to. In the window the settings strip can be changed while these questions wait
-(except those of the components found from the data); it is greyed out afterwards.
+to. The settings strip can be changed while these questions wait (except those of
+the components found from the data); it is greyed out afterwards.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -26394,12 +29409,13 @@ export_root : Path
     Results folder.
 
 ---- Globals read ----
-PREVIEW_FILE, STAGE_TITLES (module constants); settings.STANDARD_FIT.
+STAGE_TITLES (module constant); settings.STANDARD_FIT.
 
 ---- Outputs ----
 Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
-    (limits, fit, details, plotted) as the same questions return them when they are
-    asked without the browser.
+    (limits, fit, details, plotted): the trim and ignore limits of every file, the
+    fit (None when the haems are not decomposed), the OD values and events of every
+    file, and whether the figure of each file has at least one panel.
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers``, reads from and prints to the terminal,
@@ -26430,9 +29446,187 @@ trim_stage_runner
 
 ## `utils_viewer/viewer_strip.py`
 
-The settings strip under the plot: the haems, the fit, the journal and the figure size.
+The settings strip under the plot: the haems, the fit, the journal, the figure size and
 
 ### CLASSES
+
+#### `EdgeRow`
+
+```text
+---- Summary ----
+The row of the strip shown while edges are dragged on the plot: a typing box for
+each edge, holding its value for the file shown, and the "Every file" tick box. It
+follows the drag and passes on what the user types or ticks; it changes nothing by
+itself. Every method runs on the window thread.
+
+---- Attributes ----
+frame : Any
+    The Tk frame holding the row, for the window to place.
+
+---- Globals read ----
+ERROR_BACKGROUND, ERROR_TEXT, NOTE_TEXT.
+
+---- Methods ----
+__init__
+_every_file_handler
+_value_handler
+fields_setter
+values_setter
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the row, with no boxes until fields_setter.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+parent : Any
+    The widget the row is built in.
+background : str
+    Background colour of the row.
+on_value : Callable[[str, float], None]
+    Called with (field, number) when a number is typed in a box.
+on_every_file : Callable[[bool], None]
+    Called with the new state of the tick box when it is clicked.
+on_return : Callable[[], None]
+    Called after Enter in a box has passed its number on (or found it as it
+    was), so the keyboard can go back to the answer box.
+
+---- Globals read ----
+NOTE_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_every_file_handler
+```
+
+##### `_every_file_handler`
+
+```text
+---- Summary ----
+Method to pass on the new state of the "Every file" tick box.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the function given as on_every_file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_value_handler`
+
+```text
+---- Summary ----
+Method to take the number typed in one box, when Enter is pressed or the box is
+left; a box left as it was shown passes nothing on. A number that cannot be
+used turns the box red, with the reason beside the tick box, and keeps the
+keyboard; after Enter, any other answer gives it back to the answer box.
+
+---- Inputs ----
+key : str
+    The field of the box.
+is_return : bool
+    True when Enter was pressed in the box.
+
+---- Globals read ----
+ERROR_BACKGROUND, ERROR_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the box and calls the function given as on_value (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+minutes_checker
+```
+
+##### `fields_setter`
+
+```text
+---- Summary ----
+Method to make one typing box for each field, each after its name, followed by
+"min", and set the tick box.
+
+---- Inputs ----
+fields : List[Tuple[str, str]]
+    [(field, name shown before its box)] in order.
+is_every_file : bool
+    Whether "Every file" is ticked.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces the boxes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_value_handler
+```
+
+##### `values_setter`
+
+```text
+---- Summary ----
+Method to show the values of the file shown in the boxes.
+
+---- Inputs ----
+values : Optional[Dict[str, float]]
+    {field: value}, or None to empty the boxes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the boxes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
 
 #### `SettingsStrip`
 
@@ -26913,6 +30107,33 @@ _number_reader
 _page_journal_finder
 ```
 
+#### `minutes_checker`
+
+```text
+---- Summary ----
+Main function to check a number of minutes typed in a box of the edges row.
+
+---- Inputs ----
+text : str
+    What was typed, e.g. '4.5' or '4,5'.
+
+---- Globals read ----
+MINUTES_HELP.
+
+---- Outputs ----
+Tuple[Optional[float], str]
+    (minutes, '') for a number of 0 or more, or (None, what to type instead).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_number_reader
+```
+
 #### `size_answers_builder`
 
 ```text
@@ -27355,434 +30576,4 @@ None.
 
 ---- Helpers ----
 ansi_colour_getter
-```
-
-## `utils_viewer/viewer_window.py`
-
-Fallback preview: one picture file rewritten after each answer, when no window opens.
-
-### CLASSES
-
-#### `PictureWindow`
-
-```text
----- Summary ----
-The stand-in for the browser window when no window can be opened (no display, or no
-Tkinter). Each preview is saved as a picture file, which is opened in the default
-picture viewer the first time. It has the same methods as ViewerGui so the questions
-do not need to know which one they are using.
-
----- Attributes ----
-preview_path : Path
-    Picture file the previews are saved to.
-is_interactive : bool
-    Always False: the picture cannot be navigated, only rewritten.
-
----- Globals read ----
-PREVIEW_DPI (module constant).
-
----- Methods ----
-__init__
-_file_opener
-drawing_sign_shower
-extra_publisher
-figure_shower
-file_focuser
-output_capturer
-pictures_publisher
-session_attacher
-strip_fits_setter
-strip_listener_setter
-strip_setter
-strip_state_setter
-window_closer
-```
-
-##### `__init__`
-
-```text
----- Summary ----
-Method to set up the stand-in without writing anything yet.
-
----- Inputs ----
-preview_path : Path
-    Picture file the previews are saved to.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Sets the attributes on the instance.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `_file_opener`
-
-```text
----- Summary ----
-Method to open the preview picture in the default picture viewer (once).
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Starts the picture viewer; a failure to start it is ignored (side
-effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `drawing_sign_shower`
-
-```text
----- Summary ----
-Method that does nothing: a picture file has no "Drawing ..." sign, and the
-terminal says what is being drawn.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `extra_publisher`
-
-```text
----- Summary ----
-Method to show one more picture (such as the components found by the principal
-component analysis): it is saved as a picture file named after its title, so
-several extra pictures do not overwrite each other, and opened.
-
----- Inputs ----
-title : str
-    Name of the picture.
-png : bytes
-    The picture.
-is_shown : bool
-    Not used: without a selector to find it in later, every picture is opened.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Writes the picture file and opens it (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_file_opener
-```
-
-##### `figure_shower`
-
-```text
----- Summary ----
-Method to save the preview figure to the picture file and tell the user where it
-is.
-
----- Inputs ----
-figure : Figure
-    The drawn preview.
-
----- Globals read ----
-PREVIEW_DPI (module constant).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Writes the picture file and prints its path (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_file_opener
-```
-
-##### `file_focuser`
-
-```text
----- Summary ----
-Method that does nothing: a picture file has no file selector.
-
----- Inputs ----
-name : str
-    Name of the file being asked about.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `output_capturer`
-
-```text
----- Summary ----
-Method to capture what the processing of a preview prints, so it does not
-clutter the questions.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Iterator[io.StringIO]
-    The buffer the output is collected in.
-
----- Globals mutated ----
-None. Replaces sys.stdout while the block runs (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `pictures_publisher`
-
-```text
----- Summary ----
-Method to save finished pictures (the multi-experiment figures), one file each,
-tell the user where they are and open the first one.
-
----- Inputs ----
-pictures : List[Tuple[str, bytes]]
-    [(title, PNG bytes)].
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Writes the picture files and prints their paths (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_file_opener
-```
-
-##### `session_attacher`
-
-```text
----- Summary ----
-Method that does nothing: the picture needs no list of files.
-
----- Inputs ----
-session : Any
-    The browser session.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `strip_fits_setter`
-
-```text
----- Summary ----
-Method that does nothing: without a window there is no settings strip, and the
-fit is asked as a question.
-
----- Inputs ----
-names : List[str]
-    File names of the fits (ignored).
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `strip_listener_setter`
-
-```text
----- Summary ----
-Method that does nothing: without a window there is no settings strip to
-listen to.
-
----- Inputs ----
-listener : Optional[Callable[[Dict[str, Any]], None]]
-    The function that would be told the changes (ignored).
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `strip_setter`
-
-```text
----- Summary ----
-Method that does nothing: without a window there is no settings strip to show
-the values in.
-
----- Inputs ----
-values : Dict[str, Any]
-    Strip values (ignored).
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `strip_state_setter`
-
-```text
----- Summary ----
-Method that does nothing: without a window there is no settings strip to grey
-out.
-
----- Inputs ----
-is_enabled : bool
-    Whether the strip could be changed (ignored).
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `window_closer`
-
-```text
----- Summary ----
-Method that does nothing: the picture file stays where it is.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
 ```

@@ -353,6 +353,21 @@ Defined in `utils_shared/paf_reader.py`. Created by `spectra_parser`, used by `r
 | `params` | dict | | | `{}` | Acquisition parameters found in the record |
 | `checks` | dict | | | `{}` | Warnings raised while parsing |
 
+#### `EdgeChoice`
+
+Defined in `utils_viewer/viewer_edges.py`. Created by a step that lets the user choose parts of the plot by dragging edges (`trim_stage_runner`, for the trimmed and ignored parts) and handed to the window with `ViewerGui.edges_shower`. The window's `EdgeOverlay` draws and drags the edges, the edges row of the strip (`EdgeRow`, `utils_viewer/viewer_strip.py`) shows and takes the values of the file shown, and `ViewerGui.edges_reader` gives back the values the user set. The three rules run on the window thread.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `fields` | List[Tuple[str, str]] | (n_fields,) | | | `(field, name shown before its box in the strip)`, in order; in the trimming step `trim_start` "Trim start", `trim_end` "end", `ignore_start` "Ignore first", `ignore_end` "last" |
+| `values` | Dict[str, Dict[str, float]] | | min | | `{file name: {field: value}}` the edges start at; in the trimming step the minutes taken off each edge (`trim_minutes_builder`): the trim end from the end of the recording, the ignore times from the trimmed edges |
+| `layout_finder` | Callable | | | | `(file name, its values) -> (edges, parts)`: edges as `[(field, time_min, words by its handle, kind)]`, shaded parts as `[(start_min, end_min, kind)]`, times on the time axis of the plot; kind is a key of `PART_STYLES` (`'trim'` grey and hatched, handles in the top row; `'ignore'` amber, handles in the row under it) |
+| `pointer_reader` | Callable | | | | `(file name, its values, field, time_min pointed at) -> value` that puts that edge there |
+| `value_setter` | Callable | | | | `(file name, its values, field, value) -> its new values`, kept within the file's own limits |
+| `key_text` | str | | | `''` | Words under the plot explaining the colours |
+| `previous` | Dict[str, Dict[str, float]] | | min | `{}` | Values drawn as red dashed lines: in the trimming step, the limits it had when it was opened again |
+| `is_every_file` | bool | | | `True` | Whether "Every file" starts ticked: a moved or typed edge then moves on every file |
+
 #### `PreviewSpec`
 
 Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every file is drawn with the same spec.
@@ -363,8 +378,8 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every 
 | `limits` | dict | | min | | `{file name: {trim_start, trim_end, ignore_start, ignore_end}}` |
 | `fit` | Optional[dict] | | | | Fit dictionary from `fit_importer`, or None |
 | `details` | dict | | | | `{file name: {OD, volume, dilution_factor, events}}` |
-| `show_trim` | bool | | | `False` | Draw the whole recording and shade the trimmed part |
-| `show_ignored` | bool | | | `True` | Shade the ignored start and end |
+| `show_trim` | bool | | | `False` | Draw the whole recording without shading, for the trimming step (the window draws the edges and the shading over it) |
+| `show_ignored` | bool | | | `True` | Shade the ignored start and end (not with `show_trim`) |
 
 #### `UserPlaces`
 
@@ -400,9 +415,9 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by 
 |---|---|---|---|---|---|
 | `summaries` | List[dict] | (n_files,) | | | The `experiment_summary` of each file |
 | `export_root` | Path | | | | Results folder |
-| `window` | ViewerGui or PictureWindow | | | | The browser window, or the preview picture file when no window can open |
+| `window` | ViewerGui | | | | The browser window |
 | `current` | int | | | `0` | Index of the file being looked at |
-| `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the last 3 files read; each preview works on a deep copy |
+| `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the files nearest the one being looked at (`WINDOW_KEPT_FILES` in `config.py`, 3: that file and the one on each side); each preview works on a deep copy |
 | `fit` | Optional[dict] | | | `None` | The `fit` the haems are worked out with: the standard or saved fit at first, then the one chosen in the processing or the strip; `None` when the haems are left out |
 | `redraw` | Optional[Callable[[], bool]] | | | `None` | Draws the plot of the step being asked again (set by each stage runner), for a change in the strip |
 | `is_figure` | bool | | | `False` | True while the plot is the figure of each file at its saved size (section 5), so a new journal or size in the strip redraws it |
@@ -621,15 +636,6 @@ Structure: see `last_answers` in section 1.1.
 
 Structure: see `dataset_settings` in section 1.1.
 
-#### `preview picture`
-
-| Property | Value |
-|---|---|
-| File type | `.png` |
-| Location and name | `Portimao_preview.png` in the system temporary folder |
-
-Written, and opened in the default picture viewer, only when the experiment browser window cannot open. Overwritten by each preview. Extra pictures, such as the PCA components and examples, are written next to it as `Portimao_preview_<title>.png` (the title in lower case, with every other character as `_`).
-
 #### `log file`
 
 | Property | Value |
@@ -638,7 +644,7 @@ Written, and opened in the default picture viewer, only when the experiment brow
 | Encoding | UTF-8 |
 | Location and name | `<results>/logs/YYYY_MM_DD-HH_MM_SS.log` |
 
-The first lines are the project version, the random seed (none: the program uses no random numbers) and the settings of the run, then everything printed during the run.
+It starts as soon as the results folder is chosen, and is kept when Portimao is closed before the run. The first lines are the project version, the random seed (none: the program uses no random numbers), `Data folder: <path>` and `Results folder: <path>`. Then come the questions as the window's terminal shows them (without its colour codes), each answer on the line under its question, starting `> ` (indented as the question; an answer given with the mouse is logged as if typed). Once every question is answered, `Settings:` lists every answer of the run, one `  <name>: <value as JSON>` per line, then everything printed during the run follows. The window shows each problem as one sentence; its details (what was being done, then Python's own report of the error) go only here, under a line `---- Details of a problem, HH:MM:SS: <what was being done> ----`.
 
 #### `self-test log`
 
@@ -665,9 +671,13 @@ The line starting `The made-up preview is on show` tells the Mac check (`.github
 |---|---|
 | File type | text |
 | Encoding | UTF-8 |
-| Location and name | `logs/launch.log`: next to `main.py` when the launcher starts the program (not committed), or in `~/Portimao` in the Mac app; overwritten at each start |
+| Location and name | `logs/launch.log`: next to `main.py` when the launcher starts the program (not committed), or in `~/Portimao` in the Mac app; kept from start to start |
 
-Everything the program prints from its start, written by the launcher (`launchers/bootstrap.pyw`) or, in the Mac app, which has no launcher, by `app_output_logger`. When the launcher itself fails, it writes its error there instead. When the Mac app stops while starting, or its update stops, the app's start (`launchers/mac_app_starter.py`) adds a line saying which, with the date and time and the error's traceback.
+Everything the program prints from its start, written by the launcher (`launchers/bootstrap.pyw`) or, in the Mac app, which has no launcher, by `app_output_logger`; both open it with `launch_log_opener` (`utils_shared/user_places.py`). Each start is added after the starts before, under a line `==== Portimao started YYYY-MM-DD HH:MM:SS ====` (a blank line before it). When the log is bigger than 1 MB (`LAUNCH_LOG_MAX_BYTES`) at a start, only its newest half is kept, from the first start line in that half. When the launcher itself stops, it adds the details there instead (a line `The launcher stopped, YYYY-MM-DD HH:MM:SS:`, then what Python, pip or the error said), while its message to the user stays one sentence. When the Mac app stops while starting, or its update stops, the app's start (`launchers/mac_app_starter.py`) adds a line saying which, with the date and time and the error's traceback. The details of a problem met before the run's own log starts (while the questions are asked), and what Tk said when the window could not open, go here too, laid out as in the `log file`.
+
+Beside it, the program makes an empty file `logs/window_opened` once its window is up, at the place the launcher gives it in `PORTIMAO_OPENED_FILE`; the launcher then closes its small window and deletes the file. Started any other way, the program makes none.
+
+When a git copy cannot update itself (git missing, no branch on GitHub followed, or git refusing the update because of files changed here), the launcher gives the program one sentence saying why and what to do in `PORTIMAO_UPDATE_NOTE`; the program shows it under the version line, with "(does not update itself)" after the version in the window title. A copy without `.git` (from a zip) says so itself (`update_note_finder`), however it was started.
 
 #### `update log`
 
@@ -680,7 +690,7 @@ Everything the program prints from its start, written by the launcher (`launcher
 Written only by the Mac app: at each start by its update (`update_installer`), and during a swap by `launchers/mac_app_swapper.sh`. One line per step, each starting with the date and time (`YYYY-MM-DD HH:MM:SS`):
 
 - the app's version and where it is;
-- what GitHub's newest release is, or that GitHub did not answer;
+- what GitHub's newest release is; or, for each question with no answer, why (curl's reason, or GitHub refusing too many questions from the network), the second try a few seconds later, and, after a refusal, the Releases page asked instead;
 - the zip this Mac needs, or why the app cannot update itself;
 - why a download did not finish, when it did not;
 - from the swap: `The new app is in place.`, or why the old app was kept.

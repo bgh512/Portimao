@@ -19,8 +19,15 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 from PIL import Image
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.output_capture import output_capturer
+from utils_shared.output_capture import CapturedOutput, output_capturer
 from utils_shared.questions import time_request_setter
+from utils_shared.run_logging import details_writer
+from utils_shared.user_notices import problem_shower
+from utils_viewer.viewer_edges import (EdgeChoice,
+                                       EdgeOverlay,
+                                       HANDLE_BAND_PX,
+                                       own_value_lister,
+                                       )
 from utils_viewer.viewer_od_table import ODTable
 from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          PreviewSpec,
@@ -28,7 +35,7 @@ from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_renderer import PreviewRenderer
-from utils_viewer.viewer_strip import SettingsStrip, strip_values_checker
+from utils_viewer.viewer_strip import EdgeRow, SettingsStrip, strip_values_checker
 from utils_viewer.viewer_terminal import (ansi_splitter,
                                           ansi_style_updater,
                                           OutputRouter,
@@ -44,8 +51,9 @@ ERROR_COLOUR = '#ff7b86'
 ICON_PATH = Path(__file__).resolve().parent.parent / 'assets' / 'icon.png'
 ANSWER_HINT = ('Type your answer and press Enter. If you type nothing, the value in '
                '[brackets] is used.')
-TIME_HINT = ('Click on the plot where the answer falls, or type it, then press Enter. '
-             'If you type nothing, the value in [brackets] is used.')
+EDGES_HINT = ('Drag the edges on the plot, or type the times in the strip under it, '
+              'then press Enter.')
+OWN_VALUES_MARK = '  (own times)'  # after a file in the drop-down whose edges differ
 SPAN_HINT = ('Drag across the plot to fill in the answer, or type it, then press Enter. '
              'If you type nothing, the value in [brackets] is used.')
 TABLE_HINT = ('Click a cell of the table and type its value; Tab moves across, Enter '
@@ -60,7 +68,19 @@ FIGURES_HELP = ('Select a figure using the drop-down, or use the arrows to look 
                 'each one. Experiment plots marked [locked] are final; the figure '
                 'being built is listed after them.')
 ENTRY_BACKGROUND = '#2b2b2b'
+# shown, once the questions about each file are over, for a file not drawn since the
+# last change (only the file looked at and the ones beside it are redrawn)
+NOT_DRAWN_TEXT = ('{name}\n\nNot drawn with your final settings: only the files you '
+                  'looked at are.')
 MINIMUM_TK = 8.6  # Tk 8.5 (Apple's own Python) draws blank windows
+# The window opens maximised; un-maximised it takes WINDOW_SIZE_PX, made smaller to
+# leave SCREEN_MARGIN_PX for the taskbar, the Dock or the menu bar on a small screen.
+WINDOW_SIZE_PX = (1500, 860)
+MINIMUM_SIZE_PX = (900, 500)
+SCREEN_MARGIN_PX = 100
+# set by the launcher (launchers/bootstrap.pyw) to the file to make once the window is
+# up, so it can close its small "Opening Portimao" window then
+OPENED_SWITCH = 'PORTIMAO_OPENED_FILE'
 SYMBOL_FONTS = ('Segoe UI Symbol',
                 'Arial Unicode MS',
                 'Helvetica Neue',
@@ -98,8 +118,8 @@ _active_gui: Optional['ViewerGui'] = None
 class GuiUnavailableError(Exception):
     """
     ---- Summary ----
-    Raised when the browser window cannot be opened (no Tkinter, no display, or the
-    window was switched off), so the program can use the terminal instead.
+    Raised when the browser window cannot be opened (no Tkinter, no display, or a Tk
+    that draws blank windows); its text says why, and what to do, in plain words.
 
     ---- Attributes ----
     None.
@@ -121,8 +141,6 @@ class ViewerGui:
     right stays usable while a question waits. Previews are drawn by a third thread.
 
     ---- Attributes ----
-    is_interactive : bool
-        Always True: the window has its own file controls.
     logic_thread : Optional[threading.Thread]
         The thread running the program, whose output belongs in the terminal.
     exit_code : int
@@ -147,7 +165,9 @@ class ViewerGui:
     _dragger
     _drain_runner
     _drawing_sign_drawer
+    _edges_refresher
     _event_handler
+    _every_file_taker
     _history_stepper
     _icon_setter
     _image_deliverer
@@ -157,21 +177,26 @@ class ViewerGui:
     _message_shower
     _nav_state_setter
     _navigator
+    _opened_teller
     _pane_writer
     _picture_shower
     _pointer_mover
     _resizer
+    _screen_filler
     _step_taker
     _strip_change_runner
     _strip_change_teller
     _symbol_inserter
     _time_clicker
     _time_line_drawer
+    _typed_edge_taker
     _widgets_builder
     _window_raiser
     drawing_sign_shower
+    edges_hider
+    edges_reader
+    edges_shower
     extra_publisher
-    figure_shower
     file_focuser
     input_reader
     od_table_hider
@@ -191,8 +216,6 @@ class ViewerGui:
     time_reader_setter
     window_closer
     """
-
-    is_interactive = True
 
     # ---- __init__ --------------------------------------------------------------------
     def __init__(self,
@@ -281,6 +304,7 @@ class ViewerGui:
         self._fonts: Dict[tuple, Any] = {}
         root.title(title)
         self._is_pictures = False
+        self._is_browsing_over = False
         self._file_count = 0
         self._help_base = ''
         self._is_table_shown = False
@@ -554,7 +578,8 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to give the names for the drop-down: the experiment files are marked as
-        locked once the figures built from them are shown.
+        locked once the figures built from them are shown, and, while edges are dragged
+        on the plot, the files whose edges differ from most files are marked.
 
         ---- Inputs ----
         None.
@@ -573,9 +598,14 @@ class ViewerGui:
         None.
 
         ---- Helpers ----
-        None.
+        own_value_lister
         """
 
+        if self._edges.is_on and not self._is_pictures:
+            own = set(own_value_lister(self._edges.values))
+            return [f'{name}{OWN_VALUES_MARK}' if name in own else name
+                    for name in self._names
+                    ]
         if not self._is_pictures:
             return list(self._names)
         return [f'[locked] {name}' if i < self._file_count else name
@@ -586,9 +616,10 @@ class ViewerGui:
     def _drag_ender(self, event: Any) -> None:
         """
         ---- Summary ----
-        Method to end a drag across the plot: the times where it started and ended
-        (kept within the time axis) are turned into the answer, which is written into
-        the answer box. The band stays until the answer is sent.
+        Method to end a drag across the plot: an edge being dragged is put where the
+        button is let go; otherwise the times where the drag started and ended (kept
+        within the time axis) are turned into the answer, which is written into the
+        answer box. The band stays until the answer is sent.
 
         ---- Inputs ----
         event : Any
@@ -613,6 +644,8 @@ class ViewerGui:
         pointed_time_finder
         """
 
+        if self._edges.release_handler(event):
+            return
         start = self._drag_start
         self._drag_start = None
         box = self._axis_box_finder()
@@ -638,7 +671,8 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to follow the mouse while the button is held: the time line moves with
-        it and, during a drag, the band is drawn to it.
+        it and the edge being dragged follows it; during any other drag, the band is
+        drawn to it.
 
         ---- Inputs ----
         event : Any
@@ -663,6 +697,8 @@ class ViewerGui:
         """
 
         self._pointer_mover(event)
+        if self._edges.motion_handler(event):
+            return
         if self._drag_start is not None:
             self._band_drawer(event.x)
 
@@ -763,6 +799,43 @@ class ViewerGui:
                                              )
         self._canvas.tag_raise(text, back)
 
+    # ---- _edges_refresher ------------------------------------------------------------
+    def _edges_refresher(self) -> None:
+        """
+        ---- Summary ----
+        Method to show where the edges dragged on the plot are: the row of the strip
+        holds the values of the file shown, and the drop-down marks the files whose
+        edges differ from most files.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the drop-down and the row (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _display_name_lister
+        """
+
+        if not self._names:
+            return
+        self._combo.configure(values=self._display_name_lister())
+        self._combo.current(self._index)
+        if self._edges.is_on and self._index < self._file_count:
+            self._edge_row.values_setter(
+                self._edges.values.get(self._names[self._index]),
+                )
+
     # ---- _event_handler --------------------------------------------------------------
     def _event_handler(self, event: tuple) -> None:
         """
@@ -772,10 +845,10 @@ class ViewerGui:
         ---- Inputs ----
         event : tuple
             (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-            'extra', 'image', 'time', 'strip', 'strip_fits', 'strip_state', 'busy',
-            'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..." sign of
-            'busy' stays until the next question, preview or picture shown. With
-            close_after_s, 'finished' also closes the window after that time.
+            'extra', 'image', 'time', 'edges', 'strip', 'strip_fits', 'strip_state',
+            'busy', 'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..."
+            sign of 'busy' stays until the next question, preview or picture shown.
+            With close_after_s, 'finished' also closes the window after that time.
 
         ---- Globals read ----
         None.
@@ -793,6 +866,8 @@ class ViewerGui:
         ---- Helpers ----
         _closing_handler
         _display_name_lister
+        _edges_refresher
+        _hint_chooser
         _image_deliverer
         _image_receiver
         _nav_state_setter
@@ -814,7 +889,29 @@ class ViewerGui:
             if self._is_table_shown:
                 self._hint.configure(text=TABLE_HINT)
             else:
-                self._hint.configure(text=_hint_chooser(self._time_kind))
+                self._hint.configure(text=_hint_chooser(self._time_kind,
+                                                        self._edges.is_on,
+                                                        ),
+                                     )
+        elif kind == 'edges':
+            # The row of the edges sits above the rest of the strip.
+            choice = event[1]
+            self._edges.choice_setter(choice)
+            if choice is None:
+                self._edge_row.frame.pack_forget()
+            else:
+                self._edge_row.fields_setter(choice.fields, choice.is_every_file)
+                self._edge_row.frame.pack(side='bottom',
+                                          pady=(0, 4),
+                                          after=self._strip.frame,
+                                          )
+            self._picture_shower()
+            self._edges_refresher()
+            if self._is_waiting and not self._is_table_shown:
+                self._hint.configure(text=_hint_chooser(self._time_kind,
+                                                        self._edges.is_on,
+                                                        ),
+                                     )
         elif kind == 'strip':
             self._strip.values_setter(event[1])
         elif kind == 'strip_fits':
@@ -840,7 +937,7 @@ class ViewerGui:
             self._canvas.delete('band')
             self._canvas.configure(cursor='crosshair' if event[1] else '')
             if self._is_waiting and not self._is_table_shown:
-                self._hint.configure(text=_hint_chooser(event[1]))
+                self._hint.configure(text=_hint_chooser(event[1], self._edges.is_on))
         elif kind == 'session':
             self._session = event[1]
             self._names = [s['name'] for s in self._session.summaries]
@@ -914,7 +1011,11 @@ class ViewerGui:
         elif kind == 'image':
             self._image_receiver(*event[1:])
         elif kind == 'closed':
+            # No file is drawn any more, so an older picture would never be replaced.
+            self._is_browsing_over = True
+            self._previous, self._previous_axes = {}, {}
             self._nav_state_setter(False)
+            self._picture_shower()
         elif kind == 'finished':
             self._is_finished = True
             self._nav_state_setter(False)
@@ -924,6 +1025,36 @@ class ViewerGui:
                 self._root.after(round(self._close_after_s * 1000),
                                  self._closing_handler,
                                  )
+
+    # ---- _every_file_taker -----------------------------------------------------------
+    def _every_file_taker(self, is_every_file: bool) -> None:
+        """
+        ---- Summary ----
+        Method to take the "Every file" tick box of the edges row: ticked, a moved or
+        typed edge moves on every file; unticked, on the file shown only.
+
+        ---- Inputs ----
+        is_every_file : bool
+            The new state of the tick box.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the overlay (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._edges.is_every_file = is_every_file
 
     # ---- _history_stepper ------------------------------------------------------------
     def _history_stepper(self, step: int) -> None:
@@ -1168,6 +1299,8 @@ class ViewerGui:
         """
         ---- Summary ----
         Method that runs the program in its own thread and reports when it is done.
+        When the program stops with a reason, or with a problem, one plain sentence in
+        the terminal says so; the details of a problem go to the log only.
 
         ---- Inputs ----
         None.
@@ -1180,21 +1313,24 @@ class ViewerGui:
             Nothing.
 
         ---- Globals mutated ----
-        None. Sets exit_code and queues the finished message (side effects).
+        None. Sets exit_code, prints why the program stopped, if it did, and queues the
+        finished message (side effects).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
-        None.
+        problem_shower
         """
 
         try:
             self.exit_code = self._program()
         except SystemExit as exc:
+            if isinstance(exc.code, str):  # a stop with a reason for the user
+                print(f'\n{exc.code}')
             self.exit_code = exc.code if isinstance(exc.code, int) else 1
-        except BaseException:  # show the problem in the window, then finish
-            traceback.print_exc()
+        except BaseException as exc:  # show the problem in the window, then finish
+            problem_shower('\nThe run stopped', exc)
             self.exit_code = 1
         finally:
             self._events.put(('finished',))
@@ -1228,6 +1364,7 @@ class ViewerGui:
 
         self._canvas.delete('all')
         self._photo = None
+        self._edges.picture_placer(None, None, None, None, None)
         width = max(self._canvas.winfo_width(), 200)
         height = max(self._canvas.winfo_height(), 100)
         self._canvas.create_text(width // 2,
@@ -1297,6 +1434,7 @@ class ViewerGui:
         None.
 
         ---- Helpers ----
+        _edges_refresher
         _picture_shower
         """
 
@@ -1310,8 +1448,46 @@ class ViewerGui:
         if self._renderer is not None and self._index < self._file_count:
             self._renderer.wanted_setter(self._index)
         self._picture_shower()
+        if self._edges.is_on:
+            self._edges_refresher()
         if is_from_user and self._is_waiting:
             self._entry.focus_set()
+
+    # ---- _opened_teller --------------------------------------------------------------
+    def _opened_teller(self) -> None:
+        """
+        ---- Summary ----
+        Helper method to tell the launcher that the window is up, by making the file
+        it named, so its small "Opening Portimao" window closes now.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        OPENED_SWITCH (module constant); os.environ[OPENED_SWITCH], set only by the
+        launcher.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Writes an empty file (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        opened = os.environ.get(OPENED_SWITCH)
+        if not opened:
+            return
+        try:
+            Path(opened).write_text('', encoding='utf-8')
+        except OSError:  # the launcher's small window then closes after its longest wait
+            pass
 
     # ---- _pane_writer ----------------------------------------------------------------
     def _pane_writer(self, text: str, kind: str = 'out') -> None:
@@ -1388,16 +1564,19 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to show the picture of the current file, scaled to fit the plot area, or
-        say why there is none yet. While the picture for the latest settings is still
-        being made, or the program is making pictures of its own (drawing_sign_shower),
-        the "Drawing ..." sign is on the plot (over the previous picture when there is
-        one).
+        say why there is none yet. While edges are dragged on the plot, room is kept
+        above the picture for their handles, and the overlay shades the picture and
+        draws them. While the picture for the latest settings is still being made, or
+        the program is making pictures of its own (drawing_sign_shower), the
+        "Drawing ..." sign is on the plot (over the previous picture when there is
+        one). Once the questions about each file are over, a file not drawn with the
+        last settings says so instead.
 
         ---- Inputs ----
         None.
 
         ---- Globals read ----
-        None.
+        NOT_DRAWN_TEXT, HANDLE_BAND_PX (module constants).
 
         ---- Outputs ----
         None
@@ -1407,7 +1586,8 @@ class ViewerGui:
         None. Redraws the plot area and the status line (side effect).
 
         ---- Equations ----
-        scale = min(width / picture width, height / picture height), at most 1.5.
+        scale = min(width / picture width, (height - handle band) / picture height),
+        at most 1.5.
 
         ---- Helpers ----
         _drawing_sign_drawer
@@ -1430,6 +1610,8 @@ class ViewerGui:
             self._status.configure(text='')
             self._picture_box = None
             self._shown_axis = None
+            if failure is None and self._is_browsing_over:
+                failure = NOT_DRAWN_TEXT.format(name=name)
             self._message_shower(failure or f'Drawing {name} ...')
             if failure is None:
                 self._drawing_sign_drawer()
@@ -1438,34 +1620,52 @@ class ViewerGui:
         if self._decoded is None or self._decoded[0] != key:
             self._decoded = (key, Image.open(io.BytesIO(png)))
         picture = self._decoded[1]
-        width = max(self._canvas.winfo_width() - 4, 50)
-        height = max(self._canvas.winfo_height() - 4, 50)
+
+        # ---- 1 Fit the picture in the plot area, under the handles of any edges ------
+        is_edged = self._edges.is_on and self._index < self._file_count
+        band = HANDLE_BAND_PX if is_edged else 0
+        room_width = self._canvas.winfo_width()
+        room_height = self._canvas.winfo_height()
+        width = max(room_width - 4, 50)
+        height = max(room_height - 4 - band, 50)
         scale = min(width / picture.width, height / picture.height, 1.5)
         size = (max(int(picture.width * scale), 1), max(int(picture.height * scale), 1))
         resampling = getattr(Image, 'Resampling', Image)
         shown = picture.resize(size, resampling.LANCZOS)
-        buffer = io.BytesIO()
-        shown.save(buffer, format='PNG')
-        self._photo = self._tk.PhotoImage(
-            data=base64.b64encode(buffer.getvalue()).decode('ascii'),
-            )
-        self._canvas.delete('all')
-        self._canvas.create_image(self._canvas.winfo_width() // 2,
-                                  self._canvas.winfo_height() // 2,
-                                  image=self._photo,
-                                  )
-        self._picture_box = (self._canvas.winfo_width() // 2 - size[0] / 2,
-                             self._canvas.winfo_height() // 2 - size[1] / 2,
-                             size[0],
-                             size[1],
-                             )
+        left = (room_width - size[0]) // 2
+        top = band + (room_height - band - size[1]) // 2
+        self._picture_box = (left, top, size[0], size[1])
         self._shown_axis = (self._previous_axes if is_stale else self._axes).get(name)
+
+        # ---- 2 Show it, shaded with its edges while they are dragged -----------------
+        self._canvas.delete('all')
+        if is_edged and self._shown_axis is not None:
+            self._photo = None
+            item = self._canvas.create_image(left, top, anchor='nw')
+            self._edges.picture_placer(name,
+                                       shown,
+                                       item,
+                                       self._picture_box,
+                                       self._shown_axis,
+                                       )
+        else:
+            self._edges.picture_placer(None, None, None, None, None)
+            buffer = io.BytesIO()
+            shown.save(buffer, format='PNG')
+            self._photo = self._tk.PhotoImage(
+                data=base64.b64encode(buffer.getvalue()).decode('ascii'),
+                )
+            self._canvas.create_image(left, top, image=self._photo, anchor='nw')
         if self._is_pictures and self._index < self._file_count:
             self._lock_drawer()
         if is_stale or self._is_busy:
             self._drawing_sign_drawer()
+
+        # ---- 3 The notes and the key under the plot ----------------------------------
         lines = self._notes.get(name, '').splitlines()
         key = [line[len(KEY_PREFIX):] for line in lines if line.startswith(KEY_PREFIX)]
+        if is_edged and self._edges.key_teller():
+            key.append(self._edges.key_teller())
         note = '\n'.join(line for line in lines if not line.startswith(KEY_PREFIX))
         self._status.configure(text=note)
         self._help.configure(text='\n'.join([self._help_base] + key))
@@ -1476,7 +1676,8 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to note where the mouse is over the plot area and move the time line
-        there; the line goes when the mouse leaves.
+        there; the line goes when the mouse leaves. Over an edge that can be dragged,
+        the mouse becomes a two-way arrow.
 
         ---- Inputs ----
         event : Any
@@ -1500,6 +1701,8 @@ class ViewerGui:
         """
 
         self._pointer = None if event is None else (event.x, event.y)
+        if event is not None:
+            self._edges.hover_handler(event)
         self._time_line_drawer()
 
     # ---- _resizer --------------------------------------------------------------------
@@ -1533,6 +1736,55 @@ class ViewerGui:
         if self._resize_job is not None:
             self._root.after_cancel(self._resize_job)
         self._resize_job = self._root.after(120, self._picture_shower)
+
+    # ---- _screen_filler --------------------------------------------------------------
+    def _screen_filler(self) -> None:
+        """
+        ---- Summary ----
+        Helper method to open the window maximised, as its maximise button does, so the
+        answer box is never off a small screen. Un-maximised, it takes its usual size,
+        made smaller to fit the screen.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        WINDOW_SIZE_PX, MINIMUM_SIZE_PX, SCREEN_MARGIN_PX (module constants).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Sizes and maximises the window (side effect).
+
+        ---- Equations ----
+        size = max(minimum, min(usual, screen - margin)), for the width and the height.
+
+        ---- Helpers ----
+        None.
+        """
+
+        # ---- 1 The size when it is not maximised -------------------------------------
+        root = self._root
+        screen = (root.winfo_screenwidth(), root.winfo_screenheight())
+        width, height = (max(minimum, min(usual, side - SCREEN_MARGIN_PX))
+                         for usual, minimum, side in zip(WINDOW_SIZE_PX,
+                                                         MINIMUM_SIZE_PX,
+                                                         screen,
+                                                         )
+                         )
+        root.geometry(f'{width}x{height}')
+        root.minsize(*MINIMUM_SIZE_PX)
+
+        # ---- 2 Maximise it -----------------------------------------------------------
+        try:
+            if root.tk.call('tk', 'windowingsystem') == 'x11':  # Linux
+                root.attributes('-zoomed', True)
+            else:  # Windows and the Mac
+                root.state('zoomed')
+        except self._tk.TclError:  # a system without maximising: the whole screen
+            root.geometry(f'{screen[0]}x{screen[1]}+0+0')
 
     # ---- _step_taker -----------------------------------------------------------------
     def _step_taker(self, step: int) -> None:
@@ -1674,11 +1926,10 @@ class ViewerGui:
     def _time_clicker(self, event: Any) -> None:
         """
         ---- Summary ----
-        Method to act on a click on the plot of a file while the question waiting can
-        be answered with the mouse: for a click question, the answer the time gives
-        is written into the answer box; for a drag question, the drag starts here. The
-        answer replaces what was in the box, can still be edited, and is accepted with
-        Enter.
+        Method to act on a click on the plot of a file: an edge under the mouse is
+        taken, to be dragged; otherwise, while the question waiting can be answered
+        with a drag, the drag starts here. Its answer replaces what was in the answer
+        box, can still be edited, and is accepted with Enter.
 
         ---- Inputs ----
         event : Any
@@ -1698,12 +1949,13 @@ class ViewerGui:
         None.
 
         ---- Helpers ----
-        _answer_writer
         _band_drawer
         pointed_time_finder
         """
 
         self._drag_start = None
+        if self._edges.press_handler(event):
+            return
         if not (self._time_kind and self._is_waiting):
             return
         if (self._picture_box is None
@@ -1716,13 +1968,10 @@ class ViewerGui:
                                        self._picture_box,
                                        self._shown_axis,
                                        )
-        if time_min is None:
+        if time_min is None or self._time_kind != 'span':
             return
-        if self._time_kind == 'span':
-            self._drag_start = (float(event.x), time_min)
-            self._band_drawer(event.x)
-            return
-        self._answer_writer(self._time_reader(self._names[self._index], time_min))
+        self._drag_start = (float(event.x), time_min)
+        self._band_drawer(event.x)
 
     # ---- _time_line_drawer -----------------------------------------------------------
     def _time_line_drawer(self) -> None:
@@ -1796,13 +2045,48 @@ class ViewerGui:
                                              )
         self._canvas.tag_raise(text, back)
 
+    # ---- _typed_edge_taker -----------------------------------------------------------
+    def _typed_edge_taker(self, key: str, value: float) -> None:
+        """
+        ---- Summary ----
+        Method to take a number typed in the edges row: the edge moves there (on every
+        file when "Every file" is ticked), within the limits of each file, and the row
+        shows where it went.
+
+        ---- Inputs ----
+        key : str
+            The field typed in.
+        value : float
+            The number typed.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Moves the edge and redraws (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _edges_refresher
+        """
+
+        self._edges.field_setter(key, value)
+        self._edges_refresher()
+
     # ---- _widgets_builder ------------------------------------------------------------
     def _widgets_builder(self) -> None:
         """
         ---- Summary ----
         Method to build the terminal, the answer box and the OD table (hidden until it
-        is asked for) on the left, and the plot, its file controls and the settings
-        strip on the right.
+        is asked for) on the left, and the plot with the overlay of its edges, its file
+        controls, the settings strip and the edges row (hidden until edges are dragged)
+        on the right.
 
         ---- Inputs ----
         None.
@@ -1823,16 +2107,22 @@ class ViewerGui:
         ---- Helpers ----
         _answer_sender
         _closing_handler
+        _edges_refresher
+        _every_file_taker
         _history_stepper
         _message_shower
         _nav_state_setter
         _navigator
         _pointer_mover
         _resizer
+        _screen_filler
         _step_taker
         _strip_change_teller
         _symbol_inserter
         _time_clicker
+        _typed_edge_taker
+        EdgeOverlay
+        EdgeRow
         ODTable
         SettingsStrip
         """
@@ -1840,8 +2130,7 @@ class ViewerGui:
         tk = self._tk
         from tkinter import font as tkfont, ttk
         root = self._root
-        root.geometry('1500x860')
-        root.minsize(900, 500)
+        self._screen_filler()
         families = set(tkfont.families(root))
         self._family = next((f for f in MONO_FONTS if f in families), 'Courier')
         self._size = 11
@@ -1949,6 +2238,13 @@ class ViewerGui:
                                     self._strip_change_teller,
                                     )
         self._strip.frame.pack(side='bottom', pady=(2, 8))
+        self._edge_row = EdgeRow(tk,  # placed only while edges are dragged
+                                 right,
+                                 PLOT_BACKGROUND,
+                                 self._typed_edge_taker,
+                                 self._every_file_taker,
+                                 self._entry.focus_set,
+                                 )
         controls = tk.Frame(right, bg=PLOT_BACKGROUND)
         controls.pack(side='bottom', pady=(4, 6))
         self._help = tk.Label(right,
@@ -1972,6 +2268,7 @@ class ViewerGui:
                                  highlightthickness=0,
                                  )
         self._canvas.pack(side='top', fill='both', expand=True, padx=8, pady=8)
+        self._edges = EdgeOverlay(tk, self._canvas, self._family, self._edges_refresher)
         self._previous_button = ttk.Button(controls,
                                            text='< Prev',
                                            width=7,
@@ -2078,6 +2375,98 @@ class ViewerGui:
 
         self._events.put(('busy',))
 
+    # ---- edges_hider -----------------------------------------------------------------
+    def edges_hider(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the edges off the plot and the edges row out of the strip, once
+        the choice made with them is read. It is called from the question thread.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('edges', None))
+
+    # ---- edges_reader ----------------------------------------------------------------
+    def edges_reader(self) -> Dict[str, Dict[str, float]]:
+        """
+        ---- Summary ----
+        Method to give the values of the edges as the user has set them. It is meant
+        to be called once the user has answered the instruction given after
+        edges_shower, which is when the window is sure to hold the choice that was
+        sent.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Dict[str, Dict[str, float]]
+            {file name: {field: value}} (EdgeChoice in DATA_FORMAT.md); empty when no
+            choice is being made.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return self._edges.values_reader()
+
+    # ---- edges_shower ----------------------------------------------------------------
+    def edges_shower(self, choice: EdgeChoice) -> None:
+        """
+        ---- Summary ----
+        Method to put edges on the plot of every file, to be dragged, with a row of
+        typing boxes for them in the strip. It is called from the question thread; the
+        rules in the choice run on the window thread.
+
+        ---- Inputs ----
+        choice : EdgeChoice
+            The fields, the starting values and the rules (DATA_FORMAT.md).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the choice for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('edges', choice))
+
     # ---- extra_publisher -------------------------------------------------------------
     def extra_publisher(self, title: str, png: bytes, is_shown: bool = True) -> None:
         """
@@ -2113,34 +2502,6 @@ class ViewerGui:
         """
 
         self._events.put(('extra', title, png, is_shown))
-
-    # ---- figure_shower ---------------------------------------------------------------
-    def figure_shower(self, figure: Any) -> None:
-        """
-        ---- Summary ----
-        Method that is never needed: the window draws its own previews from the
-        settings (spec_publisher).
-
-        ---- Inputs ----
-        figure : Any
-            A drawn figure (ignored).
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        None
-            Nothing.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
 
     # ---- file_focuser ----------------------------------------------------------------
     def file_focuser(self, name: str) -> None:
@@ -2310,7 +2671,7 @@ class ViewerGui:
 
     # ---- output_capturer -------------------------------------------------------------
     @contextmanager
-    def output_capturer(self) -> Iterator[io.StringIO]:
+    def output_capturer(self) -> Iterator[CapturedOutput]:
         """
         ---- Summary ----
         Method to capture what the current thread prints (the preview thread), without
@@ -2323,8 +2684,8 @@ class ViewerGui:
         None.
 
         ---- Outputs ----
-        Iterator[io.StringIO]
-            The buffer the output is collected in.
+        Iterator[CapturedOutput]
+            The buffer the output is collected in, with the warnings kept apart.
 
         ---- Globals mutated ----
         None. Captures the output of the current thread (side effect).
@@ -2398,6 +2759,7 @@ class ViewerGui:
         ---- Helpers ----
         _drain_runner
         _logic_runner
+        _opened_teller
         _window_raiser
         input_reader
         text_sender
@@ -2421,6 +2783,7 @@ class ViewerGui:
             self.logic_thread.start()
             self._root.after(25, self._drain_runner)
             self._root.after(100, self._window_raiser)
+            self._root.after(100, self._opened_teller)
             try:
                 self._root.mainloop()
             except KeyboardInterrupt:
@@ -2687,17 +3050,15 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to say that the question being asked can be answered with the mouse, so
-        a click (or a drag) on the plot of a file writes the answer it gives into the
-        answer box, or that it no longer can. It is called from the question thread.
+        a drag across the plot of a file writes the answer it gives into the answer
+        box, or that it no longer can. It is called from the question thread.
 
         ---- Inputs ----
         kind : Optional[str]
-            'point' (a click), 'span' (a drag), or None once the question has its
-            answer.
+            'span' (a drag), or None once the question has its answer.
         reader : Optional[Callable]
-            Turns what the mouse gave into the answer: reader(file name, time_min) for a
-            click, reader(file name, start_min, end_min) for a drag; None with kind
-            None. It is called on the window thread.
+            Turns the drag into the answer: reader(file name, start_min, end_min); None
+            with kind None. It is called on the window thread.
 
         ---- Globals read ----
         None.
@@ -2724,7 +3085,8 @@ class ViewerGui:
         ---- Summary ----
         Method to end the previews when the browser steps are over: the preview thread
         is stopped (so it cannot clash with the processing that follows) and the file
-        controls are switched off. The last picture stays on show.
+        controls are switched off. The pictures drawn with the last settings stay; a
+        file without one says it was not drawn with them.
 
         ---- Inputs ----
         None.
@@ -2755,7 +3117,7 @@ class ViewerGui:
 
 
 # ---- _hint_chooser -------------------------------------------------------------------
-def _hint_chooser(time_kind: Optional[str]) -> str:
+def _hint_chooser(time_kind: Optional[str], is_edged: bool = False) -> str:
     """
     ---- Summary ----
     Helper function to choose the hint shown under the answer box: what the mouse can
@@ -2763,10 +3125,12 @@ def _hint_chooser(time_kind: Optional[str]) -> str:
 
     ---- Inputs ----
     time_kind : Optional[str]
-        'point' (a click gives the answer), 'span' (a drag gives it) or None.
+        'span' (a drag gives the answer) or None.
+    is_edged : bool
+        True while edges are dragged on the plot.
 
     ---- Globals read ----
-    ANSWER_HINT, SPAN_HINT, TIME_HINT (module constants).
+    ANSWER_HINT, EDGES_HINT, SPAN_HINT (module constants).
 
     ---- Outputs ----
     str
@@ -2782,8 +3146,8 @@ def _hint_chooser(time_kind: Optional[str]) -> str:
     None.
     """
 
-    if time_kind == 'point':
-        return TIME_HINT
+    if is_edged:
+        return EDGES_HINT
     if time_kind == 'span':
         return SPAN_HINT
     return ANSWER_HINT
@@ -2803,7 +3167,7 @@ def active_gui_getter() -> Optional[ViewerGui]:
 
     ---- Outputs ----
     Optional[ViewerGui]
-        The open window, or None when the program runs in the terminal.
+        The open window, or None when none is open (outside a run).
 
     ---- Globals mutated ----
     None.
@@ -2819,12 +3183,11 @@ def active_gui_getter() -> Optional[ViewerGui]:
 
 
 # ---- gui_runner ----------------------------------------------------------------------
-def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
+def gui_runner(program: Callable[[], int], title: str) -> int:
     """
     ---- Summary ----
-    Main function to run the whole program inside the browser window. It returns None
-    without running anything when the window cannot be opened, so the caller can run
-    the program in the terminal instead.
+    Main function to run the whole program inside the browser window, which the program
+    needs: nothing is run when the window cannot open.
 
     ---- Inputs ----
     program : Callable[[], int]
@@ -2836,12 +3199,12 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
     None.
 
     ---- Outputs ----
-    Optional[int]
-        The exit code of the program, or None when the window could not be opened.
+    int
+        The exit code of the program. Raises GuiUnavailableError, with the reason in
+        plain words, when the window cannot open.
 
     ---- Globals mutated ----
-    None. Opens the window and runs the program (side effects); prints why the window
-    could not open when it could not.
+    None. Opens the window and runs the program (side effects).
 
     ---- Equations ----
     None.
@@ -2851,13 +3214,7 @@ def gui_runner(program: Callable[[], int], title: str) -> Optional[int]:
     window_opener
     """
 
-    try:
-        tk, root = window_opener()
-    except GuiUnavailableError as exc:
-        print(f'The experiment browser window cannot open ({exc}), so the questions '
-              f'run in this terminal and previews are saved as a picture.',
-              )
-        return None
+    tk, root = window_opener()
     return ViewerGui(tk, root, program, title).run()
 
 
@@ -2924,36 +3281,42 @@ def window_opener() -> Tuple[Any, Any]:
     None.
 
     ---- Globals read ----
-    MINIMUM_TK (module constant); os.environ["PORTIMAO_NO_GUI"] (set to anything to
-    keep the terminal), os.environ["DISPLAY"] and os.environ["WAYLAND_DISPLAY"] (on
-    Linux).
+    MINIMUM_TK (module constant); os.environ["DISPLAY"] and
+    os.environ["WAYLAND_DISPLAY"] (on Linux).
 
     ---- Outputs ----
     Tuple[Any, Any]
         (the tkinter module, the Tk root window). Raises GuiUnavailableError, with the
-        reason in plain words, when the window cannot open.
+        reason and what to do in plain words, when the window cannot open.
 
     ---- Globals mutated ----
-    None. On Windows, makes the text sharp and gives the program its own taskbar group
-    (side effects).
+    None. On Windows, makes the text sharp and gives the program its own taskbar group;
+    when Tk will not start, what it said goes to the log (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    None.
+    details_writer
     """
 
     # ---- 1 Check that a window can open ----------------------------------------------
-    if os.environ.get('PORTIMAO_NO_GUI'):
-        raise GuiUnavailableError('PORTIMAO_NO_GUI is set')
+    is_linux = sys.platform.startswith('linux')
     try:
         import tkinter as tk
     except ImportError:
-        raise GuiUnavailableError('Tkinter is not installed')
+        fix = ('install it with "sudo apt install python3-tk"'
+               if is_linux
+               else 'install Python from python.org, which has it'
+               )
+        raise GuiUnavailableError(f'this Python has no Tkinter, which draws the '
+                                  f'window; {fix}',
+                                  )
     has_display = os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')
-    if sys.platform.startswith('linux') and not has_display:
-        raise GuiUnavailableError('there is no display')
+    if is_linux and not has_display:
+        raise GuiUnavailableError('there is no screen to show it on; start Portimao on '
+                                  'a computer with a screen',
+                                  )
 
     # ---- 2 Prepare Windows -----------------------------------------------------------
     if sys.platform == 'win32':
@@ -2975,5 +3338,12 @@ def window_opener() -> Tuple[Any, Any]:
     try:
         root = tk.Tk()
     except tk.TclError as exc:
-        raise GuiUnavailableError(str(exc))
+        details_writer(f'Tk could not start: {exc}')
+        again = ('install it again with "sudo apt install --reinstall python3-tk"'
+                 if is_linux
+                 else 'install Python from python.org again'
+                 )
+        raise GuiUnavailableError(f'Tk, which draws the window, would not start; '
+                                  f'{again}',
+                                  ) from exc
     return tk, root
