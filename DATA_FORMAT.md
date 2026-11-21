@@ -76,6 +76,7 @@ Quick description of one `.paf` file, read before the questions are asked. Creat
 | `'duration_min'` | float | | min | Length of the recording |
 | `'frames'` | int | | | Number of time points |
 | `'datasets'` | List[str] | | | Spectral datasets in the file |
+| `'spectra_shapes'` | dict | | | `{dataset: [number of spectra, number of wavelengths]}`, read from the headers without reading the spectra; gives the size of the spectra csv files offered by the export of the import |
 | `'events'` | List[dict] | | | The additions stored inside the recording, in the order of their spectrum numbers, each with `'name'` (the software's name for it, `Event 1`), `'text'`, `'datapoint'`, `'time'` (min) and `'row_index'` as in `event`. They are the same additions, with the same times, as `experiment_paf_loader` gives |
 | `'traces'` | List[str] | | | Names of the recorded traces |
 | `'ocr_check'` | dict | | | The check of the instrument's OCR against ours (`ocr_check`); a warning is printed when it disagrees or cannot be done |
@@ -305,9 +306,12 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`export`), otherwise the full path |
+| `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`results`), otherwise the full path |
 | `'answers'` | dict | | | Terminal answers |
-| `'files'` | dict | | min | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}}`; trim times are on the original recording, ignore times count from the new 0 after trimming |
+| `'files'` | dict | | | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end', 'OD', 'volume', 'dilution_factor', 'events'}}`, built by `file_settings_merger`; a file or key may be missing (a dataset saved before the OD values and labels were kept has only the four limits) |
+| `'files'[name]['trim_start']`, `['trim_end']`, `['ignore_start']`, `['ignore_end']` | Optional[float] | | min | Trim times are on the original recording (`None` for no trim), ignore times count from the new 0 after trimming |
+| `'files'[name]['OD']`, `['volume']`, `['dilution_factor']` | float | | OD, mL, none | The OD values last entered (3.1.1); kept when a later run does not scale by OD, so they are offered again |
+| `'files'[name]['events']` | List[dict] | (n_events,) | | `[{'datapoint': int, 'label': str ('ignore' for an event left out), 'concentration_uM': Optional[float] (µM), 'ignored': bool}]`, one per event of the file, in its order |
 
 #### `strip_values`
 
@@ -323,7 +327,7 @@ What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/vie
 
 #### `od_rows`
 
-The rows of the OD table of the window (`ODTable`, `utils_viewer/viewer_od_table.py`), in the order shown: the same layout as the OD values the questions give. Taken by `ViewerGui.od_table_shower` and given back by `ViewerGui.od_table_reader`, together with the list of the wrong cells (`'file name: column heading'`).
+The OD values of every file as the OD table of the window starts and ends them, in the order of the rows: the same layout as the OD values the questions give. Laid out as a table by `od_table_builder` and read back by `od_rows_reader` (`utils_viewer/viewer_table.py`).
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
@@ -331,6 +335,23 @@ The rows of the OD table of the window (`ODTable`, `utils_viewer/viewer_od_table
 | `'OD'` | Optional[float] | | OD | OD of the cells added; `None` for a cell that is empty or not a number above 0 |
 | `'volume'` | Optional[float] | | mL | Volume of cells spun down; `None` as above |
 | `'dilution_factor'` | Optional[float] | | | Dilution factor; `None` as above |
+
+#### `table_rows`
+
+A table to fill in on the terminal side of the window (`AnswerTable`, `utils_viewer/viewer_table.py`): the OD table (`od_table_builder`, one row per file) or the labels table (`label_table_builder`, one row per event under the name of its file). Taken by `ViewerGui.table_shower`. `ViewerGui.table_reader` gives back the values row by row (one `{name of the value: value}` per row: a float, a label, or `None` for a cell that is empty, wrong or greyed out) and the cells that cannot be used, as `('row name: column heading', problem)` with the problem `'empty'` or the kind of the cell.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'first_heading'` | str | | | Heading of the fixed first column: `'File'` or `'Time (min)'` |
+| `'columns'` | Sequence[Tuple[str, str, str]] | (n_columns,) | | `(name of the value, column heading, kind)` for each column typed in; the kind is `'above_zero'` (a number above 0, needed), `'zero_or_more'` (a number of 0 or more, or nothing) or `'label'` (text, needed) |
+| `'skip_word'` | Optional[str] | | | A label that leaves its row out (`'ignore'`): the row's other cells are greyed out and not read; `None` for none |
+| `'rows'` | List[dict] | (n_rows,) | | One per row, in the order shown; the keys below |
+| `'file'` | str | | | File the row belongs to; entering one of its cells shows that file on the plot |
+| `'position'` | int | | | Place of the event in its file, from 0 (0 in the OD table) |
+| `'group'` | Optional[str] | | | Heading the row sits under (the file name), shown above the first row of each group; `None` for none |
+| `'first'` | str | | | Text of the fixed first column: the file name, or the time of the event in min with two decimals |
+| `'name'` | str | | | How the row is named in the sentence after Confirm, such as `'run1 at 15.01 min'` |
+| `'cells'` | Dict[str, str] | | | `{name of the value: text the cell starts with}`; `''` for an empty cell |
 
 ### 1.2 Dataclasses
 
@@ -421,6 +442,10 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by 
 | `fit` | Optional[dict] | | | `None` | The `fit` the haems are worked out with: the standard or saved fit at first, then the one chosen in the processing or the strip; `None` when the haems are left out |
 | `redraw` | Optional[Callable[[], bool]] | | | `None` | Draws the plot of the step being asked again (set by each stage runner), for a change in the strip |
 | `is_figure` | bool | | | `False` | True while the plot is the figure of each file at its saved size (section 5), so a new journal or size in the strip redraws it |
+| `export_choice` | Optional[str] | | | `None` | What the export of the import (3.4) wrote: `'summary'`, `'trimmed'` or `'all'`; `None` before anything is exported. New edges export again with it |
+| `export_limits` | Dict[str, dict] | | | empty | The trim and ignore limits of each file when it was last exported, to find the files whose edges changed |
+| `full_exports` | Dict[str, List[Path]] | | | empty | `{file name: files written in its full/ folder}` in this run, so they are not written again when only the edges change, and are taken away when the file is no longer trimmed |
+| `exported` | List[Path] | | | empty | The results folder, once the export has written into it; `viewer_asker` can share the caller's list, so the caller can say the export is kept when the questions are stopped |
 
 ### 1.3 Arrays
 
@@ -510,7 +535,9 @@ What the file holds, each item marked **recorded** (taken as true), **calculated
 |---|---|
 | File type | xlsx |
 | Sheets | `CcO2`, `CsO2`, `VoO2` and, for the full export, `VoO2_OD`, `VoO2_percent`, `haem_conc`, `haem_abs`, `haem_delta_abs`, `haem_OD`, `haem_abs_OD`, `haem_delta_abs_OD`, `haem_percent`; plus `Averages`, `Events` and `Metadata` when available |
-| Location and name | `<results>/<run folder>/<experiment>/<experiment>.xlsx` |
+| Location and name | `<results>/<experiment>/<experiment>.xlsx`: the trimmed data (all of it when the file is not trimmed), written by the export at the end of the import and again, with the run's results added, by the run; for a trimmed file the export of the import also writes `<results>/<experiment>/full/<experiment>.xlsx`, the whole recording |
+
+The export of the import writes only `CcO2`, `CsO2`, `VoO2`, `Events` and `Metadata`. In the trimmed workbook the Metadata holds the edges (`trimmed_before_minutes`, `trimmed_after_minutes` when trimmed, `ignore_first_minutes`, `ignore_last_minutes`); the whole recording's holds none, so it does not change when they do.
 
 | Column (data sheets) | Type | Units | Description |
 |---|---|---|---|
@@ -575,7 +602,8 @@ Rules, checked by `fit_importer`: the columns come in pairs and every wavelength
 | File type | CSV |
 | Delimiter | comma |
 | Encoding | UTF-8 |
-| Location and name | `<results>/<run folder>/<experiment>/<dataset>_<type>.csv`, type `transmiss`, `intensity` or `attenuation` |
+| Location and name | `<results>/<experiment>/<dataset>_<type>.csv` (the trimmed spectra) and, for a trimmed file exported with the whole recordings' spectra, `<results>/<experiment>/full/<dataset>_<type>.csv`; type `transmiss`, `intensity` or `attenuation` |
+| Size | About 19, 8 and 21 bytes per value for the three types (`SPECTRA_CSV_BYTES` in `config.py`), so about 1.2 GB for a 100 MB `.paf` file |
 
 | Column | Type | Units | Description |
 |---|---|---|---|

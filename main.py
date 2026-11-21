@@ -27,7 +27,7 @@ from utils_custom.custom_runner import (exemplar_runner,
                                         )
 from utils_shared.app_messages import SEND_DETAILS, start_problem_shower
 from utils_shared.comparison_plotter import comparison_figure_plotter
-from utils_shared.dataset_settings import dataset_settings_saver
+from utils_shared.dataset_settings import dataset_settings_saver, file_settings_merger
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
@@ -161,6 +161,7 @@ def everything_asker(folder: Path,
                      summaries: List[dict],
                      export_root: Path,
                      saved: dict,
+                     exported: Optional[List[Path]] = None,
                      ) -> Tuple[dict,
                                 List[dict],
                                 Optional[dict],
@@ -183,6 +184,9 @@ def everything_asker(folder: Path,
     saved : dict
         Settings saved with the dataset, from files_asker; empty for a dataset never
         run.
+    exported : Optional[List[Path]]
+        List the results folder is added to once the export of the import (3.4) writes
+        into it; None when not needed.
 
     ---- Globals read ----
     PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
@@ -195,8 +199,9 @@ def everything_asker(folder: Path,
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal; writes last_answers.json through
-    last_answers_saver and the settings file of the dataset through
-    dataset_settings_saver (side effects).
+    last_answers_saver, the settings file of the dataset through
+    dataset_settings_saver, and the export of the import when one is chosen, adding to
+    ``exported`` (side effects).
 
     ---- Equations ----
     None.
@@ -204,6 +209,7 @@ def everything_asker(folder: Path,
     ---- Helpers ----
     comparison_maker
     dataset_settings_saver
+    file_settings_merger
     haem_name_formatter
     last_answers_saver
     multi_experiment_asker
@@ -231,6 +237,7 @@ def everything_asker(folder: Path,
                                                  remembered,
                                                  PLACES.fits_folder,
                                                  export_root,
+                                                 exported,
                                                  )
 
     # ---- 2.2 Multi-experiment plots --------------------------------------------------
@@ -393,12 +400,10 @@ def everything_asker(folder: Path,
         raise UserQuitError()
 
     # ---- 6 Remember the answers ------------------------------------------------------
-    files = dict(remembered)
-    files.update({name: dict(v) for name, v in limits.items()})
     last_answers_saver({'data_folder': str(folder.resolve())})
     if not dataset_settings_saver(folder,
                                   export_root,
-                                  files,
+                                  file_settings_merger(remembered, limits, details),
                                   {k: v
                                    for k, v in answers.items()
                                    if k not in ('haems', 'ho_haems') or v
@@ -738,6 +743,7 @@ def program_runner() -> int:
     log_session = logging_starter(export_root, PROGRAM_TITLE, folder)
     failed = []
     kept = {}
+    exported: List[Path] = []  # the export of the import adds the results folder
     try:
         try:
             (answers,
@@ -745,13 +751,17 @@ def program_runner() -> int:
              fit,
              comparison,
              exemplar_names,
-             ) = everything_asker(folder, summaries, export_root, saved)
+             ) = everything_asker(folder, summaries, export_root, saved, exported)
         except UserQuitError:
-            print(
-                f"\nCancelled. Nothing was changed; the questions you answered are in "
-                f"the log {log_session['log_path'].name} in the logs folder of the "
-                f'results folder.',
-                )
+            changed = (f'The data you exported is kept in {export_root}; nothing else '
+                       f'was changed'
+                       if exported
+                       else 'Nothing was changed'
+                       )
+            print(f"\nCancelled. {changed}; the questions you answered are in the log "
+                  f"{log_session['log_path'].name} in the logs folder of the results "
+                  f'folder.',
+                  )
             return 1
 
         # ---- 4 Set up the run --------------------------------------------------------

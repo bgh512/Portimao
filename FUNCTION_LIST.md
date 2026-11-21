@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.4
+- **Version:** V2.5
 - **Date:** 21/11/2026
 
 ## Contents
@@ -76,7 +76,10 @@
     - [`test_data_folders_are_listed`](#test_data_folders_are_listed)
     - [`test_folder_answer_is_resolved`](#test_folder_answer_is_resolved)
     - [`test_missing_settings_file_gives_nothing`](#test_missing_settings_file_gives_nothing)
+    - [`test_od_values_and_labels_are_kept`](#test_od_values_and_labels_are_kept)
     - [`test_results_folder_inside_is_kept_relative`](#test_results_folder_inside_is_kept_relative)
+    - [`test_results_folder_is_checked`](#test_results_folder_is_checked)
+    - [`test_results_folder_names_and_old_results`](#test_results_folder_names_and_old_results)
     - [`test_results_folder_outside_is_kept_whole`](#test_results_folder_outside_is_kept_whole)
     - [`test_settings_are_read_back`](#test_settings_are_read_back)
     - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
@@ -129,6 +132,14 @@
     - [`test_haems_are_ordered_a_then_b_then_c`](#test_haems_are_ordered_a_then_b_then_c)
     - [`test_haem_types_come_from_the_name`](#test_haem_types_come_from_the_name)
     - [`test_haems_are_coloured_by_type`](#test_haems_are_coloured_by_type)
+- [`tests/test_import_export.py`](#teststest_import_exportpy)
+    - [`_experiment_maker`](#_experiment_maker)
+    - [`_metadata_reader`](#_metadata_reader)
+    - [`_session_maker`](#_session_maker)
+    - [`test_size_in_words`](#test_size_in_words)
+    - [`test_spectra_size_by_hand`](#test_spectra_size_by_hand)
+    - [`test_trimmed_and_whole_go_to_their_folders`](#test_trimmed_and_whole_go_to_their_folders)
+    - [`test_new_edges_export_again`](#test_new_edges_export_again)
 - [`tests/test_label_tidier.py`](#teststest_label_tidierpy)
     - [`test_exponent_after_a_caret_is_raised`](#test_exponent_after_a_caret_is_raised)
     - [`test_exponent_after_a_unit_is_raised`](#test_exponent_after_a_unit_is_raised)
@@ -262,12 +273,26 @@
     - [`_binding_resolver`](#_binding_resolver)
     - [`_carrier_finder`](#_carrier_finder)
     - [`_list_reader`](#_list_reader)
+    - [`_number_matcher`](#_number_matcher)
     - [`_question_collector`](#_question_collector)
     - [`_question_matcher`](#_question_matcher)
     - [`_text_resolver`](#_text_resolver)
     - [`_tree_reader`](#_tree_reader)
     - [`test_question_texts_can_be_read`](#test_question_texts_can_be_read)
     - [`test_questions_are_in_the_list`](#test_questions_are_in_the_list)
+    - [`test_question_numbers_match_the_list`](#test_question_numbers_match_the_list)
+- [`tests/test_question_format.py`](#teststest_question_formatpy)
+    - [`_lines_reader`](#_lines_reader)
+    - [`_typist_setter`](#_typist_setter)
+    - [`test_accept_question_shapes`](#test_accept_question_shapes)
+    - [`test_choice_endings`](#test_choice_endings)
+    - [`test_given_number_is_shown`](#test_given_number_is_shown)
+    - [`test_number_endings_and_hints`](#test_number_endings_and_hints)
+    - [`test_several_numbers`](#test_several_numbers)
+    - [`test_table_instruction_waits`](#test_table_instruction_waits)
+    - [`test_text_question_waits`](#test_text_question_waits)
+    - [`test_typed_number_reader`](#test_typed_number_reader)
+    - [`test_yes_no_endings`](#test_yes_no_endings)
 - [`tests/test_run_logging.py`](#teststest_run_loggingpy)
     - [`_typist_maker`](#_typist_maker)
     - [`_fresh_numbering`](#_fresh_numbering)
@@ -317,7 +342,11 @@
     - [`test_source_keeps_things_in_program_folder`](#test_source_keeps_things_in_program_folder)
     - [`test_source_program_folder_is_found`](#test_source_program_folder_is_found)
 - [`tests/test_window_parts.py`](#teststest_window_partspy)
-    - [`test_cell_of_the_od_table`](#test_cell_of_the_od_table)
+    - [`test_cells_of_the_tables`](#test_cells_of_the_tables)
+    - [`test_event_labels_from_the_table`](#test_event_labels_from_the_table)
+    - [`test_rows_of_the_labels_table`](#test_rows_of_the_labels_table)
+    - [`test_rows_of_the_od_table`](#test_rows_of_the_od_table)
+    - [`test_sentence_when_confirmed_too_early`](#test_sentence_when_confirmed_too_early)
     - [`test_height_typed_in_the_strip`](#test_height_typed_in_the_strip)
     - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
     - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
@@ -536,10 +565,12 @@
     - [`_renderer_getter`](#_renderer_getter)
     - [`comparison_figure_plotter`](#comparison_figure_plotter)
 - [`utils_shared/dataset_settings.py`](#utils_shareddataset_settingspy)
+    - [`_event_plainer`](#_event_plainer)
     - [`_export_folder_resolver`](#_export_folder_resolver)
     - [`_export_folder_shortener`](#_export_folder_shortener)
     - [`dataset_settings_reader`](#dataset_settings_reader)
     - [`dataset_settings_saver`](#dataset_settings_saver)
+    - [`file_settings_merger`](#file_settings_merger)
 - [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
     - [`_skip_reporter`](#_skip_reporter)
     - [`event_settings_merger`](#event_settings_merger)
@@ -574,6 +605,8 @@
     - [`averages_table_builder`](#averages_table_builder)
     - [`experiment_workbook_exporter`](#experiment_workbook_exporter)
     - [`saved_settings_reader`](#saved_settings_reader)
+    - [`size_describer`](#size_describer)
+    - [`spectra_size_estimator`](#spectra_size_estimator)
     - [`workbook_path_builder`](#workbook_path_builder)
 - [`utils_shared/individual_experiment_plotter.py`](#utils_sharedindividual_experiment_plotterpy)
     - [`_HideTopTickLabels`](#_hidetopticklabels)
@@ -652,11 +685,21 @@
     - [`pca_figure_builder`](#pca_figure_builder)
 - [`utils_shared/questions.py`](#utils_sharedquestionspy)
     - [`UserQuitError`](#userquiterror)
+    - [`_brightener`](#_brightener)
     - [`_input_reader`](#_input_reader)
+    - [`_limits_checker`](#_limits_checker)
+    - [`_list_ending_builder`](#_list_ending_builder)
     - [`_number_builder`](#_number_builder)
+    - [`_number_depth_finder`](#_number_depth_finder)
+    - [`_number_hint_builder`](#_number_hint_builder)
+    - [`_numbers_hint_builder`](#_numbers_hint_builder)
+    - [`_options_printer`](#_options_printer)
     - [`_question_printer`](#_question_printer)
     - [`_time_announcer`](#_time_announcer)
+    - [`_unit_highlighter`](#_unit_highlighter)
+    - [`accept_asker`](#accept_asker)
     - [`choice_asker`](#choice_asker)
+    - [`confirm_waiter`](#confirm_waiter)
     - [`enter_waiter`](#enter_waiter)
     - [`heading_printer`](#heading_printer)
     - [`info_printer`](#info_printer)
@@ -664,15 +707,16 @@
     - [`number_asker`](#number_asker)
     - [`numbering_getter`](#numbering_getter)
     - [`numbering_setter`](#numbering_setter)
-    - [`numbers_asker`](#numbers_asker)
     - [`path_cleaner`](#path_cleaner)
     - [`progress_clearer`](#progress_clearer)
     - [`progress_printer`](#progress_printer)
+    - [`retry_teller`](#retry_teller)
     - [`section_starter`](#section_starter)
     - [`text_asker`](#text_asker)
     - [`text_colourer`](#text_colourer)
     - [`text_italiser`](#text_italiser)
     - [`time_request_setter`](#time_request_setter)
+    - [`typed_number_reader`](#typed_number_reader)
     - [`yes_no_asker`](#yes_no_asker)
 - [`utils_shared/reference_level.py`](#utils_sharedreference_levelpy)
     - [`reference_level_finder`](#reference_level_finder)
@@ -718,7 +762,6 @@
 - [`utils_shared/survey.py`](#utils_sharedsurveypy)
     - [`_columns_text_builder`](#_columns_text_builder)
     - [`_event_line_builder`](#_event_line_builder)
-    - [`_file_focuser`](#_file_focuser)
     - [`_first_event_finder`](#_first_event_finder)
     - [`_last_event_finder`](#_last_event_finder)
     - [`_limit_converter`](#_limit_converter)
@@ -735,8 +778,9 @@
     - [`data_folder_resolver`](#data_folder_resolver)
     - [`decomposition_asker`](#decomposition_asker)
     - [`event_asker`](#event_asker)
-    - [`file_focus_setter`](#file_focus_setter)
+    - [`event_entries_builder`](#event_entries_builder)
     - [`files_asker`](#files_asker)
+    - [`free_folder_finder`](#free_folder_finder)
     - [`haem_choice_asker`](#haem_choice_asker)
     - [`haem_form_asker`](#haem_form_asker)
     - [`haem_form_option_builder`](#haem_form_option_builder)
@@ -749,9 +793,13 @@
     - [`ocr_option_builder`](#ocr_option_builder)
     - [`od_scaling_asker`](#od_scaling_asker)
     - [`paf_finder`](#paf_finder)
+    - [`results_counter`](#results_counter)
+    - [`results_folder_checker`](#results_folder_checker)
+    - [`results_folder_resolver`](#results_folder_resolver)
     - [`saved_values_reader`](#saved_values_reader)
     - [`signal_asker`](#signal_asker)
     - [`size_asker`](#size_asker)
+    - [`tidy_labels_finder`](#tidy_labels_finder)
     - [`trim_layout_finder`](#trim_layout_finder)
     - [`trim_limits_builder`](#trim_limits_builder)
     - [`trim_minutes_builder`](#trim_minutes_builder)
@@ -795,18 +843,15 @@
     - [`_kept_builder`](#_kept_builder)
     - [`_pictures_builder`](#_pictures_builder)
     - [`multi_figure_checker_builder`](#multi_figure_checker_builder)
-- [`utils_viewer/viewer_od_table.py`](#utils_viewerviewer_od_tablepy)
-    - [`ODTable`](#odtable)
-    - [`cell_reader`](#cell_reader)
-    - [`wheel_step_finder`](#wheel_step_finder)
 - [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
     - [`PreviewSpec`](#previewspec)
     - [`TimeAxis`](#timeaxis)
     - [`ViewerSession`](#viewersession)
+    - [`_file_exporter`](#_file_exporter)
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
     - [`preview_info_builder`](#preview_info_builder)
-    - [`all_data_exporter`](#all_data_exporter)
+    - [`import_data_exporter`](#import_data_exporter)
     - [`kept_file_lister`](#kept_file_lister)
     - [`pca_example_picture_builder`](#pca_example_picture_builder)
     - [`pca_picture_builder`](#pca_picture_builder)
@@ -825,23 +870,25 @@
     - [`self_test_runner`](#self_test_runner)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
     - [`_addition_time_lister`](#_addition_time_lister)
-    - [`_all_data_asker`](#_all_data_asker)
     - [`_answers_previewer`](#_answers_previewer)
     - [`_averaging_reviewer`](#_averaging_reviewer)
     - [`_component_namer`](#_component_namer)
     - [`_decomposition_storer`](#_decomposition_storer)
+    - [`_export_asker`](#_export_asker)
+    - [`_export_refresher`](#_export_refresher)
     - [`_figure_starter`](#_figure_starter)
     - [`_fit_file_saver`](#_fit_file_saver)
     - [`_fit_names_lister`](#_fit_names_lister)
+    - [`_label_table_filler`](#_label_table_filler)
     - [`_limits_lister`](#_limits_lister)
     - [`_od_lister`](#_od_lister)
     - [`_od_table_filler`](#_od_table_filler)
     - [`_pca_pictures_publisher`](#_pca_pictures_publisher)
-    - [`_review_asker`](#_review_asker)
     - [`_skipped_lister`](#_skipped_lister)
     - [`_standard_fit_loader`](#_standard_fit_loader)
     - [`_strip_change_applier`](#_strip_change_applier)
     - [`_strip_shower`](#_strip_shower)
+    - [`_table_filler`](#_table_filler)
     - [`browser_stage_runner`](#browser_stage_runner)
     - [`details_stage_runner`](#details_stage_runner)
     - [`pca_stage_runner`](#pca_stage_runner)
@@ -852,7 +899,6 @@
 - [`utils_viewer/viewer_strip.py`](#utils_viewerviewer_strippy)
     - [`EdgeRow`](#edgerow)
     - [`SettingsStrip`](#settingsstrip)
-    - [`_number_reader`](#_number_reader)
     - [`_page_journal_finder`](#_page_journal_finder)
     - [`height_checker`](#height_checker)
     - [`minutes_checker`](#minutes_checker)
@@ -860,6 +906,17 @@
     - [`strip_values_builder`](#strip_values_builder)
     - [`strip_values_checker`](#strip_values_checker)
     - [`width_choices_lister`](#width_choices_lister)
+- [`utils_viewer/viewer_table.py`](#utils_viewerviewer_tablepy)
+    - [`AnswerTable`](#answertable)
+    - [`_cell_name_joiner`](#_cell_name_joiner)
+    - [`_number_writer`](#_number_writer)
+    - [`cell_reader`](#cell_reader)
+    - [`label_entries_reader`](#label_entries_reader)
+    - [`label_table_builder`](#label_table_builder)
+    - [`od_rows_reader`](#od_rows_reader)
+    - [`od_table_builder`](#od_table_builder)
+    - [`table_problem_teller`](#table_problem_teller)
+    - [`wheel_step_finder`](#wheel_step_finder)
 - [`utils_viewer/viewer_terminal.py`](#utils_viewerviewer_terminalpy)
     - [`OutputRouter`](#outputrouter)
     - [`ansi_colour_getter`](#ansi_colour_getter)
@@ -2028,6 +2085,9 @@ export_root : Path
 saved : dict
     Settings saved with the dataset, from files_asker; empty for a dataset never
     run.
+exported : Optional[List[Path]]
+    List the results folder is added to once the export of the import (3.4) writes
+    into it; None when not needed.
 
 ---- Globals read ----
 PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
@@ -2040,8 +2100,9 @@ Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal; writes last_answers.json through
-last_answers_saver and the settings file of the dataset through
-dataset_settings_saver (side effects).
+last_answers_saver, the settings file of the dataset through
+dataset_settings_saver, and the export of the import when one is chosen, adding to
+``exported`` (side effects).
 
 ---- Equations ----
 None.
@@ -2049,6 +2110,7 @@ None.
 ---- Helpers ----
 comparison_maker
 dataset_settings_saver
+file_settings_merger
 haem_name_formatter
 last_answers_saver
 multi_experiment_asker
@@ -2879,7 +2941,7 @@ user_places_finder
 
 ## `tests/test_dataset_settings.py`
 
-Tests of the settings kept with a dataset and of the list of data folders.
+Tests of the settings kept with a dataset, the results folder check and the list of data
 
 ### HELPERS
 
@@ -3021,6 +3083,35 @@ None.
 None.
 ```
 
+#### `test_od_values_and_labels_are_kept`
+
+```text
+---- Summary ----
+Main function to check that the OD values and event labels of a run are kept in the
+dataset's settings beside its limits and offered back from there: an OD not asked
+this run (no OD scaling) stays as saved, a file not in this run is kept, and the
+values are written as plain numbers and text.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+FILES, ANSWERS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_results_folder_inside_is_kept_relative`
 
 ```text
@@ -3035,6 +3126,63 @@ tmp_path : Path
 
 ---- Globals read ----
 SETTINGS_FILE_NAME (imported).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_results_folder_is_checked`
+
+```text
+---- Summary ----
+Main function to check the results folder answer: a file, or a folder under a file,
+is refused with one sentence; an existing folder and one not made yet are accepted,
+and checking leaves nothing behind.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_results_folder_names_and_old_results`
+
+```text
+---- Summary ----
+Main function to check the results folder answer against the data folder: a name
+without a path is taken inside the data folder and a full path as it is; the files
+that already have results there are counted (an empty folder of one does not
+count); and the free name offered beside a folder skips the names already used.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
 
 ---- Outputs ----
 None.
@@ -4489,6 +4637,225 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_import_export.py`
+
+Tests of the export at the end of the import: the size of the spectra and where each file goes.
+
+### HELPERS
+
+#### `_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to stand in for the reading of a file: a made-up recording of 0 to
+10 min, one point a minute, with the OD values and events it is given, as the
+processing hands them back.
+
+---- Inputs ----
+info : dict
+    Per-file information (preview_info_builder): name, OD values and events.
+cfg : object
+    Settings of the processing; not used.
+fit : object
+    Fit of the processing; not used.
+
+---- Globals read ----
+EVENTS, OD_KEYS (module constants).
+
+---- Outputs ----
+dict
+    {'experiment': experiment} (DATA_FORMAT.md), the oxygen and OCR tables equal to
+    twice the time.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_metadata_reader`
+
+```text
+---- Summary ----
+Helper function to read the Metadata sheet of a workbook as {field: value}.
+
+---- Inputs ----
+path : Path
+    The workbook.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {field: value} of the Metadata sheet.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_session_maker`
+
+```text
+---- Summary ----
+Helper function to set up a session of two made-up files whose reading is stood in
+for by _experiment_maker, with no window.
+
+---- Inputs ----
+root : Path
+    Results folder.
+monkeypatch : pytest.MonkeyPatch
+    Used to stand in for the reading of the files.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+ViewerSession
+    The session, with the files run1 and run2 of 10 min each.
+
+---- Globals mutated ----
+None. Replaces the processing in viewer_preview for the test (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_experiment_maker
+```
+
+### MAIN FUNCTIONS
+
+#### `test_size_in_words`
+
+```text
+---- Summary ----
+Main function to check how a size is put in words: two significant figures, in GB
+from 10^9 bytes and in MB from 10^6, and nothing at all said as such.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+1 234 567 890 bytes = 1.23 GB, about 1.2 GB; 352 000 000 bytes = 352 MB, about 350.
+
+---- Helpers ----
+None.
+```
+
+#### `test_spectra_size_by_hand`
+
+```text
+---- Summary ----
+Main function to check the size of the spectra csv files against sums worked out by
+hand: a file trimmed at both ends, one not trimmed with two spectrometers, one with
+no spectra, and one trimmed at its start only.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BYTES_PER_VALUE (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+run1: 60 min kept from 10 to 40, so half of 600 spectra x 100 wavelengths x 5 bytes
+= 150 000 trimmed; the whole 600 x 100 x 5 = 300 000.
+run2: not trimmed, 2 x 200 x 50 x 5 = 100 000 trimmed and nothing whole.
+run3: no spectra.
+run4: 30 min from 6 to the end, so 24 / 30 = 0.8 of 300 x 10 x 5 = 12 000 trimmed;
+the whole 300 x 10 x 5 = 15 000.
+
+---- Helpers ----
+None.
+```
+
+#### `test_trimmed_and_whole_go_to_their_folders`
+
+```text
+---- Summary ----
+Main function to check where the export of the import writes: a trimmed file's
+trimmed data in its own folder, with the edges, OD values and labels, and its whole
+recording in full/ without the edges; a file not trimmed has no full/.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Used to stand in for the reading of the files.
+
+---- Globals read ----
+EVENTS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Kept from 2 to 8 min of a point a minute: 7 points, the addition at 5 - 2 = 3 min.
+
+---- Helpers ----
+_metadata_reader
+_session_maker
+```
+
+#### `test_new_edges_export_again`
+
+```text
+---- Summary ----
+Main function to check the export once the edges change: a whole recording already
+written is left as it is, a file that has just become trimmed gets one, and a file
+no longer trimmed loses the one written for it.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Used to stand in for the reading of the files.
+
+---- Globals read ----
+EVENTS (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_metadata_reader
+_session_maker
 ```
 
 ## `tests/test_label_tidier.py`
@@ -7870,7 +8237,7 @@ None.
 
 ## `tests/test_question_flow.py`
 
-Tests that every question the program can ask is in QUESTION_FLOW.md, in the same words.
+Tests that every question is in QUESTION_FLOW.md, worded and numbered as in the code.
 
 ### HELPERS
 
@@ -7963,24 +8330,59 @@ None.
 None.
 ```
 
+#### `_number_matcher`
+
+```text
+---- Summary ----
+Helper function to say whether a question sits in the row of its own number in the
+list, in the same words. The parts filled in at run time match any words within
+that row's question.
+
+---- Inputs ----
+number : str
+    The number the code gives the question, such as '3.5'.
+question : str
+    Question text from the code, with VARYING for each part filled in at run time.
+list_text : str
+    Text of the list from _list_reader.
+
+---- Globals read ----
+VARYING (module constant).
+
+---- Outputs ----
+bool
+    True when the row of that number holds the question.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_question_collector`
 
 ```text
 ---- Summary ----
 Helper function to collect the text of every question in the code, without running
-it: the question given in each call to a function that takes one, and each
-'question' entry of a dictionary.
+it: the question given in each call to a function that takes one, with the number
+written in that call, and each 'question' entry of a dictionary.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-QUESTION_NAME (module constant).
+NUMBER_NAME, QUESTION_NAME (module constants).
 
 ---- Outputs ----
-Tuple[List[Tuple[str, str]], List[str]]
-    ([(question text, 'file:line')], ['file:line' of each question that could not
-    be read]). VARYING stands for each part filled in at run time.
+Tuple[List[Tuple[str, str, Optional[str]]], List[str]]
+    ([(question text, 'file:line', its own number or None)], ['file:line' of each
+    question that could not be read]). VARYING stands for each part filled in at
+    run time. A number handed on from another input is not one written in the call,
+    so it gives None.
 
 ---- Globals mutated ----
 None.
@@ -8139,6 +8541,395 @@ None.
 _list_reader
 _question_collector
 _question_matcher
+```
+
+#### `test_question_numbers_match_the_list`
+
+```text
+---- Summary ----
+Main function to check that every question the code gives its own number sits in
+the row of that number in QUESTION_FLOW.md, so the number on screen is the number
+in the list.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VARYING, LIST_NAME (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_list_reader
+_number_matcher
+_question_collector
+```
+
+## `tests/test_question_format.py`
+
+Tests of the question format: what Enter gives at the end of each kind of question, the
+
+### HELPERS
+
+#### `_lines_reader`
+
+```text
+---- Summary ----
+Helper function to give the printed lines without their colour codes or blank
+lines.
+
+---- Inputs ----
+printed : str
+    What the questions printed.
+
+---- Globals read ----
+CODE_PATTERN (module constant).
+
+---- Outputs ----
+List[str]
+    The lines with text, without spaces at either end.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_typist_setter`
+
+```text
+---- Summary ----
+Helper function to have the questions read the given answers, one per question
+asked or wrong answer, in place of the window's answer box.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answer for the test only.
+typed : List[str]
+    The answers, in order; each is taken once.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The reader of the questions is restored by monkeypatch.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_accept_question_shapes`
+
+```text
+---- Summary ----
+Main function to check both shapes of a "Do you accept ...?" question: with one
+way to change it is a yes or no question with what n does on the quiet line just
+above; with more it is a numbered list starting "1) Yes, accept"; with none it is
+refused.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+capsys : pytest.CaptureFixture
+    Captures what the questions print.
+
+---- Globals read ----
+COLOUR_QUIET.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_lines_reader
+_typist_setter
+accept_asker
+```
+
+#### `test_choice_endings`
+
+```text
+---- Summary ----
+Main function to check the end of a question answered from a numbered list: every
+number up to five options with the default brighter, a range beyond with the
+default option brighter in the list, and one sentence after a wrong answer.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+capsys : pytest.CaptureFixture
+    Captures what the questions print.
+
+---- Globals read ----
+COLOUR_DEFAULT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_lines_reader
+_typist_setter
+choice_asker
+```
+
+#### `test_given_number_is_shown`
+
+```text
+---- Summary ----
+Main function to check that a question given its own number shows exactly that
+number, every time it is asked and at the indent of its depth, and leaves the
+numbering of the other questions as it was; a number not like 3.5 is refused.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+capsys : pytest.CaptureFixture
+    Captures what the questions print.
+
+---- Globals read ----
+CODE_PATTERN (module constant); questions.INDENT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the numbering of the questions module (each test sets its own).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_lines_reader
+_typist_setter
+accept_asker
+text_asker
+yes_no_asker
+```
+
+#### `test_number_endings_and_hints`
+
+```text
+---- Summary ----
+Main function to check a number question: [skip] or the default at the end, the
+unit highlighted, and after a wrong answer one sentence giving the kind of number,
+its limits and an example within them, the question waiting for the next answer.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+capsys : pytest.CaptureFixture
+    Captures what the questions print.
+
+---- Globals read ----
+COLOUR_RETRY, COLOUR_UNIT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_lines_reader
+_number_hint_builder
+_typist_setter
+_unit_highlighter
+number_asker
+```
+
+#### `test_several_numbers`
+
+```text
+---- Summary ----
+Main function to check a question answered by several numbers: the quiet line just
+above saying to separate them with commas, the numbers at the end, the options
+Enter gives brighter in the list, and one sentence after a wrong answer.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+capsys : pytest.CaptureFixture
+    Captures what the questions print.
+
+---- Globals read ----
+COLOUR_DEFAULT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_lines_reader
+_typist_setter
+multi_asker
+```
+
+#### `test_table_instruction_waits`
+
+```text
+---- Summary ----
+Main function to check an instruction carried out in a table: its quiet line above
+it, its own number and no ending, and, when Confirm is pressed with the table not
+yet filled in, the checker's one sentence while the instruction waits.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the window's Confirm.
+capsys : pytest.CaptureFixture
+    Captures what the instruction prints.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_lines_reader
+_typist_setter
+```
+
+#### `test_text_question_waits`
+
+```text
+---- Summary ----
+Main function to check that a text answer the checker refuses, the default given by
+Enter included, gets the checker's sentence while the question waits, printed once.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+capsys : pytest.CaptureFixture
+    Captures what the questions print.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_lines_reader
+_typist_setter
+text_asker
+```
+
+#### `test_typed_number_reader`
+
+```text
+---- Summary ----
+Main function to check the one reader of typed numbers: a point or a comma as the
+decimal sign, spaces around it, and None for nothing, words, "nan" and infinities.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+typed_number_reader
+```
+
+#### `test_yes_no_endings`
+
+```text
+---- Summary ----
+Main function to check a yes or no question: (Y/n) or (y/N) with the letter Enter
+gives brighter, y, yes, n and no in any capitals, and one sentence after a wrong
+answer while the question waits.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+capsys : pytest.CaptureFixture
+    Captures what the questions print.
+
+---- Globals read ----
+COLOUR_DEFAULT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_lines_reader
+_typist_setter
+yes_no_asker
 ```
 
 ## `tests/test_run_logging.py`
@@ -9406,13 +10197,129 @@ Tests of the parts of the window that need no window: the widths a journal allow
 
 ### MAIN FUNCTIONS
 
-#### `test_cell_of_the_od_table`
+#### `test_cells_of_the_tables`
 
 ```text
 ---- Summary ----
-Main function to check that a cell gives its number (with a point or a comma), that
-an empty cell is "not filled in" and not wrong, and that words, zero, negative
-numbers and numbers that are not finite are wrong.
+Main function to check the three kinds of cell: a number above 0 (with a point or
+a comma), a number of 0 or more, and a label without its outer spaces; an empty
+cell is "not filled in" and never wrong; words, numbers below the limit and
+numbers that are not finite are wrong.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_event_labels_from_the_table`
+
+```text
+---- Summary ----
+Main function to check the labels as the table is confirmed: a label written
+ignore in any capitals leaves its event out and drops its concentration; a label
+that could be tidier is offered once, and one kept as it is is not offered again.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the answer box.
+
+---- Globals read ----
+SUMMARIES (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_rows_of_the_labels_table`
+
+```text
+---- Summary ----
+Main function to check the labels table: it starts from the saved label, or else
+the file's own text, with ignore for an event left out; it has one row per event
+under its file's name, none for a file without events; and the typed labels and
+concentrations go back to the right events, a label left empty keeping its own.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+SUMMARIES (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_rows_of_the_od_table`
+
+```text
+---- Summary ----
+Main function to check the OD table: one row per file named by the file, a value
+written as short as it goes and a missing one as an empty cell, and the typed
+values read back per file.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_sentence_when_confirmed_too_early`
+
+```text
+---- Summary ----
+Main function to check the one sentence said when Confirm is pressed with cells
+that cannot be used (named first, with what to type) or needed cells left empty,
+naming five cells at most and counting the others, and none when the table can be
+used.
 
 ---- Inputs ----
 None.
@@ -9638,8 +10545,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check that a turn of the mouse wheel scrolls the OD table the
-right way on Windows (steps of 120), the Mac (small steps) and Linux (buttons 4 and
+Main function to check that a turn of the mouse wheel scrolls a table the right
+way on Windows (steps of 120), the Mac (small steps) and Linux (buttons 4 and
 5), and not at all for an event that says neither.
 
 ---- Inputs ----
@@ -10087,14 +10994,14 @@ Helper function to show the figure as built so far and ask whether it is accepte
 
 ---- Inputs ----
 step_checker : Optional[Callable[[object, str, str], bool]]
-    Function (members, question, change label) that draws the figure and returns
+    Function (members, question, what no does) that draws the figure and returns
     True when it is accepted; None when there is nothing to draw with.
 members : object
     The experiments of the figure: {name: group} or a list of names.
 question : str
     The accept question.
 change : str
-    Label of the answer that asks the question again.
+    What answering no does, for example 'choose the OCR again'.
 
 ---- Globals read ----
 None.
@@ -16359,6 +17266,35 @@ The settings kept with a dataset: read from and written to a file in its folder.
 
 ### HELPERS
 
+#### `_event_plainer`
+
+```text
+---- Summary ----
+Helper function to keep an event's label, concentration and whether it is ignored
+as plain numbers and text, so it can be written to the settings file.
+
+---- Inputs ----
+event : dict
+    {'datapoint', 'label', 'concentration_uM', 'ignored'} as the event questions
+    give it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The same keys, as int, str, float or None, and bool.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_export_folder_resolver`
 
 ```text
@@ -16409,7 +17345,7 @@ None.
 
 ---- Outputs ----
 str
-    The path from the dataset folder with forward slashes ('export'), or the full
+    The path from the dataset folder with forward slashes ('results'), or the full
     path when the results folder is somewhere else.
 
 ---- Globals mutated ----
@@ -16467,8 +17403,8 @@ folder : Path
 export_root : Path
     The results folder.
 files : dict
-    {file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}} in
-    minutes.
+    {file name: limits in minutes, OD values and events} as file_settings_merger
+    builds it.
 answers : dict
     The answers of the run.
 
@@ -16487,6 +17423,44 @@ None.
 
 ---- Helpers ----
 _export_folder_shortener
+```
+
+#### `file_settings_merger`
+
+```text
+---- Summary ----
+Main function to build the files part of the dataset's settings: for each file of
+this run its limits, OD values and events laid over what was saved before. A value
+not asked this run (the OD when not scaling by OD) stays as it was saved, so it is
+offered next time; files not in this run are kept as they were.
+
+---- Inputs ----
+remembered : Dict[str, dict]
+    The files part saved before (dataset_settings, DATA_FORMAT.md); empty for a
+    dataset never saved.
+limits : Dict[str, dict]
+    {file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}} of this
+    run.
+details : Dict[str, dict]
+    {file name: {'OD', 'volume', 'dilution_factor', 'events'}} of this run; the OD
+    values only when scaling by OD.
+
+---- Globals read ----
+SAVED_VALUE_KEYS (module constant).
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: limits, then 'OD', 'volume', 'dilution_factor' (floats) and
+    'events' (DATA_FORMAT.md, dataset_settings) where known}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_event_plainer
 ```
 
 ## `utils_shared/experiment_processing.py`
@@ -17477,9 +18451,10 @@ _name_lister
 
 ```text
 ---- Summary ----
-Main function to export one experiment to <output_dir>/<name>/<name>.xlsx, with the
-CcO2, CsO2 and VoO2 sheets, Averages, Events and Metadata, and optionally every
-processed table and the spectral CSV files.
+Main function to export one experiment to <output_dir>/<name>/<name>.xlsx (or into
+a folder inside that, such as the full/ of a trimmed experiment's whole recording),
+with the CcO2, CsO2 and VoO2 sheets, Averages, Events and Metadata, and optionally
+every processed table and the spectral CSV files.
 
 ---- Inputs ----
 experiment : dict
@@ -17491,13 +18466,16 @@ full : bool
 spectra : bool
     True also writes the spectral CSV files next to the workbook (large and slow)
     and an index sheet linking to them.
+subfolder : str
+    Folder inside the experiment's folder to write into (FULL_FOLDER); '' for the
+    experiment's folder itself.
 
 ---- Globals read ----
 BASIC_SHEETS, DATA_SHEETS and schema.DELTA_HAEM_SOURCES.
 
 ---- Outputs ----
-Path
-    Path of the workbook.
+List[Path]
+    Paths of the files written: the workbook first, then any CSV files.
 
 ---- Globals mutated ----
 None. Creates the folder, the workbook and optional CSV files (side effect).
@@ -17542,6 +18520,74 @@ None.
 
 ---- Helpers ----
 workbook_path_builder
+```
+
+#### `size_describer`
+
+```text
+---- Summary ----
+Main function to put the size of files to be written in plain words, to two
+significant figures, as the export question shows it.
+
+---- Inputs ----
+size_bytes : float
+    Size in bytes; 0 or less when there is nothing to write.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'about 1.2 GB', 'about 350 MB', 'under 1 MB', or 'none in these files' for 0.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+1 GB = 10^9 bytes, 1 MB = 10^6 bytes.
+
+---- Helpers ----
+None.
+```
+
+#### `spectra_size_estimator`
+
+```text
+---- Summary ----
+Main function to work out roughly how large the spectra csv files of an export
+would be, from the number of spectra and wavelengths of each file (read from its
+headers) and the part kept by the trimming.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md), with 'duration_min' and 'spectra_shapes'; a
+    summary without 'spectra_shapes' counts as having no spectra.
+limits : Dict[str, dict]
+    {file name: {'trim_start', 'trim_end' (min on the recording, None for no trim),
+    ...}}; a file missing is not trimmed.
+bytes_per_value : Dict[str, float]
+    Bytes one value takes in the csv file of each kind (config.SPECTRA_CSV_BYTES).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[float, float]
+    (bytes of the trimmed spectra of every file, bytes of the whole recording's
+    spectra of the trimmed files only).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+kept fraction = (trim end - trim start) / duration, the trim end being the duration
+and the trim start 0 when not trimmed, kept within 0 to 1.
+trimmed bytes = sum over files and spectrometers of
+    n_spectra x kept fraction x n_wavelengths x sum(bytes_per_value).
+full bytes = the same with a fraction of 1, over the trimmed files only.
+
+---- Helpers ----
+None.
 ```
 
 #### `workbook_path_builder`
@@ -19671,11 +20717,12 @@ None.
 
 ---- Outputs ----
 dict
-    {'name' (file stem), 'duration_min', 'frames', 'datasets', 'events' (the
-    additions inside the recording, each with 'time' in minutes), 'traces',
-    'ocr_check' (ocr_check in DATA_FORMAT.md)}. Raises PafError if the VoO2 trace
-    is missing, so a file that cannot be processed is refused before any question
-    is asked about it.
+    {'name' (file stem), 'duration_min', 'frames', 'datasets', 'spectra_shapes'
+    ({dataset: [number of spectra, number of wavelengths]}, from the headers),
+    'events' (the additions inside the recording, each with 'time' in minutes),
+    'traces', 'ocr_check' (ocr_check in DATA_FORMAT.md)}. Raises PafError if the
+    VoO2 trace is missing, so a file that cannot be processed is refused before any
+    question is asked about it.
 
 ---- Globals mutated ----
 None. Prints a warning for each addition outside the recording, and one when the
@@ -19686,6 +20733,7 @@ None.
 
 ---- Helpers ----
 _event_time_adder
+acquisition_reader
 dataset_name_lister
 duration_finder
 events_reader
@@ -20555,6 +21603,36 @@ None.
 
 ### QUESTIONS HELPERS
 
+#### `_brightener`
+
+```text
+---- Summary ----
+Helper function to set part of a question line in another colour (what Enter
+gives, or a unit) and go back to the question colour after it.
+
+---- Inputs ----
+text : str
+    The part to colour.
+code : str
+    Its colour code (COLOUR_DEFAULT by default).
+
+---- Globals read ----
+COLOUR_DEFAULT, COLOUR_QUESTION, RESET (module constants).
+
+---- Outputs ----
+str
+    The part with its colour, followed by the question colour again.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_input_reader`
 
 ```text
@@ -20589,6 +21667,72 @@ None.
 answer_logger
 ```
 
+#### `_limits_checker`
+
+```text
+---- Summary ----
+Helper function to say whether a number is within the limits of a number question.
+
+---- Inputs ----
+value : float
+    The number.
+minimum : Optional[float]
+    Smallest accepted value, or None.
+maximum : Optional[float]
+    Largest accepted value, or None.
+exclusive_minimum : bool
+    True when the minimum itself is not accepted.
+is_whole : bool
+    True when only whole numbers are accepted.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the number can be used.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_list_ending_builder`
+
+```text
+---- Summary ----
+Helper function to write the end of a question answered from a numbered list: every
+number up to LIST_SPELLED_OUT options, (1/2/3) with the default brighter, and a
+range beyond, (1–7), whose default is brighter in the list instead.
+
+---- Inputs ----
+count : int
+    Number of options.
+default_number : Optional[int]
+    Number given by Enter, brightened when every number is shown; None for none.
+
+---- Globals read ----
+LIST_SPELLED_OUT (module constant).
+
+---- Outputs ----
+str
+    The ending, for example "(1/2/3)" or "(1–7)", with colour codes.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_brightener
+```
+
 #### `_number_builder`
 
 ```text
@@ -20617,22 +21761,161 @@ None.
 None.
 ```
 
+#### `_number_depth_finder`
+
+```text
+---- Summary ----
+Helper function to give the numbering depth of a question: that of its own number
+when it has one ('3.4.1' is depth 2), otherwise the depth it was asked at.
+
+---- Inputs ----
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '3.5'; None when it is
+    numbered in the order asked.
+depth : int
+    Numbering depth it was asked at (1 = 3.1, 2 = 3.1.1, ...).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    The numbering depth, at least 1. Raises ValueError for a number that is not
+    whole numbers joined by dots, below a section.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_number_hint_builder`
+
+```text
+---- Summary ----
+Helper function to write the one sentence shown after a wrong answer to a number
+question: what kind of number, its limits and an example within them.
+
+---- Inputs ----
+minimum : Optional[float]
+    Smallest accepted value, or None.
+maximum : Optional[float]
+    Largest accepted value, or None.
+exclusive_minimum : bool
+    True when the minimum itself is not accepted.
+is_whole : bool
+    True when only whole numbers are accepted.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    For example "Type a number of 0 or more, for example 2.5." or "Type a whole
+    number from 1 to 8, for example 3."; without the example when none fits.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_limits_checker
+```
+
+#### `_numbers_hint_builder`
+
+```text
+---- Summary ----
+Helper function to write the one sentence shown after a wrong answer to a question
+answered by several numbers from a list.
+
+---- Inputs ----
+count : int
+    Number of options in the list.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    For example "Type numbers from 1 to 5, separated by commas, for example 1,3.".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_options_printer`
+
+```text
+---- Summary ----
+Helper function to print the numbered options of a list under its question, the
+ones Enter gives brighter where the end of the question does not show them.
+
+---- Inputs ----
+labels : Sequence[str]
+    The options as shown, numbered 1), 2), ...
+indent : str
+    Indent of the question.
+bright : Set[int]
+    Numbers (from 1) of the options to show brighter.
+
+---- Globals read ----
+COLOUR_DEFAULT, INDENT (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+text_colourer
+```
+
 #### `_question_printer`
 
 ```text
 ---- Summary ----
-Helper function to print the numbered, coloured question line.
+Helper function to print the numbered question line in the question colour, ending
+in what Enter gives, with an optional quieter line just above it. A question with
+its own number shows that number and leaves the counters alone; any other takes the
+next number in the order asked.
 
 ---- Inputs ----
 question : str
     Question text, without its number.
 depth : int
     Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
-hint : str
-    Text after the question, such as "[default]:" or "(y/N):"; may be empty.
+ending : str
+    What Enter gives, such as "[120]" or "(y/N)", with its colour codes; may be
+    empty.
+note : str
+    A line said just above the question in the quieter colour, such as what "n"
+    does; may be empty.
+has_unit : bool
+    True for a number question, whose unit in brackets is highlighted.
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '3.5'; None to number
+    it in the order asked. When given, ``depth`` must be its depth.
 
 ---- Globals read ----
-INDENT (module constant); _tight_next (module state); text_colourer.
+COLOUR_QUIET, INDENT (module constants); _tight_next (module state).
 
 ---- Outputs ----
 str
@@ -20646,6 +21929,7 @@ None.
 
 ---- Helpers ----
 _number_builder
+_unit_highlighter
 text_colourer
 ```
 
@@ -20681,13 +21965,86 @@ None.
 None.
 ```
 
+#### `_unit_highlighter`
+
+```text
+---- Summary ----
+Helper function to highlight the unit of a number question, written once in
+brackets after the quantity: "How long a window (s) ...", "... concentration
+(µM)?". Brackets holding words with spaces, such as "(0 for none)", are left alone.
+
+---- Inputs ----
+question : str
+    Question text.
+
+---- Globals read ----
+COLOUR_UNIT, UNIT_PATTERN (module constants).
+
+---- Outputs ----
+str
+    The question with each unit in the unit colour.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_brightener
+```
+
 ### MAIN FUNCTIONS
+
+#### `accept_asker`
+
+```text
+---- Summary ----
+Main function to ask a "Do you accept ...?" question, the one place its answers are
+written. With one way to change it is a yes or no question, (Y/n), with a quieter
+line above saying what n does; with more it is a numbered list starting
+"1) Yes, accept", then "2) No, <change>" and so on.
+
+---- Inputs ----
+question : str
+    The accept question, for example 'Do you accept these event labels?'.
+changes : Sequence[Tuple[str, str]]
+    The ways to change, at least one, as (key, what it does), for example
+    ('no', 'change the labels again').
+depth : int
+    Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '3.5'; None to number
+    it in the order asked.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'yes' when accepted, otherwise the key of the change chosen. Raises ValueError
+    when no way to change is given.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal (side effect); advances the question
+numbering counters when it has no number of its own.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+yes_no_asker
+```
 
 #### `choice_asker`
 
 ```text
 ---- Summary ----
-Main function to ask a question answered by choosing one numbered option.
+Main function to ask a question answered by choosing one numbered option. The end
+of the question gives the numbers that can be typed: every one up to
+LIST_SPELLED_OUT options, the default brighter, or a range beyond, the default
+option brighter in the list.
 
 ---- Inputs ----
 question : str
@@ -20698,9 +22055,12 @@ default : Optional[str]
     Key chosen when only Enter is pressed.
 depth : int
     Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '5.1'; None to number
+    it in the order asked.
 
 ---- Globals read ----
-None.
+LIST_SPELLED_OUT (module constant).
 
 ---- Outputs ----
 str
@@ -20708,14 +22068,63 @@ str
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
-numbering counters.
+numbering counters when it has no number of its own.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _input_reader
+_list_ending_builder
+_number_depth_finder
+_options_printer
 _question_printer
+retry_teller
+```
+
+#### `confirm_waiter`
+
+```text
+---- Summary ----
+Main function to give a numbered instruction carried out in a table of the window
+("Fill in ..., then press Confirm.") and wait until Confirm is pressed with the
+table filled in. While the checker finds something wrong, its one sentence is said
+and the instruction goes on waiting.
+
+---- Inputs ----
+question : str
+    The instruction, without its number, ending "then press Confirm.".
+checker : Callable[[], Optional[str]]
+    Reads the table and gives None when it can be used, or the sentence saying
+    what is still wrong.
+note : str
+    Lines said just above the instruction in the quieter colour, such as what each
+    column means; may be empty.
+depth : int
+    Numbering depth of the instruction (1 = 3.1, 2 = 3.1.1, ...).
+number : Optional[str]
+    The instruction's own number from QUESTION_FLOW.md, such as '3.2'; None to
+    number it in the order asked.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal (side effect); advances the question
+numbering counters when it has no number of its own.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_input_reader
+_number_depth_finder
+_question_printer
+retry_teller
 ```
 
 #### `enter_waiter`
@@ -20734,6 +22143,9 @@ nudge : str
     One sentence saying where to do it instead of typing in the answer box.
 depth : int
     Numbering depth of the instruction (1 = 3.1, 2 = 3.1.1, ...).
+number : Optional[str]
+    The instruction's own number from QUESTION_FLOW.md, such as '2.1'; None to
+    number it in the order asked.
 
 ---- Globals read ----
 None.
@@ -20744,14 +22156,16 @@ None
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
-numbering counters.
+numbering counters when it has no number of its own.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _input_reader
+_number_depth_finder
 _question_printer
+retry_teller
 ```
 
 #### `heading_printer`
@@ -20785,8 +22199,9 @@ text_colourer
 
 ```text
 ---- Summary ----
-Main function to print an information line (not a question), indented to sit under
-the question above.
+Main function to print an information line (not a question) in the quieter colour,
+indented to sit under the question above. A line already coloured (a warning)
+keeps its own colour.
 
 ---- Inputs ----
 text : str
@@ -20797,7 +22212,7 @@ tight : bool
     True to make the next question follow this line without a blank line.
 
 ---- Globals read ----
-INDENT (module constant).
+COLOUR_QUIET, INDENT (module constants).
 
 ---- Outputs ----
 None
@@ -20810,14 +22225,17 @@ None. Prints to the terminal and sets the module flag _tight_next (side effects)
 None.
 
 ---- Helpers ----
-None.
+text_colourer
 ```
 
 #### `multi_asker`
 
 ```text
 ---- Summary ----
-Main function to ask a question answered by choosing several numbered options.
+Main function to ask a question answered by choosing several numbered options. A
+quieter line above says to type numbers separated by commas; the end of the
+question gives the numbers as for one choice, and the options Enter gives are
+brighter in the list.
 
 ---- Inputs ----
 question : str
@@ -20834,9 +22252,12 @@ default_values : Optional[Sequence[str]]
     Choice from last time, used for Enter when given.
 label_formatter : Optional[Callable[[str], str]]
     Function that changes how an option is shown, not what is returned.
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '5.4.1'; None to
+    number it in the order asked.
 
 ---- Globals read ----
-None.
+NUMBERS_NOTE (module constant).
 
 ---- Outputs ----
 List[str]
@@ -20844,24 +22265,31 @@ List[str]
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
-numbering counters.
+numbering counters when it has no number of its own.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _input_reader
+_list_ending_builder
+_number_depth_finder
+_numbers_hint_builder
+_options_printer
 _question_printer
+retry_teller
 ```
 
 #### `number_asker`
 
 ```text
 ---- Summary ----
-Main function to ask a question answered with a number, asking again until the value
-is valid. A question that can be answered with the mouse says so to the window,
-where a drag (``span_reader``) across the plot then writes the answer it gives into
-the answer box.
+Main function to ask a question answered with a number, waiting until the value is
+valid; after a wrong answer one sentence says what to type. The end of the question
+gives what Enter gives, [120] or [skip], and a unit in brackets is highlighted. A
+question that can be answered with the mouse says so to the window, where a drag
+(``span_reader``) across the plot then writes the answer it gives into the answer
+box.
 
 ---- Inputs ----
 question : str
@@ -20875,15 +22303,19 @@ maximum : Optional[float]
 exclusive_minimum : bool
     True when the minimum itself is not accepted.
 allow_blank : bool
-    True to accept an empty answer as None when there is no default.
+    True to accept an empty answer as None when there is no default; shown as
+    [skip].
 depth : int
     Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
-blank_label : str
-    Word shown in [brackets] for an empty answer.
 span_reader : Optional[Callable[[str, float, float], Optional[float]]]
     Turns a drag across the plot into the answer: (file shown, start min, end min)
     -> answer, or None when that drag gives none. None when the mouse gives
     nothing.
+is_whole : bool
+    True when only whole numbers are accepted.
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '3.4.3'; None to
+    number it in the order asked.
 
 ---- Globals read ----
 None.
@@ -20894,15 +22326,21 @@ Optional[float]
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
-numbering counters.
+numbering counters when it has no number of its own.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_brightener
 _input_reader
+_limits_checker
+_number_depth_finder
+_number_hint_builder
 _question_printer
 _time_announcer
+retry_teller
+typed_number_reader
 ```
 
 #### `numbering_getter`
@@ -20961,40 +22399,6 @@ None.
 
 ---- Helpers ----
 None.
-```
-
-#### `numbers_asker`
-
-```text
----- Summary ----
-Main function to ask a question answered by numbers from 1 to a count, separated by
-commas.
-
----- Inputs ----
-question : str
-    Question text, without its number.
-count : int
-    Largest number accepted.
-depth : int
-    Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
-
----- Globals read ----
-None.
-
----- Outputs ----
-List[int]
-    The chosen numbers in ascending order; an empty list for Enter (none).
-
----- Globals mutated ----
-None. Reads from and prints to the terminal (side effect); advances the question
-numbering counters.
-
----- Equations ----
-None.
-
----- Helpers ----
-_input_reader
-_question_printer
 ```
 
 #### `path_cleaner`
@@ -21056,14 +22460,15 @@ None.
 
 ```text
 ---- Summary ----
-Main function to show a one-line progress message that the next message overwrites.
+Main function to show a one-line progress message, in the quieter colour, that the
+next message overwrites.
 
 ---- Inputs ----
 text : str
     Message to show.
 
 ---- Globals read ----
-None.
+COLOUR_QUIET (module constant).
 
 ---- Outputs ----
 None
@@ -21076,7 +22481,37 @@ None. Prints to the terminal without a new line (side effect).
 None.
 
 ---- Helpers ----
+text_colourer
+```
+
+#### `retry_teller`
+
+```text
+---- Summary ----
+Main function to say, after a wrong answer, in one sentence what to type; the
+question is not printed again and waits for the next answer.
+
+---- Inputs ----
+hint : str
+    One sentence, for example "Type y or n.".
+depth : int
+    Numbering depth of the question it answers (1 = 3.1, 2 = 3.1.1, ...).
+
+---- Globals read ----
+COLOUR_RETRY, INDENT (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
 None.
+
+---- Helpers ----
+text_colourer
 ```
 
 #### `section_starter`
@@ -21111,15 +22546,23 @@ text_colourer
 
 ```text
 ---- Summary ----
-Main function to ask a question answered with a line of text.
+Main function to ask a question answered with a line of text or a folder. An answer
+the checker refuses gets its one sentence of what to type, and the question waits
+for the next answer.
 
 ---- Inputs ----
 question : str
     Question text, without its number.
 default : Optional[str]
-    Answer used when only Enter is pressed; shown as [default]:.
+    Answer used when only Enter is pressed; shown brighter as [default].
 depth : int
     Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+checker : Optional[Callable[[Optional[str]], Optional[str]]]
+    Takes the answer (the default for Enter) and gives None when it can be used,
+    or the sentence saying what to type instead; None accepts every answer.
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '1.2'; None to number
+    it in the order asked.
 
 ---- Globals read ----
 None.
@@ -21130,14 +22573,17 @@ Optional[str]
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
-numbering counters.
+numbering counters when it has no number of its own.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_brightener
 _input_reader
+_number_depth_finder
 _question_printer
+retry_teller
 ```
 
 #### `text_colourer`
@@ -21227,37 +22673,76 @@ None.
 None.
 ```
 
+#### `typed_number_reader`
+
+```text
+---- Summary ----
+Main function to read a typed number, the one reader of the answer box, the OD
+table and the boxes of the strip: spaces around it are ignored and a comma may be
+the decimal sign. Each place checks its own limits.
+
+---- Inputs ----
+text : str
+    What was typed, for example '2.5', ' 2,5 ' or '1e3'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    The number, or None for an empty text, a text that is not a number, "nan" or an
+    infinity.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `yes_no_asker`
 
 ```text
 ---- Summary ----
-Main function to ask a yes/no question.
+Main function to ask a yes or no question, ending in (y/N) or (Y/n) with the letter
+Enter gives brighter.
 
 ---- Inputs ----
 question : str
     Question text, without its number.
 default : bool
-    Answer used when only Enter is pressed (the capital letter in the hint).
+    Answer used when only Enter is pressed (the capital letter at the end).
 depth : int
     Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+note : str
+    A line said just above the question in the quieter colour; may be empty.
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '3.1'; None to number
+    it in the order asked.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 bool
-    True for y or yes, False for n or no, the default for Enter.
+    True for y or yes, False for n or no (in any capitals), the default for Enter.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
-numbering counters.
+numbering counters when it has no number of its own.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_brightener
 _input_reader
+_number_depth_finder
 _question_printer
+retry_teller
 ```
 
 ## `utils_shared/reference_level.py`
@@ -22762,8 +24247,8 @@ None.
 
 ---- Outputs ----
 str
-    For example '  15.01 min: nd-011992' or with the concentration and
-    '[IGNORED]' when they apply.
+    For example '  15.01 min: nd-011992' or with the concentration (in µM, mM or
+    M) and '[IGNORED]' when they apply.
 
 ---- Globals mutated ----
 None.
@@ -22772,35 +24257,7 @@ None.
 None.
 
 ---- Helpers ----
-None.
-```
-
-#### `_file_focuser`
-
-```text
----- Summary ----
-Helper function to tell the experiment browser which file the next question is
-about, so its window shows that file. Does nothing without the browser.
-
----- Inputs ----
-name : str
-    File name.
-
----- Globals read ----
-_file_focus_hook (module state).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Calls the hook (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
+concentration_formatter
 ```
 
 #### `_first_event_finder`
@@ -23051,9 +24508,9 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to list the current event labels that could be written more tidily
-(8 ug ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use
-them all. Asks nothing when every label is tidy already.
+Helper function to list the event labels that could be written more tidily (8 ug
+ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use them
+all. Asks nothing when every label is tidy already or was kept as it is before.
 
 ---- Inputs ----
 with_events : List[dict]
@@ -23061,6 +24518,9 @@ with_events : List[dict]
 result : Dict[str, List[dict]]
     {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
     labels are replaced by their tidy forms when the user agrees.
+kept : Set[str]
+    Labels the user chose to keep as they are; the labels kept this time are
+    added, so they are not offered again.
 
 ---- Globals read ----
 None.
@@ -23070,15 +24530,15 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Changes the labels in ``result`` and reads from and prints to the terminal
-(side effects).
+None. Changes the labels in ``result``, adds to ``kept`` and reads from and prints
+to the terminal (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 info_printer
-label_tidier
+tidy_labels_finder
 yes_no_asker
 ```
 
@@ -23313,68 +24773,70 @@ yes_no_asker
 
 ```text
 ---- Summary ----
-Main function to ask whether to change the event labels, concentrations and which
-events to ignore, file by file. A label that could be written more tidily (8 ug
-ml-1 as 8 µg mL⁻¹) is offered in its tidy form: the labels the files hold all at
-once, then each label as it is typed or kept.
+Main function to have the label and concentration of every event filled in in the
+labels table, starting from the saved or file values, an event being left out by
+writing ignore as its label. Labels that could be written more tidily (8 ug ml-1
+as 8 µg mL⁻¹) are then offered in their tidy forms, once. Nothing is asked when no
+file has events.
 
 ---- Inputs ----
 summaries : List[dict]
     File summaries (DATA_FORMAT.md).
 saved : dict
-    {file name: values read from its workbook} (read_saved_settings).
-again : bool
-    True when the user asked to change the labels again: the tidy forms of the
-    current labels and the yes/no question are skipped and the runs are listed
-    straight away.
+    {file name: OD values and events saved before} (saved_values_reader).
+table_filler : Callable[[Dict[str, List[dict]]], Dict[str, List[dict]]]
+    Function that shows the labels table filled in with the given events, waits
+    until it is confirmed, and returns the events with the labels and
+    concentrations typed.
+kept : Set[str]
+    Labels the user chose to keep as they are; they are not offered in their tidy
+    forms again, and the labels kept this time are added.
 
 ---- Globals read ----
-None.
+IGNORE_LABEL.
 
 ---- Outputs ----
 Dict[str, List[dict]]
     {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}.
-    A label of 'ignore' marks an event that was not an addition.
+    An event labelled ignore is left out and has no concentration.
 
 ---- Globals mutated ----
-None. Reads from and prints to the terminal (side effect).
+None. Adds to ``kept`` and reads from and prints to the terminal (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _event_line_builder
-_file_focuser
 _tidy_labels_offerer
+event_entries_builder
 info_printer
-label_tidier
-number_asker
-numbering_setter
-numbers_asker
-text_asker
-yes_no_asker
 ```
 
-#### `file_focus_setter`
+#### `event_entries_builder`
 
 ```text
 ---- Summary ----
-Main function to set (or clear, with None) the function that is told which file a
-question is about.
+Main function to give the events of every file as the labels table starts them:
+the label, concentration and whether it is left out as saved for the dataset, or
+else the file's own text, with no concentration.
 
 ---- Inputs ----
-hook : Optional[Callable[[str], None]]
-    Function taking the file name, or None.
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+saved : dict
+    {file name: OD values and events saved before} (saved_values_reader).
 
 ---- Globals read ----
-None.
+IGNORE_LABEL.
 
 ---- Outputs ----
-None
-    Nothing.
+Dict[str, List[dict]]
+    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
+    per event of the file, in its order; an event left out is labelled ignore.
 
 ---- Globals mutated ----
-Sets _file_focus_hook (module state).
+None.
 
 ---- Equations ----
 None.
@@ -23389,7 +24851,10 @@ None.
 ---- Summary ----
 Main function to ask for the folder of .paf files (1.1), offering the data folders
 found in the user's own folder, and the results folder (1.2), and to read a summary
-of every file and the settings saved with the dataset.
+of every file and the settings saved with the dataset. A results folder named
+without a path is made inside the data folder; one that already holds results of
+these files is taken only once the user agrees to write over them (1.2.1), and
+otherwise asked again with a free name offered.
 
 ---- Inputs ----
 last : dict
@@ -23420,12 +24885,44 @@ data_folder_lister
 data_folder_resolver
 dataset_settings_reader
 experiment_summary_reader
+free_folder_finder
 info_printer
 paf_finder
-path_cleaner
 progress_clearer
 progress_printer
+results_counter
+results_folder_checker
+results_folder_resolver
 text_asker
+yes_no_asker
+```
+
+#### `free_folder_finder`
+
+```text
+---- Summary ----
+Main function to find a folder name beside the one given that is not used yet, by
+adding _2, _3 and so on, to offer when the user keeps the results already there.
+
+---- Inputs ----
+folder : Path
+    The folder whose name is taken (results).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The first of <folder>_2, <folder>_3, ... that does not exist.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `haem_choice_asker`
@@ -23761,7 +25258,7 @@ answers : dict
 defaults : dict
     Default answers (normalise_od).
 saved : dict
-    {file name: values read from its workbook} (saved_values_reader).
+    {file name: OD values and events saved before} (saved_values_reader).
 table_filler : Callable[[Dict[str, dict]], Dict[str, dict]]
     Function that shows the OD table filled in with the given rows (od_rows,
     DATA_FORMAT.md), waits until every cell is right, and returns the rows.
@@ -23812,28 +25309,128 @@ None.
 _natural_sorter
 ```
 
-#### `saved_values_reader`
+#### `results_counter`
 
 ```text
 ---- Summary ----
-Main function to read the OD and event values saved in each experiment's workbook
-from an earlier run, so they can be offered as defaults.
+Main function to count the files that already have results in a results folder:
+their own folder there (named as the export names it) holds something.
 
 ---- Inputs ----
-summaries : List[dict]
-    File summaries (DATA_FORMAT.md).
 export_root : Path
-    Results folder, where the saved workbooks are looked for.
+    The results folder; it may not exist yet.
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md); uses 'name'.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-Dict[str, dict]
-    {file name: values read from its workbook, or None when there is none}.
+int
+    How many of the files have results there.
 
 ---- Globals mutated ----
-None. Prints progress and a note when earlier values are found (side effects).
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+file_name_sanitiser
+```
+
+#### `results_folder_checker`
+
+```text
+---- Summary ----
+Main function to check the results folder as soon as it is given: it must not be a
+file, and it must be a folder that can be saved to. A folder that does not exist yet
+is checked at the nearest folder above it that does; nothing is left behind.
+
+---- Inputs ----
+text : Optional[str]
+    The answer as typed or dragged in (quotes and a leading ~ are allowed).
+data_folder : Optional[Path]
+    The data folder a name without a path is made in; None for the folder the
+    program runs in.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    None when the folder can be used, otherwise the one sentence saying what to
+    type instead.
+
+---- Globals mutated ----
+None. Makes and removes a temporary file in the nearest existing folder (side
+effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+results_folder_resolver
+```
+
+#### `results_folder_resolver`
+
+```text
+---- Summary ----
+Main function to turn the results folder answer into its path: a name or path
+without a drive or root (quadratic_scatter_results) is taken inside the data
+folder, so a second set of results sits beside the first.
+
+---- Inputs ----
+text : str
+    The answer as typed or dragged in (quotes and a leading ~ are allowed).
+data_folder : Optional[Path]
+    The data folder; None leaves such a name to the folder the program runs in.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The results folder.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+path_cleaner
+```
+
+#### `saved_values_reader`
+
+```text
+---- Summary ----
+Main function to gather the OD values and event labels saved for each file, so they
+can be offered as defaults: those in the dataset's settings file, or, for a file
+with none there yet, those in its workbook from an earlier run.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+remembered : Dict[str, dict]
+    The files part of the dataset's settings (dataset_settings, DATA_FORMAT.md).
+export_root : Path
+    Results folder, where the workbooks of an earlier run are looked for.
+
+---- Globals read ----
+SAVED_VALUE_KEYS (imported constant).
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {'OD', 'volume', 'dilution_factor', 'events'} as far as saved, or
+    None when nothing is}.
+
+---- Globals mutated ----
+None. Prints progress and a note when values come from the workbooks (side
+effects).
 
 ---- Equations ----
 None.
@@ -23914,6 +25511,41 @@ None.
 _columns_text_builder
 choice_asker
 number_asker
+```
+
+#### `tidy_labels_finder`
+
+```text
+---- Summary ----
+Main function to find the event labels that could be written more tidily (8 ug
+ml-1 as 8 µg mL⁻¹), leaving out the events left out and the labels the user chose
+to keep as they are.
+
+---- Inputs ----
+with_events : List[dict]
+    File summaries (DATA_FORMAT.md) of the files that have events.
+result : Dict[str, List[dict]]
+    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
+    per event of the summary, in the same order.
+kept : Set[str]
+    Labels the user chose to keep as they are.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Tuple[str, float, dict, str]]
+    (file name, time of the event in min, its entry in ``result``, tidy form) for
+    each such label, in the order of the files and events.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+label_tidier
 ```
 
 #### `trim_layout_finder`
@@ -25304,6 +26936,7 @@ _axis_box_finder
 _band_drawer
 _callback_error_keeper
 _closing_handler
+_confirm_sender
 _display_name_lister
 _drag_ender
 _dragger
@@ -25312,6 +26945,7 @@ _drawing_sign_drawer
 _edges_refresher
 _event_handler
 _every_file_taker
+_file_follower
 _history_stepper
 _icon_setter
 _image_deliverer
@@ -25331,6 +26965,7 @@ _step_taker
 _strip_change_runner
 _strip_change_teller
 _symbol_inserter
+_table_layout_setter
 _time_clicker
 _time_line_drawer
 _typed_edge_taker
@@ -25341,11 +26976,7 @@ edges_hider
 edges_reader
 edges_shower
 extra_publisher
-file_focuser
 input_reader
-od_table_hider
-od_table_reader
-od_table_shower
 output_capturer
 pictures_publisher
 run
@@ -25356,6 +26987,9 @@ strip_listener_setter
 strip_reader
 strip_setter
 strip_state_setter
+table_hider
+table_reader
+table_shower
 text_sender
 time_reader_setter
 window_closer
@@ -25405,7 +27039,8 @@ _widgets_builder
 
 ```text
 ---- Summary ----
-Method to pass the typed answer to the question that is waiting for it.
+Method to pass the typed answer to the question that is waiting for it. While a
+table is open the answer box is hidden and Confirm answers instead.
 
 ---- Inputs ----
 event : Any
@@ -25572,6 +27207,35 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+##### `_confirm_sender`
+
+```text
+---- Summary ----
+Method to answer the instruction waiting on a table: Confirm was clicked, or
+Enter or the space bar pressed on it. The program then reads the table.
+
+---- Inputs ----
+event : Any
+    The Tk mouse or key event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'break', so Tk does nothing more with the click or key.
+
+---- Globals mutated ----
+None. Writes "Confirm" into the terminal and wakes the question thread (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_pane_writer
 ```
 
 ##### `_display_name_lister`
@@ -25756,9 +27420,9 @@ Method to carry out one message from the other threads, on the window thread.
 
 ---- Inputs ----
 event : tuple
-    (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-    'extra', 'image', 'time', 'edges', 'strip', 'strip_fits', 'strip_state',
-    'busy', 'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..."
+    (kind, ...) with kind 'prompt', 'spec', 'session', 'pictures', 'extra',
+    'image', 'time', 'edges', 'strip', 'strip_fits', 'strip_state', 'busy',
+    'table_show', 'table_hide', 'closed' or 'finished'. The "Drawing ..."
     sign of 'busy' stays until the next question, preview or picture shown.
     With close_after_s, 'finished' also closes the window after that time.
 
@@ -25786,6 +27450,7 @@ _nav_state_setter
 _navigator
 _pane_writer
 _picture_shower
+_table_layout_setter
 ```
 
 ##### `_every_file_taker`
@@ -25814,6 +27479,34 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+##### `_file_follower`
+
+```text
+---- Summary ----
+Method to show on the plot the file whose cell of a table is being typed in,
+when another file is shown.
+
+---- Inputs ----
+name : str
+    Name of the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the file shown (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_navigator
 ```
 
 ##### `_history_stepper`
@@ -26061,7 +27754,8 @@ Method to make a file the current one and show it.
 index : int
     Position of the file in the list.
 is_from_user : bool
-    True when the user chose it, so the answer box gets the keyboard back.
+    True when the user chose it, so the answer box gets the keyboard back
+    (not while a table is open: its cells keep it).
 
 ---- Globals read ----
 None.
@@ -26355,7 +28049,8 @@ None.
 ```text
 ---- Summary ----
 Method to type a symbol (µ, a superscript -1, ...) into the answer box at the
-cursor when a question is waiting for an answer.
+cursor when a question is waiting for an answer, or, while a table is open,
+into the cell last typed in.
 
 ---- Inputs ----
 symbol : str
@@ -26369,7 +28064,37 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Adds text to the answer box (side effect).
+None. Adds text to the answer box or the cell (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+AnswerTable.symbol_inserter
+```
+
+##### `_table_layout_setter`
+
+```text
+---- Summary ----
+Method to open or close the table on the terminal side. Open, it fills the
+terminal side under a few lines of terminal text, which keep the newest lines
+in sight and scroll, and Confirm takes the place of the answer box; closed, the
+terminal and the answer box are as before.
+
+---- Inputs ----
+is_shown : bool
+    True to open the table, False to close it.
+
+---- Globals read ----
+TABLE_HINT, TABLE_TERMINAL_LINES (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the layout of the terminal side (side effect).
 
 ---- Equations ----
 None.
@@ -26473,7 +28198,8 @@ _edges_refresher
 
 ```text
 ---- Summary ----
-Method to build the terminal, the answer box and the OD table (hidden until it
+Method to build the terminal, the answer box with its Help button (greyed out
+until the Help box is made), Confirm and the table (both hidden until a table
 is asked for) on the left, and the plot with the overlay of its edges, its file
 controls, the settings strip and the edges row (hidden until edges are dragged)
 on the right.
@@ -26497,8 +28223,10 @@ None.
 ---- Helpers ----
 _answer_sender
 _closing_handler
+_confirm_sender
 _edges_refresher
 _every_file_taker
+_file_follower
 _history_stepper
 _message_shower
 _nav_state_setter
@@ -26511,9 +28239,9 @@ _strip_change_teller
 _symbol_inserter
 _time_clicker
 _typed_edge_taker
+AnswerTable
 EdgeOverlay
 EdgeRow
-ODTable
 SettingsStrip
 ```
 
@@ -26694,34 +28422,6 @@ None.
 None.
 ```
 
-##### `file_focuser`
-
-```text
----- Summary ----
-Method to show the file a question is about. It is called from the question
-thread.
-
----- Inputs ----
-name : str
-    Name of the file.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Queues the change for the window (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 ##### `input_reader`
 
 ```text
@@ -26750,92 +28450,6 @@ None.
 
 ---- Helpers ----
 _strip_change_runner
-```
-
-##### `od_table_hider`
-
-```text
----- Summary ----
-Method to take the OD table away again. What was typed can still be read
-with od_table_reader.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Queues the change for the window (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `od_table_reader`
-
-```text
----- Summary ----
-Method to give what the OD table holds. It is meant to be called once the
-user has answered the question asked after od_table_shower, which is when the
-table is sure to hold the rows that were sent.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Tuple[Dict[str, Dict[str, Optional[float]]], List[str]]
-    ({file name: {'OD', 'volume', 'dilution_factor'}}, with None for a cell
-    that is empty or wrong (DATA_FORMAT.md); the wrong cells as 'file name:
-    column heading').
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `od_table_shower`
-
-```text
----- Summary ----
-Method to bring up the OD table above the answer box, with one row per file.
-
----- Inputs ----
-rows : Dict[str, Dict[str, Optional[float]]]
-    {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the
-    rows; a value that is None or missing leaves its cell empty
-    (DATA_FORMAT.md).
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Queues the rows for the window (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
 ```
 
 ##### `output_capturer`
@@ -27117,6 +28731,92 @@ None
 
 ---- Globals mutated ----
 None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `table_hider`
+
+```text
+---- Summary ----
+Method to take the table away again and bring back the answer box. What was
+typed can still be read with table_reader.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `table_reader`
+
+```text
+---- Summary ----
+Method to give what the table holds. It is meant to be called once Confirm has
+been pressed for the instruction given after table_shower, which is when the
+table is sure to hold the rows that were sent.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]
+    (the values row by row, as AnswerTable.values_reader gives them; the cells
+    that cannot be used or are needed and empty, as
+    AnswerTable.problems_lister gives them).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+AnswerTable.problems_lister
+AnswerTable.values_reader
+```
+
+##### `table_shower`
+
+```text
+---- Summary ----
+Method to open a table on the terminal side, in place of most of the text, with
+Confirm in place of the answer box.
+
+---- Inputs ----
+table : dict
+    The table to show (table_rows, DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the table for the window (side effect).
 
 ---- Equations ----
 None.
@@ -27493,405 +29193,9 @@ None.
 
 ---- Helpers ----
 _pictures_builder
+accept_asker
 active_gui_getter
-choice_asker
 info_printer
-```
-
-## `utils_viewer/viewer_od_table.py`
-
-The OD table of the window: one row per file with its OD, volume and dilution.
-
-### CLASSES
-
-#### `ODTable`
-
-```text
----- Summary ----
-The table for the OD values: one row per file with a cell each for the OD, the
-volume and the dilution. A cell is clicked and typed in; Tab moves across, Enter
-and the arrows move down and up. A cell that is not a number above 0 turns red.
-It tells nothing by itself: the program reads the table when the user says it is
-filled in. Every method runs on the window thread, except rows_reader and
-problems_lister.
-
----- Attributes ----
-frame : Any
-    The Tk frame holding the table, for the window to place.
-
----- Globals read ----
-COLUMNS, CELL_WIDTH, MAXIMUM_HEIGHT_PX, ERROR_BACKGROUND, HEADING_TEXT.
-
----- Methods ----
-__init__
-_cell_checker
-_cell_mover
-_cell_revealer
-_size_follower
-_wheel_binder
-_wheel_scroller
-problems_lister
-rows_reader
-rows_setter
-```
-
-##### `__init__`
-
-```text
----- Summary ----
-Method to build the empty table; rows_setter fills it.
-
----- Inputs ----
-tk : Any
-    The tkinter module.
-ttk : Any
-    The tkinter.ttk module.
-parent : Any
-    The widget the table is built in.
-font : Tuple[str, int]
-    (family, size) of the text.
-colours : Dict[str, str]
-    {'background', 'text', 'cell', 'edge'}: the colours of the table, its
-    text, its cells and the edge of the cell being typed in.
-on_finish : Callable[[], None]
-    Called when Enter is pressed in the last row.
-
----- Globals read ----
-MAXIMUM_HEIGHT_PX.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Creates the widgets (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_size_follower
-_wheel_binder
-```
-
-##### `_cell_checker`
-
-```text
----- Summary ----
-Method to keep what was typed in one cell and to turn the cell red when it
-is not a number above 0.
-
----- Inputs ----
-row : int
-    Row of the cell, from 0.
-key : str
-    Name of its value ('OD', 'volume' or 'dilution_factor').
-
----- Globals read ----
-ERROR_BACKGROUND.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Keeps the text and colours the cell (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-cell_reader
-```
-
-##### `_cell_mover`
-
-```text
----- Summary ----
-Method to move to the same cell of the row below or above. Past the last row
-the table is left, for the answer box.
-
----- Inputs ----
-row : int
-    Row of the cell being typed in, from 0.
-key : str
-    Name of its value.
-step : int
-    +1 for the row below, -1 for the row above.
-
----- Globals read ----
-None.
-
----- Outputs ----
-str
-    'break', so Tk does nothing more with the key.
-
----- Globals mutated ----
-None. Moves the typing cursor (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `_cell_revealer`
-
-```text
----- Summary ----
-Method to scroll a long table so the row being typed in can be seen.
-
----- Inputs ----
-row : int
-    Row of the cell that was entered, from 0.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Scrolls the table (side effect).
-
----- Equations ----
-The table is moved so the row sits one row height under the top:
-share = (top of the row - its height) / height of the whole table.
-
----- Helpers ----
-None.
-```
-
-##### `_size_follower`
-
-```text
----- Summary ----
-Method to give the table the height of its rows, up to the height at which
-it scrolls.
-
----- Inputs ----
-event : Any
-    The Tk event (unused).
-
----- Globals read ----
-MAXIMUM_HEIGHT_PX.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Resizes the table (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `_wheel_binder`
-
-```text
----- Summary ----
-Method to make the mouse wheel over a part of the table scroll it, on Windows,
-the Mac and Linux alike.
-
----- Inputs ----
-widget : Any
-    The Tk widget (the table, a heading, a name or a cell).
-
----- Globals read ----
-WHEEL_EVENTS.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Binds the wheel events of the widget (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_wheel_scroller
-```
-
-##### `_wheel_scroller`
-
-```text
----- Summary ----
-Method to scroll a long table with the mouse wheel.
-
----- Inputs ----
-event : Any
-    The Tk mouse wheel event, or the button 4 or 5 event of Linux.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Scrolls the table (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-wheel_step_finder
-```
-
-##### `problems_lister`
-
-```text
----- Summary ----
-Method to list the cells that hold something that is not a number above 0.
-It can be called from any thread.
-
----- Inputs ----
-None.
-
----- Globals read ----
-COLUMNS.
-
----- Outputs ----
-List[str]
-    One 'file name: column heading' per wrong cell; empty when there is none.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-cell_reader
-```
-
-##### `rows_reader`
-
-```text
----- Summary ----
-Method to give the values typed in the table. It can be called from any
-thread.
-
----- Inputs ----
-None.
-
----- Globals read ----
-COLUMNS.
-
----- Outputs ----
-Dict[str, Dict[str, Optional[float]]]
-    {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the
-    rows; None for a cell that is empty or wrong (DATA_FORMAT.md).
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-cell_reader
-```
-
-##### `rows_setter`
-
-```text
----- Summary ----
-Method to fill the table: one row per file, in the order given, with the
-values the program already has.
-
----- Inputs ----
-rows : Dict[str, Dict[str, Optional[float]]]
-    {file name: {'OD', 'volume', 'dilution_factor'}}; a value that is None
-    or missing leaves its cell empty (DATA_FORMAT.md).
-
----- Globals read ----
-COLUMNS, CELL_WIDTH, HEADING_TEXT.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Rebuilds the rows of the table (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_cell_checker
-_cell_mover
-_cell_revealer
-_wheel_binder
-```
-
-### MAIN FUNCTIONS
-
-#### `cell_reader`
-
-```text
----- Summary ----
-Main function to read what was typed in one cell of the OD table: a number above
-0, with a point or a comma as the decimal sign, or nothing yet.
-
----- Inputs ----
-text : str
-    What the cell holds.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Tuple[Optional[float], bool]
-    (value, is_valid): (the number, True) for a number above 0; (None, True) for
-    an empty cell; (None, False) for anything else.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `wheel_step_finder`
-
-```text
----- Summary ----
-Main function to say which way a turn of the mouse wheel scrolls, whichever system
-sent it: Windows and the Mac give a turn as a positive or negative amount, Linux as
-a press of button 4 (up) or 5 (down).
-
----- Inputs ----
-event : Any
-    The Tk event, with ``num`` (the button) and ``delta`` (the amount turned).
-
----- Globals read ----
-None.
-
----- Outputs ----
-int
-    -1 to scroll up, 1 to scroll down, 0 when the event says neither.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
 ```
 
 ## `utils_viewer/viewer_preview.py`
@@ -27928,6 +29232,52 @@ Detailed structure can be found in DATA_FORMAT.md.
 ```
 
 ### PREVIEW HELPERS
+
+#### `_file_exporter`
+
+```text
+---- Summary ----
+Helper function to export the imported data of one file, read once: for a trimmed
+file the whole recording into the full folder of its results folder, then the data
+kept by the trimming (all of it for a file not trimmed) into its results folder,
+with the OD values and labels entered. A file that is no longer trimmed loses the
+whole recording written for it earlier in this run, as it has nothing called full.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (results folder, the whole recordings written so far).
+summary : dict
+    File summary (DATA_FORMAT.md).
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+details : dict
+    {file name: {OD, volume, dilution_factor, events}}; may lack the file.
+choice : str
+    A key of SPECTRA_BY_EXPORT: 'summary', 'trimmed' or 'all'.
+keep_full : bool
+    True leaves a whole recording already written in this run as it is (the edges
+    changed, and the whole recording does not depend on them).
+
+---- Globals read ----
+FULL_FOLDER, SPECTRA_BY_EXPORT (module constants); settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reads the file, writes or removes the exported files and records the whole
+recordings written in session.full_exports (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_data_processor
+experiment_trimmer
+experiment_workbook_exporter
+preview_info_builder
+```
 
 #### `_loaded_experiment_getter`
 
@@ -28029,44 +29379,51 @@ None.
 
 ### MAIN FUNCTIONS
 
-#### `all_data_exporter`
+#### `import_data_exporter`
 
 ```text
 ---- Summary ----
-Main function to export the data of every file, cut to the trim limits, so it can
-be plotted outside the program: one workbook per file with the oxygen, OCR and
-event sheets, and optionally the spectra as csv files. No haem decomposition, OD
-scaling or averaging is applied; the ignored parts are left in.
+Main function to export the imported data of every file (or of the files named), so
+it can be plotted outside the program: in each file's results folder the workbook
+of the data kept by the trimming (the oxygen, OCR, events with their labels, and the
+OD values and edges), and for a trimmed file the whole recording in its full folder;
+the spectra as csv files beside them if chosen. No haem decomposition, OD scaling
+or averaging is applied; the ignored parts are left in.
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session (files, results folder).
+    The browser session (files, results folder, the whole recordings written).
 limits : dict
     {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
-include_spectra : bool
-    True to write the spectra as csv files too (large and slow).
-progress : Optional[Any]
+details : dict
+    {file name: {OD, volume, dilution_factor, events}} (details_stage_runner).
+choice : str
+    A key of SPECTRA_BY_EXPORT: 'summary' (the workbooks only), 'trimmed' (and the
+    trimmed spectra) or 'all' (and the spectra of the whole recordings too).
+names : Optional[List[str]]
+    Files to export; None for every file.
+keep_full : bool
+    True leaves the whole recordings already written in this run as they are.
+progress : Optional[Callable[[int, int], None]]
     Function called with (number done, number of files); may be None.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-Tuple[Path, List[str]]
-    (folder written, problems). A file that could not be exported is named in the
-    problems and left out.
+List[str]
+    The problems: a file that could not be exported is named in them and left out.
 
 ---- Globals mutated ----
-None. Reads the files and writes <results>/all_data/<file>/<file>.xlsx (and the
-spectra) (side effects).
+None. Reads the files, writes <results>/<file>/<file>.xlsx (and full/ inside it for
+a trimmed file, and the spectra), and notes the results folder in session.exported
+once something is written (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-experiment_data_processor
-experiment_workbook_exporter
-preview_info_builder
+_file_exporter
 problem_teller
 ```
 
@@ -28823,41 +30180,6 @@ time on the plot = time in the file - trim start.
 None.
 ```
 
-#### `_all_data_asker`
-
-```text
----- Summary ----
-Helper function to ask whether to export the data of every file now, cut to the
-limits just accepted, so it can be plotted outside the program, and to do it.
-
----- Inputs ----
-session : ViewerSession
-    The browser session.
-limits : Dict[str, dict]
-    Trim and ignore limits of every file.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Reads from and prints to the terminal and writes the files (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-all_data_exporter
-info_printer
-progress_clearer
-progress_printer
-text_colourer
-yes_no_asker
-```
-
 #### `_answers_previewer`
 
 ```text
@@ -28933,8 +30255,8 @@ None.
 
 ---- Helpers ----
 _addition_time_lister
-_review_asker
 _skipped_lister
+accept_asker
 averaging_asker
 ```
 
@@ -28969,7 +30291,6 @@ None. Reads from and prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
-info_printer
 text_asker
 yes_no_asker
 ```
@@ -29005,6 +30326,89 @@ None.
 
 ---- Helpers ----
 _strip_shower
+```
+
+#### `_export_asker`
+
+```text
+---- Summary ----
+Helper function to ask, at the end of the import, what to export now so it can be
+plotted outside the program (nothing, the workbooks, the workbooks and the trimmed
+spectra, or the spectra of the whole recordings too, with the size of the spectra
+worked out for these files), and to do it. Enter gives nothing. The choice and the
+limits exported are kept in the session, so new edges can export again.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file, as entered in section 3.
+
+---- Globals read ----
+WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal, writes the files and sets
+session.export_choice and session.export_limits (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+import_data_exporter
+info_printer
+progress_clearer
+progress_printer
+size_describer
+spectra_size_estimator
+text_colourer
+```
+
+#### `_export_refresher`
+
+```text
+---- Summary ----
+Helper function to export again, with the same choice, the files whose trimmed or
+ignored edges changed since the export of the import, so the results folder holds
+the edges in use. The whole recording of a file is written only when the file has
+just become trimmed, and taken away when it is no longer trimmed. Nothing happens
+when nothing was exported in this run.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session, with the export's choice and limits.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file, as just accepted.
+details : Dict[str, dict]
+    OD values and events of every file.
+
+---- Globals read ----
+WARNING_COLOUR (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal, writes the files and updates session.export_limits
+(side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+import_data_exporter
+info_printer
+progress_clearer
+progress_printer
+text_colourer
 ```
 
 #### `_figure_starter`
@@ -29119,6 +30523,40 @@ None.
 None.
 ```
 
+#### `_label_table_filler`
+
+```text
+---- Summary ----
+Helper function to have the label and concentration of every event filled in in
+the labels table of the window (3.2).
+
+---- Inputs ----
+session : ViewerSession
+    The browser session, whose window has the table.
+entries : Dict[str, List[dict]]
+    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]} to
+    start from (event_entries_builder).
+
+---- Globals read ----
+IGNORE_LABEL (imported constant).
+
+---- Outputs ----
+Dict[str, List[dict]]
+    The events with the labels and concentrations typed.
+
+---- Globals mutated ----
+None. Shows and hides the table and reads from and prints to the terminal (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_table_filler
+label_entries_reader
+label_table_builder
+```
+
 #### `_limits_lister`
 
 ```text
@@ -29180,10 +30618,8 @@ info_printer
 
 ```text
 ---- Summary ----
-Helper function to have the OD values filled in in the table of the window: the
-table is shown with the given rows, one question waits for Enter, and it is asked
-again, naming the cells, while a cell is empty or not a number above 0. The table
-is then taken away.
+Helper function to have the OD, volume and dilution of every file filled in in the
+OD table of the window (3.1.1).
 
 ---- Inputs ----
 session : ViewerSession
@@ -29192,7 +30628,7 @@ rows : Dict[str, Dict[str, Optional[float]]]
     The rows to start from (od_rows, DATA_FORMAT.md); None leaves a cell empty.
 
 ---- Globals read ----
-COLUMNS (imported constant); settings.OD_RESUSPENDED_ML.
+settings.OD_RESUSPENDED_ML.
 
 ---- Outputs ----
 Dict[str, Dict[str, Optional[float]]]
@@ -29206,8 +30642,9 @@ effects).
 None.
 
 ---- Helpers ----
-info_printer
-text_asker
+_table_filler
+od_rows_reader
+od_table_builder
 ```
 
 #### `_pca_pictures_publisher`
@@ -29252,37 +30689,6 @@ info_printer
 pca_example_picture_builder
 pca_picture_builder
 problem_teller
-```
-
-#### `_review_asker`
-
-```text
----- Summary ----
-Helper function to ask whether the user accepts what the plot window shows, with
-the two answers yes and no; the user can flick through the files while the question
-waits.
-
----- Inputs ----
-question : str
-    The accept question, for example 'Do you accept these limits?'.
-change_label : str
-    Label of the answer that asks the questions of the step again.
-
----- Globals read ----
-None.
-
----- Outputs ----
-bool
-    True when accepted, False when the user wants to answer the step again.
-
----- Globals mutated ----
-None. Reads from and prints to the terminal (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-choice_asker
 ```
 
 #### `_skipped_lister`
@@ -29437,6 +30843,47 @@ None.
 strip_values_builder
 ```
 
+#### `_table_filler`
+
+```text
+---- Summary ----
+Helper function to have a table filled in in the window: the table fills the
+terminal side, the instruction waits for Confirm, and while a cell is wrong or a
+needed cell empty one sentence names those cells and the instruction goes on
+waiting. The table is then taken away.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session, whose window has the table.
+table : dict
+    The table to show (table_rows, DATA_FORMAT.md).
+question : str
+    The instruction, ending "then press Confirm.".
+note : str
+    What the table needs, said above the instruction in the quieter colour.
+number : str
+    The instruction's own number from QUESTION_FLOW.md, such as '3.2'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Dict[str, Any]]
+    The values typed, one {name of the value: value} per row of the table
+    (AnswerTable.values_reader).
+
+---- Globals mutated ----
+None. Shows and hides the table and reads from and prints to the terminal (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+confirm_waiter
+table_problem_teller
+```
+
 ### MAIN FUNCTIONS
 
 #### `browser_stage_runner`
@@ -29478,10 +30925,11 @@ preview_drawer
 ```text
 ---- Summary ----
 Main function to ask the last questions of the import, on the standard plot cut to
-the limits: the OD values (in the table of the window), then the event labels. The
-OD values are only checked:
-the data is scaled by OD in the individual plots. The plot is redrawn with the
-labels once they are entered. The haems are those of the session's fit.
+the limits: the OD values, then the event labels, each in a table of the window.
+The OD values are only checked: the data is scaled by OD in the individual plots.
+The plot is redrawn with the labels once they are entered, and they are accepted or
+typed again; with no events in any file there is nothing to accept. Last, the
+export of what was imported is offered. The haems are those of the session's fit.
 
 ---- Inputs ----
 session : ViewerSession
@@ -29492,6 +30940,9 @@ defaults : dict
     Default answers offered by the questions.
 limits : Dict[str, dict]
     Trim and ignore limits of every file (trim_stage_runner).
+remembered : Dict[str, dict]
+    The files part of the dataset's settings, with the OD values and events saved
+    before (dataset_settings, DATA_FORMAT.md).
 details_before : Optional[Dict[str, dict]]
     OD values and events from an earlier pass, offered as defaults when the step is
     asked again.
@@ -29505,16 +30956,19 @@ Dict[str, dict]
     only present when scaling by OD.
 
 ---- Globals mutated ----
-None. Stores normalise_od in ``answers`` (side effect).
+None. Stores normalise_od in ``answers`` and writes the export when one is chosen
+(side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _answers_previewer
+_export_asker
+_label_table_filler
 _od_lister
 _od_table_filler
-_review_asker
+accept_asker
 event_asker
 od_scaling_asker
 preview_drawer
@@ -29568,7 +31022,7 @@ None.
 _component_namer
 _fit_file_saver
 _pca_pictures_publisher
-choice_asker
+accept_asker
 component_builder
 component_classifier
 component_count_suggester
@@ -29628,7 +31082,7 @@ None.
 _answers_previewer
 _figure_starter
 _strip_shower
-choice_asker
+accept_asker
 haem_choice_asker
 haem_form_asker
 haem_scaling_asker
@@ -29690,7 +31144,7 @@ _averaging_reviewer
 _decomposition_storer
 _fit_names_lister
 _strip_shower
-choice_asker
+accept_asker
 decomposition_asker
 info_printer
 pca_stage_runner
@@ -29705,9 +31159,9 @@ yes_no_asker
 Main function to run the trimming step on the standard plot of the whole recording
 of every file: the trimmed and ignored edges are dragged on the plot or typed in
 the strip under it, and Enter accepts them. When the step is opened again, the
-limits it had stay on the plot as red dashed lines. The limits are then listed, the
-trimmed data is drawn, and the export of all the data cut to them is offered. The
-haems are those of the session's fit (none when it has none).
+limits it had stay on the plot as red dashed lines. The limits are then listed and
+the trimmed data is drawn. The haems are those of the session's fit (none when it
+has none).
 
 ---- Inputs ----
 session : ViewerSession
@@ -29736,7 +31190,6 @@ effects).
 None.
 
 ---- Helpers ----
-_all_data_asker
 _answers_previewer
 _limits_lister
 enter_waiter
@@ -29771,11 +31224,16 @@ answers : dict
 defaults : dict
     Default answers offered by the questions.
 remembered : Dict[str, dict]
-    {file name: limits} from the last run.
+    The files part of the dataset's settings: {file name: limits, OD values and
+    events} from the last run (dataset_settings, DATA_FORMAT.md).
 fits_folder : Path
     Folder holding the fit .csv files.
 export_root : Path
     Results folder.
+exported : Optional[List[Path]]
+    List the results folder is added to once the export of the import writes into
+    it, so the caller can say it is kept even when the questions are stopped; None
+    when the caller does not need to know.
 
 ---- Globals read ----
 STAGE_TITLES (module constant); settings.STANDARD_FIT.
@@ -29788,12 +31246,14 @@ Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers``, reads from and prints to the terminal,
-draws and closes the plot window and sets up the settings strip (side effects).
+draws and closes the plot window, sets up the settings strip, writes the export
+when one is chosen and adds to ``exported`` (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_export_refresher
 _fit_names_lister
 _standard_fit_loader
 _strip_change_applier
@@ -29802,7 +31262,6 @@ active_gui_getter
 browser_stage_runner
 choice_asker
 details_stage_runner
-file_focus_setter
 heading_printer
 info_printer
 numbering_getter
@@ -30386,34 +31845,6 @@ _size_refresher
 
 ### HELPERS
 
-#### `_number_reader`
-
-```text
----- Summary ----
-Helper function to read a typed number, with a point or a comma as the decimal
-sign.
-
----- Inputs ----
-text : str
-    What was typed.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Optional[float]
-    The number, or None when the text is not one.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `_page_journal_finder`
 
 ```text
@@ -30472,8 +31903,8 @@ None.
 height in mm = height * page height of the journal in mm.
 
 ---- Helpers ----
-_number_reader
 _page_journal_finder
+typed_number_reader
 ```
 
 #### `minutes_checker`
@@ -30500,7 +31931,7 @@ None.
 None.
 
 ---- Helpers ----
-_number_reader
+typed_number_reader
 ```
 
 #### `size_answers_builder`
@@ -30623,6 +32054,809 @@ None.
 
 ---- Helpers ----
 _page_journal_finder
+```
+
+## `utils_viewer/viewer_table.py`
+
+The tables of the window, filled in by clicking a cell and typing: the OD values of each
+
+### CLASSES
+
+#### `AnswerTable`
+
+```text
+---- Summary ----
+A table of the window, filled in by clicking a cell and typing: a fixed first
+column (the file, or the time of an event), then cells of three kinds (a number
+above 0, a number of 0 or more or nothing, a label), the rows grouped under the
+name of their file where the table says so. Tab moves across, Enter and the arrows
+move down and up, and Enter in the last row goes on to Confirm. A cell that cannot
+be used turns red; in a row whose label is the skip word the other cells are greyed
+out and not read. Entering a cell tells the window which file it belongs to. The
+table tells nothing else by itself: the program reads it when Confirm is pressed.
+Every method runs on the window thread, except problems_lister and values_reader.
+
+---- Attributes ----
+frame : Any
+    The Tk frame holding the table, for the window to place.
+
+---- Globals read ----
+CELL_WIDTHS, MINIMUM_HEIGHT_PX, ERROR_BACKGROUND, HEADING_TEXT, SKIPPED_BACKGROUND,
+SKIPPED_TEXT, LABEL.
+
+---- Methods ----
+__init__
+_cell_checker
+_cell_mover
+_cell_revealer
+_focus_handler
+_problem_finder
+_row_skipper
+_size_follower
+_skip_checker
+_wheel_binder
+_wheel_scroller
+cell_focuser
+problems_lister
+rows_setter
+symbol_inserter
+values_reader
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the empty table; rows_setter fills it.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+ttk : Any
+    The tkinter.ttk module.
+parent : Any
+    The widget the table is built in.
+font : Tuple[str, int]
+    (family, size) of the text.
+colours : Dict[str, str]
+    {'background', 'text', 'cell', 'edge'}: the colours of the table, its
+    text, its cells and the edge of the cell being typed in.
+on_finish : Callable[[], None]
+    Called when Enter is pressed in the last row.
+on_file : Callable[[str], None]
+    Called with the name of the file a cell belongs to when the cell is
+    entered.
+
+---- Globals read ----
+MINIMUM_HEIGHT_PX.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_follower
+_wheel_binder
+```
+
+##### `_cell_checker`
+
+```text
+---- Summary ----
+Method to keep what was typed in one cell, to turn the cell red when it cannot
+be used, and, for a label, to grey out or bring back the other cells of its
+row as the label is or is not the skip word.
+
+---- Inputs ----
+row : int
+    Row of the cell, from 0.
+key : str
+    Name of its value, such as 'OD' or 'label'.
+
+---- Globals read ----
+ERROR_BACKGROUND, LABEL.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the text and colours the cell (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_row_skipper
+cell_reader
+```
+
+##### `_cell_mover`
+
+```text
+---- Summary ----
+Method to move to the same cell of the row below or above, passing greyed-out
+cells. Past the last row the table is left, for Confirm.
+
+---- Inputs ----
+row : int
+    Row of the cell being typed in, from 0.
+key : str
+    Name of its value.
+step : int
+    +1 for the row below, -1 for the row above.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'break', so Tk does nothing more with the key.
+
+---- Globals mutated ----
+None. Moves the typing cursor (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_cell_revealer`
+
+```text
+---- Summary ----
+Method to scroll a long table so the cell being typed in can be seen.
+
+---- Inputs ----
+cell : Any
+    The Tk entry of the cell that was entered.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Scrolls the table (side effect).
+
+---- Equations ----
+The table is moved so the cell sits one row height under the top:
+share = (top of the cell - its height) / height of the whole table.
+
+---- Helpers ----
+None.
+```
+
+##### `_focus_handler`
+
+```text
+---- Summary ----
+Method to follow the cell being typed in: it is remembered for the Symbols
+row, scrolled into sight, and its file is told to the window.
+
+---- Inputs ----
+row : int
+    Row of the cell, from 0.
+key : str
+    Name of its value.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Scrolls the table and calls on_file (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_cell_revealer
+```
+
+##### `_problem_finder`
+
+```text
+---- Summary ----
+Method to find the cells that hold something that cannot be used, and the
+needed cells left empty, in the order of the table. The greyed-out cells of a
+skipped row are not looked at.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+EMPTY, LABEL, NEEDED_KINDS.
+
+---- Outputs ----
+List[Tuple[int, str, str]]
+    (row, name of the value, problem) for each such cell; the problem is the
+    kind of the cell when what it holds is wrong, or EMPTY.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_skip_checker
+cell_reader
+```
+
+##### `_row_skipper`
+
+```text
+---- Summary ----
+Method to grey out the cells of a row beside its label while the label is the
+skip word (an event left out), and to bring them back when it is not.
+
+---- Inputs ----
+row : int
+    Row, from 0.
+
+---- Globals read ----
+LABEL.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the state of the cells (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_skip_checker
+```
+
+##### `_size_follower`
+
+```text
+---- Summary ----
+Method to let the table scroll over all its rows when they change size.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the scrolled region (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_skip_checker`
+
+```text
+---- Summary ----
+Method to say whether a row is left out: its label is the skip word, in any
+capitals.
+
+---- Inputs ----
+row : int
+    Row, from 0.
+
+---- Globals read ----
+LABEL.
+
+---- Outputs ----
+bool
+    True when the row is left out; always False for a table with no skip word.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_wheel_binder`
+
+```text
+---- Summary ----
+Method to make the mouse wheel over a part of the table scroll it, on Windows,
+the Mac and Linux alike.
+
+---- Inputs ----
+widget : Any
+    The Tk widget (the table, a heading, a name or a cell).
+
+---- Globals read ----
+WHEEL_EVENTS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Binds the wheel events of the widget (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_wheel_scroller
+```
+
+##### `_wheel_scroller`
+
+```text
+---- Summary ----
+Method to scroll a long table with the mouse wheel.
+
+---- Inputs ----
+event : Any
+    The Tk mouse wheel event, or the button 4 or 5 event of Linux.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Scrolls the table (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+wheel_step_finder
+```
+
+##### `cell_focuser`
+
+```text
+---- Summary ----
+Method to put the typing cursor in the first cell that still needs something,
+or else in the first cell, with what it holds selected so typing replaces it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Moves the typing cursor (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_problem_finder
+```
+
+##### `problems_lister`
+
+```text
+---- Summary ----
+Method to list the cells that hold something that cannot be used and the needed
+cells left empty. It can be called from any thread.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Tuple[str, str]]
+    ('row name: column heading', problem) for each such cell, in the order of
+    the table; the problem is the kind of the cell, or EMPTY. Empty when every
+    cell can be used.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_problem_finder
+```
+
+##### `rows_setter`
+
+```text
+---- Summary ----
+Method to fill the table with its headings and rows, the rows of a file under
+its name where they are grouped.
+
+---- Inputs ----
+table : dict
+    The table to show (table_rows, DATA_FORMAT.md).
+
+---- Globals read ----
+CELL_WIDTHS, HEADING_TEXT, LABEL, SKIPPED_BACKGROUND, SKIPPED_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Rebuilds the rows of the table (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_cell_checker
+_cell_mover
+_focus_handler
+_wheel_binder
+```
+
+##### `symbol_inserter`
+
+```text
+---- Summary ----
+Method to type a symbol (µ, a superscript -1, ...) into the cell last typed in,
+at its cursor, in place of what is selected there.
+
+---- Inputs ----
+symbol : str
+    The characters to add.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the text of the cell (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `values_reader`
+
+```text
+---- Summary ----
+Method to give the values typed in the table, row by row. It can be called
+from any thread.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LABEL.
+
+---- Outputs ----
+List[Dict[str, Any]]
+    One {name of the value: value} per row, in the order of the rows: a number
+    or a label without its outer spaces; None for a cell that is empty, wrong,
+    or greyed out in a skipped row.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_skip_checker
+cell_reader
+```
+
+### CELL HELPERS
+
+#### `_cell_name_joiner`
+
+```text
+---- Summary ----
+Helper function to name cells in a sentence: the first few, then how many more.
+
+---- Inputs ----
+names : Sequence[str]
+    Names of the cells, at least one.
+
+---- Globals read ----
+NAMED_PROBLEMS.
+
+---- Outputs ----
+str
+    For example 'a: OD, b: OD' or 'a: OD, ..., e: OD and 3 more'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_number_writer`
+
+```text
+---- Summary ----
+Helper function to write a value in a cell: the number as short as it goes, or
+nothing.
+
+---- Inputs ----
+value : Optional[float]
+    The value, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    For example '0.5' or ''.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `cell_reader`
+
+```text
+---- Summary ----
+Main function to read what was typed in one cell: a number (with a point or a comma
+as the decimal sign) above 0 or of 0 or more, as the kind asks, or a label; or
+nothing yet, which is never wrong here (a needed cell left empty is found when
+Confirm is pressed).
+
+---- Inputs ----
+text : str
+    What the cell holds.
+kind : str
+    ABOVE_ZERO, ZERO_OR_MORE or LABEL.
+
+---- Globals read ----
+ABOVE_ZERO, LABEL.
+
+---- Outputs ----
+Tuple[Any, bool]
+    (value, is_valid): (the number or the label without its outer spaces, True)
+    when it can be used; (None, True) for an empty cell; (None, False) for a
+    number that is not one, or is below its limit.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+typed_number_reader
+```
+
+#### `label_entries_reader`
+
+```text
+---- Summary ----
+Main function to take the labels and concentrations typed in the labels table back
+into the events of each file.
+
+---- Inputs ----
+table : dict
+    The labels table that was shown (label_table_builder, table_rows,
+    DATA_FORMAT.md).
+values : List[Dict[str, Any]]
+    What AnswerTable.values_reader gave for it, row by row.
+entries : Dict[str, List[dict]]
+    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]} the
+    table was built from; not changed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, List[dict]]
+    A copy of ``entries`` with each event's label and concentration_uM as typed;
+    a label left empty keeps the one it had.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `label_table_builder`
+
+```text
+---- Summary ----
+Main function to lay out the labels table: one row per event, with its time, label
+and concentration, under the name of its file; files without events have no rows.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md), in the order of the files.
+entries : Dict[str, List[dict]]
+    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
+    per event of the summary, in the same order.
+skip_word : str
+    The label that leaves an event out; its row's concentration is greyed out.
+
+---- Globals read ----
+LABEL_COLUMNS.
+
+---- Outputs ----
+dict
+    The table to show (table_rows, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_number_writer
+```
+
+#### `od_rows_reader`
+
+```text
+---- Summary ----
+Main function to take the values typed in the OD table back as the OD values of
+each file.
+
+---- Inputs ----
+table : dict
+    The OD table that was shown (od_table_builder, table_rows, DATA_FORMAT.md).
+values : List[Dict[str, Any]]
+    What AnswerTable.values_reader gave for it, row by row.
+
+---- Globals read ----
+OD_COLUMNS.
+
+---- Outputs ----
+Dict[str, Dict[str, Optional[float]]]
+    {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the rows
+    (od_rows, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `od_table_builder`
+
+```text
+---- Summary ----
+Main function to lay out the OD table: one row per file, with its OD, volume and
+dilution.
+
+---- Inputs ----
+rows : Dict[str, Dict[str, Optional[float]]]
+    {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the files; a
+    value that is None or missing leaves its cell empty (od_rows, DATA_FORMAT.md).
+
+---- Globals read ----
+OD_COLUMNS.
+
+---- Outputs ----
+dict
+    The table to show (table_rows, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_number_writer
+```
+
+#### `table_problem_teller`
+
+```text
+---- Summary ----
+Main function to say in one sentence what is still wrong in a table when Confirm is
+pressed: the cells that hold something that cannot be used first, then the needed
+cells left empty.
+
+---- Inputs ----
+problems : List[Tuple[str, str]]
+    What AnswerTable.problems_lister gave: (cell name, problem).
+
+---- Globals read ----
+EMPTY, KIND_HINTS.
+
+---- Outputs ----
+Optional[str]
+    The sentence, or None when the table can be used.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_cell_name_joiner
+```
+
+#### `wheel_step_finder`
+
+```text
+---- Summary ----
+Main function to say which way a turn of the mouse wheel scrolls, whichever system
+sent it: Windows and the Mac give a turn as a positive or negative amount, Linux as
+a press of button 4 (up) or 5 (down).
+
+---- Inputs ----
+event : Any
+    The Tk event, with ``num`` (the button) and ``delta`` (the amount turned).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    -1 to scroll up, 1 to scroll down, 0 when the event says neither.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_viewer/viewer_terminal.py`

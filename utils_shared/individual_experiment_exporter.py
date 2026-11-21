@@ -5,7 +5,7 @@ Export of one processed experiment to an Excel workbook.
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import json
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
@@ -40,6 +40,8 @@ SPECTRAL_CSV_TYPES = (('transmission', 'transmiss'),
                       ('intensity', 'intensity'),
                       ('attenuation', 'attenuation'),
                       )
+# folder, inside the folder of a trimmed experiment, that holds its whole recording
+FULL_FOLDER = 'full'
 
 # What the user typed for an experiment (OD, volume, dilution factor, event labels and
 # concentrations) is kept in the workbook, on the
@@ -268,12 +270,14 @@ def experiment_workbook_exporter(experiment: dict,
                                  output_dir: Path,
                                  full: bool = False,
                                  spectra: bool = False,
-                                 ) -> Path:
+                                 subfolder: str = '',
+                                 ) -> List[Path]:
     """
     ---- Summary ----
-    Main function to export one experiment to <output_dir>/<name>/<name>.xlsx, with the
-    CcO2, CsO2 and VoO2 sheets, Averages, Events and Metadata, and optionally every
-    processed table and the spectral CSV files.
+    Main function to export one experiment to <output_dir>/<name>/<name>.xlsx (or into
+    a folder inside that, such as the full/ of a trimmed experiment's whole recording),
+    with the CcO2, CsO2 and VoO2 sheets, Averages, Events and Metadata, and optionally
+    every processed table and the spectral CSV files.
 
     ---- Inputs ----
     experiment : dict
@@ -285,13 +289,16 @@ def experiment_workbook_exporter(experiment: dict,
     spectra : bool
         True also writes the spectral CSV files next to the workbook (large and slow)
         and an index sheet linking to them.
+    subfolder : str
+        Folder inside the experiment's folder to write into (FULL_FOLDER); '' for the
+        experiment's folder itself.
 
     ---- Globals read ----
     BASIC_SHEETS, DATA_SHEETS and schema.DELTA_HAEM_SOURCES.
 
     ---- Outputs ----
-    Path
-        Path of the workbook.
+    List[Path]
+        Paths of the files written: the workbook first, then any CSV files.
 
     ---- Globals mutated ----
     None. Creates the folder, the workbook and optional CSV files (side effect).
@@ -308,7 +315,8 @@ def experiment_workbook_exporter(experiment: dict,
 
     # ---- 1 Set up the output paths ---------------------------------------------------
     name = file_name_sanitiser(experiment.get('experiment_name', 'experiment'))
-    folder = Path(output_dir) / name
+    folder = Path(output_dir) / name / subfolder if subfolder else Path(output_dir,
+                                                                        ) / name
     folder.mkdir(parents=True, exist_ok=True)
     output_path = folder / f'{name}.xlsx'
     spectral_records = _spectral_csv_exporter(experiment, folder) if spectra else []
@@ -328,7 +336,8 @@ def experiment_workbook_exporter(experiment: dict,
         sheets = (writer, header_format, used_sheets)
         # 1. Spectral data index (links to the CSVs).
         if spectral_records:
-            worksheet = _frame_writer(sheets, pd.DataFrame(spectral_records),
+            worksheet = _frame_writer(sheets,
+                                      pd.DataFrame(spectral_records),
                                       'Spectral data',
                                       first_col_width=14,
                                       )
@@ -417,8 +426,9 @@ def experiment_workbook_exporter(experiment: dict,
         worksheet.set_column(1, 1, 90)
 
     # ---- 3 Report the export ---------------------------------------------------------
-    print(f'  Exported experiment data to: {Path(output_dir).name}/{name}/{name}.xlsx')
-    return output_path
+    shown = [Path(output_dir).name, name] + ([subfolder] if subfolder else [])
+    print(f"  Exported experiment data to: {'/'.join(shown)}/{name}.xlsx")
+    return [output_path] + [folder / record['CSV file'] for record in spectral_records]
 
 
 # ---- saved_settings_reader -----------------------------------------------------------
@@ -493,6 +503,104 @@ def saved_settings_reader(output_dir: Path, experiment_name: str) -> Optional[di
                       )
     saved['events'] = events
     return saved if any(k in saved for k in SETTINGS_KEYS) or events else None
+
+
+# ---- size_describer ------------------------------------------------------------------
+def size_describer(size_bytes: float) -> str:
+    """
+    ---- Summary ----
+    Main function to put the size of files to be written in plain words, to two
+    significant figures, as the export question shows it.
+
+    ---- Inputs ----
+    size_bytes : float
+        Size in bytes; 0 or less when there is nothing to write.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        'about 1.2 GB', 'about 350 MB', 'under 1 MB', or 'none in these files' for 0.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    1 GB = 10^9 bytes, 1 MB = 10^6 bytes.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if size_bytes <= 0:
+        return 'none in these files'
+    for unit, scale in (('GB', 1e9), ('MB', 1e6)):
+        if size_bytes >= scale:
+            return f"about {float(f'{size_bytes / scale:.2g}'):g} {unit}"
+    return 'under 1 MB'
+
+
+# ---- spectra_size_estimator ----------------------------------------------------------
+def spectra_size_estimator(summaries: List[dict],
+                           limits: Dict[str, dict],
+                           bytes_per_value: Dict[str, float],
+                           ) -> Tuple[float, float]:
+    """
+    ---- Summary ----
+    Main function to work out roughly how large the spectra csv files of an export
+    would be, from the number of spectra and wavelengths of each file (read from its
+    headers) and the part kept by the trimming.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md), with 'duration_min' and 'spectra_shapes'; a
+        summary without 'spectra_shapes' counts as having no spectra.
+    limits : Dict[str, dict]
+        {file name: {'trim_start', 'trim_end' (min on the recording, None for no trim),
+        ...}}; a file missing is not trimmed.
+    bytes_per_value : Dict[str, float]
+        Bytes one value takes in the csv file of each kind (config.SPECTRA_CSV_BYTES).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[float, float]
+        (bytes of the trimmed spectra of every file, bytes of the whole recording's
+        spectra of the trimmed files only).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    kept fraction = (trim end - trim start) / duration, the trim end being the duration
+    and the trim start 0 when not trimmed, kept within 0 to 1.
+    trimmed bytes = sum over files and spectrometers of
+        n_spectra x kept fraction x n_wavelengths x sum(bytes_per_value).
+    full bytes = the same with a fraction of 1, over the trimmed files only.
+
+    ---- Helpers ----
+    None.
+    """
+
+    per_value = float(sum(bytes_per_value.values()))
+    trimmed_bytes, full_bytes = 0.0, 0.0
+    for summary in summaries:
+        duration = float(summary['duration_min'])
+        own = limits.get(summary['name']) or {}
+        start, end = own.get('trim_start'), own.get('trim_end')
+        is_trimmed = start is not None or end is not None
+        kept = ((duration if end is None else float(end)) -
+                (0.0 if start is None else float(start))
+                )
+        fraction = min(max(kept / duration, 0.0), 1.0) if duration > 0 else 1.0
+        for n_spectra, n_wavelengths in (summary.get('spectra_shapes') or {}).values():
+            whole = float(n_spectra) * float(n_wavelengths) * per_value
+            trimmed_bytes += whole * fraction
+            if is_trimmed:
+                full_bytes += whole
+    return trimmed_bytes, full_bytes
 
 
 # ---- workbook_path_builder -----------------------------------------------------------

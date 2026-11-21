@@ -1,5 +1,5 @@
 """
-Tests that every question the program can ask is in QUESTION_FLOW.md, in the same words.
+Tests that every question is in QUESTION_FLOW.md, worded and numbered as in the code.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -18,6 +18,7 @@ CODE_PATTERNS = ('main.py',
                  )
 LIST_NAME = 'QUESTION_FLOW.md'
 QUESTION_NAME = 'question'  # the input every asker and wrapper takes its question in
+NUMBER_NAME = 'number'  # the input a question's own number is given in
 MINIMUM_QUESTIONS = 50  # fewer found than this means the reading itself has broken
 VARYING = '\x00'  # stands for a part filled in at run time ({name}, {time})
 
@@ -163,24 +164,66 @@ def _list_reader() -> str:
     return ' '.join(re.sub(r'[*`]', '', text).split())
 
 
+# ---- _number_matcher -----------------------------------------------------------------
+def _number_matcher(number: str, question: str, list_text: str) -> bool:
+    """
+    ---- Summary ----
+    Helper function to say whether a question sits in the row of its own number in the
+    list, in the same words. The parts filled in at run time match any words within
+    that row's question.
+
+    ---- Inputs ----
+    number : str
+        The number the code gives the question, such as '3.5'.
+    question : str
+        Question text from the code, with VARYING for each part filled in at run time.
+    list_text : str
+        Text of the list from _list_reader.
+
+    ---- Globals read ----
+    VARYING (module constant).
+
+    ---- Outputs ----
+    bool
+        True when the row of that number holds the question.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    parts = ' '.join(question.split()).split(VARYING)
+    pattern = (r'\| ' + re.escape(number) + r' \|[^|]*?' +
+               '[^|]+?'.join(re.escape(part) for part in parts)
+               )
+    return re.search(pattern, list_text) is not None
+
+
 # ---- _question_collector -------------------------------------------------------------
-def _question_collector() -> Tuple[List[Tuple[str, str]], List[str]]:
+def _question_collector() -> Tuple[List[Tuple[str, str, Optional[str]]], List[str]]:
     """
     ---- Summary ----
     Helper function to collect the text of every question in the code, without running
-    it: the question given in each call to a function that takes one, and each
-    'question' entry of a dictionary.
+    it: the question given in each call to a function that takes one, with the number
+    written in that call, and each 'question' entry of a dictionary.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    QUESTION_NAME (module constant).
+    NUMBER_NAME, QUESTION_NAME (module constants).
 
     ---- Outputs ----
-    Tuple[List[Tuple[str, str]], List[str]]
-        ([(question text, 'file:line')], ['file:line' of each question that could not
-        be read]). VARYING stands for each part filled in at run time.
+    Tuple[List[Tuple[str, str, Optional[str]]], List[str]]
+        ([(question text, 'file:line', its own number or None)], ['file:line' of each
+        question that could not be read]). VARYING stands for each part filled in at
+        run time. A number handed on from another input is not one written in the call,
+        so it gives None.
 
     ---- Globals mutated ----
     None.
@@ -199,15 +242,22 @@ def _question_collector() -> Tuple[List[Tuple[str, str]], List[str]]:
     carriers = _carrier_finder(trees)
 
     # ---- 2 Take the question from every call and dictionary --------------------------
-    questions: List[Tuple[str, str]] = []
+    questions: List[Tuple[str, str, Optional[str]]] = []
     unreadable: List[str] = []
     for file_name, tree in trees.items():
         for node in ast.walk(tree):
             values: List[Optional[ast.AST]] = []
+            number = None
             if isinstance(node, ast.Call):
                 name = getattr(node.func, 'id', getattr(node.func, 'attr', None))
                 if name not in carriers:
                     continue
+                given = [k.value for k in node.keywords if k.arg == NUMBER_NAME]
+                if (given and
+                    isinstance(given[0], ast.Constant) and
+                    isinstance(given[0].value, str)
+                    ):
+                    number = given[0].value
                 keyword = [k.value for k in node.keywords if k.arg == QUESTION_NAME]
                 place = carriers[name]
                 if keyword:
@@ -232,7 +282,7 @@ def _question_collector() -> Tuple[List[Tuple[str, str]], List[str]]:
                 if texts is None:
                     unreadable.append(where)
                 else:
-                    questions.extend((text, where) for text in texts)
+                    questions.extend((text, where, number) for text in texts)
     return questions, unreadable
 
 
@@ -468,10 +518,56 @@ def test_questions_are_in_the_list() -> None:
     list_text = _list_reader()
     questions, _ = _question_collector()
     missing = [f"{where}: {' '.join(text.split()).replace(VARYING, '...')}"
-               for text, where in questions
+               for text, where, _ in questions
                if not _question_matcher(text, list_text)
                ]
     assert not missing, (
         f'{len(missing)} question(s) are not in {LIST_NAME} in these words:\n'
         + '\n'.join(missing)
+    )
+
+
+# ---- test_question_numbers_match_the_list --------------------------------------------
+def test_question_numbers_match_the_list() -> None:
+    """
+    ---- Summary ----
+    Main function to check that every question the code gives its own number sits in
+    the row of that number in QUESTION_FLOW.md, so the number on screen is the number
+    in the list.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    VARYING, LIST_NAME (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _list_reader
+    _number_matcher
+    _question_collector
+    """
+
+    list_text = _list_reader()
+    questions, _ = _question_collector()
+    numbered = [(text, where, number) for text, where, number in questions if number]
+    assert numbered, (
+        'No question in the code is given its own number, so the test is no longer '
+        'reading the numbers.'
+    )
+    wrong = [f"{where}: {number} {' '.join(text.split()).replace(VARYING, '...')}"
+             for text, where, number in numbered
+             if not _number_matcher(number, text, list_text)
+             ]
+    assert not wrong, (
+        f'{len(wrong)} question(s) are not in the row of their number in {LIST_NAME}:\n'
+        + '\n'.join(wrong)
     )

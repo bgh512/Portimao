@@ -4,21 +4,21 @@ Numbered terminal questions of the main program (sections 1 to 5) and the trimmi
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import re
+import tempfile
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_custom.run_namer import run_name_lister
-from utils_shared.dataset_settings import dataset_settings_reader
+from utils_shared.dataset_settings import dataset_settings_reader, SAVED_VALUE_KEYS
+from utils_shared.helpers import concentration_formatter, file_name_sanitiser
 from utils_shared.individual_experiment_exporter import saved_settings_reader
 from utils_shared.paf_reader import experiment_summary_reader, PafError
 from utils_shared.questions import (choice_asker,
                                     info_printer,
                                     multi_asker,
                                     number_asker,
-                                    numbering_setter,
-                                    numbers_asker,
                                     path_cleaner,
                                     progress_clearer,
                                     progress_printer,
@@ -31,7 +31,7 @@ from utils_shared.user_notices import problem_teller
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-_file_focus_hook: Optional[Callable[[str], None]] = None
+IGNORE_LABEL = 'ignore'  # the label that leaves an event out, in any capitals
 JOURNAL_NAMES = {'nature': 'Nature',
                  'science': 'Science',
                  'cell': 'Cell',
@@ -101,8 +101,8 @@ def _event_line_builder(event: dict, entry: dict) -> str:
 
     ---- Outputs ----
     str
-        For example '  15.01 min: nd-011992' or with the concentration and
-        '[IGNORED]' when they apply.
+        For example '  15.01 min: nd-011992' or with the concentration (in µM, mM or
+        M) and '[IGNORED]' when they apply.
 
     ---- Globals mutated ----
     None.
@@ -111,47 +111,15 @@ def _event_line_builder(event: dict, entry: dict) -> str:
     None.
 
     ---- Helpers ----
-    None.
+    concentration_formatter
     """
 
     conc = (''
             if entry['concentration_uM'] is None
-            else f", {entry['concentration_uM']:g} uM"
+            else f", {concentration_formatter(entry['concentration_uM'])}"
             )
     note = '  [IGNORED]' if entry['ignored'] else ''
     return f"  {event['time']:.2f} min: {entry['label']}{conc}{note}"
-
-
-# ---- _file_focuser -------------------------------------------------------------------
-def _file_focuser(name: str) -> None:
-    """
-    ---- Summary ----
-    Helper function to tell the experiment browser which file the next question is
-    about, so its window shows that file. Does nothing without the browser.
-
-    ---- Inputs ----
-    name : str
-        File name.
-
-    ---- Globals read ----
-    _file_focus_hook (module state).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Calls the hook (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    if _file_focus_hook is not None:
-        _file_focus_hook(name)
 
 
 # ---- _first_event_finder -------------------------------------------------------------
@@ -451,12 +419,13 @@ def _subscript_stripper(match: 're.Match') -> str:
 # ---- _tidy_labels_offerer ------------------------------------------------------------
 def _tidy_labels_offerer(with_events: List[dict],
                          result: Dict[str, List[dict]],
+                         kept: Set[str],
                          ) -> None:
     """
     ---- Summary ----
-    Helper function to list the current event labels that could be written more tidily
-    (8 ug ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use
-    them all. Asks nothing when every label is tidy already.
+    Helper function to list the event labels that could be written more tidily (8 ug
+    ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use them
+    all. Asks nothing when every label is tidy already or was kept as it is before.
 
     ---- Inputs ----
     with_events : List[dict]
@@ -464,6 +433,9 @@ def _tidy_labels_offerer(with_events: List[dict],
     result : Dict[str, List[dict]]
         {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
         labels are replaced by their tidy forms when the user agrees.
+    kept : Set[str]
+        Labels the user chose to keep as they are; the labels kept this time are
+        added, so they are not offered again.
 
     ---- Globals read ----
     None.
@@ -473,35 +445,29 @@ def _tidy_labels_offerer(with_events: List[dict],
         Nothing.
 
     ---- Globals mutated ----
-    None. Changes the labels in ``result`` and reads from and prints to the terminal
-    (side effects).
+    None. Changes the labels in ``result``, adds to ``kept`` and reads from and prints
+    to the terminal (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     info_printer
-    label_tidier
+    tidy_labels_finder
     yes_no_asker
     """
 
-    # ---- 1 Find the labels that could be tidier --------------------------------------
-    found = []
-    for summary in with_events:
-        for event, entry in zip(summary['events'], result[summary['name']]):
-            tidy = label_tidier(entry['label'])
-            if not entry['ignored'] and tidy != entry['label']:
-                found.append((summary['name'], event['time'], entry, tidy))
+    found = tidy_labels_finder(with_events, result, kept)
     if not found:
         return
-
-    # ---- 2 List them and ask once ----------------------------------------------------
     info_printer('These labels can be written more tidily:')
     for name, time, entry, tidy in found:
         info_printer(f"  {name}, {time:.2f} min: {entry['label']} -> {tidy}", depth=2)
-    if yes_no_asker('Do you want to use these tidy forms?', True):
+    if yes_no_asker('Do you want to use these tidy forms?', True, number='3.2.1'):
         for _, _, entry, tidy in found:
             entry['label'] = tidy
+    else:
+        kept.update(entry['label'] for _, _, entry, _ in found)
 
 
 # ---- _trim_minutes_clamper -----------------------------------------------------------
@@ -927,53 +893,108 @@ def decomposition_asker(summaries: List[dict],
 # ---- event_asker ---------------------------------------------------------------------
 def event_asker(summaries: List[dict],
                 saved: dict,
-                again: bool = False,
+                table_filler: Callable[[Dict[str, List[dict]]], Dict[str, List[dict]]],
+                kept: Set[str],
                 ) -> Dict[str, List[dict]]:
     """
     ---- Summary ----
-    Main function to ask whether to change the event labels, concentrations and which
-    events to ignore, file by file. A label that could be written more tidily (8 ug
-    ml-1 as 8 µg mL⁻¹) is offered in its tidy form: the labels the files hold all at
-    once, then each label as it is typed or kept.
+    Main function to have the label and concentration of every event filled in in the
+    labels table, starting from the saved or file values, an event being left out by
+    writing ignore as its label. Labels that could be written more tidily (8 ug ml-1
+    as 8 µg mL⁻¹) are then offered in their tidy forms, once. Nothing is asked when no
+    file has events.
 
     ---- Inputs ----
     summaries : List[dict]
         File summaries (DATA_FORMAT.md).
     saved : dict
-        {file name: values read from its workbook} (read_saved_settings).
-    again : bool
-        True when the user asked to change the labels again: the tidy forms of the
-        current labels and the yes/no question are skipped and the runs are listed
-        straight away.
+        {file name: OD values and events saved before} (saved_values_reader).
+    table_filler : Callable[[Dict[str, List[dict]]], Dict[str, List[dict]]]
+        Function that shows the labels table filled in with the given events, waits
+        until it is confirmed, and returns the events with the labels and
+        concentrations typed.
+    kept : Set[str]
+        Labels the user chose to keep as they are; they are not offered in their tidy
+        forms again, and the labels kept this time are added.
 
     ---- Globals read ----
-    None.
+    IGNORE_LABEL.
 
     ---- Outputs ----
     Dict[str, List[dict]]
         {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}.
-        A label of 'ignore' marks an event that was not an addition.
+        An event labelled ignore is left out and has no concentration.
 
     ---- Globals mutated ----
-    None. Reads from and prints to the terminal (side effect).
+    None. Adds to ``kept`` and reads from and prints to the terminal (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _event_line_builder
-    _file_focuser
     _tidy_labels_offerer
+    event_entries_builder
     info_printer
-    label_tidier
-    number_asker
-    numbering_setter
-    numbers_asker
-    text_asker
-    yes_no_asker
     """
 
     # ---- 1 Start from the saved or file values ---------------------------------------
+    result = event_entries_builder(summaries, saved)
+    with_events = [s for s in summaries if s['events']]
+    if not with_events:
+        return result
+
+    # ---- 2 Fill in the table ---------------------------------------------------------
+    result = table_filler(result)
+    for events in result.values():
+        for entry in events:
+            entry['ignored'] = entry['label'].strip().lower() == IGNORE_LABEL
+            if entry['ignored']:
+                entry['label'] = IGNORE_LABEL
+                entry['concentration_uM'] = None
+
+    # ---- 3 Offer the tidy forms and list the labels ----------------------------------
+    _tidy_labels_offerer(with_events, result, kept)
+    info_printer('Event labels:')
+    for summary in with_events:
+        info_printer(f"{summary['name']}:", depth=2)
+        for event, entry in zip(summary['events'], result[summary['name']]):
+            info_printer(_event_line_builder(event, entry), depth=2)
+    return result
+
+
+# ---- event_entries_builder -----------------------------------------------------------
+def event_entries_builder(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
+    """
+    ---- Summary ----
+    Main function to give the events of every file as the labels table starts them:
+    the label, concentration and whether it is left out as saved for the dataset, or
+    else the file's own text, with no concentration.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    saved : dict
+        {file name: OD values and events saved before} (saved_values_reader).
+
+    ---- Globals read ----
+    IGNORE_LABEL.
+
+    ---- Outputs ----
+    Dict[str, List[dict]]
+        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
+        per event of the file, in its order; an event left out is labelled ignore.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
     result = {}
     for summary in summaries:
         old = {e['datapoint']: e
@@ -984,102 +1005,16 @@ def event_asker(summaries: List[dict],
             before = old.get(event['datapoint'], {})
             ignored = bool(before.get('ignored', False))
             events.append({'datapoint': event['datapoint'],
-                           'label': 'ignore'
-                           if ignored
-                           else (before.get('label') or event['text']),
+                           'label': (IGNORE_LABEL
+                                     if ignored
+                                     else (before.get('label') or event['text'])
+                                     ),
                            'concentration_uM': before.get('concentration_uM'),
                            'ignored': ignored,
                            },
                           )
         result[summary['name']] = events
-    with_events = [s for s in summaries if s['events']]
-    if not with_events:
-        return result
-
-    # ---- 2 Show the current events and ask which runs to change ----------------------
-    info_printer('Current runs with events are:')
-    for number, summary in enumerate(with_events, start=1):
-        info_printer(f"{number}) {summary['name']}:")
-        for event, entry in zip(summary['events'], result[summary['name']]):
-            info_printer(_event_line_builder(event, entry), depth=2)
-    if not again:
-        _tidy_labels_offerer(with_events, result)
-        if not yes_no_asker('Do you want to change any event labels?', False):
-            return result
-    chosen = numbers_asker('Which run(s) do you want to change?',
-                           len(with_events),
-                           depth=2,
-                           )
-
-    # ---- 3 Ask about the events of each chosen run -----------------------------------
-    for number in chosen:
-        summary = with_events[number - 1]
-        name = summary['name']
-        _file_focuser(name)
-        events = result[name]
-        info_printer(f'\n{name}:', depth=2)
-        for event, entry in zip(summary['events'], events):
-            info_printer(_event_line_builder(event, entry), depth=2)
-        numbering_setter(2, number)
-        for event, entry in zip(summary['events'], events):
-            label = text_asker(f"What was added at {event['time']:.2f} min? "
-                               "Write 'ignore' to ignore this event.",
-                               entry['label'],
-                               depth=3,
-                               )
-            label = label or entry['label']
-            tidy = label_tidier(label)
-            if tidy != label and yes_no_asker(f"Do you want to write this as '{tidy}'?",
-                                              True,
-                                              depth=3,
-                                              ):
-                label = tidy
-            entry['label'] = label
-            entry['ignored'] = entry['label'].strip().lower() == 'ignore'
-            if entry['ignored']:
-                continue
-            entry['concentration_uM'] = number_asker('What was the final concentration'
-                                                     ' '
-                                                     'in uM?',
-                                                     entry['concentration_uM'],
-                                                     minimum=0,
-                                                     allow_blank=True,
-                                                     depth=3,
-                                                     blank_label='unknown',
-                                                     )
     return result
-
-
-# ---- file_focus_setter ---------------------------------------------------------------
-def file_focus_setter(hook: Optional[Callable[[str], None]]) -> None:
-    """
-    ---- Summary ----
-    Main function to set (or clear, with None) the function that is told which file a
-    question is about.
-
-    ---- Inputs ----
-    hook : Optional[Callable[[str], None]]
-        Function taking the file name, or None.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    Sets _file_focus_hook (module state).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    global _file_focus_hook
-    _file_focus_hook = hook
 
 
 # ---- files_asker ---------------------------------------------------------------------
@@ -1088,7 +1023,10 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     ---- Summary ----
     Main function to ask for the folder of .paf files (1.1), offering the data folders
     found in the user's own folder, and the results folder (1.2), and to read a summary
-    of every file and the settings saved with the dataset.
+    of every file and the settings saved with the dataset. A results folder named
+    without a path is made inside the data folder; one that already holds results of
+    these files is taken only once the user agrees to write over them (1.2.1), and
+    otherwise asked again with a free name offered.
 
     ---- Inputs ----
     last : dict
@@ -1119,12 +1057,16 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     data_folder_resolver
     dataset_settings_reader
     experiment_summary_reader
+    free_folder_finder
     info_printer
     paf_finder
-    path_cleaner
     progress_clearer
     progress_printer
+    results_counter
+    results_folder_checker
+    results_folder_resolver
     text_asker
+    yes_no_asker
     """
 
     # ---- 1 Ask for the .paf folder ---------------------------------------------------
@@ -1139,22 +1081,22 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
         info_printer('Type a number or a name from this list, or the path of another '
                      'folder.',
                      )
-    while True:
-        text = text_asker('What is the directory with the .paf files?',
-                          last.get('data_folder'),
-                          )
+    def folder_checker(text: Optional[str]) -> Optional[str]:
         if not text:
-            info_printer('Please type or drag in a folder.')
-            continue
-        folder = data_folder_resolver(text, listed)
-        if not folder.is_dir():
-            info_printer('That folder does not exist.')
-            continue
-        files = paf_finder(folder)
-        if not files:
-            info_printer('There are no .paf files directly inside that folder.')
-            continue
-        break
+            return 'Type or drag in a folder.'
+        found = data_folder_resolver(text, listed)
+        if not found.is_dir():
+            return 'Type or drag in a folder that exists.'
+        if not paf_finder(found):
+            return 'Type or drag in a folder with .paf files directly inside it.'
+        return None
+    text = text_asker('What is the directory with the .paf files?',
+                      last.get('data_folder'),
+                      checker=folder_checker,
+                      number='1.1',
+                      )
+    folder = data_folder_resolver(text, listed)
+    files = paf_finder(folder)
 
     # ---- 2 Read every file -----------------------------------------------------------
     summaries = []
@@ -1186,10 +1128,64 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
         info_printer('This dataset was opened before: the settings saved in its folder '
                      'are offered as the defaults.',
                      )
-    text = text_asker('To which directory would you like the results to be saved?',
-                      str(saved.get('export_folder') or folder / 'export'),
-                      )
-    return folder, summaries, Path(path_cleaner(text)).expanduser(), saved
+    offered = saved.get('export_folder') or folder / settings.RESULTS_FOLDER_NAME
+    while True:
+        text = text_asker('To which directory would you like the results to be saved?',
+                          str(offered),
+                          checker=lambda typed: results_folder_checker(typed, folder),
+                          number='1.2',
+                          )
+        export_root = results_folder_resolver(text, folder)
+
+        # ---- 3.1 Warn before results already there are written over ------------------
+        count = results_counter(export_root, summaries)
+        if not count:
+            break
+        info_printer(f'{export_root.name} already holds results of {count} of these '
+                     f'{len(summaries)} files.',
+                     )
+        if yes_no_asker('Do you want to write over them?', False, number='1.2.1'):
+            break
+        offered = free_folder_finder(export_root)
+        info_printer(
+            'Type another folder, or a new name: a name without a path is made '
+            'inside the data folder.',
+            )
+    return folder, summaries, export_root, saved
+
+
+# ---- free_folder_finder --------------------------------------------------------------
+def free_folder_finder(folder: Path) -> Path:
+    """
+    ---- Summary ----
+    Main function to find a folder name beside the one given that is not used yet, by
+    adding _2, _3 and so on, to offer when the user keeps the results already there.
+
+    ---- Inputs ----
+    folder : Path
+        The folder whose name is taken (results).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Path
+        The first of <folder>_2, <folder>_3, ... that does not exist.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    number = 2
+    while (folder.parent / f'{folder.name}_{number}').exists():
+        number += 1
+    return folder.parent / f'{folder.name}_{number}'
 
 
 # ---- haem_choice_asker ---------------------------------------------------------------
@@ -1729,7 +1725,7 @@ def od_scaling_asker(summaries: List[dict],
     defaults : dict
         Default answers (normalise_od).
     saved : dict
-        {file name: values read from its workbook} (saved_values_reader).
+        {file name: OD values and events saved before} (saved_values_reader).
     table_filler : Callable[[Dict[str, dict]], Dict[str, dict]]
         Function that shows the OD table filled in with the given rows (od_rows,
         DATA_FORMAT.md), waits until every cell is right, and returns the rows.
@@ -1754,10 +1750,14 @@ def od_scaling_asker(summaries: List[dict],
     """
 
     # ---- 1 Ask whether to scale ------------------------------------------------------
-    answers['normalise_od'] = yes_no_asker('Do you want to scale by OD (divide by '
-                                           'dilution factor x OD x volume)?',
-                                           defaults['normalise_od'],
-                                           )
+    answers['normalise_od'] = yes_no_asker(
+        'Do you want to scale by OD?',
+        defaults['normalise_od'],
+        note='Scaling by OD divides the OCR (and the '
+        'haems, if you choose so in section 5) by '
+        'dilution factor × OD × volume.',
+        number='3.1',
+        )
     details = {s['name']: {} for s in summaries}
     if not answers['normalise_od']:
         return details
@@ -1809,28 +1809,167 @@ def paf_finder(folder: Path) -> List[Path]:
     return sorted(files, key=lambda p: _natural_sorter(p.name))
 
 
-# ---- saved_values_reader -------------------------------------------------------------
-def saved_values_reader(summaries: List[dict], export_root: Path) -> Dict[str, dict]:
+# ---- results_counter -----------------------------------------------------------------
+def results_counter(export_root: Path, summaries: List[dict]) -> int:
     """
     ---- Summary ----
-    Main function to read the OD and event values saved in each experiment's workbook
-    from an earlier run, so they can be offered as defaults.
+    Main function to count the files that already have results in a results folder:
+    their own folder there (named as the export names it) holds something.
 
     ---- Inputs ----
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md).
     export_root : Path
-        Results folder, where the saved workbooks are looked for.
+        The results folder; it may not exist yet.
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md); uses 'name'.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    Dict[str, dict]
-        {file name: values read from its workbook, or None when there is none}.
+    int
+        How many of the files have results there.
 
     ---- Globals mutated ----
-    None. Prints progress and a note when earlier values are found (side effects).
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    file_name_sanitiser
+    """
+
+    count = 0
+    for summary in summaries:
+        own = Path(export_root) / file_name_sanitiser(summary['name'])
+        if own.is_dir() and any(own.iterdir()):
+            count += 1
+    return count
+
+
+# ---- results_folder_checker ----------------------------------------------------------
+def results_folder_checker(text: Optional[str],
+                           data_folder: Optional[Path] = None,
+                           ) -> Optional[str]:
+    """
+    ---- Summary ----
+    Main function to check the results folder as soon as it is given: it must not be a
+    file, and it must be a folder that can be saved to. A folder that does not exist yet
+    is checked at the nearest folder above it that does; nothing is left behind.
+
+    ---- Inputs ----
+    text : Optional[str]
+        The answer as typed or dragged in (quotes and a leading ~ are allowed).
+    data_folder : Optional[Path]
+        The data folder a name without a path is made in; None for the folder the
+        program runs in.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[str]
+        None when the folder can be used, otherwise the one sentence saying what to
+        type instead.
+
+    ---- Globals mutated ----
+    None. Makes and removes a temporary file in the nearest existing folder (side
+    effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    results_folder_resolver
+    """
+
+    # ---- 1 Find the nearest folder that exists ---------------------------------------
+    if not text:
+        return 'Type or drag in a folder.'
+    nearest = results_folder_resolver(text, data_folder)
+    while not nearest.exists():
+        if nearest.parent == nearest:  # a drive or root that is not there
+            return 'Type or drag in a folder you can save to.'
+        nearest = nearest.parent
+    if not nearest.is_dir():
+        return 'Type or drag in a folder, not a file.'
+
+    # ---- 2 Try to save in it ---------------------------------------------------------
+    try:
+        with tempfile.TemporaryFile(dir=nearest):
+            pass
+    except OSError:  # read-only, or not allowed: the run's log could not start there
+        return 'Type or drag in a folder you can save to.'
+    return None
+
+
+# ---- results_folder_resolver ---------------------------------------------------------
+def results_folder_resolver(text: str, data_folder: Optional[Path] = None) -> Path:
+    """
+    ---- Summary ----
+    Main function to turn the results folder answer into its path: a name or path
+    without a drive or root (quadratic_scatter_results) is taken inside the data
+    folder, so a second set of results sits beside the first.
+
+    ---- Inputs ----
+    text : str
+        The answer as typed or dragged in (quotes and a leading ~ are allowed).
+    data_folder : Optional[Path]
+        The data folder; None leaves such a name to the folder the program runs in.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Path
+        The results folder.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    path_cleaner
+    """
+
+    path = Path(path_cleaner(text)).expanduser()
+    if data_folder is not None and not path.is_absolute():
+        return Path(data_folder) / path
+    return path
+
+
+# ---- saved_values_reader -------------------------------------------------------------
+def saved_values_reader(summaries: List[dict],
+                        remembered: Dict[str, dict],
+                        export_root: Path,
+                        ) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Main function to gather the OD values and event labels saved for each file, so they
+    can be offered as defaults: those in the dataset's settings file, or, for a file
+    with none there yet, those in its workbook from an earlier run.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    remembered : Dict[str, dict]
+        The files part of the dataset's settings (dataset_settings, DATA_FORMAT.md).
+    export_root : Path
+        Results folder, where the workbooks of an earlier run are looked for.
+
+    ---- Globals read ----
+    SAVED_VALUE_KEYS (imported constant).
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: {'OD', 'volume', 'dilution_factor', 'events'} as far as saved, or
+        None when nothing is}.
+
+    ---- Globals mutated ----
+    None. Prints progress and a note when values come from the workbooks (side
+    effects).
 
     ---- Equations ----
     None.
@@ -1843,17 +1982,25 @@ def saved_values_reader(summaries: List[dict], export_root: Path) -> Dict[str, d
     """
 
     saved = {}
+    from_workbooks = False
     for number, summary in enumerate(summaries, start=1):
+        name = summary['name']
+        entry = remembered.get(name) or {}
+        kept = {k: entry[k] for k in SAVED_VALUE_KEYS if entry.get(k) is not None}
+        if kept:
+            saved[name] = kept
+            continue
         progress_printer(f'Looking for earlier values, file {number} of '
                          f'{len(summaries)} ...',
                          )
-        saved[summary['name']] = saved_settings_reader(export_root, summary['name'])
+        saved[name] = saved_settings_reader(export_root, name)
+        from_workbooks = from_workbooks or bool(saved[name])
     progress_clearer()
-    if any(saved.values()):
-        info_printer("\nEarlier OD and event values found in the experiments' "
-                     'workbooks are '
-                     'offered as defaults.',
-                     )
+    if from_workbooks:
+        info_printer(
+            '\nOD values and event labels from the workbooks of an earlier run '
+            'are offered as defaults.',
+            )
     return saved
 
 
@@ -2006,6 +2153,54 @@ def size_asker(answers: dict,
                                            maximum=1,
                                            depth=depth + 1,
                                            )
+
+
+# ---- tidy_labels_finder --------------------------------------------------------------
+def tidy_labels_finder(with_events: List[dict],
+                       result: Dict[str, List[dict]],
+                       kept: Set[str],
+                       ) -> List[Tuple[str, float, dict, str]]:
+    """
+    ---- Summary ----
+    Main function to find the event labels that could be written more tidily (8 ug
+    ml-1 as 8 µg mL⁻¹), leaving out the events left out and the labels the user chose
+    to keep as they are.
+
+    ---- Inputs ----
+    with_events : List[dict]
+        File summaries (DATA_FORMAT.md) of the files that have events.
+    result : Dict[str, List[dict]]
+        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
+        per event of the summary, in the same order.
+    kept : Set[str]
+        Labels the user chose to keep as they are.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Tuple[str, float, dict, str]]
+        (file name, time of the event in min, its entry in ``result``, tidy form) for
+        each such label, in the order of the files and events.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    label_tidier
+    """
+
+    found = []
+    for summary in with_events:
+        for event, entry in zip(summary['events'], result[summary['name']]):
+            tidy = label_tidier(entry['label'])
+            is_left_alone = entry['ignored'] or entry['label'] in kept
+            if tidy != entry['label'] and not is_left_alone:
+                found.append((summary['name'], event['time'], entry, tidy))
+    return found
 
 
 # ---- trim_layout_finder --------------------------------------------------------------

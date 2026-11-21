@@ -5,14 +5,53 @@ The settings kept with a dataset: read from and written to a file in its folder.
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+# what is known about each run, kept beside its trim and ignore limits
+SAVED_VALUE_KEYS = ('OD', 'volume', 'dilution_factor', 'events')
 SETTINGS_FILE_NAME = 'portimao_settings.json'
 
 
 # ---- HELPERS -------------------------------------------------------------------------
+
+
+# ---- _event_plainer ------------------------------------------------------------------
+def _event_plainer(event: dict) -> dict:
+    """
+    ---- Summary ----
+    Helper function to keep an event's label, concentration and whether it is ignored
+    as plain numbers and text, so it can be written to the settings file.
+
+    ---- Inputs ----
+    event : dict
+        {'datapoint', 'label', 'concentration_uM', 'ignored'} as the event questions
+        give it.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    dict
+        The same keys, as int, str, float or None, and bool.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    concentration = event.get('concentration_uM')
+    return {'datapoint': int(event['datapoint']),
+            'label': str(event.get('label') or ''),
+            'concentration_uM': None if concentration is None else float(concentration),
+            'ignored': bool(event.get('ignored', False)),
+            }
 
 
 # ---- _export_folder_resolver ---------------------------------------------------------
@@ -73,7 +112,7 @@ def _export_folder_shortener(folder: Path, export_root: Path) -> str:
 
     ---- Outputs ----
     str
-        The path from the dataset folder with forward slashes ('export'), or the full
+        The path from the dataset folder with forward slashes ('results'), or the full
         path when the results folder is somewhere else.
 
     ---- Globals mutated ----
@@ -162,8 +201,8 @@ def dataset_settings_saver(folder: Path,
     export_root : Path
         The results folder.
     files : dict
-        {file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}} in
-        minutes.
+        {file name: limits in minutes, OD values and events} as file_settings_merger
+        builds it.
     answers : dict
         The answers of the run.
 
@@ -195,3 +234,59 @@ def dataset_settings_saver(folder: Path,
     except OSError:
         return False
     return True
+
+
+# ---- file_settings_merger ------------------------------------------------------------
+def file_settings_merger(remembered: Dict[str, dict],
+                         limits: Dict[str, dict],
+                         details: Dict[str, dict],
+                         ) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Main function to build the files part of the dataset's settings: for each file of
+    this run its limits, OD values and events laid over what was saved before. A value
+    not asked this run (the OD when not scaling by OD) stays as it was saved, so it is
+    offered next time; files not in this run are kept as they were.
+
+    ---- Inputs ----
+    remembered : Dict[str, dict]
+        The files part saved before (dataset_settings, DATA_FORMAT.md); empty for a
+        dataset never saved.
+    limits : Dict[str, dict]
+        {file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}} of this
+        run.
+    details : Dict[str, dict]
+        {file name: {'OD', 'volume', 'dilution_factor', 'events'}} of this run; the OD
+        values only when scaling by OD.
+
+    ---- Globals read ----
+    SAVED_VALUE_KEYS (module constant).
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: limits, then 'OD', 'volume', 'dilution_factor' (floats) and
+        'events' (DATA_FORMAT.md, dataset_settings) where known}.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _event_plainer
+    """
+
+    files = {name: dict(entry) for name, entry in remembered.items()}
+    for name, limit in limits.items():
+        entry = files.setdefault(name, {})
+        entry.update(limit)
+        values = details.get(name) or {}
+        for key in SAVED_VALUE_KEYS:
+            if values.get(key) is None:
+                continue
+            entry[key] = ([_event_plainer(e) for e in values[key]]
+                          if key == 'events'
+                          else float(values[key])
+                          )
+    return files

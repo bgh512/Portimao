@@ -1,14 +1,22 @@
-# Portimao question flow (V2.5)
+# Portimao question flow (V2.6)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
 **How to read it**
 
 - The questions are asked in Portimao's window. If the window cannot open, nothing is asked: a message says why and what to do (in the Mac app, with a **Copy details** button to send the details with the Mac problem form).
-- `(Y/n)` and `(y/N)` questions: the capital letter is what Enter gives. The letters shown are the standard settings, offered for a dataset you have never run. Once you have started a run, your answers are saved in a small file inside the data folder (`portimao_settings.json`), and that dataset offers them instead, on this computer or on another one the folder is copied to. Press Enter on any question to use the value in `[brackets]`.
+- Each question is one line in pink. Explanations and messages are in a quieter grey above it.
+- The end of each question says what Enter gives, brighter than the rest:
+    - `(Y/n)` and `(y/N)` on a yes or no question: the capital letter is what Enter gives. y, yes, n and no are taken in any capitals.
+    - On a numbered list, the numbers you can type: every one up to five, `(1/2/3)`, the one Enter gives brighter; a range beyond, `(1–7)`, the option Enter gives brighter in the list. A question answered by several numbers says on the grey line above it to separate them with commas, and the options Enter gives are brighter in the list.
+    - `[value]` on everything else, and `[skip]` when Enter leaves the answer empty. A unit is written once, in brackets after the quantity, in another colour: (s), (nm), (µM).
+- The defaults shown here are the standard settings, offered for a dataset you have never run. Once you have started a run, your answers, your OD values and event labels among them, are saved in a small file inside the data folder (`portimao_settings.json`), and that dataset offers them instead, on this computer or on another one the folder is copied to.
+- After an answer that cannot be used, one line in red says what to type, and the question waits for the next answer.
+- Some answers are typed in a table, which opens on the terminal side under the last few lines of text: one row per file (the OD values, 3.1.1) or per event (the event labels, 3.2). Click a cell and type, or select what is there and type over it; Tab moves across and Enter moves down. A cell that cannot be used turns red. While a table is open, a **Confirm** button takes the place of the answer box: press it when the table is filled in. If a cell is still wrong or empty, one line names it and the table stays open.
+- The **Help** button beside the answer box is greyed out for now.
 - **Yes → / No →** says which question comes next. **Next** means the next question in this list.
-- The numbers here are for reference. On screen the numbers are given in the order the questions are asked, so when a branch is skipped the later numbers move up, and every "Do you accept...?" question takes a number of its own.
-- Every "Do you accept...?" question starts with **1 (Yes, accept)**, which moves on. Its other answers (**2 (No, ...)**, and **3**, **4** ... where there are more) each say what is asked again, with your last answers as the defaults.
+- In sections 1 to 3 the numbers on screen are the numbers here. A question asked again keeps its number, and when a question is skipped the next one keeps its own, so 3.3 follows 3.2 when 3.2.1 is not asked. From section 4 on, the numbers here are for reference: on screen they are given in the order the questions are asked, so when a branch is skipped the later numbers move up, and every "Do you accept...?" question takes a number of its own.
+- A "Do you accept...?" question with one way to change is a yes or no question, `(Y/n)`: the grey line just above it says what **n** does ("Type n to change the labels again."). One with more ways to change is a numbered list starting with **1) Yes, accept**, which moves on; its other answers (**2) No, ...**, and **3**, **4** ... where there are more) each say what is asked again, with your last answers as the defaults.
 - The plot on the right is redrawn after each step marked **(plot)**. You can flick through the files with the arrows or the drop-down at any time while a question waits. The file shown and the one on each side of it are redrawn at once; any other file is drawn when you go to it, with its last plot under the **Drawing ...** sign meanwhile. From section 6 on, a file you did not look at after your last change says it was not drawn with your final settings.
 - The **strip** under the plot shows what the run uses: **Haems** (ticked when the haems are worked out and shown), the **Fit**, the **Journal**, the **Width** and the **Height** of the figure of each file.
     - While your files are on the plot (sections 2 to 5), you can change it whenever a question waits. The plot is redrawn at once, the run uses the change, and the question goes on waiting.
@@ -26,8 +34,12 @@ Every question in the order it is asked, with where each answer leads. The quest
 
 | # | Question | Answer leads to |
 |---|---|---|
-| 1.1 | What is the directory with the .paf files? | The folders in the program folder (in the Mac app, in the Portimao folder in your home folder) that hold `.paf` files are listed first, numbered, with how many files each holds. Answer with a number or a name from that list, or type (or drag in) the path of another folder; Enter gives the folder used last time. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused and the question is asked again. Otherwise every file is read and listed, then **1.2**. |
-| 1.2 | To which directory would you like the results to be saved? `[the export folder inside the data folder]` If the dataset was run before, a message says its saved settings are offered as the defaults, and its last results folder is offered here. | the standard plot is drawn **(plot)**, then **2.1** |
+| 1.1 | What is the directory with the .paf files? | The folders in the program folder (in the Mac app, in the Portimao folder in your home folder) that hold `.paf` files are listed first, numbered, with how many files each holds. Answer with a number or a name from that list, or type (or drag in) the path of another folder; Enter gives the folder used last time. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused: one line says what to type and the question waits. Otherwise every file is read and listed, then **1.2**. |
+| 1.2 | To which directory would you like the results to be saved? `[the results folder inside the data folder]` If the dataset was run before, a message says its saved settings are offered as the defaults, and its last results folder is offered here. A name without a path, such as `quadratic_scatter_results`, is made inside the data folder, so a second set of results can sit beside the first. | A file, or a folder that cannot be saved to, is refused: one line says what to type and the question waits. **1.2.1** if the folder already holds results of any of these files; otherwise the standard plot is drawn **(plot)**, then **2.1** |
+
+| # | Question | Yes → | No → |
+|---|---|---|---|
+| 1.2.1 | *(only when the folder already holds results of these files; above it: "results already holds results of 12 of these 12 files.")* Do you want to write over them? `(y/N)` | the standard plot is drawn **(plot)**, then **2.1**; results written later replace those there | **1.2** again, offering a free name beside it (`results_2`), with the line "Type another folder, or a new name: a name without a path is made inside the data folder." |
 
 The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. The haems are worked out with the standard fit (`bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit file is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
 
@@ -44,56 +56,63 @@ TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted
 
 | # | Question | Leads to |
 |---|---|---|
-| 2.1 | Drag the edges on the plot: grey for the trimmed parts, amber for the ignored parts, or type the times in the strip under the plot. With "Every file" ticked, a change applies to every file; untick it to change only the file shown. Press Enter when every file looks right. | Enter with the answer box empty: the limits of every file are listed, the plot shows the data they keep **(plot)**, then **2.2**. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 2.1 goes on waiting. |
+| 2.1 | Drag the edges on the plot, or type the times in the strip under it. Press Enter when every file looks right. (above it, in grey: what TRIM and IGNORE mean, and "Grey edges trim, amber edges ignore; with "Every file" ticked, a change moves every file.") | Enter with the answer box empty: the limits of every file are listed, the plot shows the data they keep **(plot)**, then **3.1**. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 2.1 goes on waiting. |
 
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 2.2 | Do you want to export all the data now, cut to these limits, so you can plot it yourself? `(y/N)` | **2.2.1** | **3.1** |
-| 2.2.1 | Do you want to include the spectra as csv files (large, and it takes a while)? `(y/N)` | the data is exported to `<results>/all_data/<file>/` (a workbook per file with every sheet, plus the spectra csv files if chosen), then **3.1** | |
-
-The export is not scaled by OD, decomposed or averaged; event labels are the ones in the files, and the ignored parts are included.
+If you exported the data at 3.4 and this step is asked again (**4.3**, or going back at **5.8**), each file whose edges changed is exported again with the same choice, and a message says how many. The whole recording of a file is written only when the file has just become trimmed, and taken away when it is no longer trimmed.
 
 ---
 
 ## 3. OD values and event labels
 
-The last part of the import: what is known about each run. Earlier OD and event values found in the files' workbooks are offered as defaults. The plot is the standard plot, cut to the limits of section 2.
+The last part of the import: what is known about each run, then the offer to export what was imported. The OD values and event labels saved for the dataset are offered as defaults. For a dataset whose settings file holds none yet, those found in the workbooks of an earlier run are offered instead, and a message says so. The plot is the standard plot, cut to the limits of section 2.
 
 ### 3.A OD values
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.1 | Do you want to scale by OD (divide by dilution factor x OD x volume)? `(y/N)` | **3.1.1** | **3.2** (no OD scaling anywhere in the run) |
+| 3.1 | Do you want to scale by OD? `(y/N)` (above it, in grey: "Scaling by OD divides the OCR (and the haems, if you choose so in section 5) by dilution factor × OD × volume.") | **3.1.1** | **3.2** (no OD scaling anywhere in the run) |
 
-A table opens under the terminal text, above the answer box, with one row per file and a column each for the OD, the volume (mL) and the dilution factor. The values stored for a file are filled in, and the dilution factor is 1 when none is stored. Click a cell and type; Tab moves across and Enter moves down.
+The OD table opens on the terminal side, with one row per file and a column each for the OD, the volume (mL) and the dilution factor. The values stored for a file are filled in, and the dilution factor is 1 when none is stored. Clicking a cell of a file shows that file on the plot.
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.1.1 | Fill in the table under this text for each file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run. Then press Enter here. | If a cell is empty or not a number above 0, those cells are named and the question is asked again (with the next number). Otherwise the table closes, the values of every file are listed and the next step is **3.2**. |
+| 3.1.1 | Fill in the OD, volume and dilution of each file, then press Confirm. (above it, in grey: "One row per file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run.") | If a cell is empty or not a number above 0, one line names those cells and the table stays open. Otherwise the table closes, the values of every file are listed and the next step is **3.2**. |
 
 The data is **not** scaled by OD here. The values are only checked; the scaling is chosen in section 5.
 
 ### 3.B Event labels
 
-If no file has any event, 3.2 to 3.4 are not asked and the next step is **3.5**.
+If no file has any event, nothing is asked here and the next step is **3.4**.
 
-"Current runs with events are:" and the runs with their event labels are listed first. A label whose units could be written more tidily is offered in its tidy form: `u` in front of a unit as µ (`100 uM` as 100 µM), a litre as a capital L, a space between a number and its unit, and `-1` after a unit or anything after `^` raised (`8ug ml-1` as 8 µg mL⁻¹). Only units are changed: a name with numbers in it (`nd-011992`) and a formula (`H2O2`) are left as they are. The **Symbols** row under the answer box types µ, ⁻¹, ₂ and the like by hand.
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 3.2 | *(only when a label in the list could be tidier; those labels are listed as "label -> tidy form", then)* Do you want to use these tidy forms? `(Y/n)` | every listed label is replaced by its tidy form, then **3.3** | the labels stay as they are (each is offered its tidy form again if you go through it in 3.4.1), then **3.3** |
-| 3.3 | Do you want to change any event labels? `(y/N)` | **3.4** | the labels are drawn **(plot)**, then **3.5** |
+The labels table opens on the terminal side: one row per event, under the name of its file, with the time of the event (min), its label and its final concentration (µM). Each label starts as saved for the dataset, or else as written in the file; an event left out before reads `ignore`. Clicking a cell of a file shows that file on the plot. The **Symbols** row under the table types µ, ⁻¹, ₂ and the like into the cell last typed in.
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.4 | Which run(s) do you want to change? (numbers from the list, separated by commas) | **3.4.1** for the first chosen run |
-| 3.4.1 | For each event of the run: What was added at *time* min? Write 'ignore' to ignore this event. `[current label]` | If you write `ignore`, the next event. If the label, typed or kept with Enter, could be tidier, **3.4.2**. Otherwise **3.4.3**. |
-| 3.4.2 | Do you want to write this as '*tidy form*'? `(Y/n)` | **Yes**: the tidy form is used. **No**: the label stays as it is. Then **3.4.3**. |
-| 3.4.3 | What was the final concentration in uM? `[unknown]` | the next event, then the next chosen run, then the labels are drawn **(plot)** and **3.5** |
+| 3.2 | Fill in the label and the concentration of each event, then press Confirm. (above it, in grey: "One row per event. Write ignore as the label to leave an event out.") | A concentration may be left empty. An event labelled `ignore` (in any capitals) is left out, and its concentration is greyed out. If a label is empty or a concentration is not a number of 0 or more, one line names those cells and the table stays open. Otherwise the table closes: **3.2.1** if a label could be written more tidily, otherwise the labels of every file are listed and drawn **(plot)**, then **3.3**. |
 
-| # | Question | 1 → | 2 → |
+A label is written more tidily with `u` in front of a unit as µ (`100 uM` as 100 µM), a litre as a capital L, a space between a number and its unit, and `-1` after a unit or anything after `^` raised (`8ug ml-1` as 8 µg mL⁻¹). Only units are changed: a name with numbers in it (`nd-011992`) and a formula (`H2O2`) are left as they are. The labels that could be tidier are listed as "label -> tidy form", then:
+
+| # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.5 | Do you accept these event labels? | **4.1** | **3.4** (change the labels again: the runs are listed again and 3.2 and 3.3 are not asked) |
+| 3.2.1 | *(only when a label could be tidier)* Do you want to use these tidy forms? `(Y/n)` | every listed label is replaced by its tidy form; the labels are listed and drawn **(plot)**, then **3.3** | the labels stay as typed and are not offered again while you go through the labels; the labels are listed and drawn **(plot)**, then **3.3** |
+
+| # | Question | Yes → | No → |
+|---|---|---|---|
+| 3.3 | Do you accept these event labels? `(Y/n)` (above it: "Type n to change the labels again.") | **3.4** | **3.2** (the table opens again with the labels as you left them) |
+
+### 3.C Export
+
+| # | Question | Leads to |
+|---|---|---|
+| 3.4 | What would you like to export now, so you can plot it yourself? `(1/2/3/4)` (above it, in grey: "The spectra are large, and writing them takes a while.") 1) Nothing 2) The summary: a workbook for each file (a few MB) 3) The trimmed data: the summaries and the trimmed spectra as csv files (about *size*) 4) All the data: the summaries and the spectra, trimmed and full (about *size*). Enter gives 1, also for a dataset exported before. | **1**: nothing is written, then **4.1**. **2, 3 or 4**: every file is exported, then a message says where, and **4.1** |
+
+The sizes are worked out for your files: about 1.2 GB of spectra for each 100 MB `.paf` file, less for a trimmed one. Each file is exported to its own folder in the results folder, `<results>/<file>/`:
+
+- `<file>.xlsx`: the trimmed data (all of it for a file not trimmed), with the sheets **CcO2** and **CsO2** (the measured and set oxygen), **VoO2** (the OCR), **Events** (the time, the text in the file, your label and concentration, and whether the event is ignored) and **Metadata** (your OD, volume and dilution, the trimmed and ignored edges in minutes, and the spectrometers). The run later writes this workbook again with its own results added.
+- the spectra csv files, with 3 and 4: one per spectrometer and kind (`Cyt_transmiss.csv`, `Cyt_intensity.csv`, `Cyt_attenuation.csv`, and the same for `NADH`), wavelengths down and one column per spectrum.
+- `full/`, only for a file you trimmed: the same for the whole recording (the spectra only with 4). It does not record the edges, so it stays as it is when they change.
+
+Nothing is scaled by OD, decomposed or averaged, and the ignored parts are included.
 
 ---
 
@@ -119,15 +138,15 @@ If the `fits/` folder holds no `.csv` file, 4.1 is still asked, and 4.1.1 then o
 | 4.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last; the fit in the strip is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.4**. |
 | 4.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **4.2** (or **4.1.1.1** when the components are being found) |
 
-To try another fit, pick it in the strip while 4.2 waits: the plot is redrawn with it. To leave the haems out, untick Haems in the strip; answering 1 then goes on without haems, to **4.4**.
+To try another fit, pick it in the strip while 4.2 waits: the plot is redrawn with it. To leave the haems out, untick Haems in the strip; answering yes then goes on without haems, to **4.4**.
 
-| # | Question | 1 → | 2 → |
+| # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.2 | Do you accept this decomposition? | **4.3** (**4.4** when Haems was unticked) | **4.1.1.1** (*No, find the components from the data*: the questions of 4.A.1, then 4.2 again with the components) |
+| 4.2 | Do you accept this decomposition? `(Y/n)` (above it: "Type n to find the components from the data.") | **4.3** (**4.4** when Haems was unticked) | **4.1.1.1** (the questions of 4.A.1, then 4.2 again with the components) |
 
 #### 4.A.1 Components from the data (principal component analysis)
 
-Asked when the last choice of 4.1.1, or answer 2 of 4.2, is taken. The strip is greyed out until they are answered, and its fit list then includes a fit file saved in 4.1.1.9. The numbers keep counting up when a question is asked again, and each component name is a question of its own, so the numbers on screen can be higher than these. The files are read for their spectra (trimmed, without the ignored parts; this can take a moment). Once the components are made, the plot window gets a *PCA components* picture (one panel per component, coloured by the haem type it looks like) and a *PCA examples* picture (the best and worst described spectrum and their residuals) after the files **(plot)**. The **Drawing ...** sign is on the plot while they are made. They go when the decomposition is drawn.
+Asked when the last choice of 4.1.1, or No at 4.2, is taken. The strip is greyed out until they are answered, and its fit list then includes a fit file saved in 4.1.1.9. The numbers keep counting up when a question is asked again, and each component name is a question of its own, so the numbers on screen can be higher than these. The files are read for their spectra (trimmed, without the ignored parts; this can take a moment). Once the components are made, the plot window gets a *PCA components* picture (one panel per component, coloured by the haem type it looks like) and a *PCA examples* picture (the best and worst described spectrum and their residuals) after the files **(plot)**. The **Drawing ...** sign is on the plot while they are made. They go when the decomposition is drawn.
 
 | # | Question | Leads to |
 |---|---|---|
@@ -139,7 +158,7 @@ Asked when the last choice of 4.1.1, or answer 2 of 4.2, is taken. The strip is 
 
 | # | Question | 1 → | 2 → | 3 → | 4 → |
 |---|---|---|---|---|---|
-| 4.1.1.6 | Do you accept these components? | **4.1.1.7** | **4.1.1.3** (the number of components) | **4.1.1.1** (the window) | *No, choose a fit file instead*: **4.1.1**, or **4.2** when you came from 4.2 (pick the fit in the strip) |
+| 4.1.1.6 | Do you accept these components? `(1/2/3/4)` | **4.1.1.7** | **4.1.1.3** (the number of components) | **4.1.1.1** (the window) | *No, choose a fit file instead*: **4.1.1**, or **4.2** when you came from 4.2 (pick the fit in the strip) |
 
 | # | Question | Leads to |
 |---|---|---|
@@ -151,7 +170,7 @@ Asked when the last choice of 4.1.1, or answer 2 of 4.2, is taken. The strip is 
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.3 | *(only when the haems are decomposed)* Do you want to change the trim and ignore times now that the haems are shown? `(y/N)` | section 2 (**2.1** to **2.2.1**, the offer to export all the data included) is asked again, numbered on from here, with the edges where you left them, your limits as red dashed lines and the haems of the chosen fit on the plot; then the plot is redrawn **(plot)** and **4.4** | **4.4** |
+| 4.3 | *(only when the haems are decomposed)* Do you want to change the trim and ignore times now that the haems are shown? `(y/N)` | section 2 (**2.1**) is asked again with its own number, with the edges where you left them, your limits as red dashed lines and the haems of the chosen fit on the plot; if you exported at 3.4, the files whose edges changed are exported again (see section 2); then the plot is redrawn **(plot)** and **4.4** | **4.4** |
 
 ### 4.C Averaging around the events
 
@@ -168,9 +187,11 @@ You can set both with the mouse: while 4.4.1 waits, drag across one window on th
 | 4.4.1 | How long a window (s) should the average be taken over? `[120]` | **4.4.2** |
 | 4.4.2 | How long before the next addition should the averaging window end (s)? `[30]`, or, after a drag in 4.4.1, the time from where you let go to the next addition (no default from a drag after the last addition). A drag here gives the gap alone. | the windows are drawn **(plot)**, then **4.5** |
 
-| # | Question | 1 → | 2 → |
+Windows that do not fit are skipped; they are drawn red with a warning sign and listed in red in the terminal first.
+
+| # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.5 | Do you accept these averaging windows? Windows that do not fit are skipped; they are drawn red with a warning sign and listed in red in the terminal first. | **5.1** | **4.4** |
+| 4.5 | Do you accept these averaging windows? `(Y/n)` (above it: "Type n to change the window and gap.") | **5.1** | **4.4** |
 
 ---
 
@@ -188,7 +209,7 @@ The haems are in the figure when Haems is ticked in the strip. The journal, widt
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.1 | Do you accept this figure? | **1) Yes, accept**: **5.8**. **2) No, change the oxygen and OCR**: **5.2**. **3) No, change which haems are shown** *(only when the haems are plotted)*: **5.4.1**. **4) No, change how the haems are shown** *(only when the haems are plotted)*: **5.5**. **5) No, change the angle of the event labels** *(only when something is plotted)*: **5.6**. |
+| 5.1 | Do you accept this figure? `(1/2/3/4/5)` | **1) Yes, accept**: **5.8**. **2) No, change the oxygen and OCR**: **5.2**. **3) No, change which haems are shown** *(only when the haems are plotted)*: **5.4.1**. **4) No, change how the haems are shown** *(only when the haems are plotted)*: **5.5**. **5) No, change the angle of the event labels** *(only when something is plotted)*: **5.6**. When nothing is plotted, the oxygen and OCR are the only change, so it is a yes or no question `(Y/n)`: **No** leads to **5.2**. |
 
 Each part's questions offer your current choices as the defaults. After them the figure is drawn again **(plot)** and **5.1** is asked again; the numbers on screen keep counting up. If nothing is plotted (5.2 and 5.3 No, and Haems unticked), a message says no individual figures will be made, nothing is drawn, and 5.1 is asked again so you can turn a panel back on; accepting then makes no individual figures.
 
@@ -206,7 +227,7 @@ Whether the haems are plotted at all is the Haems box in the strip; this questio
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.4.1 | Which haems would you like to plot, and in which order? (numbers separated by commas; Enter = the haems shown) | the figure is drawn **(plot)**, then **5.1** |
+| 5.4.1 | Which haems would you like to plot, and in which order? (the numbers of the haems; the grey line above says to separate them with commas, and the haems shown are brighter in the list and are what Enter gives) | the figure is drawn **(plot)**, then **5.1** |
 
 ### 5.C How the haems are shown
 
@@ -261,9 +282,9 @@ Each figure is drawn from your data once its questions are answered (this reads 
 | 6.1.2 | Which experiment goes on the right? | **6.1.3** |
 | 6.1.3 | Which journal format would you like? (then, for a journal, how wide and how tall, as in 5.7) | the figure is drawn **(plot)**, then **6.2** |
 
-| # | Question | 1 → | 2 → |
+| # | Question | Yes → | No → |
 |---|---|---|---|
-| 6.2 | Do you accept this figure? | **6.3** | **6.1** |
+| 6.2 | Do you accept this figure? `(Y/n)` (above it: "Type n to change its settings.") | **6.3** | **6.1** |
 
 If the figure cannot be previewed, a message says so and the figure is kept as it is.
 
@@ -285,9 +306,9 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 | 6.3.4 | Do you want the run name written faintly on each plot? `(Y/n)` | **6.3.5** |
 | 6.3.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then **6.4** |
 
-| # | Question | 1 → | 2 → |
+| # | Question | Yes → | No → |
 |---|---|---|---|
-| 6.4 | Do you accept this figure? | **7.1** | **6.3** |
+| 6.4 | Do you accept this figure? `(Y/n)` (above it: "Type n to change its settings.") | **7.1** | **6.3** |
 
 ---
 
@@ -316,11 +337,13 @@ The figure is built up in the plot window: the drop-down lists the individual ex
 | 7.1.7 | Which experiment should decomposition plot 3 show? | drawn **(plot)**, accept question, then **7.1.8** |
 | 7.1.8 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then the final accept question |
 
-| Question | 1 → | 2 → |
+Each is a yes or no question, `(Y/n)`, with what **n** does on the grey line above it.
+
+| Question | Yes → | No → |
 |---|---|---|
-| Do you accept these waterfall plots? | the next question | **7.1.2** again |
-| Do you accept this plot? (after each kinetic trace and decomposition plot) | the next question | the same choice again |
-| Do you accept this figure? (final) | **7.2** | **7.1** |
+| Do you accept these waterfall plots? | the next question | **7.1.2** again ("Type n to choose the time points again.") |
+| Do you accept this plot? (after each kinetic trace and decomposition plot) | the next question | the same choice again ("Type n to choose another experiment.") |
+| Do you accept this figure? (final) | **7.2** | **7.1** ("Type n to change its settings.") |
 
 ### 7.B Haem and OCR response
 
@@ -340,12 +363,14 @@ The figure is built up in the plot window in stages. First only the baseline OCR
 | 7.2.4 | Which haems should get a row, and in which order? | drawn **(plot)**, accept question, then **7.2.5** |
 | 7.2.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then the final accept question |
 
-| Question | 1 → | 2 → |
+Each is a yes or no question, `(Y/n)`, with what **n** does on the grey line above it.
+
+| Question | Yes → | No → |
 |---|---|---|
-| Do you accept the OCR plots? | **7.2.2** | **7.2.1** again |
-| Do you accept these haem plots? | **7.2.4** | **7.2.2** again |
-| Do you accept these haem rows? | **7.2.5** | **7.2.4** again |
-| Do you accept this figure? (final) | **8.1** | **7.2** |
+| Do you accept the OCR plots? | **7.2.2** | **7.2.1** again ("Type n to choose the OCR again.") |
+| Do you accept these haem plots? | **7.2.4** | **7.2.2** again ("Type n to choose how to show the haems again.") |
+| Do you accept these haem rows? | **7.2.5** | **7.2.4** again ("Type n to choose the haems again.") |
+| Do you accept this figure? (final) | **8.1** | **7.2** ("Type n to change its settings.") |
 
 ---
 
@@ -366,4 +391,4 @@ A summary of all your answers is printed (files, results folder, trimming, ignor
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 9.1 | Do you want to start? `(Y/n)` | Your answers are saved in the data folder (`portimao_settings.json`) for the next time this dataset is opened, and the run starts. If the data folder cannot be written to, a message says the dataset will start from the standard settings next time. Every file is processed, plotted and exported, then the multi-experiment figures and summaries are made. | The program stops and nothing is changed. |
+| 9.1 | Do you want to start? `(Y/n)` | Your answers are saved in the data folder (`portimao_settings.json`) for the next time this dataset is opened, and the run starts. If the data folder cannot be written to, a message says the dataset will start from the standard settings next time. Every file is processed, plotted and exported, then the multi-experiment figures and summaries are made. | The program stops and nothing else is changed: data you exported at 3.4 is kept, and the last line says so. |

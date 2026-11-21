@@ -158,7 +158,7 @@ def test_answers_are_logged_as_they_come(tmp_path: Path,
     assert not any('\x1b' in line for line in lines)
     question = next(i for i, line in enumerate(lines) if 'every table' in line)
     assert lines[question + 1:question + 4] == ['> maybe',
-                                                'Please answer y or n.',
+                                                'Type y or n.',
                                                 '> n',
                                                 ]
     assert lines.index('Settings:') > question + 3

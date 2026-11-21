@@ -3,9 +3,10 @@ Helpers for asking numbered questions in the terminal of the window.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import math
 import os
 import re
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Set, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.run_logging import answer_logger
@@ -13,11 +14,21 @@ from utils_shared.run_logging import answer_logger
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 COLOUR_QUESTION = '\x1b[1;38;5;213m'  # bold pink
+COLOUR_DEFAULT = '\x1b[1;97m'  # bold white: what Enter gives
+COLOUR_QUIET = '\x1b[38;5;245m'  # grey: explanations and loading messages
+COLOUR_RETRY = '\x1b[91m'  # soft red: what to type, after a wrong answer
 COLOUR_SECTION = '\x1b[1;33m'  # bold yellow
+COLOUR_UNIT = '\x1b[1;96m'  # bold cyan: the unit of a number question
 ITALIC = '\x1b[3m'
 RESET = '\x1b[0m'
 INDENT = '   '
+# a list this long or shorter shows every number at the end, (1/2/3); a longer one a
+# range, (1–7)
+LIST_SPELLED_OUT = 5
 MAX_DEPTH = 6
+NUMBERS_NOTE = 'Type one or more numbers, separated by commas.'
+# a unit in brackets in a number question: (s), (nm), (µM); words with spaces are not
+UNIT_PATTERN = re.compile(r'\(([^()\s]{1,6})\)')
 _counters = [0] * MAX_DEPTH  # [section, question, sub question, ...]
 _tight_next = False  # True: the next question follows its heading line directly
 # What is told when a question can be answered with the mouse (the window, which then
@@ -43,6 +54,39 @@ class UserQuitError(Exception):
 
 
 # ---- QUESTIONS HELPERS ---------------------------------------------------------------
+
+
+# ---- _brightener ---------------------------------------------------------------------
+def _brightener(text: str, code: str = COLOUR_DEFAULT) -> str:
+    """
+    ---- Summary ----
+    Helper function to set part of a question line in another colour (what Enter
+    gives, or a unit) and go back to the question colour after it.
+
+    ---- Inputs ----
+    text : str
+        The part to colour.
+    code : str
+        Its colour code (COLOUR_DEFAULT by default).
+
+    ---- Globals read ----
+    COLOUR_DEFAULT, COLOUR_QUESTION, RESET (module constants).
+
+    ---- Outputs ----
+    str
+        The part with its colour, followed by the question colour again.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return f'{RESET}{code}{text}{RESET}{COLOUR_QUESTION}'
 
 
 # ---- _input_reader -------------------------------------------------------------------
@@ -87,6 +131,92 @@ def _input_reader(text: str, indent: str = '') -> str:
     return answer
 
 
+# ---- _limits_checker -----------------------------------------------------------------
+def _limits_checker(value: float,
+                    minimum: Optional[float],
+                    maximum: Optional[float],
+                    exclusive_minimum: bool,
+                    is_whole: bool,
+                    ) -> bool:
+    """
+    ---- Summary ----
+    Helper function to say whether a number is within the limits of a number question.
+
+    ---- Inputs ----
+    value : float
+        The number.
+    minimum : Optional[float]
+        Smallest accepted value, or None.
+    maximum : Optional[float]
+        Largest accepted value, or None.
+    exclusive_minimum : bool
+        True when the minimum itself is not accepted.
+    is_whole : bool
+        True when only whole numbers are accepted.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when the number can be used.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if minimum is not None and (value <= minimum if exclusive_minimum else value < minimum):
+        return False
+    if maximum is not None and value > maximum:
+        return False
+    return not is_whole or value == int(value)
+
+
+# ---- _list_ending_builder ------------------------------------------------------------
+def _list_ending_builder(count: int, default_number: Optional[int]) -> str:
+    """
+    ---- Summary ----
+    Helper function to write the end of a question answered from a numbered list: every
+    number up to LIST_SPELLED_OUT options, (1/2/3) with the default brighter, and a
+    range beyond, (1–7), whose default is brighter in the list instead.
+
+    ---- Inputs ----
+    count : int
+        Number of options.
+    default_number : Optional[int]
+        Number given by Enter, brightened when every number is shown; None for none.
+
+    ---- Globals read ----
+    LIST_SPELLED_OUT (module constant).
+
+    ---- Outputs ----
+    str
+        The ending, for example "(1/2/3)" or "(1–7)", with colour codes.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _brightener
+    """
+
+    if count > LIST_SPELLED_OUT:
+        return f'(1–{count})'
+    numbers = [_brightener(str(n)) if n == default_number else str(n)
+               for n in range(1, count + 1)
+               ]
+    return f"({'/'.join(numbers)})"
+
+
 # ---- _number_builder -----------------------------------------------------------------
 def _number_builder(depth: int) -> str:
     """
@@ -121,22 +251,227 @@ def _number_builder(depth: int) -> str:
     return '.'.join(str(c) for c in _counters[:depth + 1])
 
 
-# ---- _question_printer ---------------------------------------------------------------
-def _question_printer(question: str, depth: int, hint: str = '') -> str:
+# ---- _number_depth_finder ------------------------------------------------------------
+def _number_depth_finder(number: Optional[str], depth: int) -> int:
     """
     ---- Summary ----
-    Helper function to print the numbered, coloured question line.
+    Helper function to give the numbering depth of a question: that of its own number
+    when it has one ('3.4.1' is depth 2), otherwise the depth it was asked at.
+
+    ---- Inputs ----
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '3.5'; None when it is
+        numbered in the order asked.
+    depth : int
+        Numbering depth it was asked at (1 = 3.1, 2 = 3.1.1, ...).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    int
+        The numbering depth, at least 1. Raises ValueError for a number that is not
+        whole numbers joined by dots, below a section.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if number is None:
+        return depth
+    if not re.fullmatch(r'\d+(\.\d+)+', number):
+        raise ValueError(f"The question number '{number}' is not like 3.5 or 3.4.1.")
+    return number.count('.')
+
+
+# ---- _number_hint_builder ------------------------------------------------------------
+def _number_hint_builder(minimum: Optional[float],
+                         maximum: Optional[float],
+                         exclusive_minimum: bool,
+                         is_whole: bool,
+                         ) -> str:
+    """
+    ---- Summary ----
+    Helper function to write the one sentence shown after a wrong answer to a number
+    question: what kind of number, its limits and an example within them.
+
+    ---- Inputs ----
+    minimum : Optional[float]
+        Smallest accepted value, or None.
+    maximum : Optional[float]
+        Largest accepted value, or None.
+    exclusive_minimum : bool
+        True when the minimum itself is not accepted.
+    is_whole : bool
+        True when only whole numbers are accepted.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        For example "Type a number of 0 or more, for example 2.5." or "Type a whole
+        number from 1 to 8, for example 3."; without the example when none fits.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _limits_checker
+    """
+
+    # ---- 1 The kind of number and its limits -----------------------------------------
+    kind = 'a whole number' if is_whole else 'a number'
+    if minimum is not None and maximum is not None:
+        limits = (f' above {minimum:g} and up to {maximum:g}'
+                  if exclusive_minimum
+                  else f' from {minimum:g} to {maximum:g}'
+                  )
+    elif minimum is not None:
+        limits = f' above {minimum:g}' if exclusive_minimum else f' of {minimum:g} or more'
+    elif maximum is not None:
+        limits = f' of {maximum:g} or less'
+    else:
+        limits = ''
+
+    # ---- 2 An example within the limits ----------------------------------------------
+    candidates = [3.0 if is_whole else 2.5]
+    if minimum is not None and maximum is not None:
+        middle = (minimum + maximum) / 2
+        candidates.append(float(round(middle)) if is_whole else middle)
+    if minimum is not None:
+        candidates.append(minimum + 1)
+    if maximum is not None:
+        candidates.append(maximum)
+    example = next(
+        (value
+         for value in candidates
+         if _limits_checker(value, minimum, maximum, exclusive_minimum, is_whole)
+         ),
+        None,
+        )
+    if example is None:
+        return f'Type {kind}{limits}.'
+    return f'Type {kind}{limits}, for example {example:g}.'
+
+
+# ---- _numbers_hint_builder -----------------------------------------------------------
+def _numbers_hint_builder(count: int) -> str:
+    """
+    ---- Summary ----
+    Helper function to write the one sentence shown after a wrong answer to a question
+    answered by several numbers from a list.
+
+    ---- Inputs ----
+    count : int
+        Number of options in the list.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        For example "Type numbers from 1 to 5, separated by commas, for example 1,3.".
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if count < 2:
+        return 'Type 1.'
+    return (f'Type numbers from 1 to {count}, separated by commas, for example '
+            f'1,{min(count, 3)}.'
+            )
+
+
+# ---- _options_printer ----------------------------------------------------------------
+def _options_printer(labels: Sequence[str], indent: str, bright: Set[int]) -> None:
+    """
+    ---- Summary ----
+    Helper function to print the numbered options of a list under its question, the
+    ones Enter gives brighter where the end of the question does not show them.
+
+    ---- Inputs ----
+    labels : Sequence[str]
+        The options as shown, numbered 1), 2), ...
+    indent : str
+        Indent of the question.
+    bright : Set[int]
+        Numbers (from 1) of the options to show brighter.
+
+    ---- Globals read ----
+    COLOUR_DEFAULT, INDENT (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    text_colourer
+    """
+
+    for number, label in enumerate(labels, start=1):
+        line = f'{number}) {label}'
+        if number in bright:
+            line = text_colourer(line, COLOUR_DEFAULT)
+        print(f'{indent}{INDENT}{line}')
+
+
+# ---- _question_printer ---------------------------------------------------------------
+def _question_printer(question: str,
+                      depth: int,
+                      ending: str = '',
+                      note: str = '',
+                      has_unit: bool = False,
+                      number: Optional[str] = None,
+                      ) -> str:
+    """
+    ---- Summary ----
+    Helper function to print the numbered question line in the question colour, ending
+    in what Enter gives, with an optional quieter line just above it. A question with
+    its own number shows that number and leaves the counters alone; any other takes the
+    next number in the order asked.
 
     ---- Inputs ----
     question : str
         Question text, without its number.
     depth : int
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
-    hint : str
-        Text after the question, such as "[default]:" or "(y/N):"; may be empty.
+    ending : str
+        What Enter gives, such as "[120]" or "(y/N)", with its colour codes; may be
+        empty.
+    note : str
+        A line said just above the question in the quieter colour, such as what "n"
+        does; may be empty.
+    has_unit : bool
+        True for a number question, whose unit in brackets is highlighted.
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '3.5'; None to number
+        it in the order asked. When given, ``depth`` must be its depth.
 
     ---- Globals read ----
-    INDENT (module constant); _tight_next (module state); text_colourer.
+    COLOUR_QUIET, INDENT (module constants); _tight_next (module state).
 
     ---- Outputs ----
     str
@@ -150,15 +485,21 @@ def _question_printer(question: str, depth: int, hint: str = '') -> str:
 
     ---- Helpers ----
     _number_builder
+    _unit_highlighter
     text_colourer
     """
 
     global _tight_next
     indent = INDENT * (depth - 1)
-    line = f'{_number_builder(depth)} {question}'
-    if hint:
-        line += f' {hint}'
-    print(f"{'' if _tight_next else chr(10)}{indent}{text_colourer(line)}")
+    gap = '' if _tight_next else '\n'
+    if note:
+        print(f'{gap}{indent}{text_colourer(note, COLOUR_QUIET)}')
+        gap = ''
+    shown = _unit_highlighter(question) if has_unit else question
+    line = f'{number or _number_builder(depth)} {shown}'
+    if ending:
+        line += f' {ending}'
+    print(f'{gap}{indent}{text_colourer(line)}')
     _tight_next = False
     return indent
 
@@ -199,7 +540,102 @@ def _time_announcer(kind: Optional[str], reader: Optional[Callable]) -> None:
         _time_requester(kind, reader)
 
 
+# ---- _unit_highlighter ---------------------------------------------------------------
+def _unit_highlighter(question: str) -> str:
+    """
+    ---- Summary ----
+    Helper function to highlight the unit of a number question, written once in
+    brackets after the quantity: "How long a window (s) ...", "... concentration
+    (µM)?". Brackets holding words with spaces, such as "(0 for none)", are left alone.
+
+    ---- Inputs ----
+    question : str
+        Question text.
+
+    ---- Globals read ----
+    COLOUR_UNIT, UNIT_PATTERN (module constants).
+
+    ---- Outputs ----
+    str
+        The question with each unit in the unit colour.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _brightener
+    """
+
+    return UNIT_PATTERN.sub(lambda m: f'({_brightener(m.group(1), COLOUR_UNIT)})',
+                            question,
+                            )
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- accept_asker --------------------------------------------------------------------
+def accept_asker(question: str,
+                 changes: Sequence[Tuple[str, str]],
+                 depth: int = 1,
+                 number: Optional[str] = None,
+                 ) -> str:
+    """
+    ---- Summary ----
+    Main function to ask a "Do you accept ...?" question, the one place its answers are
+    written. With one way to change it is a yes or no question, (Y/n), with a quieter
+    line above saying what n does; with more it is a numbered list starting
+    "1) Yes, accept", then "2) No, <change>" and so on.
+
+    ---- Inputs ----
+    question : str
+        The accept question, for example 'Do you accept these event labels?'.
+    changes : Sequence[Tuple[str, str]]
+        The ways to change, at least one, as (key, what it does), for example
+        ('no', 'change the labels again').
+    depth : int
+        Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '3.5'; None to number
+        it in the order asked.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        'yes' when accepted, otherwise the key of the change chosen. Raises ValueError
+        when no way to change is given.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal (side effect); advances the question
+    numbering counters when it has no number of its own.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    choice_asker
+    yes_no_asker
+    """
+
+    if not changes:
+        raise ValueError(f"The question '{question}' was given no way to change.")
+    if len(changes) == 1:
+        key, change = changes[0]
+        is_accepted = yes_no_asker(question,
+                                   True,
+                                   depth,
+                                   note=f'Type n to {change}.',
+                                   number=number,
+                                   )
+        return 'yes' if is_accepted else key
+    options = [('yes', 'Yes, accept'),
+               ] + [(key, f'No, {change}') for key, change in changes]
+    return choice_asker(question, options, 'yes', depth, number=number)
 
 
 # ---- choice_asker --------------------------------------------------------------------
@@ -207,10 +643,14 @@ def choice_asker(question: str,
                  options: Sequence[Tuple[str, str]],
                  default: Optional[str] = None,
                  depth: int = 1,
+                 number: Optional[str] = None,
                  ) -> str:
     """
     ---- Summary ----
-    Main function to ask a question answered by choosing one numbered option.
+    Main function to ask a question answered by choosing one numbered option. The end
+    of the question gives the numbers that can be typed: every one up to
+    LIST_SPELLED_OUT options, the default brighter, or a range beyond, the default
+    option brighter in the list.
 
     ---- Inputs ----
     question : str
@@ -221,9 +661,12 @@ def choice_asker(question: str,
         Key chosen when only Enter is pressed.
     depth : int
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '5.1'; None to number
+        it in the order asked.
 
     ---- Globals read ----
-    None.
+    LIST_SPELLED_OUT (module constant).
 
     ---- Outputs ----
     str
@@ -231,42 +674,116 @@ def choice_asker(question: str,
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect); advances the question
-    numbering counters.
+    numbering counters when it has no number of its own.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _input_reader
+    _list_ending_builder
+    _number_depth_finder
+    _options_printer
     _question_printer
+    retry_teller
     """
 
     # ---- 1 Work out the default ------------------------------------------------------
+    depth = _number_depth_finder(number, depth)
     default_number = next((i
                            for i, (key, _) in enumerate(options, start=1)
                            if key == default
                            ),
                           None,
                           )
-    hint = f'[{default_number}]:' if default_number else ''
 
     # ---- 2 Print the question and options --------------------------------------------
-    indent = _question_printer(question, depth, hint)
-    for number, (_, label) in enumerate(options, start=1):
-        print(f'{indent}{INDENT}{number}) {label}')
+    count = len(options)
+    indent = _question_printer(question,
+                               depth,
+                               _list_ending_builder(count, default_number),
+                               number=number,
+                               )
+    bright = {default_number} if default_number and count > LIST_SPELLED_OUT else set()
+    _options_printer([label for _, label in options], indent, bright)
 
     # ---- 3 Read and check the answer -------------------------------------------------
+    hint = f'Type a number from 1 to {count}.' if count > 1 else 'Type 1.'
     while True:
         answer = _input_reader(question, indent)
         if not answer and default_number:
             return options[default_number - 1][0]
-        if answer.isdigit() and 1 <= int(answer) <= len(options):
+        if answer.isdigit() and 1 <= int(answer) <= count:
             return options[int(answer) - 1][0]
-        print(f'{indent}Please type a number from 1 to {len(options)}.')
+        retry_teller(hint, depth)
+
+
+# ---- confirm_waiter ------------------------------------------------------------------
+def confirm_waiter(question: str,
+                   checker: Callable[[], Optional[str]],
+                   note: str = '',
+                   depth: int = 1,
+                   number: Optional[str] = None,
+                   ) -> None:
+    """
+    ---- Summary ----
+    Main function to give a numbered instruction carried out in a table of the window
+    ("Fill in ..., then press Confirm.") and wait until Confirm is pressed with the
+    table filled in. While the checker finds something wrong, its one sentence is said
+    and the instruction goes on waiting.
+
+    ---- Inputs ----
+    question : str
+        The instruction, without its number, ending "then press Confirm.".
+    checker : Callable[[], Optional[str]]
+        Reads the table and gives None when it can be used, or the sentence saying
+        what is still wrong.
+    note : str
+        Lines said just above the instruction in the quieter colour, such as what each
+        column means; may be empty.
+    depth : int
+        Numbering depth of the instruction (1 = 3.1, 2 = 3.1.1, ...).
+    number : Optional[str]
+        The instruction's own number from QUESTION_FLOW.md, such as '3.2'; None to
+        number it in the order asked.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal (side effect); advances the question
+    numbering counters when it has no number of its own.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _input_reader
+    _number_depth_finder
+    _question_printer
+    retry_teller
+    """
+
+    depth = _number_depth_finder(number, depth)
+    indent = _question_printer(question, depth, note=note, number=number)
+    while True:
+        _input_reader(question, indent)
+        hint = checker()
+        if hint is None:
+            return
+        retry_teller(hint, depth)
 
 
 # ---- enter_waiter --------------------------------------------------------------------
-def enter_waiter(question: str, nudge: str, depth: int = 1) -> None:
+def enter_waiter(question: str,
+                 nudge: str,
+                 depth: int = 1,
+                 number: Optional[str] = None,
+                 ) -> None:
     """
     ---- Summary ----
     Main function to give a numbered instruction that is carried out in the window (on
@@ -281,6 +798,9 @@ def enter_waiter(question: str, nudge: str, depth: int = 1) -> None:
         One sentence saying where to do it instead of typing in the answer box.
     depth : int
         Numbering depth of the instruction (1 = 3.1, 2 = 3.1.1, ...).
+    number : Optional[str]
+        The instruction's own number from QUESTION_FLOW.md, such as '2.1'; None to
+        number it in the order asked.
 
     ---- Globals read ----
     None.
@@ -291,19 +811,22 @@ def enter_waiter(question: str, nudge: str, depth: int = 1) -> None:
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect); advances the question
-    numbering counters.
+    numbering counters when it has no number of its own.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _input_reader
+    _number_depth_finder
     _question_printer
+    retry_teller
     """
 
-    indent = _question_printer(question, depth)
+    depth = _number_depth_finder(number, depth)
+    indent = _question_printer(question, depth, number=number)
     while _input_reader(question, indent):
-        print(f'{indent}{nudge}')
+        retry_teller(nudge, depth)
 
 
 # ---- heading_printer -----------------------------------------------------------------
@@ -340,8 +863,9 @@ def heading_printer(text: str) -> None:
 def info_printer(text: str, depth: int = 1, tight: bool = False) -> None:
     """
     ---- Summary ----
-    Main function to print an information line (not a question), indented to sit under
-    the question above.
+    Main function to print an information line (not a question) in the quieter colour,
+    indented to sit under the question above. A line already coloured (a warning)
+    keeps its own colour.
 
     ---- Inputs ----
     text : str
@@ -352,7 +876,7 @@ def info_printer(text: str, depth: int = 1, tight: bool = False) -> None:
         True to make the next question follow this line without a blank line.
 
     ---- Globals read ----
-    INDENT (module constant).
+    COLOUR_QUIET, INDENT (module constants).
 
     ---- Outputs ----
     None
@@ -365,11 +889,11 @@ def info_printer(text: str, depth: int = 1, tight: bool = False) -> None:
     None.
 
     ---- Helpers ----
-    None.
+    text_colourer
     """
 
     global _tight_next
-    print(f'{INDENT * (depth - 1)}{text}')
+    print(f'{INDENT * (depth - 1)}{text_colourer(text, COLOUR_QUIET)}')
     _tight_next = tight
 
 
@@ -381,10 +905,14 @@ def multi_asker(question: str,
                 depth: int = 1,
                 default_values: Optional[Sequence[str]] = None,
                 label_formatter: Optional[Callable[[str], str]] = None,
+                number: Optional[str] = None,
                 ) -> List[str]:
     """
     ---- Summary ----
-    Main function to ask a question answered by choosing several numbered options.
+    Main function to ask a question answered by choosing several numbered options. A
+    quieter line above says to type numbers separated by commas; the end of the
+    question gives the numbers as for one choice, and the options Enter gives are
+    brighter in the list.
 
     ---- Inputs ----
     question : str
@@ -401,9 +929,12 @@ def multi_asker(question: str,
         Choice from last time, used for Enter when given.
     label_formatter : Optional[Callable[[str], str]]
         Function that changes how an option is shown, not what is returned.
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '5.4.1'; None to
+        number it in the order asked.
 
     ---- Globals read ----
-    None.
+    NUMBERS_NOTE (module constant).
 
     ---- Outputs ----
     List[str]
@@ -411,33 +942,39 @@ def multi_asker(question: str,
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect); advances the question
-    numbering counters.
+    numbering counters when it has no number of its own.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _input_reader
+    _list_ending_builder
+    _number_depth_finder
+    _numbers_hint_builder
+    _options_printer
     _question_printer
+    retry_teller
     """
 
     # ---- 1 Work out the defaults -----------------------------------------------------
+    depth = _number_depth_finder(number, depth)
     remembered = [v for v in (default_values or []) if v in options]
     fallback = remembered or (list(options) if default_all else [])
-    if remembered:
-        numbers_text = ','.join(str(options.index(v) + 1) for v in remembered)
-        hint = f'(numbers separated by commas, Enter = {numbers_text}):'
-    else:
-        hint = ('(numbers separated by commas, Enter = all):'
-                if default_all
-                else '(numbers separated by commas):'
-                )
 
     # ---- 2 Print the question and options --------------------------------------------
-    indent = _question_printer(question, depth, hint)
-    for number, label in enumerate(options, start=1):
-        shown = label_formatter(label) if label_formatter else label
-        print(f'{indent}{INDENT}{number}) {shown}')
+    indent = _question_printer(question,
+                               depth,
+                               _list_ending_builder(len(options), None),
+                               NUMBERS_NOTE,
+                               number=number,
+                               )
+    _options_printer([label_formatter(label) if label_formatter else label
+                      for label in options
+                      ],
+                     indent,
+                     {options.index(v) + 1 for v in fallback},
+                     )
 
     # ---- 3 Read and check the answer -------------------------------------------------
     while True:
@@ -451,7 +988,7 @@ def multi_asker(question: str,
                        else sorted({int(p) - 1 for p in picked})
                        )
             return [options[i] for i in numbers]
-        print(f'{indent}Please type numbers from 1 to {len(options)}, e.g. 1,3.')
+        retry_teller(_numbers_hint_builder(len(options)), depth)
 
 
 # ---- number_asker --------------------------------------------------------------------
@@ -462,16 +999,19 @@ def number_asker(question: str,
                  exclusive_minimum: bool = False,
                  allow_blank: bool = False,
                  depth: int = 1,
-                 blank_label: str = 'none',
                  span_reader: Optional[Callable[[str, float, float],
                                                 Optional[float]]] = None,
+                 is_whole: bool = False,
+                 number: Optional[str] = None,
                  ) -> Optional[float]:
     """
     ---- Summary ----
-    Main function to ask a question answered with a number, asking again until the value
-    is valid. A question that can be answered with the mouse says so to the window,
-    where a drag (``span_reader``) across the plot then writes the answer it gives into
-    the answer box.
+    Main function to ask a question answered with a number, waiting until the value is
+    valid; after a wrong answer one sentence says what to type. The end of the question
+    gives what Enter gives, [120] or [skip], and a unit in brackets is highlighted. A
+    question that can be answered with the mouse says so to the window, where a drag
+    (``span_reader``) across the plot then writes the answer it gives into the answer
+    box.
 
     ---- Inputs ----
     question : str
@@ -485,15 +1025,19 @@ def number_asker(question: str,
     exclusive_minimum : bool
         True when the minimum itself is not accepted.
     allow_blank : bool
-        True to accept an empty answer as None when there is no default.
+        True to accept an empty answer as None when there is no default; shown as
+        [skip].
     depth : int
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
-    blank_label : str
-        Word shown in [brackets] for an empty answer.
     span_reader : Optional[Callable[[str, float, float], Optional[float]]]
         Turns a drag across the plot into the answer: (file shown, start min, end min)
         -> answer, or None when that drag gives none. None when the mouse gives
         nothing.
+    is_whole : bool
+        True when only whole numbers are accepted.
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '3.4.3'; None to
+        number it in the order asked.
 
     ---- Globals read ----
     None.
@@ -504,53 +1048,55 @@ def number_asker(question: str,
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect); advances the question
-    numbering counters.
+    numbering counters when it has no number of its own.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _brightener
     _input_reader
+    _limits_checker
+    _number_depth_finder
+    _number_hint_builder
     _question_printer
     _time_announcer
+    retry_teller
+    typed_number_reader
     """
 
-    # ---- 1 Format the default --------------------------------------------------------
+    # ---- 1 Write what Enter gives ----------------------------------------------------
+    depth = _number_depth_finder(number, depth)
     if isinstance(default, (int, float)):
-        hint = f'[{default:g}]:'
+        ending = f'[{_brightener(f"{default:g}")}]'
     else:
-        hint = f'[{blank_label}]:' if allow_blank else ''
+        ending = f"[{_brightener('skip')}]" if allow_blank else ''
 
     # ---- 2 Print the question --------------------------------------------------------
-    indent = _question_printer(question, depth, hint)
+    indent = _question_printer(question, depth, ending, has_unit=True, number=number)
 
     # ---- 3 Read and check the answer -------------------------------------------------
+    hint = _number_hint_builder(minimum, maximum, exclusive_minimum, is_whole)
     if span_reader is not None:
         _time_announcer('span', span_reader)
     try:
         while True:
-            answer = _input_reader(question, indent).replace(',', '.')
+            answer = _input_reader(question, indent)
             if not answer:
                 if default is not None:
                     return default
                 if allow_blank:
                     return None
-                print(f'{indent}A number is needed here.')
+                retry_teller(hint, depth)
                 continue
-            try:
-                value = float(answer)
-            except ValueError:
-                print(f'{indent}That is not a number.')
-                continue
-            if (minimum is not None and
-                (value <= minimum if exclusive_minimum else value < minimum)
-                ):
-                print(f'{indent}The value must be '
-                      f"{'above' if exclusive_minimum else 'at least'} {minimum:g}.",
-                      )
-                continue
-            if maximum is not None and value > maximum:
-                print(f'{indent}The value must be at most {maximum:g}.')
+            value = typed_number_reader(answer)
+            if value is None or not _limits_checker(value,
+                                                    minimum,
+                                                    maximum,
+                                                    exclusive_minimum,
+                                                    is_whole,
+                                                    ):
+                retry_teller(hint, depth)
                 continue
             return value
     finally:
@@ -624,57 +1170,6 @@ def numbering_setter(depth: int, value: int) -> None:
         _counters[level] = 0
 
 
-# ---- numbers_asker -------------------------------------------------------------------
-def numbers_asker(question: str, count: int, depth: int = 1) -> List[int]:
-    """
-    ---- Summary ----
-    Main function to ask a question answered by numbers from 1 to a count, separated by
-    commas.
-
-    ---- Inputs ----
-    question : str
-        Question text, without its number.
-    count : int
-        Largest number accepted.
-    depth : int
-        Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    List[int]
-        The chosen numbers in ascending order; an empty list for Enter (none).
-
-    ---- Globals mutated ----
-    None. Reads from and prints to the terminal (side effect); advances the question
-    numbering counters.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _input_reader
-    _question_printer
-    """
-
-    # ---- 1 Print the question --------------------------------------------------------
-    indent = _question_printer(question,
-                               depth,
-                               '(numbers separated by commas, Enter = none):',
-                               )
-
-    # ---- 2 Read and check the answer -------------------------------------------------
-    while True:
-        answer = _input_reader(question, indent)
-        if not answer:
-            return []
-        picked = [p for p in re.split(r'[,\s]+', answer) if p]
-        if all(p.isdigit() and 1 <= int(p) <= count for p in picked):
-            return sorted({int(p) for p in picked})
-        print(f'{indent}Please type numbers from 1 to {count}, e.g. 1,3.')
-
-
 # ---- path_cleaner --------------------------------------------------------------------
 def path_cleaner(text: str) -> str:
     r"""
@@ -743,14 +1238,15 @@ def progress_clearer() -> None:
 def progress_printer(text: str) -> None:
     """
     ---- Summary ----
-    Main function to show a one-line progress message that the next message overwrites.
+    Main function to show a one-line progress message, in the quieter colour, that the
+    next message overwrites.
 
     ---- Inputs ----
     text : str
         Message to show.
 
     ---- Globals read ----
-    None.
+    COLOUR_QUIET (module constant).
 
     ---- Outputs ----
     None
@@ -763,10 +1259,43 @@ def progress_printer(text: str) -> None:
     None.
 
     ---- Helpers ----
-    None.
+    text_colourer
     """
 
-    print(f'\r{text}'.ljust(100), end='', flush=True)
+    print(f'\r{text_colourer(text.ljust(99), COLOUR_QUIET)}', end='', flush=True)
+
+
+# ---- retry_teller --------------------------------------------------------------------
+def retry_teller(hint: str, depth: int = 1) -> None:
+    """
+    ---- Summary ----
+    Main function to say, after a wrong answer, in one sentence what to type; the
+    question is not printed again and waits for the next answer.
+
+    ---- Inputs ----
+    hint : str
+        One sentence, for example "Type y or n.".
+    depth : int
+        Numbering depth of the question it answers (1 = 3.1, 2 = 3.1.1, ...).
+
+    ---- Globals read ----
+    COLOUR_RETRY, INDENT (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    text_colourer
+    """
+
+    print(f'{INDENT * (depth - 1)}{text_colourer(hint, COLOUR_RETRY)}')
 
 
 # ---- section_starter -----------------------------------------------------------------
@@ -808,18 +1337,28 @@ def section_starter(title: str) -> None:
 def text_asker(question: str,
                default: Optional[str] = None,
                depth: int = 1,
+               checker: Optional[Callable[[Optional[str]], Optional[str]]] = None,
+               number: Optional[str] = None,
                ) -> Optional[str]:
     """
     ---- Summary ----
-    Main function to ask a question answered with a line of text.
+    Main function to ask a question answered with a line of text or a folder. An answer
+    the checker refuses gets its one sentence of what to type, and the question waits
+    for the next answer.
 
     ---- Inputs ----
     question : str
         Question text, without its number.
     default : Optional[str]
-        Answer used when only Enter is pressed; shown as [default]:.
+        Answer used when only Enter is pressed; shown brighter as [default].
     depth : int
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+    checker : Optional[Callable[[Optional[str]], Optional[str]]]
+        Takes the answer (the default for Enter) and gives None when it can be used,
+        or the sentence saying what to type instead; None accepts every answer.
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '1.2'; None to number
+        it in the order asked.
 
     ---- Globals read ----
     None.
@@ -830,20 +1369,28 @@ def text_asker(question: str,
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect); advances the question
-    numbering counters.
+    numbering counters when it has no number of its own.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _brightener
     _input_reader
+    _number_depth_finder
     _question_printer
+    retry_teller
     """
 
-    hint = f'[{default}]:' if default not in (None, '') else ''
-    indent = _question_printer(question, depth, hint)
-    answer = _input_reader(question, indent)
-    return answer if answer else default
+    depth = _number_depth_finder(number, depth)
+    ending = f'[{_brightener(default)}]' if default not in (None, '') else ''
+    indent = _question_printer(question, depth, ending, number=number)
+    while True:
+        answer = _input_reader(question, indent) or default
+        hint = checker(answer) if checker is not None else None
+        if hint is None:
+            return answer
+        retry_teller(hint, depth)
 
 
 # ---- text_colourer -------------------------------------------------------------------
@@ -948,42 +1495,97 @@ def time_request_setter(requester: Optional[Callable[[Optional[str],
     _time_requester = requester
 
 
-# ---- yes_no_asker --------------------------------------------------------------------
-def yes_no_asker(question: str, default: bool = False, depth: int = 1) -> bool:
+# ---- typed_number_reader -------------------------------------------------------------
+def typed_number_reader(text: str) -> Optional[float]:
     """
     ---- Summary ----
-    Main function to ask a yes/no question.
+    Main function to read a typed number, the one reader of the answer box, the OD
+    table and the boxes of the strip: spaces around it are ignored and a comma may be
+    the decimal sign. Each place checks its own limits.
+
+    ---- Inputs ----
+    text : str
+        What was typed, for example '2.5', ' 2,5 ' or '1e3'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[float]
+        The number, or None for an empty text, a text that is not a number, "nan" or an
+        infinity.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    cleaned = text.strip().replace(',', '.')
+    if not cleaned:
+        return None
+    try:
+        value = float(cleaned)
+    except ValueError:
+        return None
+    return value if math.isfinite(value) else None
+
+
+# ---- yes_no_asker --------------------------------------------------------------------
+def yes_no_asker(question: str,
+                 default: bool = False,
+                 depth: int = 1,
+                 note: str = '',
+                 number: Optional[str] = None,
+                 ) -> bool:
+    """
+    ---- Summary ----
+    Main function to ask a yes or no question, ending in (y/N) or (Y/n) with the letter
+    Enter gives brighter.
 
     ---- Inputs ----
     question : str
         Question text, without its number.
     default : bool
-        Answer used when only Enter is pressed (the capital letter in the hint).
+        Answer used when only Enter is pressed (the capital letter at the end).
     depth : int
         Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+    note : str
+        A line said just above the question in the quieter colour; may be empty.
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '3.1'; None to number
+        it in the order asked.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     bool
-        True for y or yes, False for n or no, the default for Enter.
+        True for y or yes, False for n or no (in any capitals), the default for Enter.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect); advances the question
-    numbering counters.
+    numbering counters when it has no number of its own.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _brightener
     _input_reader
+    _number_depth_finder
     _question_printer
+    retry_teller
     """
 
     # ---- 1 Print the question --------------------------------------------------------
-    hint = '(Y/n):' if default else '(y/N):'
-    indent = _question_printer(question, depth, hint)
+    depth = _number_depth_finder(number, depth)
+    ending = f"({_brightener('Y')}/n)" if default else f"(y/{_brightener('N')})"
+    indent = _question_printer(question, depth, ending, note, number=number)
 
     # ---- 2 Read and check the answer -------------------------------------------------
     while True:
@@ -994,4 +1596,4 @@ def yes_no_asker(question: str, default: bool = False, depth: int = 1) -> bool:
             return True
         if answer in ('n', 'no'):
             return False
-        print(f'{indent}Please answer y or n.')
+        retry_teller('Type y or n.', depth)

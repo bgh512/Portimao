@@ -4,11 +4,14 @@ The steps of the experiment browser: ask, redraw the plot window, then accept or
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.helpers import file_name_sanitiser
+from utils_shared.individual_experiment_exporter import (size_describer,
+                                                         spectra_size_estimator,
+                                                         )
 from utils_shared.pca_fitter import (component_builder,
                                      component_classifier,
                                      component_count_suggester,
@@ -18,7 +21,9 @@ from utils_shared.pca_fitter import (component_builder,
                                      fit_table_builder,
                                      TYPE_NAMES,
                                      )
-from utils_shared.questions import (choice_asker,
+from utils_shared.questions import (accept_asker,
+                                    choice_asker,
+                                    confirm_waiter,
                                     enter_waiter,
                                     heading_printer,
                                     info_printer,
@@ -36,10 +41,10 @@ from utils_shared.spectral_decomposer import fit_importer
 from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
                                  event_asker,
-                                 file_focus_setter,
                                  haem_choice_asker,
                                  haem_form_asker,
                                  haem_scaling_asker,
+                                 IGNORE_LABEL,
                                  label_angle_asker,
                                  ocr_kind_lister,
                                  od_scaling_asker,
@@ -53,8 +58,8 @@ from utils_shared.survey import (averaging_asker,
                                  )
 from utils_shared.user_notices import problem_teller
 from utils_viewer.viewer_edges import EdgeChoice
-from utils_viewer.viewer_preview import (all_data_exporter,
-                                         BROWSING_ANSWERS,
+from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
+                                         import_data_exporter,
                                          pca_example_picture_builder,
                                          pca_picture_builder,
                                          pca_spectra_gatherer,
@@ -63,8 +68,13 @@ from utils_viewer.viewer_preview import (all_data_exporter,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
-from utils_viewer.viewer_od_table import COLUMNS
 from utils_viewer.viewer_strip import size_answers_builder, strip_values_builder
+from utils_viewer.viewer_table import (label_entries_reader,
+                                       label_table_builder,
+                                       od_rows_reader,
+                                       od_table_builder,
+                                       table_problem_teller,
+                                       )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -141,68 +151,6 @@ def _addition_time_lister(summaries: List[dict],
                              if event['datapoint'] not in ignored
                              )
     return found
-
-
-# ---- _all_data_asker -----------------------------------------------------------------
-def _all_data_asker(session: ViewerSession, limits: Dict[str, dict]) -> None:
-    """
-    ---- Summary ----
-    Helper function to ask whether to export the data of every file now, cut to the
-    limits just accepted, so it can be plotted outside the program, and to do it.
-
-    ---- Inputs ----
-    session : ViewerSession
-        The browser session.
-    limits : Dict[str, dict]
-        Trim and ignore limits of every file.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Reads from and prints to the terminal and writes the files (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    all_data_exporter
-    info_printer
-    progress_clearer
-    progress_printer
-    text_colourer
-    yes_no_asker
-    """
-
-    if not yes_no_asker('Do you want to export all the data now, cut to these limits, '
-                        'so you can plot it yourself?',
-                        False,
-                        ):
-        return
-    include_spectra = yes_no_asker('Do you want to include the spectra as csv files '
-                                   '(large, and it takes a while)?',
-                                   False,
-                                   depth=2,
-                                   )
-    folder, problems = all_data_exporter(
-        session,
-        limits,
-        include_spectra,
-        lambda n, total: progress_printer(f'Exporting file {n} of {total} ...'),
-    )
-    progress_clearer()
-    for problem in problems:
-        info_printer(text_colourer(f'Not exported: {problem}', WARNING_COLOUR), depth=2)
-    info_printer(f'Exported the data of {len(session.summaries) - len(problems)} '
-                 f'file(s) to {folder}. It is not scaled by OD, decomposed or '
-                 f'averaged, and the event labels are the ones in the files. The '
-                 f'ignored parts are included.',
-                 depth=2,
-                 )
 
 
 # ---- _answers_previewer --------------------------------------------------------------
@@ -317,8 +265,8 @@ def _averaging_reviewer(session: ViewerSession,
 
     ---- Helpers ----
     _addition_time_lister
-    _review_asker
     _skipped_lister
+    accept_asker
     averaging_asker
     """
 
@@ -329,9 +277,9 @@ def _averaging_reviewer(session: ViewerSession,
             return
         redraw()
         _skipped_lister(session, answers, limits, details)
-        if _review_asker('Do you accept these averaging windows?',
-                         'No, change the window and gap',
-                         ):
+        if accept_asker('Do you accept these averaging windows?',
+                        [('no', 'change the window and gap')],
+                        ) == 'yes':
             return
         defaults = dict(defaults, averaging=True)
         defaults.update({k: answers[k] for k in ('window_minutes', 'gap_minutes')})
@@ -368,7 +316,6 @@ def _component_namer(result: dict, types: List[str], depth: int) -> List[str]:
     None.
 
     ---- Helpers ----
-    info_printer
     text_asker
     yes_no_asker
     """
@@ -386,19 +333,19 @@ def _component_namer(result: dict, types: List[str], depth: int) -> List[str]:
         else:
             suggestions.append(names[i])
     for i, peak in enumerate(result['peaks']):
-        while True:
-            name = (text_asker(f'What is component {i + 1} ({TYPE_NAMES[types[i]]}, '
-                               f'largest peak at {peak:.0f} nm) called?',
-                               suggestions[i],
-                               depth=depth,
-                               ) or '').strip()
+        def name_checker(text: Optional[str]) -> Optional[str]:
+            name = (text or '').strip()
             if name and ',' not in name and name not in names[:i]:
-                names[i] = name
-                break
-            info_printer('Use a name that is not empty, has no commas and is not used '
-                         'by another component.',
-                         depth=depth,
-                         )
+                return None
+            return ('Type a name that is not empty, has no commas and is not used by '
+                    'another component.'
+                    )
+        names[i] = text_asker(f'What is component {i + 1} ({TYPE_NAMES[types[i]]}, '
+                              f'largest peak at {peak:.0f} nm) called?',
+                              suggestions[i],
+                              depth=depth,
+                              checker=name_checker,
+                              ).strip()
     return names
 
 
@@ -441,6 +388,169 @@ def _decomposition_storer(session: ViewerSession, answers: dict, chosen: tuple) 
         answers['fit_file'] = name
     session.fit = fit if decompose else None
     _strip_shower(session, answers)
+
+
+# ---- _export_asker -------------------------------------------------------------------
+def _export_asker(session: ViewerSession,
+                  limits: Dict[str, dict],
+                  details: Dict[str, dict],
+                  ) -> None:
+    """
+    ---- Summary ----
+    Helper function to ask, at the end of the import, what to export now so it can be
+    plotted outside the program (nothing, the workbooks, the workbooks and the trimmed
+    spectra, or the spectra of the whole recordings too, with the size of the spectra
+    worked out for these files), and to do it. Enter gives nothing. The choice and the
+    limits exported are kept in the session, so new edges can export again.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    details : Dict[str, dict]
+        OD values and events of every file, as entered in section 3.
+
+    ---- Globals read ----
+    WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal, writes the files and sets
+    session.export_choice and session.export_limits (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    choice_asker
+    import_data_exporter
+    info_printer
+    progress_clearer
+    progress_printer
+    size_describer
+    spectra_size_estimator
+    text_colourer
+    """
+
+    # ---- 1 Ask what to export, with the size of the spectra --------------------------
+    trimmed_bytes, full_bytes = spectra_size_estimator(session.summaries,
+                                                       limits,
+                                                       settings.SPECTRA_CSV_BYTES,
+                                                       )
+    options = [('none', 'Nothing'),
+               ('summary', 'The summary: a workbook for each file (a few MB)'),
+               ('trimmed',
+                'The trimmed data: the summaries and the trimmed spectra as '
+                f'csv files ({size_describer(trimmed_bytes)})',
+                ),
+               ('all',
+                'All the data: the summaries and the spectra, trimmed and full '
+                f'({size_describer(trimmed_bytes + full_bytes)})',
+                ),
+               ]
+    info_printer('The spectra are large, and writing them takes a while.')
+    choice = choice_asker('What would you like to export now, so you can plot it '
+                          'yourself?',
+                          options,
+                          'none',
+                          number='3.4',
+                          )
+    if choice == 'none':
+        return
+
+    # ---- 2 Export --------------------------------------------------------------------
+    problems = import_data_exporter(
+        session,
+        limits,
+        details,
+        choice,
+        progress=lambda n, total: progress_printer(f'Exporting file {n} of {total} ...'),
+    )
+    progress_clearer()
+    for problem in problems:
+        info_printer(text_colourer(f'Not exported: {problem}', WARNING_COLOUR), depth=2)
+    session.export_choice = choice
+    session.export_limits = {name: dict(values) for name, values in limits.items()}
+    info_printer(
+        f'Exported {len(session.summaries) - len(problems)} file(s) to '
+        f'{session.export_root}, one folder each; the whole recording of a '
+        f'trimmed file is in the full folder inside its own. Nothing is scaled '
+        f'by OD, decomposed or averaged, and the ignored parts are included.',
+        depth=2,
+        )
+
+
+# ---- _export_refresher ---------------------------------------------------------------
+def _export_refresher(session: ViewerSession,
+                      limits: Dict[str, dict],
+                      details: Dict[str, dict],
+                      ) -> None:
+    """
+    ---- Summary ----
+    Helper function to export again, with the same choice, the files whose trimmed or
+    ignored edges changed since the export of the import, so the results folder holds
+    the edges in use. The whole recording of a file is written only when the file has
+    just become trimmed, and taken away when it is no longer trimmed. Nothing happens
+    when nothing was exported in this run.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session, with the export's choice and limits.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file, as just accepted.
+    details : Dict[str, dict]
+        OD values and events of every file.
+
+    ---- Globals read ----
+    WARNING_COLOUR (module constant).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Prints to the terminal, writes the files and updates session.export_limits
+    (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    import_data_exporter
+    info_printer
+    progress_clearer
+    progress_printer
+    text_colourer
+    """
+
+    if not session.export_choice:
+        return
+    changed = [s['name']
+               for s in session.summaries
+               if limits.get(s['name']) != session.export_limits.get(s['name'])
+               ]
+    if not changed:
+        return
+    info_printer(f'The edges of {len(changed)} file(s) changed since the export, so '
+                 f'their trimmed data is exported again.',
+                 )
+    problems = import_data_exporter(
+        session,
+        limits,
+        details,
+        session.export_choice,
+        names=changed,
+        keep_full=True,
+        progress=lambda n, total: progress_printer(f'Exporting file {n} of {total} ...'),
+    )
+    progress_clearer()
+    for problem in problems:
+        info_printer(text_colourer(f'Not exported: {problem}', WARNING_COLOUR), depth=2)
+    session.export_limits = {name: dict(values) for name, values in limits.items()}
 
 
 # ---- _figure_starter -----------------------------------------------------------------
@@ -560,16 +670,20 @@ def _fit_file_saver(fit: dict,
                         ):
         return None
     default = f'pca_{count}_components_{window[0]:g}-{window[1]:g}nm'
-    while True:
-        raw = (text_asker('What should the fit file be called (without .csv)?',
-                          default,
-                          depth=depth,
-                          ) or '').strip()
+    def stem_finder(text: Optional[str]) -> str:
+        raw = (text or '').strip()
         stem = raw[:-4] if raw.lower().endswith('.csv') else raw
-        stem = file_name_sanitiser(stem, default='')
-        if not stem:
-            info_printer('Please give the file a name.', depth=depth)
-            continue
+        return file_name_sanitiser(stem, default='')
+    def stem_checker(text: Optional[str]) -> Optional[str]:
+        return None if stem_finder(text) else 'Type a name for the fit file.'
+    while True:
+        stem = stem_finder(text_asker('What should the fit file be called (without '
+                                      '.csv)?',
+                                      default,
+                                      depth=depth,
+                                      checker=stem_checker,
+                                      ),
+                           )
         path = fits_folder / f'{stem}.csv'
         if path.exists() and not yes_no_asker(f'{path.name} already exists. Do you '
                                               f'want to replace it?',
@@ -622,6 +736,54 @@ def _fit_names_lister(fits_folder: Path) -> List[str]:
     """
 
     return sorted((path.name for path in fits_folder.glob('*.csv')), key=str.lower)
+
+
+# ---- _label_table_filler -------------------------------------------------------------
+def _label_table_filler(session: ViewerSession,
+                        entries: Dict[str, List[dict]],
+                        ) -> Dict[str, List[dict]]:
+    """
+    ---- Summary ----
+    Helper function to have the label and concentration of every event filled in in
+    the labels table of the window (3.2).
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session, whose window has the table.
+    entries : Dict[str, List[dict]]
+        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]} to
+        start from (event_entries_builder).
+
+    ---- Globals read ----
+    IGNORE_LABEL (imported constant).
+
+    ---- Outputs ----
+    Dict[str, List[dict]]
+        The events with the labels and concentrations typed.
+
+    ---- Globals mutated ----
+    None. Shows and hides the table and reads from and prints to the terminal (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _table_filler
+    label_entries_reader
+    label_table_builder
+    """
+
+    table = label_table_builder(session.summaries, entries, IGNORE_LABEL)
+    values = _table_filler(session,
+                           table,
+                           question='Fill in the label and the concentration of each '
+                           'event, then press Confirm.',
+                           note=f'One row per event. Write {IGNORE_LABEL} as the label '
+                           'to leave an event out.',
+                           number='3.2',
+                           )
+    return label_entries_reader(table, values, entries)
 
 
 # ---- _limits_lister ------------------------------------------------------------------
@@ -707,10 +869,8 @@ def _od_table_filler(session: ViewerSession,
                      ) -> Dict[str, Dict[str, Optional[float]]]:
     """
     ---- Summary ----
-    Helper function to have the OD values filled in in the table of the window: the
-    table is shown with the given rows, one question waits for Enter, and it is asked
-    again, naming the cells, while a cell is empty or not a number above 0. The table
-    is then taken away.
+    Helper function to have the OD, volume and dilution of every file filled in in the
+    OD table of the window (3.1.1).
 
     ---- Inputs ----
     session : ViewerSession
@@ -719,7 +879,7 @@ def _od_table_filler(session: ViewerSession,
         The rows to start from (od_rows, DATA_FORMAT.md); None leaves a cell empty.
 
     ---- Globals read ----
-    COLUMNS (imported constant); settings.OD_RESUSPENDED_ML.
+    settings.OD_RESUSPENDED_ML.
 
     ---- Outputs ----
     Dict[str, Dict[str, Optional[float]]]
@@ -733,39 +893,23 @@ def _od_table_filler(session: ViewerSession,
     None.
 
     ---- Helpers ----
-    info_printer
-    text_asker
+    _table_filler
+    od_rows_reader
+    od_table_builder
     """
 
-    window = session.window
-    window.od_table_shower(rows)
-    try:
-        while True:
-            text_asker(
-                'Fill in the table under this text for each file: the OD of the '
-                'cells added, the volume of cells (mL) spun down and resuspended '
-                f'in {settings.OD_RESUSPENDED_ML:g} mL, and the dilution factor if '
-                'the cells were diluted mid run. Then press Enter here.',
-                )
-            filled, wrong = window.od_table_reader()
-            empty = [f'{name}: {heading}'
-                     for name, values in filled.items()
-                     for key, heading in COLUMNS
-                     if values.get(key) is None and f'{name}: {heading}' not in wrong
-                     ]
-            if not (wrong or empty):
-                return filled
-            if wrong:
-                info_printer('These cells need a number above 0: '
-                             + ', '.join(wrong) + '.',
-                             depth=2,
-                             )
-            if empty:
-                info_printer('These cells are empty: ' + ', '.join(empty) + '.',
-                             depth=2,
-                             )
-    finally:
-        window.od_table_hider()
+    table = od_table_builder(rows)
+    values = _table_filler(session,
+                           table,
+                           question='Fill in the OD, volume and dilution of each '
+                           'file, then press Confirm.',
+                           note='One row per file: the OD of the cells added, the '
+                           'volume of cells (mL) spun down and resuspended in '
+                           f'{settings.OD_RESUSPENDED_ML:g} mL, and the dilution '
+                           'factor if the cells were diluted mid run.',
+                           number='3.1.1',
+                           )
+    return od_rows_reader(table, values)
 
 
 # ---- _pca_pictures_publisher ---------------------------------------------------------
@@ -840,43 +984,6 @@ def _pca_pictures_publisher(session: ViewerSession,
         info_printer(problem_teller('The PCA pictures could not be drawn', exc),
                      depth=depth,
                      )
-
-
-# ---- _review_asker -------------------------------------------------------------------
-def _review_asker(question: str, change_label: str) -> bool:
-    """
-    ---- Summary ----
-    Helper function to ask whether the user accepts what the plot window shows, with
-    the two answers yes and no; the user can flick through the files while the question
-    waits.
-
-    ---- Inputs ----
-    question : str
-        The accept question, for example 'Do you accept these limits?'.
-    change_label : str
-        Label of the answer that asks the questions of the step again.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    bool
-        True when accepted, False when the user wants to answer the step again.
-
-    ---- Globals mutated ----
-    None. Reads from and prints to the terminal (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    choice_asker
-    """
-
-    options = [('yes', 'Yes, accept'),
-               ('no', change_label),
-               ]
-    return choice_asker(question, options, 'yes') == 'yes'
 
 
 # ---- _skipped_lister -----------------------------------------------------------------
@@ -1145,6 +1252,63 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     session.window.strip_setter(strip_values_builder(answers, session.fit is not None))
 
 
+# ---- _table_filler -------------------------------------------------------------------
+def _table_filler(session: ViewerSession,
+                  table: dict,
+                  question: str,
+                  note: str,
+                  number: str,
+                  ) -> List[Dict[str, Any]]:
+    """
+    ---- Summary ----
+    Helper function to have a table filled in in the window: the table fills the
+    terminal side, the instruction waits for Confirm, and while a cell is wrong or a
+    needed cell empty one sentence names those cells and the instruction goes on
+    waiting. The table is then taken away.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session, whose window has the table.
+    table : dict
+        The table to show (table_rows, DATA_FORMAT.md).
+    question : str
+        The instruction, ending "then press Confirm.".
+    note : str
+        What the table needs, said above the instruction in the quieter colour.
+    number : str
+        The instruction's own number from QUESTION_FLOW.md, such as '3.2'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Dict[str, Any]]
+        The values typed, one {name of the value: value} per row of the table
+        (AnswerTable.values_reader).
+
+    ---- Globals mutated ----
+    None. Shows and hides the table and reads from and prints to the terminal (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    confirm_waiter
+    table_problem_teller
+    """
+
+    window = session.window
+    window.table_shower(table)
+    def table_checker() -> Optional[str]:
+        return table_problem_teller(window.table_reader()[1])
+    try:
+        confirm_waiter(question, table_checker, note=note, number=number)
+        return window.table_reader()[0]
+    finally:
+        window.table_hider()
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -1199,15 +1363,17 @@ def details_stage_runner(session: ViewerSession,
                          answers: dict,
                          defaults: dict,
                          limits: Dict[str, dict],
+                         remembered: Dict[str, dict],
                          details_before: Optional[Dict[str, dict]] = None,
                          ) -> Dict[str, dict]:
     """
     ---- Summary ----
     Main function to ask the last questions of the import, on the standard plot cut to
-    the limits: the OD values (in the table of the window), then the event labels. The
-    OD values are only checked:
-    the data is scaled by OD in the individual plots. The plot is redrawn with the
-    labels once they are entered. The haems are those of the session's fit.
+    the limits: the OD values, then the event labels, each in a table of the window.
+    The OD values are only checked: the data is scaled by OD in the individual plots.
+    The plot is redrawn with the labels once they are entered, and they are accepted or
+    typed again; with no events in any file there is nothing to accept. Last, the
+    export of what was imported is offered. The haems are those of the session's fit.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1218,6 +1384,9 @@ def details_stage_runner(session: ViewerSession,
         Default answers offered by the questions.
     limits : Dict[str, dict]
         Trim and ignore limits of every file (trim_stage_runner).
+    remembered : Dict[str, dict]
+        The files part of the dataset's settings, with the OD values and events saved
+        before (dataset_settings, DATA_FORMAT.md).
     details_before : Optional[Dict[str, dict]]
         OD values and events from an earlier pass, offered as defaults when the step is
         asked again.
@@ -1231,16 +1400,19 @@ def details_stage_runner(session: ViewerSession,
         only present when scaling by OD.
 
     ---- Globals mutated ----
-    None. Stores normalise_od in ``answers`` (side effect).
+    None. Stores normalise_od in ``answers`` and writes the export when one is chosen
+    (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _answers_previewer
+    _export_asker
+    _label_table_filler
     _od_lister
     _od_table_filler
-    _review_asker
+    accept_asker
     event_asker
     od_scaling_asker
     preview_drawer
@@ -1250,7 +1422,7 @@ def details_stage_runner(session: ViewerSession,
     # ---- 1 Read the values of earlier runs -------------------------------------------
     summaries = session.summaries
     details: Dict[str, dict] = {s['name']: {} for s in summaries}
-    saved = saved_values_reader(summaries, session.export_root)
+    saved = saved_values_reader(summaries, remembered, session.export_root)
     for name, values in (details_before or {}).items():
         saved[name] = dict(saved.get(name) or {}, **values)
     def redraw() -> bool:
@@ -1272,17 +1444,24 @@ def details_stage_runner(session: ViewerSession,
         _od_lister(details)
 
     # ---- 3 Event labels --------------------------------------------------------------
-    is_again = False
+    # The table opens again with the labels as last typed until they are accepted.
+    def label_filler(entries: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
+        return _label_table_filler(session, entries)
+    has_events = any(s['events'] for s in summaries)
+    kept: Set[str] = set()
     while True:
-        for name, events in event_asker(summaries, saved, is_again).items():
+        for name, events in event_asker(summaries, saved, label_filler, kept).items():
             details[name]['events'] = events
             saved[name] = dict(saved.get(name) or {}, events=events)
         redraw()
-        if _review_asker('Do you accept these event labels?',
-                         'No, change the labels again',
-                         ):
+        if not has_events or accept_asker('Do you accept these event labels?',
+                                          [('no', 'change the labels again')],
+                                          number='3.3',
+                                          ) == 'yes':
             break
-        is_again = True
+
+    # ---- 4 Offer the export of what was imported -------------------------------------
+    _export_asker(session, limits, details)
     return details
 
 
@@ -1340,7 +1519,7 @@ def pca_stage_runner(session: ViewerSession,
     _component_namer
     _fit_file_saver
     _pca_pictures_publisher
-    choice_asker
+    accept_asker
     component_builder
     component_classifier
     component_count_suggester
@@ -1424,19 +1603,16 @@ def pca_stage_runner(session: ViewerSession,
         count = min(count or suggestion, available)
         while True:
             # ---- 2.1 Ask how many and whether to rotate ------------------------------
-            while True:
-                value = number_asker(f'How many components should be found? (The data '
+            count = int(number_asker(f'How many components should be found? (The data '
                                      f'suggest {suggestion}; use as few as describe '
                                      f'the data, extra ones only fit noise.)',
                                      count,
                                      minimum=1,
                                      maximum=available,
                                      depth=depth,
-                                     )
-                if value == int(value):
-                    count = int(value)
-                    break
-                info_printer('Please enter a whole number.', depth=depth)
+                                     is_whole=True,
+                                     ),
+                        )
             rotate = yes_no_asker('Do you want to rotate the components so each is as '
                                   'peak-like as possible (varimax)?',
                                   rotate,
@@ -1489,13 +1665,11 @@ def pca_stage_runner(session: ViewerSession,
                              )
 
             # ---- 2.3 Accept or change them -------------------------------------------
-            choice = choice_asker('Do you accept these components?',
-                                  [('yes', 'Yes, accept'),
-                                   ('count', 'No, change the number of components'),
-                                   ('window', 'No, change the spectral window'),
-                                   ('fit', 'No, choose a fit file instead'),
+            choice = accept_asker('Do you accept these components?',
+                                  [('count', 'change the number of components'),
+                                   ('window', 'change the spectral window'),
+                                   ('fit', 'choose a fit file instead'),
                                    ],
-                                  'yes',
                                   depth=depth,
                                   )
             if choice != 'count':
@@ -1576,7 +1750,7 @@ def plots_stage_runner(session: ViewerSession,
     _answers_previewer
     _figure_starter
     _strip_shower
-    choice_asker
+    accept_asker
     haem_choice_asker
     haem_form_asker
     haem_scaling_asker
@@ -1620,15 +1794,13 @@ def plots_stage_runner(session: ViewerSession,
         # ---- 2.2 Ask whether it is accepted, or which part to change -----------------
         # The Haems box turns the haems on and off, and the strip holds the journal and
         # size.
-        options = [('yes', 'Yes, accept'),
-                   ('signals', 'No, change the oxygen and OCR'),
-                   ]
+        changes = [('signals', 'change the oxygen and OCR')]
         if answers['plot_haems']:
-            options.append(('haems', 'No, change which haems are shown'))
-            options.append(('form', 'No, change how the haems are shown'))
+            changes.append(('haems', 'change which haems are shown'))
+            changes.append(('form', 'change how the haems are shown'))
         if plotted:
-            options.append(('angle', 'No, change the angle of the event labels'))
-        choice = choice_asker('Do you accept this figure?', options, 'yes')
+            changes.append(('angle', 'change the angle of the event labels'))
+        choice = accept_asker('Do you accept this figure?', changes)
         if choice == 'yes':
             return is_plotted()
 
@@ -1704,7 +1876,7 @@ def processing_stage_runner(session: ViewerSession,
     _decomposition_storer
     _fit_names_lister
     _strip_shower
-    choice_asker
+    accept_asker
     decomposition_asker
     info_printer
     pca_stage_runner
@@ -1759,12 +1931,11 @@ def processing_stage_runner(session: ViewerSession,
 
     # ---- 1.2 Accept the fit or find the components from the data ---------------------
     # The strip picks another fit and leaves the haems out.
-    options = [('yes', 'Yes, accept'),
-               ('pca', 'No, find the components from the data'),
-               ]
     while answers['decompose']:
         redraw()
-        if choice_asker('Do you accept this decomposition?', options, 'yes') == 'yes':
+        if accept_asker('Do you accept this decomposition?',
+                        [('pca', 'find the components from the data')],
+                        ) == 'yes':
             break
         name, fit = pca_finder(answers['decomposition_dataset'], 2)
         if fit is not None:
@@ -1801,9 +1972,9 @@ def trim_stage_runner(session: ViewerSession,
     Main function to run the trimming step on the standard plot of the whole recording
     of every file: the trimmed and ignored edges are dragged on the plot or typed in
     the strip under it, and Enter accepts them. When the step is opened again, the
-    limits it had stay on the plot as red dashed lines. The limits are then listed, the
-    trimmed data is drawn, and the export of all the data cut to them is offered. The
-    haems are those of the session's fit (none when it has none).
+    limits it had stay on the plot as red dashed lines. The limits are then listed and
+    the trimmed data is drawn. The haems are those of the session's fit (none when it
+    has none).
 
     ---- Inputs ----
     session : ViewerSession
@@ -1832,7 +2003,6 @@ def trim_stage_runner(session: ViewerSession,
     None.
 
     ---- Helpers ----
-    _all_data_asker
     _answers_previewer
     _limits_lister
     enter_waiter
@@ -1876,29 +2046,28 @@ def trim_stage_runner(session: ViewerSession,
                                   else {}
                                   ),
                         )
-    info_printer('TRIM: data that will not be imported, plotted or used.')
-    info_printer('IGNORE: data that will be imported and plotted, but not used for '
-                 'calculations (baselines, % ranges, axis limits).',
+    info_printer('TRIM = data that is not imported, plotted or used.')
+    info_printer('IGNORE = data that is plotted but not used for calculations.')
+    info_printer('Grey edges trim, amber edges ignore; with "Every file" ticked, a '
+                 'change moves every file.',
+                 tight=True,
                  )
     session.window.edges_shower(choice)
     try:
-        enter_waiter('Drag the edges on the plot: grey for the trimmed parts, amber '
-                     'for the ignored parts, or type the times in the strip under the '
-                     'plot. With "Every file" ticked, a change applies to every file; '
-                     'untick it to change only the file shown. Press Enter when every '
-                     'file looks right.',
+        enter_waiter('Drag the edges on the plot, or type the times in the strip under '
+                     'it. Press Enter when every file looks right.',
                      TRIM_NUDGE,
+                     number='2.1',
                      )
         minutes = session.window.edges_reader()
     finally:
         session.window.edges_hider()
 
-    # ---- 3 List the limits, draw what they keep and offer the export -----------------
+    # ---- 3 List the limits and draw what they keep -----------------------------------
     limits = trim_limits_builder(session.summaries, minutes)
     _limits_lister(session.summaries, limits)
     session.redraw = lambda: draw(limits)
     draw(limits)
-    _all_data_asker(session, limits)
     return limits
 
 
@@ -1909,6 +2078,7 @@ def viewer_asker(summaries: List[dict],
                  remembered: Dict[str, dict],
                  fits_folder: Path,
                  export_root: Path,
+                 exported: Optional[List[Path]] = None,
                  ) -> Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]:
     """
     ---- Summary ----
@@ -1929,11 +2099,16 @@ def viewer_asker(summaries: List[dict],
     defaults : dict
         Default answers offered by the questions.
     remembered : Dict[str, dict]
-        {file name: limits} from the last run.
+        The files part of the dataset's settings: {file name: limits, OD values and
+        events} from the last run (dataset_settings, DATA_FORMAT.md).
     fits_folder : Path
         Folder holding the fit .csv files.
     export_root : Path
         Results folder.
+    exported : Optional[List[Path]]
+        List the results folder is added to once the export of the import writes into
+        it, so the caller can say it is kept even when the questions are stopped; None
+        when the caller does not need to know.
 
     ---- Globals read ----
     STAGE_TITLES (module constant); settings.STANDARD_FIT.
@@ -1946,12 +2121,14 @@ def viewer_asker(summaries: List[dict],
 
     ---- Globals mutated ----
     None. Stores the answers in ``answers``, reads from and prints to the terminal,
-    draws and closes the plot window and sets up the settings strip (side effects).
+    draws and closes the plot window, sets up the settings strip, writes the export
+    when one is chosen and adds to ``exported`` (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    _export_refresher
     _fit_names_lister
     _standard_fit_loader
     _strip_change_applier
@@ -1960,7 +2137,6 @@ def viewer_asker(summaries: List[dict],
     browser_stage_runner
     choice_asker
     details_stage_runner
-    file_focus_setter
     heading_printer
     info_printer
     numbering_getter
@@ -1973,12 +2149,9 @@ def viewer_asker(summaries: List[dict],
 
     window = active_gui_getter()
     session = ViewerSession(summaries, export_root, window)
+    if exported is not None:
+        session.exported = exported  # the same list, so the caller sees what is added
     window.session_attacher(session)
-    names = [s['name'] for s in summaries]
-    def focus(name: str) -> None:
-        session.current = names.index(name)
-        window.file_focuser(name)
-    file_focus_setter(focus)
     state: dict = {}
 
     # ---- 1 Load the fit of the standard plot -----------------------------------------
@@ -2009,6 +2182,9 @@ def viewer_asker(summaries: List[dict],
         answers['ignore_last_minutes'] = max(v['ignore_end']
                                              for v in state['limits'].values()
                                              )
+        # asked again (4.3, or going back): an export already made follows the edges
+        if state.get('details') is not None:
+            _export_refresher(session, state['limits'], state['details'])
         return state['limits']
     def run_details() -> None:
         old_defaults = dict(answers) if state.get('details') else defaults
@@ -2016,6 +2192,7 @@ def viewer_asker(summaries: List[dict],
                                                 answers,
                                                 old_defaults,
                                                 state['limits'],
+                                                remembered,
                                                 state.get('details'),
                                                 )
     def run_processing() -> None:
@@ -2080,7 +2257,6 @@ def viewer_asker(summaries: List[dict],
                              f'Go back to them if this change affects them.',
                              )
     finally:
-        file_focus_setter(None)
         window.strip_listener_setter(None)
         window.strip_state_setter(False)
         session.redraw = None

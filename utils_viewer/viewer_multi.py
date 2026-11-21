@@ -14,7 +14,7 @@ import config as settings
 from utils_custom.custom_runner import experiment_preparer
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.helpers import figure_capture_setter
-from utils_shared.questions import choice_asker, info_printer
+from utils_shared.questions import accept_asker, info_printer
 from utils_shared.user_notices import problem_shower
 from utils_viewer.viewer_gui import active_gui_getter
 from utils_viewer.viewer_preview import preview_info_builder
@@ -245,8 +245,8 @@ def multi_figure_checker_builder(context: dict,
 
     ---- Helpers ----
     _pictures_builder
+    accept_asker
     active_gui_getter
-    choice_asker
     info_printer
     """
 
@@ -269,11 +269,8 @@ def multi_figure_checker_builder(context: dict,
             return True
         window.pictures_publisher(pictures)
         question = payload.get('question')
-        choice = choice_asker(question or 'Do you accept this figure?',
-                              [('yes', 'Yes, accept'),
-                               ('no', payload.get('change', 'No, change its settings')),
-                               ],
-                              'yes',
+        choice = accept_asker(question or 'Do you accept this figure?',
+                              [('no', payload.get('change', 'change its settings'))],
                               depth=2 if question else 1,
                               )
         if question is None:  # the finished figure: the processed files are not needed

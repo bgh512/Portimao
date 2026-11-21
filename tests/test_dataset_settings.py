@@ -1,17 +1,29 @@
 """
-Tests of the settings kept with a dataset and of the list of data folders.
+Tests of the settings kept with a dataset, the results folder check and the list of data
+folders.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import json
 from pathlib import Path
 
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import numpy as np
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.dataset_settings import (dataset_settings_reader,
                                            dataset_settings_saver,
+                                           file_settings_merger,
                                            SETTINGS_FILE_NAME,
                                            )
-from utils_shared.survey import data_folder_lister, data_folder_resolver
+from utils_shared.survey import (data_folder_lister,
+                                 data_folder_resolver,
+                                 free_folder_finder,
+                                 results_counter,
+                                 results_folder_checker,
+                                 results_folder_resolver,
+                                 saved_values_reader,
+                                 )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -200,6 +212,96 @@ def test_missing_settings_file_gives_nothing(tmp_path: Path) -> None:
     assert dataset_settings_reader(tmp_path) == {}
 
 
+# ---- test_od_values_and_labels_are_kept ----------------------------------------------
+def test_od_values_and_labels_are_kept(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the OD values and event labels of a run are kept in the
+    dataset's settings beside its limits and offered back from there: an OD not asked
+    this run (no OD scaling) stays as saved, a file not in this run is kept, and the
+    values are written as plain numbers and text.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    FILES, ANSWERS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Saved before: OD values for run1, and another file ------------------------
+    remembered = {'run1': dict(FILES['run1'], OD=0.5, volume=1.0, dilution_factor=1.0),
+                  'old_run': {'trim_start': None, 'OD': 0.7},
+                  }
+    limits = {'run1': {'trim_start': 3.0,
+                       'trim_end': 40.0,
+                       'ignore_start': 5.0,
+                       'ignore_end': 0.0,
+                       },
+              }
+    events = [{'datapoint': np.int64(120),
+               'label': '1 µL 10 mM KCN',
+               'concentration_uM': np.float64(2.0),
+               'ignored': np.bool_(False),
+               },
+              {'datapoint': 300,
+               'label': 'ignore',
+               'concentration_uM': None,
+               'ignored': True,
+               },
+              ]
+
+    # ---- 2 This run: no OD scaling, new labels ---------------------------------------
+    files = file_settings_merger(remembered, limits, {'run1': {'events': events}})
+    assert files['run1']['trim_start'] == 3.0
+    assert files['run1']['OD'] == 0.5
+    assert files['run1']['events'][0] == {'datapoint': 120,
+                                          'label': '1 µL 10 mM KCN',
+                                          'concentration_uM': 2.0,
+                                          'ignored': False,
+                                          }
+    assert files['old_run'] == {'trim_start': None, 'OD': 0.7}
+
+    # ---- 3 Saved, read back and offered ----------------------------------------------
+    assert dataset_settings_saver(tmp_path, tmp_path / 'results', files, ANSWERS)
+    saved = dataset_settings_reader(tmp_path)['files']
+    offered = saved_values_reader([{'name': 'run1'}, {'name': 'new_run'}],
+                                  saved,
+                                  tmp_path / 'results',
+                                  )
+    assert offered['run1'] == {'OD': 0.5,
+                               'volume': 1.0,
+                               'dilution_factor': 1.0,
+                               'events': files['run1']['events'],
+                               }
+    assert offered['new_run'] is None
+
+    # ---- 4 This run scaled by OD: the new values replace the old ---------------------
+    files = file_settings_merger(remembered,
+                                 limits,
+                                 {'run1': {'OD': 0.8,
+                                           'volume': 2.0,
+                                           'dilution_factor': 1.0,
+                                           'events': [],
+                                           },
+                                  },
+                                 )
+    assert (files['run1']['OD'], files['run1']['volume']) == (0.8, 2.0)
+    assert files['run1']['events'] == []
+
+
 # ---- test_results_folder_inside_is_kept_relative -------------------------------------
 def test_results_folder_inside_is_kept_relative(tmp_path: Path) -> None:
     """
@@ -231,11 +333,108 @@ def test_results_folder_inside_is_kept_relative(tmp_path: Path) -> None:
     first, copy = tmp_path / 'first', tmp_path / 'copy'
     first.mkdir()
     copy.mkdir()
-    assert dataset_settings_saver(first, first / 'export' / 'run', FILES, ANSWERS)
+    assert dataset_settings_saver(first, first / 'results' / 'run', FILES, ANSWERS)
     text = (first / SETTINGS_FILE_NAME).read_text(encoding='utf-8')
-    assert json.loads(text)['export_folder'] == 'export/run'
+    assert json.loads(text)['export_folder'] == 'results/run'
     (copy / SETTINGS_FILE_NAME).write_text(text, encoding='utf-8')
-    assert dataset_settings_reader(copy)['export_folder'] == copy / 'export' / 'run'
+    assert dataset_settings_reader(copy)['export_folder'] == copy / 'results' / 'run'
+
+
+# ---- test_results_folder_is_checked --------------------------------------------------
+def test_results_folder_is_checked(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check the results folder answer: a file, or a folder under a file,
+    is refused with one sentence; an existing folder and one not made yet are accepted,
+    and checking leaves nothing behind.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    a_file = tmp_path / 'notes.txt'
+    a_file.write_text('')
+    not_a_file = 'Type or drag in a folder, not a file.'
+    assert results_folder_checker(str(a_file)) == not_a_file
+    assert results_folder_checker(f'"{a_file / "results"}"') == not_a_file
+    assert results_folder_checker('') == 'Type or drag in a folder.'
+    assert results_folder_checker(str(tmp_path)) is None
+    assert results_folder_checker(str(tmp_path / 'new' / 'results')) is None
+    assert [p.name for p in tmp_path.iterdir()] == ['notes.txt']
+
+
+# ---- test_results_folder_names_and_old_results ---------------------------------------
+def test_results_folder_names_and_old_results(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check the results folder answer against the data folder: a name
+    without a path is taken inside the data folder and a full path as it is; the files
+    that already have results there are counted (an empty folder of one does not
+    count); and the free name offered beside a folder skips the names already used.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 A plain name goes inside the data folder ----------------------------------
+    data = tmp_path / 'data'
+    data.mkdir()
+    elsewhere = tmp_path / 'elsewhere'
+    assert results_folder_resolver('quadratic_scatter_results', data) == (
+        data / 'quadratic_scatter_results')
+    assert results_folder_resolver(f'"{elsewhere}"', data) == elsewhere
+    assert results_folder_checker('quadratic_scatter_results', data) is None
+    (data / 'notes.txt').write_text('')
+    assert results_folder_checker('notes.txt', data) == ('Type or drag in a folder, '
+                                                         'not a file.')
+
+    # ---- 2 Count the files with results ----------------------------------------------
+    results = data / 'results'
+    summaries = [{'name': 'run1'}, {'name': 'run2'}, {'name': 'run3'}]
+    assert results_counter(results, summaries) == 0
+    (results / 'run1').mkdir(parents=True)
+    (results / 'run1' / 'run1.xlsx').write_text('')
+    (results / 'run2').mkdir()
+    (results / 'logs').mkdir()
+    (results / 'logs' / 'run.log').write_text('')
+    assert results_counter(results, summaries) == 1
+
+    # ---- 3 A free name beside the folder ---------------------------------------------
+    assert free_folder_finder(results) == data / 'results_2'
+    (data / 'results_2').mkdir()
+    assert free_folder_finder(results) == data / 'results_3'
 
 
 # ---- test_results_folder_outside_is_kept_whole ---------------------------------------
@@ -298,7 +497,7 @@ def test_settings_are_read_back(tmp_path: Path) -> None:
     None.
     """
 
-    assert dataset_settings_saver(tmp_path, tmp_path / 'export', FILES, ANSWERS)
+    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, ANSWERS)
     saved = dataset_settings_reader(tmp_path)
     assert saved['files'] == FILES
     assert saved['answers'] == ANSWERS
@@ -332,4 +531,4 @@ def test_unwritable_folder_is_reported(tmp_path: Path) -> None:
     """
 
     missing = tmp_path / 'not_there'
-    assert not dataset_settings_saver(missing, missing / 'export', FILES, ANSWERS)
+    assert not dataset_settings_saver(missing, missing / 'results', FILES, ANSWERS)

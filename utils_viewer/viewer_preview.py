@@ -20,7 +20,9 @@ from matplotlib.figure import Figure
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.experiment_processing import experiment_data_processor
-from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
+from utils_shared.individual_experiment_exporter import (experiment_workbook_exporter,
+                                                         FULL_FOLDER,
+                                                         )
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.paf_reader import experiment_paf_loader
 from utils_shared.pca_plotter import (pca_example_figure_builder,
@@ -39,6 +41,12 @@ BROWSING_ANSWERS = {key: settings.DEFAULT_ANSWERS[key]
 _cache_lock = threading.Lock()
 KEY_PREFIX = 'Key: '
 IGNORE_COLOUR = '#e8a317'  # also the ignored parts in the trimming step (viewer_edges)
+# what the export of the import writes: the workbooks only, with the trimmed spectra, or
+# with the spectra of the whole recordings as well
+SPECTRA_BY_EXPORT = {'summary': (False, False),
+                     'trimmed': (True, False),
+                     'all': (True, True),
+                     }
 
 
 # ---- PreviewSpec ---------------------------------------------------------------------
@@ -95,9 +103,112 @@ class ViewerSession:
     fit: Optional[dict] = None
     redraw: Optional[Callable[[], bool]] = None
     is_figure: bool = False
+    export_choice: Optional[str] = None
+    export_limits: Dict[str, dict] = field(default_factory=dict)
+    full_exports: Dict[str, List[Path]] = field(default_factory=dict)
+    exported: List[Path] = field(default_factory=list)
 
 
 # ---- PREVIEW HELPERS -----------------------------------------------------------------
+
+
+# ---- _file_exporter ------------------------------------------------------------------
+def _file_exporter(session: ViewerSession,
+                   summary: dict,
+                   limits: dict,
+                   details: dict,
+                   choice: str,
+                   keep_full: bool,
+                   ) -> None:
+    """
+    ---- Summary ----
+    Helper function to export the imported data of one file, read once: for a trimmed
+    file the whole recording into the full folder of its results folder, then the data
+    kept by the trimming (all of it for a file not trimmed) into its results folder,
+    with the OD values and labels entered. A file that is no longer trimmed loses the
+    whole recording written for it earlier in this run, as it has nothing called full.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (results folder, the whole recordings written so far).
+    summary : dict
+        File summary (DATA_FORMAT.md).
+    limits : dict
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+    details : dict
+        {file name: {OD, volume, dilution_factor, events}}; may lack the file.
+    choice : str
+        A key of SPECTRA_BY_EXPORT: 'summary', 'trimmed' or 'all'.
+    keep_full : bool
+        True leaves a whole recording already written in this run as it is (the edges
+        changed, and the whole recording does not depend on them).
+
+    ---- Globals read ----
+    FULL_FOLDER, SPECTRA_BY_EXPORT (module constants); settings.DEFAULT_ANSWERS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Reads the file, writes or removes the exported files and records the whole
+    recordings written in session.full_exports (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    experiment_data_processor
+    experiment_trimmer
+    experiment_workbook_exporter
+    preview_info_builder
+    """
+
+    # ---- 1 Read the whole recording, with the OD values and labels -------------------
+    name = summary['name']
+    own = limits.get(name) or {}
+    start, end = own.get('trim_start'), own.get('trim_end')
+    is_trimmed = start is not None or end is not None
+    with_spectra, with_full_spectra = SPECTRA_BY_EXPORT[choice]
+    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS,
+                               decompose=False,
+                               normalise_od=False,
+                               averaging=False,
+                               export_spectra=with_spectra,
+                               ),
+                          )
+    experiment = experiment_data_processor(preview_info_builder(summary, {}, details),
+                                           cfg,
+                                           None,
+                                           )['experiment']
+
+    # ---- 2 Write the whole recording, or take away one no longer wanted --------------
+    earlier = session.full_exports.get(name)
+    if is_trimmed and not (keep_full and earlier):
+        session.full_exports[name] = experiment_workbook_exporter(
+            experiment,
+            session.export_root,
+            spectra=with_full_spectra,
+            subfolder=FULL_FOLDER,
+            )
+    elif not is_trimmed and earlier:
+        for path in earlier:
+            path.unlink(missing_ok=True)
+        try:
+            earlier[0].parent.rmdir()
+        except OSError:
+            pass  # something else is in it, which is left alone
+        del session.full_exports[name]
+
+    # ---- 3 Trim, then write the data used --------------------------------------------
+    if is_trimmed:
+        experiment_trimmer(experiment, start_time=start, end_time=end)
+    experiment['metadata'].update(
+        {'ignore_first_minutes': own.get('ignore_start') or 0.0,
+         'ignore_last_minutes': own.get('ignore_end') or 0.0,
+         },
+        )
+    experiment_workbook_exporter(experiment, session.export_root, spectra=with_spectra)
 
 
 # ---- _loaded_experiment_getter -------------------------------------------------------
@@ -264,75 +375,74 @@ def preview_info_builder(summary: dict, limits: dict, details: dict) -> dict:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- all_data_exporter ---------------------------------------------------------------
-def all_data_exporter(session: ViewerSession,
-                      limits: dict,
-                      include_spectra: bool,
-                      progress: Optional[Any] = None,
-                      ) -> Tuple[Path, List[str]]:
+# ---- import_data_exporter ------------------------------------------------------------
+def import_data_exporter(session: ViewerSession,
+                         limits: dict,
+                         details: dict,
+                         choice: str,
+                         names: Optional[List[str]] = None,
+                         keep_full: bool = False,
+                         progress: Optional[Callable[[int, int], None]] = None,
+                         ) -> List[str]:
     """
     ---- Summary ----
-    Main function to export the data of every file, cut to the trim limits, so it can
-    be plotted outside the program: one workbook per file with the oxygen, OCR and
-    event sheets, and optionally the spectra as csv files. No haem decomposition, OD
-    scaling or averaging is applied; the ignored parts are left in.
+    Main function to export the imported data of every file (or of the files named), so
+    it can be plotted outside the program: in each file's results folder the workbook
+    of the data kept by the trimming (the oxygen, OCR, events with their labels, and the
+    OD values and edges), and for a trimmed file the whole recording in its full folder;
+    the spectra as csv files beside them if chosen. No haem decomposition, OD scaling
+    or averaging is applied; the ignored parts are left in.
 
     ---- Inputs ----
     session : ViewerSession
-        The browser session (files, results folder).
+        The browser session (files, results folder, the whole recordings written).
     limits : dict
         {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
-    include_spectra : bool
-        True to write the spectra as csv files too (large and slow).
-    progress : Optional[Any]
+    details : dict
+        {file name: {OD, volume, dilution_factor, events}} (details_stage_runner).
+    choice : str
+        A key of SPECTRA_BY_EXPORT: 'summary' (the workbooks only), 'trimmed' (and the
+        trimmed spectra) or 'all' (and the spectra of the whole recordings too).
+    names : Optional[List[str]]
+        Files to export; None for every file.
+    keep_full : bool
+        True leaves the whole recordings already written in this run as they are.
+    progress : Optional[Callable[[int, int], None]]
         Function called with (number done, number of files); may be None.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    Tuple[Path, List[str]]
-        (folder written, problems). A file that could not be exported is named in the
-        problems and left out.
+    List[str]
+        The problems: a file that could not be exported is named in them and left out.
 
     ---- Globals mutated ----
-    None. Reads the files and writes <results>/all_data/<file>/<file>.xlsx (and the
-    spectra) (side effects).
+    None. Reads the files, writes <results>/<file>/<file>.xlsx (and full/ inside it for
+    a trimmed file, and the spectra), and notes the results folder in session.exported
+    once something is written (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    experiment_data_processor
-    experiment_workbook_exporter
-    preview_info_builder
+    _file_exporter
     problem_teller
     """
 
-    folder = session.export_root / 'all_data'
+    wanted = [s for s in session.summaries if names is None or s['name'] in names]
     problems: List[str] = []
-    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS,
-                               decompose=False,
-                               normalise_od=False,
-                               averaging=False,
-                               export_spectra=include_spectra,
-                               ),
-                          )
-    for number, summary in enumerate(session.summaries, start=1):
+    for number, summary in enumerate(wanted, start=1):
         try:
             with session.window.output_capturer():
-                info = preview_info_builder(summary, limits, {})
-                processed = experiment_data_processor(info, cfg, None)
-                experiment_workbook_exporter(processed['experiment'],
-                                             folder,
-                                             full=True,
-                                             spectra=include_spectra,
-                                             )
+                _file_exporter(session, summary, limits, details, choice, keep_full)
         except Exception as exc:  # one bad file must not stop the others
             problems.append(problem_teller(summary['name'], exc))
         if progress is not None:
-            progress(number, len(session.summaries))
-    return folder, problems
+            progress(number, len(wanted))
+    if len(problems) < len(wanted) and session.export_root not in session.exported:
+        session.exported.append(session.export_root)
+    return problems
 
 
 # ---- kept_file_lister ----------------------------------------------------------------

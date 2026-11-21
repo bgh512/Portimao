@@ -167,7 +167,7 @@ def _haem_ocr_asker(names: List[str],
         if _step_checker(step_checker,
                          names_used,
                          'Do you accept the OCR plots?',
-                         'No, choose the OCR again',
+                         'choose the OCR again',
                          ):
             break
         ocr_default = answers['ho_ocr_mode']
@@ -190,7 +190,7 @@ def _haem_ocr_asker(names: List[str],
         if _step_checker(step_checker,
                          names_used,
                          'Do you accept these haem plots?',
-                         'No, choose how to show the haems again',
+                         'choose how to show the haems again',
                          ):
             break
         mode_default = answers['ho_haem_mode']
@@ -208,7 +208,7 @@ def _haem_ocr_asker(names: List[str],
         if _step_checker(step_checker,
                          names_used,
                          'Do you accept these haem rows?',
-                         'No, choose the haems again',
+                         'choose the haems again',
                          ):
             break
         haems_default = answers['ho_haems']
@@ -318,7 +318,7 @@ def _panel_chooser(question: str,
         if _step_checker(step_checker,
                          members,
                          'Do you accept this plot?',
-                         'No, choose another experiment',
+                         'choose another experiment',
                          ):
             return choice
         default = choice
@@ -381,14 +381,14 @@ def _step_checker(step_checker: Optional[Callable[[object, str, str], bool]],
 
     ---- Inputs ----
     step_checker : Optional[Callable[[object, str, str], bool]]
-        Function (members, question, change label) that draws the figure and returns
+        Function (members, question, what no does) that draws the figure and returns
         True when it is accepted; None when there is nothing to draw with.
     members : object
         The experiments of the figure: {name: group} or a list of names.
     question : str
         The accept question.
     change : str
-        Label of the answer that asks the question again.
+        What answering no does, for example 'choose the OCR again'.
 
     ---- Globals read ----
     None.
@@ -564,7 +564,7 @@ def _time_response_asker(names: List[str],
         if _step_checker(step_checker,
                          members,
                          'Do you accept these waterfall plots?',
-                         'No, choose the time points again',
+                         'choose the time points again',
                          ):
             break
         skip_default = ', '.join(f'{h:g}' for h in answers['tr_skip_hours']) or 'none'

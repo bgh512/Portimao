@@ -28,7 +28,6 @@ from utils_viewer.viewer_edges import (EdgeChoice,
                                        HANDLE_BAND_PX,
                                        own_value_lister,
                                        )
-from utils_viewer.viewer_od_table import ODTable
 from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          PreviewSpec,
                                          TimeAxis,
@@ -36,6 +35,7 @@ from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          )
 from utils_viewer.viewer_renderer import PreviewRenderer
 from utils_viewer.viewer_strip import EdgeRow, SettingsStrip, strip_values_checker
+from utils_viewer.viewer_table import AnswerTable
 from utils_viewer.viewer_terminal import (ansi_splitter,
                                           ansi_style_updater,
                                           OutputRouter,
@@ -49,15 +49,20 @@ TERMINAL_TEXT = '#d4d4d4'
 ANSWER_COLOUR = '#9cdcfe'
 ERROR_COLOUR = '#ff7b86'
 ICON_PATH = Path(__file__).resolve().parent.parent / 'assets' / 'icon.png'
-ANSWER_HINT = ('Type your answer and press Enter. If you type nothing, the value in '
-               '[brackets] is used.')
+ANSWER_HINT = ('Type your answer and press Enter. Enter alone gives the brighter '
+               'choice or the value in [brackets].')
 EDGES_HINT = ('Drag the edges on the plot, or type the times in the strip under it, '
               'then press Enter.')
 OWN_VALUES_MARK = '  (own times)'  # after a file in the drop-down whose edges differ
 SPAN_HINT = ('Drag across the plot to fill in the answer, or type it, then press Enter. '
-             'If you type nothing, the value in [brackets] is used.')
-TABLE_HINT = ('Click a cell of the table and type its value; Tab moves across, Enter '
-              'moves down. When the table is filled in, press Enter in the box below.')
+             'Enter alone gives the value in [brackets].')
+TABLE_HINT = ('Click a cell and type; Tab moves across, Enter moves down. Press '
+              'Confirm when the table is filled in.')
+# While a table is open it fills the terminal side under this many lines of text.
+TABLE_TERMINAL_LINES = 8
+CONFIRM_BACKGROUND = '#264f78'
+CONFIRM_HOVER = '#2f6396'
+CONFIRM_TEXT = '#ffffff'
 SIGN_BACKGROUND = '#ffd76a'
 SIGN_EDGE = '#e8a317'
 SIGN_TEXT = '#5a3d00'
@@ -160,6 +165,7 @@ class ViewerGui:
     _band_drawer
     _callback_error_keeper
     _closing_handler
+    _confirm_sender
     _display_name_lister
     _drag_ender
     _dragger
@@ -168,6 +174,7 @@ class ViewerGui:
     _edges_refresher
     _event_handler
     _every_file_taker
+    _file_follower
     _history_stepper
     _icon_setter
     _image_deliverer
@@ -187,6 +194,7 @@ class ViewerGui:
     _strip_change_runner
     _strip_change_teller
     _symbol_inserter
+    _table_layout_setter
     _time_clicker
     _time_line_drawer
     _typed_edge_taker
@@ -197,11 +205,7 @@ class ViewerGui:
     edges_reader
     edges_shower
     extra_publisher
-    file_focuser
     input_reader
-    od_table_hider
-    od_table_reader
-    od_table_shower
     output_capturer
     pictures_publisher
     run
@@ -212,6 +216,9 @@ class ViewerGui:
     strip_reader
     strip_setter
     strip_state_setter
+    table_hider
+    table_reader
+    table_shower
     text_sender
     time_reader_setter
     window_closer
@@ -319,7 +326,8 @@ class ViewerGui:
     def _answer_sender(self, event: Any = None) -> None:
         """
         ---- Summary ----
-        Method to pass the typed answer to the question that is waiting for it.
+        Method to pass the typed answer to the question that is waiting for it. While a
+        table is open the answer box is hidden and Confirm answers instead.
 
         ---- Inputs ----
         event : Any
@@ -343,7 +351,7 @@ class ViewerGui:
         _pane_writer
         """
 
-        if not self._is_waiting:
+        if not self._is_waiting or self._is_table_shown:
             return
         answer = self._entry.get()
         self._is_waiting = False
@@ -572,6 +580,43 @@ class ViewerGui:
         if self._renderer is not None:
             self._renderer.stopper()
         self._root.destroy()
+
+    # ---- _confirm_sender -------------------------------------------------------------
+    def _confirm_sender(self, event: Any = None) -> str:
+        """
+        ---- Summary ----
+        Method to answer the instruction waiting on a table: Confirm was clicked, or
+        Enter or the space bar pressed on it. The program then reads the table.
+
+        ---- Inputs ----
+        event : Any
+            The Tk mouse or key event (unused).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        str
+            'break', so Tk does nothing more with the click or key.
+
+        ---- Globals mutated ----
+        None. Writes "Confirm" into the terminal and wakes the question thread (side
+        effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _pane_writer
+        """
+
+        if not self._is_waiting or not self._is_table_shown:
+            return 'break'
+        self._is_waiting = False
+        self._hint.configure(text='Working ...')
+        self._pane_writer('Confirm\n', 'answer')
+        self._answers.put('')
+        return 'break'
 
     # ---- _display_name_lister --------------------------------------------------------
     def _display_name_lister(self) -> List[str]:
@@ -844,9 +889,9 @@ class ViewerGui:
 
         ---- Inputs ----
         event : tuple
-            (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'pictures',
-            'extra', 'image', 'time', 'edges', 'strip', 'strip_fits', 'strip_state',
-            'busy', 'od_show', 'od_hide', 'closed' or 'finished'. The "Drawing ..."
+            (kind, ...) with kind 'prompt', 'spec', 'session', 'pictures', 'extra',
+            'image', 'time', 'edges', 'strip', 'strip_fits', 'strip_state', 'busy',
+            'table_show', 'table_hide', 'closed' or 'finished'. The "Drawing ..."
             sign of 'busy' stays until the next question, preview or picture shown.
             With close_after_s, 'finished' also closes the window after that time.
 
@@ -874,6 +919,7 @@ class ViewerGui:
         _navigator
         _pane_writer
         _picture_shower
+        _table_layout_setter
         """
 
         kind = event[0]
@@ -884,11 +930,13 @@ class ViewerGui:
         if kind == 'prompt':
             self._pane_writer(event[1])
             self._is_waiting = True
-            self._entry.configure(state='normal')
-            self._entry.focus_set()
             if self._is_table_shown:
+                # the cell that still needs something, after a refused Confirm
                 self._hint.configure(text=TABLE_HINT)
+                self._table.cell_focuser()
             else:
+                self._entry.configure(state='normal')
+                self._entry.focus_set()
                 self._hint.configure(text=_hint_chooser(self._time_kind,
                                                         self._edges.is_on,
                                                         ),
@@ -921,16 +969,11 @@ class ViewerGui:
         elif kind == 'busy':
             self._is_busy = True
             self._picture_shower()
-        elif kind == 'od_show':
-            # Above the answer box and under the text, which gives up the room.
-            self._od_table.rows_setter(event[1])
-            self._od_table.frame.pack(side='bottom', fill='x', after=self._bottom)
-            self._is_table_shown = True
-            if self._is_waiting:
-                self._hint.configure(text=TABLE_HINT)
-        elif kind == 'od_hide':
-            self._od_table.frame.pack_forget()
-            self._is_table_shown = False
+        elif kind == 'table_show':
+            self._table.rows_setter(event[1])
+            self._table_layout_setter(True)
+        elif kind == 'table_hide':
+            self._table_layout_setter(False)
         elif kind == 'time':
             self._time_kind, self._time_reader = event[1], event[2]
             self._drag_start = None
@@ -1005,9 +1048,6 @@ class ViewerGui:
                 self._index = self._names.index(name)
             self._renderer.request_setter(spec, self._version, self._index)
             self._navigator(self._index)
-        elif kind == 'focus':
-            if event[1] in self._names:
-                self._navigator(self._names.index(event[1]))
         elif kind == 'image':
             self._image_receiver(*event[1:])
         elif kind == 'closed':
@@ -1055,6 +1095,38 @@ class ViewerGui:
         """
 
         self._edges.is_every_file = is_every_file
+
+    # ---- _file_follower --------------------------------------------------------------
+    def _file_follower(self, name: str) -> None:
+        """
+        ---- Summary ----
+        Method to show on the plot the file whose cell of a table is being typed in,
+        when another file is shown.
+
+        ---- Inputs ----
+        name : str
+            Name of the file.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the file shown (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _navigator
+        """
+
+        files = self._names[:self._file_count]
+        if name in files and files.index(name) != self._index:
+            self._navigator(files.index(name))
 
     # ---- _history_stepper ------------------------------------------------------------
     def _history_stepper(self, step: int) -> None:
@@ -1418,7 +1490,8 @@ class ViewerGui:
         index : int
             Position of the file in the list.
         is_from_user : bool
-            True when the user chose it, so the answer box gets the keyboard back.
+            True when the user chose it, so the answer box gets the keyboard back
+            (not while a table is open: its cells keep it).
 
         ---- Globals read ----
         None.
@@ -1450,7 +1523,7 @@ class ViewerGui:
         self._picture_shower()
         if self._edges.is_on:
             self._edges_refresher()
-        if is_from_user and self._is_waiting:
+        if is_from_user and self._is_waiting and not self._is_table_shown:
             self._entry.focus_set()
 
     # ---- _opened_teller --------------------------------------------------------------
@@ -1895,7 +1968,8 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to type a symbol (µ, a superscript -1, ...) into the answer box at the
-        cursor when a question is waiting for an answer.
+        cursor when a question is waiting for an answer, or, while a table is open,
+        into the cell last typed in.
 
         ---- Inputs ----
         symbol : str
@@ -1909,7 +1983,44 @@ class ViewerGui:
             Nothing.
 
         ---- Globals mutated ----
-        None. Adds text to the answer box (side effect).
+        None. Adds text to the answer box or the cell (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        AnswerTable.symbol_inserter
+        """
+
+        if self._is_table_shown:
+            self._table.symbol_inserter(symbol)
+            return
+        if self._is_waiting:
+            self._entry.insert('insert', symbol)
+        self._entry.focus_set()
+
+    # ---- _table_layout_setter --------------------------------------------------------
+    def _table_layout_setter(self, is_shown: bool) -> None:
+        """
+        ---- Summary ----
+        Method to open or close the table on the terminal side. Open, it fills the
+        terminal side under a few lines of terminal text, which keep the newest lines
+        in sight and scroll, and Confirm takes the place of the answer box; closed, the
+        terminal and the answer box are as before.
+
+        ---- Inputs ----
+        is_shown : bool
+            True to open the table, False to close it.
+
+        ---- Globals read ----
+        TABLE_HINT, TABLE_TERMINAL_LINES (module constants).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the layout of the terminal side (side effect).
 
         ---- Equations ----
         None.
@@ -1918,9 +2029,35 @@ class ViewerGui:
         None.
         """
 
-        if self._is_waiting:
-            self._entry.insert('insert', symbol)
-        self._entry.focus_set()
+        if is_shown == self._is_table_shown:
+            return
+        self._is_table_shown = is_shown
+        if is_shown:
+            # Packed after the answer area, the table takes the room the few lines of
+            # text leave.
+            self._text.configure(height=TABLE_TERMINAL_LINES)
+            self._table.frame.pack(side='bottom',
+                                   fill='both',
+                                   expand=True,
+                                   after=self._bottom,
+                                   )
+            self._prompt_mark.pack_forget()
+            self._entry.pack_forget()
+            self._confirm.pack(side='left', fill='x', expand=True, padx=(10, 6))
+            if self._is_waiting:
+                self._hint.configure(text=TABLE_HINT)
+        else:
+            self._table.frame.pack_forget()
+            self._text.configure(height=self._terminal_lines)
+            self._confirm.pack_forget()
+            self._prompt_mark.pack(side='left', padx=(10, 4))
+            self._entry.pack(side='left',
+                             fill='x',
+                             expand=True,
+                             padx=(0, 6),
+                             ipady=5,
+                             )
+        self._text.see('end')
 
     # ---- _time_clicker ---------------------------------------------------------------
     def _time_clicker(self, event: Any) -> None:
@@ -2083,7 +2220,8 @@ class ViewerGui:
     def _widgets_builder(self) -> None:
         """
         ---- Summary ----
-        Method to build the terminal, the answer box and the OD table (hidden until it
+        Method to build the terminal, the answer box with its Help button (greyed out
+        until the Help box is made), Confirm and the table (both hidden until a table
         is asked for) on the left, and the plot with the overlay of its edges, its file
         controls, the settings strip and the edges row (hidden until edges are dragged)
         on the right.
@@ -2107,8 +2245,10 @@ class ViewerGui:
         ---- Helpers ----
         _answer_sender
         _closing_handler
+        _confirm_sender
         _edges_refresher
         _every_file_taker
+        _file_follower
         _history_stepper
         _message_shower
         _nav_state_setter
@@ -2121,9 +2261,9 @@ class ViewerGui:
         _symbol_inserter
         _time_clicker
         _typed_edge_taker
+        AnswerTable
         EdgeOverlay
         EdgeRow
-        ODTable
         SettingsStrip
         """
 
@@ -2188,12 +2328,16 @@ class ViewerGui:
             key.bind('<Leave>', lambda e, widget=key: widget.configure(bg='#333333'))
         keys.pack(fill='x', pady=(4, 0))
         row = tk.Frame(bottom, bg=TERMINAL_BACKGROUND)
-        tk.Label(row,
-                 text='>',
-                 bg=TERMINAL_BACKGROUND,
-                 fg=ANSWER_COLOUR,
-                 font=(self._family, self._size, 'bold'),
-                 ).pack(side='left', padx=(10, 4))
+        # greyed out until the Help box is made
+        self._help_button = ttk.Button(row, text='Help', width=6, state='disabled')
+        self._help_button.pack(side='right', padx=(0, 10))
+        self._prompt_mark = tk.Label(row,
+                                     text='>',
+                                     bg=TERMINAL_BACKGROUND,
+                                     fg=ANSWER_COLOUR,
+                                     font=(self._family, self._size, 'bold'),
+                                     )
+        self._prompt_mark.pack(side='left', padx=(10, 4))
         self._entry = tk.Entry(row,
                                bg=ENTRY_BACKGROUND,
                                fg=TERMINAL_TEXT,
@@ -2207,23 +2351,47 @@ class ViewerGui:
                                highlightcolor=ANSWER_COLOUR,
                                state='disabled',
                                )
-        self._entry.pack(side='left', fill='x', expand=True, padx=(0, 10), ipady=5)
+        self._entry.pack(side='left', fill='x', expand=True, padx=(0, 6), ipady=5)
+        # Confirm takes the answer box's place while a table is open; a label rather
+        # than a button, so it looks the same on Windows, the Mac and Linux.
+        self._confirm = tk.Label(row,
+                                 text='Confirm',
+                                 bg=CONFIRM_BACKGROUND,
+                                 fg=CONFIRM_TEXT,
+                                 font=(self._family, self._size, 'bold'),
+                                 pady=5,
+                                 cursor='hand2',
+                                 takefocus=1,
+                                 highlightthickness=1,
+                                 highlightbackground=TERMINAL_BACKGROUND,
+                                 highlightcolor=ANSWER_COLOUR,
+                                 )
+        for sequence in ('<Button-1>', '<Return>', '<KP_Enter>', '<space>'):
+            self._confirm.bind(sequence, self._confirm_sender)
+        self._confirm.bind('<Enter>',
+                           lambda e: self._confirm.configure(bg=CONFIRM_HOVER),
+                           )
+        self._confirm.bind('<Leave>',
+                           lambda e: self._confirm.configure(bg=CONFIRM_BACKGROUND),
+                           )
         row.pack(fill='x', pady=(2, 10))
         bottom.pack(side='bottom', fill='x')
         self._bottom = bottom
-        self._od_table = ODTable(tk,
-                                 ttk,
-                                 left,
-                                 (self._family, self._size),
-                                 {'background': TERMINAL_BACKGROUND,
-                                  'text': TERMINAL_TEXT,
-                                  'cell': ENTRY_BACKGROUND,
-                                  'edge': ANSWER_COLOUR,
-                                  },
-                                 self._entry.focus_set,
-                                 )
+        self._table = AnswerTable(tk,
+                                  ttk,
+                                  left,
+                                  (self._family, self._size),
+                                  {'background': TERMINAL_BACKGROUND,
+                                   'text': TERMINAL_TEXT,
+                                   'cell': ENTRY_BACKGROUND,
+                                   'edge': ANSWER_COLOUR,
+                                   },
+                                  self._confirm.focus_set,
+                                  self._file_follower,
+                                  )
         scroll.pack(side='right', fill='y')
         self._text.pack(side='left', fill='both', expand=True)
+        self._terminal_lines = int(self._text.cget('height'))
         panes.add(left, weight=1)
         self._entry.bind('<Return>', self._answer_sender)
         self._entry.bind('<Up>', lambda e: self._history_stepper(-1))
@@ -2503,36 +2671,6 @@ class ViewerGui:
 
         self._events.put(('extra', title, png, is_shown))
 
-    # ---- file_focuser ----------------------------------------------------------------
-    def file_focuser(self, name: str) -> None:
-        """
-        ---- Summary ----
-        Method to show the file a question is about. It is called from the question
-        thread.
-
-        ---- Inputs ----
-        name : str
-            Name of the file.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        None
-            Nothing.
-
-        ---- Globals mutated ----
-        None. Queues the change for the window (side effect).
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        self._events.put(('focus', name))
-
     # ---- input_reader ----------------------------------------------------------------
     def input_reader(self, prompt: Any = '') -> str:
         """
@@ -2573,101 +2711,6 @@ class ViewerGui:
             if isinstance(answer, str):
                 return answer
             self._strip_change_runner(answer[1], prompt)
-
-    # ---- od_table_hider --------------------------------------------------------------
-    def od_table_hider(self) -> None:
-        """
-        ---- Summary ----
-        Method to take the OD table away again. What was typed can still be read
-        with od_table_reader.
-
-        ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        None
-            Nothing.
-
-        ---- Globals mutated ----
-        None. Queues the change for the window (side effect).
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        self._events.put(('od_hide',))
-
-    # ---- od_table_reader -------------------------------------------------------------
-    def od_table_reader(self,
-                        ) -> Tuple[Dict[str, Dict[str, Optional[float]]], List[str]]:
-        """
-        ---- Summary ----
-        Method to give what the OD table holds. It is meant to be called once the
-        user has answered the question asked after od_table_shower, which is when the
-        table is sure to hold the rows that were sent.
-
-        ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        Tuple[Dict[str, Dict[str, Optional[float]]], List[str]]
-            ({file name: {'OD', 'volume', 'dilution_factor'}}, with None for a cell
-            that is empty or wrong (DATA_FORMAT.md); the wrong cells as 'file name:
-            column heading').
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        return self._od_table.rows_reader(), self._od_table.problems_lister()
-
-    # ---- od_table_shower -------------------------------------------------------------
-    def od_table_shower(self, rows: Dict[str, Dict[str, Optional[float]]]) -> None:
-        """
-        ---- Summary ----
-        Method to bring up the OD table above the answer box, with one row per file.
-
-        ---- Inputs ----
-        rows : Dict[str, Dict[str, Optional[float]]]
-            {file name: {'OD', 'volume', 'dilution_factor'}} in the order of the
-            rows; a value that is None or missing leaves its cell empty
-            (DATA_FORMAT.md).
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        None
-            Nothing.
-
-        ---- Globals mutated ----
-        None. Queues the rows for the window (side effect).
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        self._events.put(
-            ('od_show', {name: dict(values) for name, values in rows.items()}),
-            )
 
     # ---- output_capturer -------------------------------------------------------------
     @contextmanager
@@ -3010,6 +3053,98 @@ class ViewerGui:
         """
 
         self._events.put(('strip_state', bool(is_enabled)))
+
+    # ---- table_hider -----------------------------------------------------------------
+    def table_hider(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the table away again and bring back the answer box. What was
+        typed can still be read with table_reader.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('table_hide',))
+
+    # ---- table_reader ----------------------------------------------------------------
+    def table_reader(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]:
+        """
+        ---- Summary ----
+        Method to give what the table holds. It is meant to be called once Confirm has
+        been pressed for the instruction given after table_shower, which is when the
+        table is sure to hold the rows that were sent.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]
+            (the values row by row, as AnswerTable.values_reader gives them; the cells
+            that cannot be used or are needed and empty, as
+            AnswerTable.problems_lister gives them).
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        AnswerTable.problems_lister
+        AnswerTable.values_reader
+        """
+
+        return self._table.values_reader(), self._table.problems_lister()
+
+    # ---- table_shower ----------------------------------------------------------------
+    def table_shower(self, table: dict) -> None:
+        """
+        ---- Summary ----
+        Method to open a table on the terminal side, in place of most of the text, with
+        Confirm in place of the answer box.
+
+        ---- Inputs ----
+        table : dict
+            The table to show (table_rows, DATA_FORMAT.md).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the table for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('table_show', table))
 
     # ---- text_sender -----------------------------------------------------------------
     def text_sender(self, text: str, kind: str) -> None:

@@ -18,6 +18,8 @@ from utils_shared.helpers import haem_type_finder, name_simplifier
 # opened before from the settings kept in its own folder (utils_shared.dataset_settings).
 # The standard fit is the file in fits/ used for the haems of the standard plot.
 STANDARD_FIT = 'bswitch_no2_mycobl_b557.csv'
+# the results folder offered, inside the data folder, for a dataset never run before
+RESULTS_FOLDER_NAME = 'results'
 DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ranges
                    # the same at the end of the recording
                    'ignore_last_minutes': 0.0,
@@ -126,6 +128,11 @@ PCA_WINDOW_NM = (500.0, 630.0)
 PCA_SMOOTHING_NM = 4.0
 # volume (mL) the spun-down cells are resuspended in, as the OD questions say
 OD_RESUSPENDED_ML = 5
+# bytes a spectra csv file takes per value of each kind, for the sizes the export
+# question gives: measured on 200 spectra of each spectrometer of
+# data_instrument_check/example.paf (18.9, 8.0 and 20.9), so about 1.2 GB for that 100 MB
+# file
+SPECTRA_CSV_BYTES = {'transmission': 19, 'intensity': 8, 'attenuation': 21}
 # axis-label size. Tick labels, legends and event labels are 1 pt smaller and titles 1
 # pt larger; panel letters follow the journal.
 BASE_FONT_PT = 6

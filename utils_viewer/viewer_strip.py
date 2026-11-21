@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+from utils_shared.questions import typed_number_reader
 from utils_shared.survey import JOURNAL_NAMES
 
 
@@ -862,41 +863,6 @@ class SettingsStrip:
 # ---- HELPERS -------------------------------------------------------------------------
 
 
-# ---- _number_reader ------------------------------------------------------------------
-def _number_reader(text: str) -> Optional[float]:
-    """
-    ---- Summary ----
-    Helper function to read a typed number, with a point or a comma as the decimal
-    sign.
-
-    ---- Inputs ----
-    text : str
-        What was typed.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    Optional[float]
-        The number, or None when the text is not one.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    try:
-        number = float(text.strip().replace(',', '.'))
-    except ValueError:
-        return None
-    return number if number == number and abs(number) != float('inf') else None
-
-
 # ---- _page_journal_finder ------------------------------------------------------------
 def _page_journal_finder(journal: str) -> str:
     """
@@ -963,12 +929,12 @@ def height_checker(text: str, journal: str) -> Tuple[Optional[float], str]:
     height in mm = height * page height of the journal in mm.
 
     ---- Helpers ----
-    _number_reader
     _page_journal_finder
+    typed_number_reader
     """
 
     page_mm = settings.JOURNAL_SPECS[_page_journal_finder(journal)]['page_height_mm']
-    height = _number_reader(text)
+    height = typed_number_reader(text)
     if height is None or not 0 < height <= 1:
         return None, f'Type {HEIGHT_HELP}.'
     return height, f'of a page ({round(height * page_mm, 1):g} mm)'
@@ -998,10 +964,10 @@ def minutes_checker(text: str) -> Tuple[Optional[float], str]:
     None.
 
     ---- Helpers ----
-    _number_reader
+    typed_number_reader
     """
 
-    minutes = _number_reader(text)
+    minutes = typed_number_reader(text)
     if minutes is None or minutes < 0:
         return None, MINUTES_HELP
     return minutes + 0.0, ''
