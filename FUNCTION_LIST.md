@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.13
+- **Version:** V2.14
 - **Date:** 22/11/2026
 
 ## Contents
@@ -70,6 +70,13 @@
     - [`test_temporary_copy_cannot_update`](#test_temporary_copy_cannot_update)
     - [`test_unanswered_ask_is_asked_again`](#test_unanswered_ask_is_asked_again)
     - [`test_update_from_made_up_zip`](#test_update_from_made_up_zip)
+- [`tests/test_averaging_windows.py`](#teststest_averaging_windowspy)
+    - [`test_a_figure_without_windows_offers_the_window_step`](#test_a_figure_without_windows_offers_the_window_step)
+    - [`test_a_window_can_be_switched_off_and_set`](#test_a_window_can_be_switched_off_and_set)
+    - [`test_a_pulled_end_gives_the_gap`](#test_a_pulled_end_gives_the_gap)
+    - [`test_a_pulled_start_gives_the_length`](#test_a_pulled_start_gives_the_length)
+    - [`test_the_plot_shows_the_windows`](#test_the_plot_shows_the_windows)
+    - [`test_the_windows_fall_before_the_additions`](#test_the_windows_fall_before_the_additions)
 - [`tests/test_dataset_settings.py`](#teststest_dataset_settingspy)
     - [`_program_folder_maker`](#_program_folder_maker)
     - [`test_broken_settings_file_gives_nothing`](#test_broken_settings_file_gives_nothing)
@@ -350,12 +357,12 @@
     - [`_run_builder`](#_run_builder)
     - [`_spectra_experiment_builder`](#_spectra_experiment_builder)
     - [`test_averaged_spectra_around_the_additions`](#test_averaged_spectra_around_the_additions)
+    - [`test_baseline_starts_with_the_recording`](#test_baseline_starts_with_the_recording)
     - [`test_difference_of_two_known_spectra`](#test_difference_of_two_known_spectra)
     - [`test_difference_needs_its_averages`](#test_difference_needs_its_averages)
     - [`test_average_over_three_runs`](#test_average_over_three_runs)
     - [`test_average_needs_two_runs`](#test_average_needs_two_runs)
 - [`tests/test_time_pointer.py`](#teststest_time_pointerpy)
-    - [`test_drag_gives_the_window_and_gap`](#test_drag_gives_the_window_and_gap)
     - [`test_pointed_time_inside_the_panels`](#test_pointed_time_inside_the_panels)
     - [`test_pointed_time_off_the_panels`](#test_pointed_time_off_the_panels)
     - [`test_pointed_time_on_a_scaled_picture`](#test_pointed_time_on_a_scaled_picture)
@@ -426,7 +433,6 @@
     - [`_step_checker`](#_step_checker)
     - [`_step_wirer`](#_step_wirer)
     - [`_time_response_asker`](#_time_response_asker)
-    - [`_window_ensurer`](#_window_ensurer)
     - [`summary_figure_asker`](#summary_figure_asker)
 - [`utils_custom/custom_runner.py`](#utils_customcustom_runnerpy)
     - [`_ocr_and_haem_response_preparer`](#_ocr_and_haem_response_preparer)
@@ -541,7 +547,6 @@
     - [`difference_spectrum_calculator`](#difference_spectrum_calculator)
     - [`difference_spectrum_decomposer`](#difference_spectrum_decomposer)
     - [`spectral_averager`](#spectral_averager)
-    - [`window_definer`](#window_definer)
 - [`utils_custom/time_response_exporter.py`](#utils_customtime_response_exporterpy)
     - [`_difference_sheet_writer`](#_difference_sheet_writer)
     - [`_haem_sheet_writer`](#_haem_sheet_writer)
@@ -612,7 +617,11 @@
 - [`utils_shared/averaging.py`](#utils_sharedaveragingpy)
     - [`_baseline_change_adder`](#_baseline_change_adder)
     - [`experiment_averages_calculator`](#experiment_averages_calculator)
+    - [`window_layout_finder`](#window_layout_finder)
+    - [`window_pointer_reader`](#window_pointer_reader)
+    - [`window_span_lister`](#window_span_lister)
     - [`window_statistics_calculator`](#window_statistics_calculator)
+    - [`window_value_setter`](#window_value_setter)
 - [`utils_shared/comparison_plotter.py`](#utils_sharedcomparison_plotterpy)
     - [`_overhang_calculator`](#_overhang_calculator)
     - [`_renderer_getter`](#_renderer_getter)
@@ -857,8 +866,6 @@
     - [`_subscript_stripper`](#_subscript_stripper)
     - [`_tidy_labels_offerer`](#_tidy_labels_offerer)
     - [`_trim_minutes_clamper`](#_trim_minutes_clamper)
-    - [`averaging_asker`](#averaging_asker)
-    - [`averaging_drag_reader`](#averaging_drag_reader)
     - [`data_folder_lister`](#data_folder_lister)
     - [`data_folder_resolver`](#data_folder_resolver)
     - [`decomposition_asker`](#decomposition_asker)
@@ -891,6 +898,7 @@
     - [`trim_minutes_builder`](#trim_minutes_builder)
     - [`trim_minutes_setter`](#trim_minutes_setter)
     - [`trim_pointer_reader`](#trim_pointer_reader)
+    - [`windows_ensurer`](#windows_ensurer)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
 - [`utils_shared/user_notices.py`](#utils_shareduser_noticespy)
@@ -946,7 +954,6 @@
     - [`pca_spectra_gatherer`](#pca_spectra_gatherer)
     - [`preview_drawer`](#preview_drawer)
     - [`preview_figure_builder`](#preview_figure_builder)
-    - [`skipped_windows_finder`](#skipped_windows_finder)
     - [`time_axis_finder`](#time_axis_finder)
     - [`time_title_chooser`](#time_title_chooser)
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
@@ -959,7 +966,6 @@
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
     - [`_addition_time_lister`](#_addition_time_lister)
     - [`_answers_previewer`](#_answers_previewer)
-    - [`_averaging_reviewer`](#_averaging_reviewer)
     - [`_component_namer`](#_component_namer)
     - [`_decomposition_storer`](#_decomposition_storer)
     - [`_export_asker`](#_export_asker)
@@ -975,11 +981,12 @@
     - [`_region_rules_lister`](#_region_rules_lister)
     - [`_regions_chooser`](#_regions_chooser)
     - [`_regions_lister`](#_regions_lister)
-    - [`_skipped_lister`](#_skipped_lister)
     - [`_standard_fit_loader`](#_standard_fit_loader)
     - [`_strip_change_applier`](#_strip_change_applier)
     - [`_strip_shower`](#_strip_shower)
     - [`_table_filler`](#_table_filler)
+    - [`_unfit_windows_lister`](#_unfit_windows_lister)
+    - [`_windows_chooser`](#_windows_chooser)
     - [`browser_stage_runner`](#browser_stage_runner)
     - [`details_stage_runner`](#details_stage_runner)
     - [`pca_stage_runner`](#pca_stage_runner)
@@ -988,6 +995,7 @@
     - [`region_files_lister`](#region_files_lister)
     - [`trim_stage_runner`](#trim_stage_runner)
     - [`viewer_asker`](#viewer_asker)
+    - [`windows_stage_runner`](#windows_stage_runner)
 - [`utils_viewer/viewer_strip.py`](#utils_viewerviewer_strippy)
     - [`EdgeRow`](#edgerow)
     - [`SettingsStrip`](#settingsstrip)
@@ -2226,6 +2234,7 @@ section_starter
 special_figures_maker
 summary_figure_asker
 viewer_asker
+windows_stage_runner
 yes_no_asker
 ```
 
@@ -3044,6 +3053,195 @@ _closed_pid_giver
 _release_writer
 update_installer
 user_places_finder
+```
+
+## `tests/test_averaging_windows.py`
+
+Tests that the averaging windows fall, and follow a pulled edge, as worked out by hand,
+
+### MAIN FUNCTIONS
+
+#### `test_a_figure_without_windows_offers_the_window_step`
+
+```text
+---- Summary ----
+Main function to check what a figure that needs the averaging windows does: with
+windows set up nothing is asked; with none, one question offers the window step of
+the processing, and the figure is made only when windows are set up after it. No
+window or gap is asked for by the figure itself. The question and the window step
+are stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Puts the stand-in for the question in place, and takes it away afterwards.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_window_can_be_switched_off_and_set`
+
+```text
+---- Summary ----
+Main function to check the values typed or ticked in the window step: a length or
+a gap that can be used is taken, a length of 0 and a gap below 0 change nothing,
+the tick box switches the windows off and on, and one change reaches every file.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VALUES (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_pulled_end_gives_the_gap`
+
+```text
+---- Summary ----
+Main function to check that the end of a window pulled to a time gives how long
+before the next addition the windows end, in whole steps of 5 s and never below 0.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+The module constants.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The ends that can be pulled are at 9.5 and 19.5 min (the last window's cannot).
+Pulled to 19.0 min: the nearest is 19.5, before the addition at 20, so 1 min =
+60 s. To 9.82 min: nearest 9.5, before the addition at 10, 0.18 min = 10.8 s ->
+10 s. To 20.3 min: nearest 19.5, past its addition at 20, -18 s -> 0 s.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_pulled_start_gives_the_length`
+
+```text
+---- Summary ----
+Main function to check that the start of a window pulled to a time gives the
+length of the windows, in whole steps of 5 s and of at least one step, and that a
+file without additions keeps the length it had.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+The module constants.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Equations ----
+The starts are at 7.5, 17.5 and 27.5 min, the ends at 9.5, 19.5 and 29.5 min.
+Pulled to 17.0 min: the nearest start is 17.5, of the window ending at 19.5, so
+2.5 min = 150 s. To 27.93 min: nearest 27.5, ending at 29.5, 1.57 min = 94.2 s ->
+95 s. To 19.49 min: nearest 17.5, ending at 19.5, 0.6 s -> 0 -> one step, 5 s.
+
+---- Globals mutated ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_plot_shows_the_windows`
+
+```text
+---- Summary ----
+Main function to check what the window step draws for a file: the start of every
+window and the end of all but the last as edges, the first of each kind with its
+words, the windows as blue parts and those that do not fit as red ones, and
+nothing when the windows are unticked or the file has no additions.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+The module constants; PART_STYLES of the window.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+120 s and 30 s: windows 7.5 to 9.5, 17.5 to 19.5 and 27.5 to 29.5 min. 720 s
+(12 min): the baseline 0 to 9.5 (cut at the start of the run, it fits), 7.5 to
+19.5 (starts before its addition at 10) and 17.5 to 29.5 (before its addition at
+20) do not fit.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_windows_fall_before_the_additions`
+
+```text
+---- Summary ----
+Main function to check where the windows of a file fall and which do not fit: the
+baseline before the first addition, one window before each later addition and one
+before the end of the run.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+The module constants.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+2 min and 0.5 min: baseline 10 - 0.5 = 9.5, from 7.5; then 20 - 0.5 = 19.5, from
+17.5; then 30 - 0.5 = 29.5, from 27.5. 12 min: the baseline would start at -2.5,
+so at 0; 19.5 - 12 = 7.5 is before the addition at 10, and 29.5 - 12 = 17.5 is
+before the addition at 20, so neither fits. A first addition at 0.6 min: the
+baseline runs from 0 to 0.1 min, 6 s, less than the 10 s it needs.
+
+---- Helpers ----
+None.
 ```
 
 ## `tests/test_dataset_settings.py`
@@ -10628,6 +10826,36 @@ spectrum (t, 2 t, 0) averages to (2.5, 5, 0) with spread (0.7906, 1.5811, 0).
 _spectra_experiment_builder
 ```
 
+#### `test_baseline_starts_with_the_recording`
+
+```text
+---- Summary ----
+Main function to check that the baseline window of the averaged spectra starts
+where the recording starts when the window would begin before it, as the windows
+of the processing do.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Additions at 2 and 8 min, 2 min windows ending 0.5 min before the next addition:
+the baseline ends at 1.5 min and would start at -0.5 min, so it starts at 0. Its
+spectra are at t = 0, 0.5, 1 and 1.5 min: mean 0.75, so (t, 2 t, 0) averages to
+(0.75, 1.5, 0). The next window runs from 5.5 to 7.5 min, after the addition at 2.
+
+---- Helpers ----
+_spectra_experiment_builder
+```
+
 #### `test_difference_of_two_known_spectra`
 
 ```text
@@ -10742,37 +10970,6 @@ _run_builder
 Tests that the mouse over a preview gives the times and answers worked out by hand,
 
 ### MAIN FUNCTIONS
-
-#### `test_drag_gives_the_window_and_gap`
-
-```text
----- Summary ----
-Main function to check that a drag across one averaging window gives its length
-and how long before the next addition it ends, in seconds rounded to whole 5 s,
-worked out by hand for additions at 10 and 20 min.
-
----- Inputs ----
-None.
-
----- Globals read ----
-config.DRAG_STEP_SECONDS (5 s, checked first).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-18.5 to 19 min: 30 s long, 60 s before the addition at 20. 9 to 9.82 min: 49.2 s
--> 50 s, and 10.8 s before the addition at 10 -> 10 s. 25 to 25.4 min, after the
-last addition: 24 s -> 25 s, no gap. 5 to 5.01 min: 0.6 s -> one step (5 s), and
-299.4 s -> 300 s before the addition at 10.
-
----- Helpers ----
-None.
-```
 
 #### `test_pointed_time_inside_the_panels`
 
@@ -12732,47 +12929,17 @@ size_asker
 text_asker
 ```
 
-#### `_window_ensurer`
-
-```text
----- Summary ----
-Helper function to make sure the event-window settings exist for the special
-figures: they reuse the section 3 settings, which are asked here if event
-averaging was switched off there.
-
----- Inputs ----
-answers : dict
-    Answers dictionary; uses averaging, window_minutes and gap_minutes.
-defaults : dict
-    Default answers.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Stores the tr_* and ho_* window answers in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-averaging_asker
-info_printer
-```
-
 ### MAIN FUNCTIONS
 
 #### `summary_figure_asker`
 
 ```text
 ---- Summary ----
-Main function to ask section 6: whether to plot a time response and a haem and
+Main function to ask section 7: whether to plot a time response and a haem and
 OCR response, and the settings of each one chosen. Both need the haem fit, which
-is asked for here if it was not chosen in section 3.
+is asked for here if it was not chosen in the processing, and the averaging
+windows of the processing: with none set up, the window step is offered and the
+figure is not made without them.
 
 ---- Inputs ----
 names : List[str]
@@ -12794,6 +12961,9 @@ figure_checker : Optional[Callable[[str, dict], bool]]
 percent_names : Optional[List[str]]
     Names of the files with an oxidised and a reduced region, whose haems have a
     % oxidised; None when no file has them.
+windows_adder : Optional[Callable[[], bool]]
+    Function that runs the window step of the processing (windows_ensurer); None
+    when it cannot be run.
 
 ---- Globals read ----
 None.
@@ -12813,9 +12983,9 @@ None.
 _haem_ocr_asker
 _step_wirer
 _time_response_asker
-_window_ensurer
 decomposition_asker
 info_printer
+windows_ensurer
 yes_no_asker
 ```
 
@@ -12836,7 +13006,8 @@ response figures, on a copy of one experiment.
 experiment : dict
     Processed experiment (DATA_FORMAT.md).
 answers : dict
-    Terminal answers; uses the ho_* settings.
+    Terminal answers; uses the ho_* settings and the averaging windows of the
+    dataset (window_minutes, gap_minutes, final_gap_minutes).
 od_available : bool
     True when OD, volume and dilution factor were available for this experiment.
 
@@ -12873,8 +13044,9 @@ experiment : dict
 group : str
     Group the experiment belongs to.
 answers : dict
-    Terminal answers; uses decomposition_dataset, haem_background and the tr_*
-    windows.
+    Terminal answers; uses decomposition_dataset, haem_background and the
+    averaging windows of the dataset (window_minutes, gap_minutes,
+    final_gap_minutes).
 fit : dict
     Fit dictionary from import_fit.
 
@@ -16587,48 +16759,12 @@ None. Adds ``spectral_averages`` to the experiment and shows a warning for each
 window skipped (side effects).
 
 ---- Equations ----
-None.
+None. The windows fall as window_span_lister says; a window is left out when it
+does not fit or holds no spectrum.
 
 ---- Helpers ----
 warning_shower
-window_definer
-```
-
-#### `window_definer`
-
-```text
----- Summary ----
-Helper function to lay out the averaging windows of one run.
-
----- Inputs ----
-event_times : Iterable
-    Event times in minutes.
-recording_end : float
-    Last time of the recording in minutes.
-window_minutes : float
-    Length of each window.
-gap_minutes : float
-    Gap between the end of a window and the next addition.
-final_window_gap_minutes : float
-    Gap between the last window and the end of the data.
-
----- Globals read ----
-None.
-
----- Outputs ----
-list
-    [(name, start, end, previous event time or None), ...].
-
----- Globals mutated ----
-None.
-
----- Equations ----
-average0 ends gap_minutes before the first addition; averageN ends gap_minutes
-before addition N + 1; the last window ends final_window_gap_minutes before the end.
-start = end - window_minutes.
-
----- Helpers ----
-None.
+window_span_lister
 ```
 
 ## `utils_custom/time_response_exporter.py`
@@ -18742,7 +18878,141 @@ mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0).
 _baseline_change_adder
 source_resolver
 time_getter
+window_span_lister
 window_statistics_calculator
+```
+
+#### `window_layout_finder`
+
+```text
+---- Summary ----
+Main function to give what the window step draws on the plot of one file: the two
+edges of every averaging window, and the windows as parts to shade, those that do
+not fit apart. The first edge of each kind carries its words.
+
+---- Inputs ----
+values : Dict[str, float]
+    {window_s, gap_s, is_on} of the file (WINDOW_KEYS).
+event_times_min : List[float]
+    Times of the file's additions on the time axis of the plot (min), in order,
+    not those marked ignore.
+recording_span_min : Tuple[float, float]
+    (first, last) time of the data on that axis (min).
+final_window_gap_minutes : float
+    How long before the end of the recording the last window ends, in minutes.
+baseline_minimum_seconds : float
+    Least length of the baseline window, in seconds.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
+    ([(field, time in min, words, kind)], [(start, end, kind)]): the start of every
+    window is an edge of the field 'window_s' (kind 'average'), the end of every
+    window but the last an edge of 'gap_s' (kind 'average_end'; the last window
+    ends a fixed time before the end of the recording). A part has the kind
+    'average', or 'average_unfit' for a window that does not fit. Both lists are
+    empty when the windows are switched off or the file has no additions.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+window_span_lister
+```
+
+#### `window_pointer_reader`
+
+```text
+---- Summary ----
+Main function to turn where the mouse holds an edge of an averaging window into the
+length of the windows (a start edge) or how long before the next addition they end
+(an end edge), in seconds rounded to whole steps. The edge held is the one of its
+kind nearest the mouse, which stays the same edge while it follows the mouse.
+
+---- Inputs ----
+values : Dict[str, float]
+    {window_s, gap_s, is_on} of the file now (WINDOW_KEYS).
+key : str
+    'window_s' for a start edge, 'gap_s' for an end edge.
+time_min : float
+    Time under the mouse on the time axis of the plot (min).
+event_times_min : List[float]
+    Times of the file's additions on that axis (min), in order.
+recording_span_min : Tuple[float, float]
+    (first, last) time of the data on that axis (min).
+final_window_gap_minutes : float
+    How long before the end of the recording the last window ends, in minutes.
+step_seconds : float
+    The step the result is rounded to, in seconds (> 0).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    The new value of the field, in seconds: a length of at least one step, or a
+    gap of at least 0. The value as it is when the file has no edge of that kind.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+length_s = round((end of the window held - time) x 60 / step) x step;
+gap_s = round((addition after the window held - time) x 60 / step) x step, with
+the addition after a window = its end + the gap now.
+
+---- Helpers ----
+window_span_lister
+```
+
+#### `window_span_lister`
+
+```text
+---- Summary ----
+Main function to give where the averaging windows of one file fall, and which do
+not fit: the baseline window before the first addition, then one window after each
+addition. The averaging and the plot of the window step both use it.
+
+---- Inputs ----
+event_times_min : List[float]
+    Times of the additions (min), in order; at least one.
+recording_span_min : Tuple[float, float]
+    (first, last) time of the data (min).
+window_minutes : float
+    Length of each window, in minutes.
+gap_minutes : float
+    How long before the next addition each window ends, in minutes.
+final_window_gap_minutes : float
+    How long before the end of the recording the last window ends, in minutes.
+baseline_minimum_seconds : float
+    Least length of the baseline window, in seconds; 0 (the standard) never finds
+    it too short, for a caller that checks the data inside it itself.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Tuple[str, float, float, Optional[str]]]
+    [(name, start, end, problem)] in minutes, 'average0' (the baseline) first, then
+    'average1' after the first addition and so on. The problem is None for a
+    window that fits, or one sentence saying why it does not.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+average0: end = first addition - gap; start = end - window, or the start of the
+recording when that is later; too short when end - start < the least length.
+averageN: end = addition N + 1 - gap (the end of the recording - final gap for the
+last addition); start = end - window; it does not fit when start < addition N.
+
+---- Helpers ----
+None.
 ```
 
 #### `window_statistics_calculator`
@@ -18779,6 +19049,39 @@ with start_time <= t <= end_time.
 measurement_column_finder
 time_getter
 value_getter
+```
+
+#### `window_value_setter`
+
+```text
+---- Summary ----
+Main function to set the length of the windows, how long before the next addition
+they end, or whether there are windows, as dragged, typed or ticked in the window
+step. A value that cannot be used leaves everything as it is.
+
+---- Inputs ----
+values : Dict[str, float]
+    {window_s, gap_s, is_on} now (WINDOW_KEYS); not changed.
+key : str
+    The field set: one of WINDOW_KEYS.
+value : float
+    Its new value: seconds, or for 'is_on' anything but 0 for windows.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, float]
+    The new values. A length of 0 or less, or a gap below 0, changes nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_shared/comparison_plotter.py`
@@ -27344,88 +27647,6 @@ _limit_maximum_getter
 
 ### MAIN FUNCTIONS
 
-#### `averaging_asker`
-
-```text
----- Summary ----
-Main function to ask whether to average around the events, and the window
-settings, in seconds. When the plot shows the files, a drag across one window on
-the plot gives its length, and the gap from where the drag ended to the next
-addition is then offered as the default of the gap question; a drag during the gap
-question gives the gap alone.
-
----- Inputs ----
-answers : dict
-    Answers dictionary the values are stored in.
-defaults : dict
-    Default answers (averaging, window_minutes, gap_minutes).
-forced : bool
-    True to skip the yes/no question and only ask the window settings (a figure
-    that needs the averages was chosen). The averaging answer is not changed.
-depth : int
-    Numbering depth of the first question.
-additions : Optional[Dict[str, List[float]]]
-    {file name: times of its additions (min, not those marked ignore), on the time
-    axis of the plot}, so a drag on the plot of a file can be read; None when the
-    plot does not show the files (the answers are then typed).
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Stores window_minutes and gap_minutes (in minutes) and averaging in
-``answers``.
-
----- Equations ----
-minutes = seconds / 60.
-
----- Helpers ----
-averaging_drag_reader
-number_asker
-yes_no_asker
-```
-
-#### `averaging_drag_reader`
-
-```text
----- Summary ----
-Main function to turn a drag across one averaging window on the plot of a file into
-the window's length and how long before the next addition it ends, both in seconds
-rounded to whole steps.
-
----- Inputs ----
-additions_min : List[float]
-    Times of the file's additions on the time axis of the plot (min), not those
-    marked ignore.
-start_min : float
-    Where the drag started (min).
-end_min : float
-    Where the drag ended (min); after ``start_min``.
-
----- Globals read ----
-config.DRAG_STEP_SECONDS (the rounding step).
-
----- Outputs ----
-Tuple[float, Optional[float]]
-    (length_s, gap_s): the length is at least one step; the gap is at least 0, and
-    None when no addition comes after the end of the drag (the last window ends a
-    set time before the end of the recording instead).
-
----- Globals mutated ----
-None.
-
----- Equations ----
-length_s = round((end - start) x 60 / step) x step, at least one step;
-gap_s = round((first addition at or after the end - end) x 60 / step) x step.
-
----- Helpers ----
-None.
-```
-
 #### `data_folder_lister`
 
 ```text
@@ -27920,7 +28141,9 @@ None.
 ```text
 ---- Summary ----
 Main function to ask the multi-experiment plots: the side-by-side figure of two
-experiments and the 2x2 figure of four experiments.
+experiments and the 2x2 figure of four experiments. The 2x2 figure needs the
+averaging windows: with none set up it offers the window step of the processing,
+and is not made without them.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -27937,6 +28160,9 @@ figure_checker : Optional[Callable[[str, dict], bool]]
     ('comparison', {'comparison': ...}) or ('exemplar', {'exemplar_names': ...}). It
     shows the figure and returns True when the user accepts it. When it returns
     False the figure's questions are asked again with the answers as the defaults.
+windows_adder : Optional[Callable[[], bool]]
+    Function that runs the window step of the processing (windows_ensurer); None
+    when it cannot be run.
 
 ---- Globals read ----
 None.
@@ -27954,11 +28180,11 @@ None. Stores the answers in ``answers`` (side effect).
 None.
 
 ---- Helpers ----
-averaging_asker
 choice_asker
 info_printer
 run_name_lister
 size_asker
+windows_ensurer
 yes_no_asker
 ```
 
@@ -28530,6 +28756,44 @@ Trim start = t. Trim end = duration - t. Ignore start = t - trim start. Ignore e
 
 ---- Helpers ----
 None.
+```
+
+#### `windows_ensurer`
+
+```text
+---- Summary ----
+Main function to make sure the averaging windows are set up before the questions
+of a figure that needs them. The figure never asks for a window of its own: with
+none set up it says so and offers the window step of the processing (4.6), or
+carries on without the figure.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary; averaging says whether the windows are set up.
+windows_adder : Optional[Callable[[], bool]]
+    Function that runs the window step of the processing, stores what is chosen
+    in ``answers`` and returns True when the windows are then set up; None when
+    the step cannot be run, so the figure is not made.
+depth : int
+    Depth of the question (how far it is set in).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the averaging windows are set up, so the figure can be made.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal; the window step stores the windows
+in ``answers`` (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+yes_no_asker
 ```
 
 ## `utils_shared/trimming.py`
@@ -30278,8 +30542,10 @@ _table_layout_setter
 
 ```text
 ---- Summary ----
-Method to take the "Every file" tick box of the edges row: ticked, a moved or
-typed edge moves on every file; unticked, on the file shown only.
+Method to take the tick box of the edges row. As "Every file": ticked, a moved
+or typed edge moves on every file; unticked, on the file shown only. As the
+step's own switch (EdgeChoice.switch), it sets the field of the switch to 1 or
+0 on every file.
 
 ---- Inputs ----
 is_every_file : bool
@@ -30299,7 +30565,7 @@ None. Changes the overlay (side effect).
 None.
 
 ---- Helpers ----
-None.
+_edges_refresher
 ```
 
 ##### `_file_follower`
@@ -32659,43 +32925,6 @@ problem_teller
 time_title_chooser
 ```
 
-#### `skipped_windows_finder`
-
-```text
----- Summary ----
-Main function to find, for every file, the averaging windows that do not fit
-between the additions (or after the last one) with the current window and gap.
-
----- Inputs ----
-session : ViewerSession
-    The browser session (files, window, cache).
-answers : dict
-    Answers so far, with averaging turned on and the window and gap chosen.
-limits : dict
-    {file name: {trim_start, trim_end, ignore_start, ignore_end}}.
-details : dict
-    {file name: {OD, volume, dilution_factor, events}}.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Dict[str, Dict[str, dict]]
-    {file name: {window name: {start_time, end_time, reason}}}; files with nothing
-    skipped are left out. A file that cannot be read is left out as well.
-
----- Globals mutated ----
-None. Reads the files (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_loaded_experiment_getter
-experiment_data_processor
-preview_info_builder
-```
-
 #### `time_axis_finder`
 
 ```text
@@ -33215,51 +33444,6 @@ None.
 
 ---- Helpers ----
 None.
-```
-
-#### `_averaging_reviewer`
-
-```text
----- Summary ----
-Helper function to ask whether to average around the events and over which window,
-draw the windows, list in red those that do not fit, and ask whether to accept them
-or answer again. A drag across the plot of a file gives the window and the gap,
-from the additions of that file.
-
----- Inputs ----
-session : ViewerSession
-    The browser session.
-answers : dict
-    Answers dictionary the values are stored in.
-defaults : dict
-    Default answers offered by the questions.
-limits : Dict[str, dict]
-    Trim and ignore limits of every file.
-details : Dict[str, dict]
-    OD values and events of every file; the windows are drawn around the events
-    not ignored there.
-redraw : Callable[[], bool]
-    Function that draws the preview of the current file with the answers so far.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Stores the answers in ``answers``, reads from and prints to the terminal and
-redraws the window (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_addition_time_lister
-_skipped_lister
-accept_asker
-averaging_asker
 ```
 
 #### `_component_namer`
@@ -33840,44 +34024,6 @@ region_span_reader
 warning_shower
 ```
 
-#### `_skipped_lister`
-
-```text
----- Summary ----
-Helper function to tell the user, in red, which averaging windows were skipped in
-which files because there is not enough time for them, so they can be checked before
-the averaging is accepted. Prints nothing when every window fits.
-
----- Inputs ----
-session : ViewerSession
-    The browser session.
-answers : dict
-    Answers so far, with the averaging window and gap.
-limits : Dict[str, dict]
-    Trim and ignore limits of every file.
-details : Dict[str, dict]
-    OD values and events of every file.
-
----- Globals read ----
-WARNING_COLOUR (module constant).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Reads the files and prints to the terminal (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_answers_previewer
-info_printer
-skipped_windows_finder
-text_colourer
-```
-
 #### `_standard_fit_loader`
 
 ```text
@@ -34053,6 +34199,91 @@ None.
 ---- Helpers ----
 confirm_waiter
 table_problem_teller
+```
+
+#### `_unfit_windows_lister`
+
+```text
+---- Summary ----
+Helper function to name, in plain words, the averaging windows of one file that do
+not fit.
+
+---- Inputs ----
+spans : List[Tuple[str, float, float, Optional[str]]]
+    The windows of the file, as window_span_lister gives them.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    One name for each window with a problem: 'the baseline before addition 1',
+    'the one before addition 3', 'the one after the last addition'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_windows_chooser`
+
+```text
+---- Summary ----
+Helper function to run the window step on the plot of every file: the averaging
+windows are shaded on the plot, one length and one gap before the next addition
+for every window of every file. Pulling the start of any window changes the
+length, pulling its end the gap, or both are typed in the strip under the plot;
+unticking "Averaging windows" there means no windows. Enter accepts. The windows
+that do not fit are shaded red and named in a warning after Enter. When no file has
+an addition, nothing is asked and nothing is averaged.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session, with the processing plot drawn without windows.
+answers : dict
+    Answers dictionary the values are stored in; final_gap_minutes is how long
+    before the end of the recording the last window ends.
+defaults : dict
+    Default answers the step starts with (averaging, window_minutes,
+    gap_minutes).
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file; the windows go around the additions not
+    ignored there.
+
+---- Globals read ----
+WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_NUDGE, WINDOW_SWITCH (module constants);
+settings.BASELINE_MINIMUM_SECONDS, settings.DRAG_STEP_SECONDS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores averaging, window_minutes and gap_minutes in ``answers``, reads from
+and prints to the terminal and draws on the plot window (side effects).
+
+---- Equations ----
+minutes = seconds / 60. The data of a file runs from 0 to (trim end - trim start)
+on the time axis of the plot.
+
+---- Helpers ----
+_addition_time_lister
+_unfit_windows_lister
+enter_waiter
+info_printer
+warning_shower
+window_layout_finder
+window_pointer_reader
+window_span_lister
+window_value_setter
+EdgeChoice
 ```
 
 ### MAIN FUNCTIONS
@@ -34276,7 +34507,8 @@ Main function to talk the user through the processing, with the plot redrawn aft
 each answer: first the haem fit, then, now that the haems are seen, an offer to
 change the trim and ignore times, then the oxidised and the reduced region of every
 file (when the haems are shown), then whether to work out Δψ (when it can be), and
-last the averaging around the events. A line
+last the averaging windows, dragged on the plot (they are drawn in the plot only
+once that step is answered). A line
 points to the strip at the start, and another to its % oxidised once a file has
 both regions. The
 settings strip picks the fit and leaves the haems out, so the decomposition
@@ -34325,7 +34557,7 @@ None.
 
 ---- Helpers ----
 _answers_previewer
-_averaging_reviewer
+_windows_chooser
 _decomposition_storer
 _regions_chooser
 _strip_shower
@@ -34503,6 +34735,44 @@ section_starter
 trim_stage_runner
 ```
 
+#### `windows_stage_runner`
+
+```text
+---- Summary ----
+Main function to run the window step of the processing (4.6) by itself, after the
+browser steps have ended, for a later figure that needs the averaging windows when
+none are set up. The processing plot of every file is drawn again, with the trim
+and ignore limits, the fit and the regions already chosen, and the windows are
+dragged or typed on it as in the processing; they start ticked. Nothing else is
+asked, and the settings strip stays greyed out.
+
+---- Inputs ----
+context : dict
+    {answers, fit, summaries, limits, details, regions, export_root} of the run so
+    far (everything_asker of main.py). The answers are changed in place.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the averaging windows are set up after the step.
+
+---- Globals mutated ----
+None. Stores averaging, window_minutes and gap_minutes in the answers of the
+context, reads from and prints to the terminal and draws in the plot window (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_windows_chooser
+active_gui_getter
+preview_drawer
+```
+
 ## `utils_viewer/viewer_strip.py`
 
 The settings strip under the plot: the haems, the fit, the background, the decomposition
@@ -34635,16 +34905,21 @@ minutes_checker
 ```text
 ---- Summary ----
 Method to make one typing box for each field, each after its name, followed by
-"min", and set the tick box.
+the unit, and set the tick box and its words.
 
 ---- Inputs ----
 fields : List[Tuple[str, str]]
     [(field, name shown before its box)] in order.
 is_every_file : bool
-    Whether "Every file" is ticked.
+    Whether the tick box is ticked.
+unit : str
+    The unit written after the boxes: 'min' or 's' (a key of UNIT_HELP).
+tick_text : str
+    The words of the tick box: "Every file", or those of the step's own
+    switch.
 
 ---- Globals read ----
-None.
+EVERY_FILE_TEXT, UNIT_HELP.
 
 ---- Outputs ----
 None

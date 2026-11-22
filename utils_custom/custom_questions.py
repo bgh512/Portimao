@@ -14,12 +14,12 @@ from utils_shared.questions import (choice_asker,
                                     text_asker,
                                     yes_no_asker,
                                     )
-from utils_shared.survey import (averaging_asker,
-                                 decomposition_asker,
+from utils_shared.survey import (decomposition_asker,
                                  haem_form_option_builder,
                                  haem_name_formatter,
                                  ocr_option_builder,
                                  size_asker,
+                                 windows_ensurer,
                                  )
 
 
@@ -638,50 +638,6 @@ def _time_response_asker(names: List[str],
     return members
 
 
-# ---- _window_ensurer -----------------------------------------------------------------
-def _window_ensurer(answers: dict, defaults: dict) -> None:
-    """
-    ---- Summary ----
-    Helper function to make sure the event-window settings exist for the special
-    figures: they reuse the section 3 settings, which are asked here if event
-    averaging was switched off there.
-
-    ---- Inputs ----
-    answers : dict
-        Answers dictionary; uses averaging, window_minutes and gap_minutes.
-    defaults : dict
-        Default answers.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Stores the tr_* and ho_* window answers in ``answers`` (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    averaging_asker
-    info_printer
-    """
-
-    if not answers['averaging'] and not answers.get('window_asked'):
-        info_printer('This figure averages around the events, so the averaging '
-                     'window is asked here.',
-                     depth=2,
-                     )
-        averaging_asker(answers, defaults, forced=True, depth=2)
-    for prefix in ('tr', 'ho'):
-        answers[f'{prefix}_window_minutes'] = answers['window_minutes']
-        answers[f'{prefix}_gap_minutes'] = answers['gap_minutes']
-        answers[f'{prefix}_final_gap_minutes'] = answers['final_gap_minutes']
-
-
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -694,12 +650,15 @@ def summary_figure_asker(names: List[str],
                          fits_folder: Path,
                          figure_checker: Optional[Callable[[str, dict], bool]] = None,
                          percent_names: Optional[List[str]] = None,
+                         windows_adder: Optional[Callable[[], bool]] = None,
                          ) -> tuple:
     """
     ---- Summary ----
-    Main function to ask section 6: whether to plot a time response and a haem and
+    Main function to ask section 7: whether to plot a time response and a haem and
     OCR response, and the settings of each one chosen. Both need the haem fit, which
-    is asked for here if it was not chosen in section 3.
+    is asked for here if it was not chosen in the processing, and the averaging
+    windows of the processing: with none set up, the window step is offered and the
+    figure is not made without them.
 
     ---- Inputs ----
     names : List[str]
@@ -721,6 +680,9 @@ def summary_figure_asker(names: List[str],
     percent_names : Optional[List[str]]
         Names of the files with an oxidised and a reduced region, whose haems have a
         % oxidised; None when no file has them.
+    windows_adder : Optional[Callable[[], bool]]
+        Function that runs the window step of the processing (windows_ensurer); None
+        when it cannot be run.
 
     ---- Globals read ----
     None.
@@ -740,9 +702,9 @@ def summary_figure_asker(names: List[str],
     _haem_ocr_asker
     _step_wirer
     _time_response_asker
-    _window_ensurer
     decomposition_asker
     info_printer
+    windows_ensurer
     yes_no_asker
     """
 
@@ -785,8 +747,11 @@ def summary_figure_asker(names: List[str],
                                  )
                     break
 
-            # ---- 2 Ask the settings of the figure ------------------------------------
-            _window_ensurer(answers, defaults)
+            # ---- 2 Make sure the averaging windows are set up ------------------------
+            if not windows_ensurer(answers, windows_adder):
+                break
+
+            # ---- 3 Ask the settings of the figure ------------------------------------
             checker = _step_wirer(figure_checker, key, fit, result)
             if key == 'time_response':
                 result[key] = _time_response_asker(names, answers, defaults, checker)

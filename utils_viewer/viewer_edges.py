@@ -23,6 +23,8 @@ from utils_viewer.viewer_preview import IGNORE_COLOUR, TimeAxis
 TRIM_COLOUR = '0.45'
 OXIDISED_COLOUR = '#d62728'  # red and blue, as oxidised and reduced blood are drawn
 REDUCED_COLOUR = '#1f77b4'
+AVERAGE_COLOUR = '#2878B5'  # the blue the averaging windows have in the figures
+UNFIT_COLOUR = '#d62728'  # an averaging window that does not fit
 PREVIOUS_COLOUR = '#d62728'
 # How each kind of part looks: its colour, how strongly its shading covers the plot (0
 # to 1), whether it is hatched, and the row of its handles above the plot (0 the top).
@@ -31,6 +33,9 @@ PART_STYLES = {'trim': (TRIM_COLOUR, 0.25, True, 0),
                'ignore': (IGNORE_COLOUR, 0.22, False, 1),
                'oxidised': (OXIDISED_COLOUR, 0.18, False, 0),
                'reduced': (REDUCED_COLOUR, 0.18, False, 1),
+               'average': (AVERAGE_COLOUR, 0.22, False, 0),
+               'average_end': (AVERAGE_COLOUR, 0.22, False, 1),
+               'average_unfit': (UNFIT_COLOUR, 0.22, True, 0),
                }
 HANDLE_ROW_PX = 22
 HANDLE_SIZE_PX = (9, 16)  # (width, height)
@@ -68,6 +73,8 @@ class EdgeChoice:
     previous: Dict[str, Dict[str, float]] = field(default_factory=dict)
     is_every_file: bool = True
     value_copier: Optional[Callable[[str, str, str, float], Optional[float]]] = None
+    unit: str = 'min'
+    switch: Optional[Tuple[str, str]] = None
 
 
 # ---- EdgeOverlay ---------------------------------------------------------------------

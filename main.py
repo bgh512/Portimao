@@ -55,7 +55,10 @@ from utils_shared.user_places import (app_output_logger,
                                       )
 from utils_viewer.viewer_gui import gui_runner, GuiUnavailableError
 from utils_viewer.viewer_multi import multi_figure_checker_builder
-from utils_viewer.viewer_stages import region_files_lister, viewer_asker
+from utils_viewer.viewer_stages import (region_files_lister,
+                                        viewer_asker,
+                                        windows_stage_runner,
+                                        )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -220,6 +223,7 @@ def everything_asker(folder: Path,
     special_figures_maker
     summary_figure_asker
     viewer_asker
+    windows_stage_runner
     yes_no_asker
     """
 
@@ -262,12 +266,18 @@ def everything_asker(folder: Path,
                                             'special': special_figures_maker,
                                             },
                                            )
+    # A figure that needs the averaging windows when none are set up offers the window
+    # step of the processing; the files processed for a preview are then out of date.
+    def windows_adder() -> bool:
+        context.pop('_processed', None)
+        return windows_stage_runner(context)
     section_starter('Multi-experiment plots')
     comparison, exemplar_names = multi_experiment_asker(summaries,
                                                         answers,
                                                         defaults,
                                                         plotted,
                                                         checker,
+                                                        windows_adder,
                                                         )
 
     # ---- 2.3 Experiment summaries ----------------------------------------------------
@@ -280,6 +290,7 @@ def everything_asker(folder: Path,
                                        PLACES.fits_folder,
                                        checker,
                                        percent_names,
+                                       windows_adder,
                                        )
 
     # ---- 2.4 Data export -------------------------------------------------------------
@@ -362,14 +373,14 @@ def everything_asker(folder: Path,
     print(f"  Temperature:      {answers['temperature_c']:g} °C")
     psi_text = 'yes, for the files with both regions' if answers['delta_psi'] else 'no'
     print(f'  Δψ:               {psi_text}')
-    averaging_text = 'no'
+    averaging_text = 'none'
     if answers['averaging']:
-        averaging_text = ('%g s window, ending %g s before the next addition'
+        averaging_text = ('%g s long, ending %g s before the next addition'
                           % (round(answers['window_minutes'] * 60.0, 2),
                              round(answers['gap_minutes'] * 60.0, 2),
                              )
                           )
-    print(f'  Event averaging:  {averaging_text}')
+    print(f'  Averaging windows: {averaging_text}')
     haem_names = [haem_name_formatter(name) for name in answers['haems']]
     shown = [name
              for name, on in (('O2', answers['plot_o2']),

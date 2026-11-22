@@ -35,7 +35,8 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'haem_background': 'rowan_scatter',
                    'decomposition_dataset': 'Cyt',
                    'normalise_od': False,
-                   'averaging': False,
+                   # the window step starts with windows, which the user can untick
+                   'averaging': True,
                    'window_minutes': 2.0,
                    'gap_minutes': 0.5,
                    'final_gap_minutes': 0.5,
@@ -103,9 +104,6 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'plot_time_response': False,
                    'plot_haem_ocr': False,
                    'tr_groups': ['knockdown', 'control'],
-                   'tr_window_minutes': 1.0,
-                   'tr_gap_minutes': 0.5,
-                   'tr_final_gap_minutes': 0.5,
                    'tr_examples': [],
                    'tr_decompositions': [],
                    'tr_skip_hours': [],
@@ -118,9 +116,6 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ho_metric': 'delta',
                    'ho_haems': [],
                    'ho_ocr_mode': 'od',
-                   'ho_window_minutes': 2.0,
-                   'ho_gap_minutes': 0.5,
-                   'ho_final_gap_minutes': 0.5,
                    'ho_journal': 'nature',
                    'ho_pub_columns': 2,
                    'ho_pub_height': 0.75,
@@ -150,7 +145,7 @@ DELTA_PSI_MIDPOINT_ANSWERS = {'bH_first': 'psi_bH_first_mV',
                               }
 # least data the baseline average (before the first addition) must span
 BASELINE_MINIMUM_SECONDS = 10
-# an averaging window dragged across the plot is rounded to whole steps of this
+# an edge of an averaging window dragged on the plot moves in whole steps of this
 DRAG_STEP_SECONDS = 5
 # The window. Resolution of its plots, in dots per inch.
 PREVIEW_DPI = 200

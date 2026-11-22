@@ -177,6 +177,54 @@ def test_averaged_spectra_around_the_additions() -> None:
     assert np.isclose(windows['average1']['end_time'], 7.5)
 
 
+# ---- test_baseline_starts_with_the_recording -----------------------------------------
+def test_baseline_starts_with_the_recording() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the baseline window of the averaged spectra starts
+    where the recording starts when the window would begin before it, as the windows
+    of the processing do.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Additions at 2 and 8 min, 2 min windows ending 0.5 min before the next addition:
+    the baseline ends at 1.5 min and would start at -0.5 min, so it starts at 0. Its
+    spectra are at t = 0, 0.5, 1 and 1.5 min: mean 0.75, so (t, 2 t, 0) averages to
+    (0.75, 1.5, 0). The next window runs from 5.5 to 7.5 min, after the addition at 2.
+
+    ---- Helpers ----
+    _spectra_experiment_builder
+    """
+
+    made_up = _spectra_experiment_builder()
+    made_up['metadata']['events'] = [{'time': 2.0}, {'time': 8.0}]
+    experiment = spectral_averager(made_up,
+                                   'Cyt',
+                                   'attenuation',
+                                   window_minutes=2.0,
+                                   gap_minutes=0.5,
+                                   final_window_gap_minutes=0.5,
+                                   )
+    windows = experiment['spectral_averages']['windows']
+    assert list(windows) == ['average0', 'average1', 'average2']
+    assert np.isclose(windows['average0']['start_time'], 0.0)
+    assert np.isclose(windows['average0']['end_time'], 1.5)
+    assert windows['average0']['n_spectra'] == 4
+    assert np.allclose(windows['average0']['mean'], [0.75, 1.5, 0.0])
+    assert np.isclose(windows['average1']['start_time'], 5.5)
+
+
 # ---- test_difference_of_two_known_spectra --------------------------------------------
 def test_difference_of_two_known_spectra() -> None:
     """

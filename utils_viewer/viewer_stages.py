@@ -9,6 +9,11 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+from utils_shared.averaging import (window_layout_finder,
+                                    window_pointer_reader,
+                                    window_span_lister,
+                                    window_value_setter,
+                                    )
 from utils_shared.helpers import file_name_sanitiser
 from utils_shared.individual_experiment_exporter import (size_describer,
                                                          spectra_size_estimator,
@@ -55,8 +60,7 @@ from utils_shared.spectral_decomposer import (answers_fit_loader,
                                               OWN_HAEMS_NAME,
                                               PRESETS_FOLDER_NAME,
                                               )
-from utils_shared.survey import (averaging_asker,
-                                 decomposition_asker,
+from utils_shared.survey import (decomposition_asker,
                                  delta_psi_asker,
                                  event_asker,
                                  haem_choice_asker,
@@ -81,7 +85,6 @@ from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          pca_picture_builder,
                                          pca_spectra_gatherer,
                                          preview_drawer,
-                                         skipped_windows_finder,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
@@ -131,6 +134,13 @@ REGION_FIELDS = [('oxidised_start', 'Oxidised from'),
 REGION_KEY_TEXT = 'red = oxidised region, blue = reduced region'
 REGION_NUDGE = ('Type the times in the strip under the plot, or pull the regions out on '
                 'the plot; press Enter with this box empty when every file looks right.')
+# The boxes of the window step in the strip, and its tick box (averaging.WINDOW_KEYS).
+WINDOW_FIELDS = [('window_s', 'Window'), ('gap_s', 'Gap before the next addition')]
+WINDOW_SWITCH = ('is_on', 'Averaging windows')
+WINDOW_KEY_TEXT = 'blue = averaging window, red hatched = a window that does not fit'
+WINDOW_NUDGE = ('Type the window and the gap in the strip under the plot, or drag the '
+                'edges of a window; press Enter with this box empty when the windows '
+                'look right.')
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
@@ -254,72 +264,6 @@ def _answers_previewer(answers: dict,
     if result['decompose'] and fit is not None:
         result.update({'plot_haems': True, 'haems': list(fit['haem_list'])})
     return result
-
-
-# ---- _averaging_reviewer -------------------------------------------------------------
-def _averaging_reviewer(session: ViewerSession,
-                        answers: dict,
-                        defaults: dict,
-                        limits: Dict[str, dict],
-                        details: Dict[str, dict],
-                        redraw: Callable[[], bool],
-                        ) -> None:
-    """
-    ---- Summary ----
-    Helper function to ask whether to average around the events and over which window,
-    draw the windows, list in red those that do not fit, and ask whether to accept them
-    or answer again. A drag across the plot of a file gives the window and the gap,
-    from the additions of that file.
-
-    ---- Inputs ----
-    session : ViewerSession
-        The browser session.
-    answers : dict
-        Answers dictionary the values are stored in.
-    defaults : dict
-        Default answers offered by the questions.
-    limits : Dict[str, dict]
-        Trim and ignore limits of every file.
-    details : Dict[str, dict]
-        OD values and events of every file; the windows are drawn around the events
-        not ignored there.
-    redraw : Callable[[], bool]
-        Function that draws the preview of the current file with the answers so far.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Stores the answers in ``answers``, reads from and prints to the terminal and
-    redraws the window (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _addition_time_lister
-    _skipped_lister
-    accept_asker
-    averaging_asker
-    """
-
-    additions = _addition_time_lister(session.summaries, limits, details)
-    while True:
-        averaging_asker(answers, defaults, additions=additions)
-        if not answers['averaging']:
-            return
-        redraw()
-        _skipped_lister(session, answers, limits, details)
-        if accept_asker('Do you accept these averaging windows?',
-                        [('no', 'change the window and gap')],
-                        ) == 'yes':
-            return
-        defaults = dict(defaults, averaging=True)
-        defaults.update({k: answers[k] for k in ('window_minutes', 'gap_minutes')})
 
 
 # ---- _component_namer ----------------------------------------------------------------
@@ -1378,66 +1322,6 @@ def _regions_lister(summaries: List[dict],
                        )
 
 
-# ---- _skipped_lister -----------------------------------------------------------------
-def _skipped_lister(session: ViewerSession,
-                    answers: dict,
-                    limits: Dict[str, dict],
-                    details: Dict[str, dict],
-                    ) -> None:
-    """
-    ---- Summary ----
-    Helper function to tell the user, in red, which averaging windows were skipped in
-    which files because there is not enough time for them, so they can be checked before
-    the averaging is accepted. Prints nothing when every window fits.
-
-    ---- Inputs ----
-    session : ViewerSession
-        The browser session.
-    answers : dict
-        Answers so far, with the averaging window and gap.
-    limits : Dict[str, dict]
-        Trim and ignore limits of every file.
-    details : Dict[str, dict]
-        OD values and events of every file.
-
-    ---- Globals read ----
-    WARNING_COLOUR (module constant).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Reads the files and prints to the terminal (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _answers_previewer
-    info_printer
-    skipped_windows_finder
-    text_colourer
-    """
-
-    info_printer('Checking that the averaging windows fit in every file ...')
-    skipped = skipped_windows_finder(session,
-                                     _answers_previewer(answers, None, 'analysis'),
-                                     limits,
-                                     details,
-                                     )
-    if not skipped:
-        return
-    info_printer(text_colourer('WARNING: averaging was skipped for these windows '
-                               '(not enough time). They are shown in red with a '
-                               'warning sign in the plot. Please check this is OK:',
-                               WARNING_COLOUR,
-                               ),
-                 )
-    for name, windows in skipped.items():
-        info_printer(f"  {name}: {', '.join(windows)}")
-
-
 # ---- _standard_fit_loader ------------------------------------------------------------
 def _standard_fit_loader(summaries: List[dict],
                          defaults: dict,
@@ -1810,6 +1694,218 @@ def _table_filler(session: ViewerSession,
         return window.table_reader()[0]
     finally:
         window.table_hider()
+
+
+# ---- _unfit_windows_lister -----------------------------------------------------------
+def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
+                          ) -> List[str]:
+    """
+    ---- Summary ----
+    Helper function to name, in plain words, the averaging windows of one file that do
+    not fit.
+
+    ---- Inputs ----
+    spans : List[Tuple[str, float, float, Optional[str]]]
+        The windows of the file, as window_span_lister gives them.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[str]
+        One name for each window with a problem: 'the baseline before addition 1',
+        'the one before addition 3', 'the one after the last addition'.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    names = []
+    for index, (_, _, _, problem) in enumerate(spans):
+        if problem is None:
+            continue
+        if index == 0:
+            names.append('the baseline before addition 1')
+        elif index == len(spans) - 1:
+            names.append('the one after the last addition')
+        else:
+            names.append(f'the one before addition {index + 1}')
+    return names
+
+
+# ---- _windows_chooser ----------------------------------------------------------------
+def _windows_chooser(session: ViewerSession,
+                     answers: dict,
+                     defaults: dict,
+                     limits: Dict[str, dict],
+                     details: Dict[str, dict],
+                     ) -> None:
+    """
+    ---- Summary ----
+    Helper function to run the window step on the plot of every file: the averaging
+    windows are shaded on the plot, one length and one gap before the next addition
+    for every window of every file. Pulling the start of any window changes the
+    length, pulling its end the gap, or both are typed in the strip under the plot;
+    unticking "Averaging windows" there means no windows. Enter accepts. The windows
+    that do not fit are shaded red and named in a warning after Enter. When no file has
+    an addition, nothing is asked and nothing is averaged.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session, with the processing plot drawn without windows.
+    answers : dict
+        Answers dictionary the values are stored in; final_gap_minutes is how long
+        before the end of the recording the last window ends.
+    defaults : dict
+        Default answers the step starts with (averaging, window_minutes,
+        gap_minutes).
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    details : Dict[str, dict]
+        OD values and events of every file; the windows go around the additions not
+        ignored there.
+
+    ---- Globals read ----
+    WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_NUDGE, WINDOW_SWITCH (module constants);
+    settings.BASELINE_MINIMUM_SECONDS, settings.DRAG_STEP_SECONDS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Stores averaging, window_minutes and gap_minutes in ``answers``, reads from
+    and prints to the terminal and draws on the plot window (side effects).
+
+    ---- Equations ----
+    minutes = seconds / 60. The data of a file runs from 0 to (trim end - trim start)
+    on the time axis of the plot.
+
+    ---- Helpers ----
+    _addition_time_lister
+    _unfit_windows_lister
+    enter_waiter
+    info_printer
+    warning_shower
+    window_layout_finder
+    window_pointer_reader
+    window_span_lister
+    window_value_setter
+    EdgeChoice
+    """
+
+    # ---- 1 The additions and the data of every file ----------------------------------
+    additions = _addition_time_lister(session.summaries, limits, details)
+    if not any(additions.values()):
+        answers['averaging'] = False
+        info_printer('None of the files has an addition, so there are no averaging '
+                     'windows.',
+                     )
+        return
+    final_gap = float(answers['final_gap_minutes'])
+    minimum_s = float(settings.BASELINE_MINIMUM_SECONDS)
+    step_s = float(settings.DRAG_STEP_SECONDS)
+    spans = {}
+    for summary in session.summaries:
+        own = limits.get(summary['name']) or {}
+        shift = float(own.get('trim_start') or 0.0)
+        spans[summary['name']] = (0.0,
+                                  float(own.get('trim_end') or summary['duration_min'])
+                                  - shift,
+                                  )
+
+    # ---- 2 The rules of the edges ----------------------------------------------------
+    start = {'window_s': round(defaults['window_minutes'] * 60.0, 2),
+             'gap_s': round(defaults['gap_minutes'] * 60.0, 2),
+             'is_on': 1.0 if defaults['averaging'] else 0.0,
+             }
+    choice = EdgeChoice(fields=list(WINDOW_FIELDS),
+                        values={name: dict(start) for name in additions},
+                        layout_finder=lambda name, values: (
+                            window_layout_finder(values,
+                                                 additions[name],
+                                                 spans[name],
+                                                 final_gap,
+                                                 minimum_s,
+                                                 )),
+                        pointer_reader=lambda name, values, key, time_min: (
+                            window_pointer_reader(values,
+                                                  key,
+                                                  time_min,
+                                                  additions[name],
+                                                  spans[name],
+                                                  final_gap,
+                                                  step_s,
+                                                  )),
+                        value_setter=lambda name, values, key, value: (
+                            window_value_setter(values, key, value)),
+                        key_text=WINDOW_KEY_TEXT,
+                        unit='s',
+                        switch=WINDOW_SWITCH,
+                        )
+
+    # ---- 3 Drag or type the windows until Enter --------------------------------------
+    info_printer('AVERAGING WINDOWS = the stretch before each addition that its '
+                 'average is taken over.',
+                 )
+    info_printer('Every window has the same length and ends the same time before the '
+                 'next addition, in every file; the last one ends '
+                 f'{final_gap:g} min before the end of the recording.',
+                 tight=True,
+                 )
+    info_printer('Pull the start of any window to change the length, its end to '
+                 'change the gap before the addition.',
+                 tight=True,
+                 )
+    session.window.edges_shower(choice)
+    try:
+        enter_waiter('Drag an edge of any window on the plot, or type the window and '
+                     'the gap in the strip under it. Press Enter when the windows look '
+                     'right, or untick Averaging windows in the strip for none.',
+                     WINDOW_NUDGE,
+                     number='4.6',
+                     )
+        chosen = next(iter(session.window.edges_reader().values()))
+    finally:
+        session.window.edges_hider()
+
+    # ---- 4 Keep the windows and name those that do not fit ---------------------------
+    answers['averaging'] = bool(chosen['is_on'])
+    answers['window_minutes'] = chosen['window_s'] / 60.0
+    answers['gap_minutes'] = chosen['gap_s'] / 60.0
+    if not answers['averaging']:
+        info_printer('No averaging windows: nothing is averaged around the additions.')
+        return
+    info_printer(f"Averaging windows: {round(chosen['window_s'], 2):g} s long, ending "
+                 f"{round(chosen['gap_s'], 2):g} s before the next addition.",
+                 )
+    unfit = []
+    for summary in session.summaries:
+        name = summary['name']
+        if not additions[name]:
+            continue
+        names = _unfit_windows_lister(window_span_lister(additions[name],
+                                                         spans[name],
+                                                         answers['window_minutes'],
+                                                         answers['gap_minutes'],
+                                                         final_gap,
+                                                         minimum_s,
+                                                         ),
+                                      )
+        if names:
+            unfit.append(f"{name}: {', '.join(names)}")
+    if unfit:
+        warning_shower('These averaging windows do not fit (not enough time), so they '
+                       f"are left out: {'; '.join(unfit)}. They are red on the plot. "
+                       'Go back to the processing step to shorten the window or the '
+                       'gap if they are needed.',
+                       )
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -2375,7 +2471,8 @@ def processing_stage_runner(session: ViewerSession,
     each answer: first the haem fit, then, now that the haems are seen, an offer to
     change the trim and ignore times, then the oxidised and the reduced region of every
     file (when the haems are shown), then whether to work out Δψ (when it can be), and
-    last the averaging around the events. A line
+    last the averaging windows, dragged on the plot (they are drawn in the plot only
+    once that step is answered). A line
     points to the strip at the start, and another to its % oxidised once a file has
     both regions. The
     settings strip picks the fit and leaves the haems out, so the decomposition
@@ -2424,7 +2521,7 @@ def processing_stage_runner(session: ViewerSession,
 
     ---- Helpers ----
     _answers_previewer
-    _averaging_reviewer
+    _windows_chooser
     _decomposition_storer
     _regions_chooser
     _strip_shower
@@ -2440,9 +2537,14 @@ def processing_stage_runner(session: ViewerSession,
     """
 
     summaries = session.summaries
+    # The windows are drawn in the plot only once their step is answered: until then
+    # they are edges over it, and the steps before it show none. The answers keep the
+    # windows of the last time meanwhile, so a run stopped here loses nothing.
+    drawn = {'windows': False}
     def redraw() -> bool:
+        shown = dict(answers, averaging=answers['averaging'] and drawn['windows'])
         return preview_drawer(session,
-                              _answers_previewer(answers,
+                              _answers_previewer(shown,
                                                  session.fit,
                                                  'analysis',
                                                  session.has_od,
@@ -2584,8 +2686,15 @@ def processing_stage_runner(session: ViewerSession,
         answers['delta_psi'] = False
         _strip_shower(session, answers)
 
-    # ---- 5 Averaging around the events -----------------------------------------------
-    _averaging_reviewer(session, answers, defaults, limits, details, redraw)
+    # ---- 5 The averaging windows -----------------------------------------------------
+    # Without haems nothing has drawn this step's plot yet: it may still show the plot
+    # of another step.
+    if not answers['decompose']:
+        redraw()
+    _windows_chooser(session, answers, defaults, limits, details)
+    drawn['windows'] = True
+    if answers['averaging']:
+        redraw()
     # Read now: Go back to kept may have put the kept regions back since they were
     # chosen.
     return session.regions if answers['decompose'] else regions
@@ -2988,3 +3097,77 @@ def viewer_asker(summaries: List[dict],
     # after the figure was accepted.
     plotted = bool(answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems'])
     return state['limits'], session.fit, state['details'], plotted, session.regions
+
+
+# ---- windows_stage_runner ------------------------------------------------------------
+def windows_stage_runner(context: dict) -> bool:
+    """
+    ---- Summary ----
+    Main function to run the window step of the processing (4.6) by itself, after the
+    browser steps have ended, for a later figure that needs the averaging windows when
+    none are set up. The processing plot of every file is drawn again, with the trim
+    and ignore limits, the fit and the regions already chosen, and the windows are
+    dragged or typed on it as in the processing; they start ticked. Nothing else is
+    asked, and the settings strip stays greyed out.
+
+    ---- Inputs ----
+    context : dict
+        {answers, fit, summaries, limits, details, regions, export_root} of the run so
+        far (everything_asker of main.py). The answers are changed in place.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when the averaging windows are set up after the step.
+
+    ---- Globals mutated ----
+    None. Stores averaging, window_minutes and gap_minutes in the answers of the
+    context, reads from and prints to the terminal and draws in the plot window (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _answers_previewer
+    _windows_chooser
+    active_gui_getter
+    preview_drawer
+    """
+
+    # ---- 1 Open the files in the window again ----------------------------------------
+    answers, fit = context['answers'], context['fit']
+    limits, details = context['limits'], context['details']
+    window = active_gui_getter()
+    session = ViewerSession(context['summaries'], context['export_root'], window)
+    session.fit = fit
+    session.regions = context.get('regions') or {}
+    session.limits = limits
+    session.has_od = bool(answers['normalise_od'])
+    window.session_attacher(session)
+
+    # ---- 2 Draw the processing plot and run the window step --------------------------
+    # The windows are edges over the plot in this step, so the plot is drawn without
+    # them, as in the processing.
+    try:
+        preview_drawer(session,
+                       _answers_previewer(dict(answers, averaging=False),
+                                          fit,
+                                          'analysis',
+                                          session.has_od,
+                                          ),
+                       limits,
+                       fit,
+                       details,
+                       )
+        _windows_chooser(session,
+                         answers,
+                         dict(answers, averaging=True),
+                         limits,
+                         details,
+                         )
+    finally:
+        window.window_closer()
+    return bool(answers['averaging'])

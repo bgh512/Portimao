@@ -321,3 +321,49 @@ Example 1: bH and bL are both 65.0858 % oxidised at 37 °C, so R_H = R_L = 0.349
 Example 2: bH is 75.6308 % and bL 40.6805 % oxidised at 37 °C, so R_H = 0.243692 and R_L = 0.593195. Then b = 0.040289, h = 0.203403, l = 0.552906 and n = 0.203403. E_H = 40 − 26.727 × ln(0.203403 ÷ 0.203403) = 40 mV and E_L = −20 − 26.727 × ln(0.552906 ÷ 0.203403) = −20 − 26.727 × 1 = −46.727 mV, so Δψ = (40 + 46.727) ÷ 0.5 = 173.453 mV.
 
 Checked by: `test_equal_haems_at_their_midpoints_give_120_mV`, `test_unequal_haems_give_173_mV`, `test_delta_psi_is_empty_outside_the_limits`, `test_numbers_that_cannot_be_used_are_refused` and `test_the_numbers_the_program_starts_with` in `tests/test_delta_psi.py`; the filled-in midpoints by `test_numbers_of_the_delta_psi_row` in `tests/test_window_parts.py`.
+
+---
+
+## 7. The averaging windows
+
+An averaging window is the stretch of time before an addition over which a measurement (the OCR, a haem, a spectrum) is averaged, once it has settled after the addition before. Every window has the same length, w, and ends the same time, g, before the next addition, in every file of the dataset. The window before the first addition is the baseline. Every figure that averages around the additions uses these windows.
+
+The baseline, before the first addition:
+
+```text
+end_0 = a_1 − g
+start_0 = end_0 − w
+```
+
+The window after addition number i, when another addition follows:
+
+```text
+end_i = a_(i+1) − g
+start_i = end_i − w
+```
+
+The window after the last addition:
+
+```text
+end_last = T − f
+start_last = end_last − w
+```
+
+- a_1, a_2, ...: the times of the additions, in order (min); an addition marked to be ignored is left out
+- w: the length of every window (min; typed in seconds in the program, 120 s to start with)
+- g: the gap between the end of a window and the next addition (min; typed in seconds, 30 s to start with)
+- T: the time of the last measurement of the file, after trimming (min)
+- f: the gap between the last window and the end of the file, 0.5 min
+- start, end: the first and last time of a window (min); the measurements from start to end, both included, are averaged
+
+Notes:
+
+- When the baseline would start before the file does, it starts where the file starts, so it is shorter than w. A baseline with less than 10 s of data is left out, and the file then has no baseline.
+- A window that would start before its own addition (start_i before a_i) does not fit: the additions are too close together for a window of that length. It is left out and named in a warning, and is never shortened.
+- The average of a window is the mean of its measurements, and the spread is their standard deviation (dividing by their number − 1).
+
+Example 1: a file of 30 min with additions at 10 and 20 min, w = 2 min and g = 0.5 min. The baseline ends at 10 − 0.5 = 9.5 min and starts at 9.5 − 2 = 7.5 min. The window after the first addition ends at 20 − 0.5 = 19.5 min and starts at 17.5 min. The window after the last addition ends at 30 − 0.5 = 29.5 min and starts at 27.5 min.
+
+Example 2: the same file with w = 12 min. The baseline would start at 9.5 − 12 = −2.5 min, so it starts at 0 and runs to 9.5 min. The window after the first addition would start at 19.5 − 12 = 7.5 min, before its addition at 10 min, and the last would start at 29.5 − 12 = 17.5 min, before its addition at 20 min: neither fits, and both are left out.
+
+Checked by: `test_the_windows_fall_before_the_additions` in `tests/test_averaging_windows.py`; the averages inside the windows by `test_averages_around_the_additions` and `test_average_that_does_not_fit` in `tests/test_processing_maths.py`; the averaged spectra of the time response by `test_averaged_spectra_around_the_additions` and `test_baseline_starts_with_the_recording` in `tests/test_summary_maths.py`.

@@ -1183,66 +1183,6 @@ def preview_figure_builder(session: ViewerSession,
     return fig, notes
 
 
-# ---- skipped_windows_finder ----------------------------------------------------------
-def skipped_windows_finder(session: ViewerSession,
-                           answers: dict,
-                           limits: dict,
-                           details: dict,
-                           ) -> Dict[str, Dict[str, dict]]:
-    """
-    ---- Summary ----
-    Main function to find, for every file, the averaging windows that do not fit
-    between the additions (or after the last one) with the current window and gap.
-
-    ---- Inputs ----
-    session : ViewerSession
-        The browser session (files, window, cache).
-    answers : dict
-        Answers so far, with averaging turned on and the window and gap chosen.
-    limits : dict
-        {file name: {trim_start, trim_end, ignore_start, ignore_end}}.
-    details : dict
-        {file name: {OD, volume, dilution_factor, events}}.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    Dict[str, Dict[str, dict]]
-        {file name: {window name: {start_time, end_time, reason}}}; files with nothing
-        skipped are left out. A file that cannot be read is left out as well.
-
-    ---- Globals mutated ----
-    None. Reads the files (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _loaded_experiment_getter
-    experiment_data_processor
-    preview_info_builder
-    """
-
-    found: Dict[str, Dict[str, dict]] = {}
-    check = dict(settings.DEFAULT_ANSWERS,
-                 **dict(answers, decompose=False, normalise_od=False, averaging=True),
-                 )
-    cfg = settings.Config(check)
-    for summary in session.summaries:
-        try:
-            with session.window.output_capturer():
-                info = preview_info_builder(summary, limits, details)
-                experiment = _loaded_experiment_getter(session, summary, None)
-                processed = experiment_data_processor(info, cfg, None, experiment)
-        except Exception:  # a file that cannot be checked is left out
-            continue
-        skipped = processed['experiment'].get('averages', {}).get('skipped')
-        if skipped:
-            found[summary['name']] = skipped
-    return found
-
-
 # ---- time_axis_finder ----------------------------------------------------------------
 def time_axis_finder(fig: Figure) -> Optional[TimeAxis]:
     """

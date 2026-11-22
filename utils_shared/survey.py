@@ -537,153 +537,6 @@ def _trim_minutes_clamper(summary: dict,
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- averaging_asker -----------------------------------------------------------------
-def averaging_asker(answers: dict,
-                    defaults: dict,
-                    forced: bool = False,
-                    depth: int = 1,
-                    additions: Optional[Dict[str, List[float]]] = None,
-                    ) -> None:
-    """
-    ---- Summary ----
-    Main function to ask whether to average around the events, and the window
-    settings, in seconds. When the plot shows the files, a drag across one window on
-    the plot gives its length, and the gap from where the drag ended to the next
-    addition is then offered as the default of the gap question; a drag during the gap
-    question gives the gap alone.
-
-    ---- Inputs ----
-    answers : dict
-        Answers dictionary the values are stored in.
-    defaults : dict
-        Default answers (averaging, window_minutes, gap_minutes).
-    forced : bool
-        True to skip the yes/no question and only ask the window settings (a figure
-        that needs the averages was chosen). The averaging answer is not changed.
-    depth : int
-        Numbering depth of the first question.
-    additions : Optional[Dict[str, List[float]]]
-        {file name: times of its additions (min, not those marked ignore), on the time
-        axis of the plot}, so a drag on the plot of a file can be read; None when the
-        plot does not show the files (the answers are then typed).
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Stores window_minutes and gap_minutes (in minutes) and averaging in
-    ``answers``.
-
-    ---- Equations ----
-    minutes = seconds / 60.
-
-    ---- Helpers ----
-    averaging_drag_reader
-    number_asker
-    yes_no_asker
-    """
-
-    # ---- 1 Ask whether to average ----------------------------------------------------
-    if not forced:
-        answers['averaging'] = yes_no_asker('Do you want to average around the events?',
-                                            defaults['averaging'],
-                                            depth=depth,
-                                            )
-        if not answers['averaging']:
-            return
-
-    # ---- 2 Set up the reading of a drag on the plot ----------------------------------
-    dragged: Dict[str, Optional[float]] = {}
-    def length_reader(name: str, start_min: float, end_min: float) -> Optional[float]:
-        if name not in additions:
-            return None
-        length_s, dragged['gap_s'] = averaging_drag_reader(additions[name],
-                                                           start_min,
-                                                           end_min,
-                                                           )
-        return length_s
-    def gap_reader(name: str, start_min: float, end_min: float) -> Optional[float]:
-        if name not in additions:
-            return None
-        return averaging_drag_reader(additions[name], start_min, end_min)[1]
-
-    # ---- 3 Ask for the window and gap ------------------------------------------------
-    sub = depth if forced else depth + 1
-    window_s = number_asker('How long a window (s) should the average be taken over?',
-                            round(defaults['window_minutes'] * 60.0, 2),
-                            minimum=0,
-                            exclusive_minimum=True,
-                            depth=sub,
-                            span_reader=length_reader if additions else None,
-                            )
-    gap_default = dragged.get('gap_s')
-    if gap_default is None:
-        gap_default = round(defaults['gap_minutes'] * 60.0, 2)
-    gap_s = number_asker('How long before the next addition should the averaging '
-                         'window end (s)?',
-                         gap_default,
-                         minimum=0,
-                         depth=sub,
-                         span_reader=gap_reader if additions else None,
-                         )
-    answers['window_minutes'] = window_s / 60.0
-    answers['gap_minutes'] = gap_s / 60.0
-    answers['window_asked'] = True
-
-
-# ---- averaging_drag_reader -----------------------------------------------------------
-def averaging_drag_reader(additions_min: List[float],
-                          start_min: float,
-                          end_min: float,
-                          ) -> Tuple[float, Optional[float]]:
-    """
-    ---- Summary ----
-    Main function to turn a drag across one averaging window on the plot of a file into
-    the window's length and how long before the next addition it ends, both in seconds
-    rounded to whole steps.
-
-    ---- Inputs ----
-    additions_min : List[float]
-        Times of the file's additions on the time axis of the plot (min), not those
-        marked ignore.
-    start_min : float
-        Where the drag started (min).
-    end_min : float
-        Where the drag ended (min); after ``start_min``.
-
-    ---- Globals read ----
-    config.DRAG_STEP_SECONDS (the rounding step).
-
-    ---- Outputs ----
-    Tuple[float, Optional[float]]
-        (length_s, gap_s): the length is at least one step; the gap is at least 0, and
-        None when no addition comes after the end of the drag (the last window ends a
-        set time before the end of the recording instead).
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    length_s = round((end - start) x 60 / step) x step, at least one step;
-    gap_s = round((first addition at or after the end - end) x 60 / step) x step.
-
-    ---- Helpers ----
-    None.
-    """
-
-    step = float(settings.DRAG_STEP_SECONDS)
-    length_s = max(round((end_min - start_min) * 60.0 / step) * step, step)
-    later = [time for time in additions_min if time >= end_min]
-    if not later:
-        return length_s, None
-    gap_s = max(round((min(later) - end_min) * 60.0 / step) * step, 0.0)
-    return length_s, gap_s
-
-
 # ---- data_folder_lister --------------------------------------------------------------
 def data_folder_lister(root: Path) -> List[Path]:
     """
@@ -1523,11 +1376,14 @@ def multi_experiment_asker(summaries: List[dict],
                            defaults: dict,
                            plotted: bool,
                            figure_checker: Optional[Callable[[str, dict], bool]] = None,
+                           windows_adder: Optional[Callable[[], bool]] = None,
                            ) -> tuple:
     """
     ---- Summary ----
     Main function to ask the multi-experiment plots: the side-by-side figure of two
-    experiments and the 2x2 figure of four experiments.
+    experiments and the 2x2 figure of four experiments. The 2x2 figure needs the
+    averaging windows: with none set up it offers the window step of the processing,
+    and is not made without them.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1544,6 +1400,9 @@ def multi_experiment_asker(summaries: List[dict],
         ('comparison', {'comparison': ...}) or ('exemplar', {'exemplar_names': ...}). It
         shows the figure and returns True when the user accepts it. When it returns
         False the figure's questions are asked again with the answers as the defaults.
+    windows_adder : Optional[Callable[[], bool]]
+        Function that runs the window step of the processing (windows_ensurer); None
+        when it cannot be run.
 
     ---- Globals read ----
     None.
@@ -1561,11 +1420,11 @@ def multi_experiment_asker(summaries: List[dict],
     None.
 
     ---- Helpers ----
-    averaging_asker
     choice_asker
     info_printer
     run_name_lister
     size_asker
+    windows_ensurer
     yes_no_asker
     """
 
@@ -1638,7 +1497,8 @@ def multi_experiment_asker(summaries: List[dict],
             runs = sorted({r['run'] for r in rows})
             if not runs:
                 info_printer('No file name fits, so this figure is skipped.', depth=2)
-            else:
+            # the figure starts at the baseline averaging window
+            elif windows_ensurer(answers, windows_adder):
                 old = defaults['ho_exemplar_run']
                 run = choice_asker('Which run number should be shown?',
                                    [(r, f'run {r}') for r in runs],
@@ -1646,13 +1506,6 @@ def multi_experiment_asker(summaries: List[dict],
                                    depth=2,
                                    )
                 answers['ho_exemplar_run'] = int(run)
-                if not answers['averaging']:
-                    info_printer('This figure starts at the baseline averaging window, '
-                                 'so the events are averaged as in the processing.',
-                                 depth=2,
-                                 )
-                    averaging_asker(answers, defaults, forced=True, depth=2)
-                    answers['averaging'] = True
                 exemplar_names = [r['name'] for r in rows if r['run'] == int(run)]
                 info_printer(f"Using: {', '.join(exemplar_names)}", depth=2)
                 answers['ex_watermark'] = yes_no_asker(
@@ -2529,3 +2382,67 @@ def trim_pointer_reader(summary: dict,
              'ignore_end': duration - minutes['trim_end'] - time_min,
              }[key]
     return round(max(float(found), 0.0), 1)
+
+
+# ---- windows_ensurer -----------------------------------------------------------------
+def windows_ensurer(answers: dict,
+                    windows_adder: Optional[Callable[[], bool]],
+                    depth: int = 2,
+                    ) -> bool:
+    """
+    ---- Summary ----
+    Main function to make sure the averaging windows are set up before the questions
+    of a figure that needs them. The figure never asks for a window of its own: with
+    none set up it says so and offers the window step of the processing (4.6), or
+    carries on without the figure.
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary; averaging says whether the windows are set up.
+    windows_adder : Optional[Callable[[], bool]]
+        Function that runs the window step of the processing, stores what is chosen
+        in ``answers`` and returns True when the windows are then set up; None when
+        the step cannot be run, so the figure is not made.
+    depth : int
+        Depth of the question (how far it is set in).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when the averaging windows are set up, so the figure can be made.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal; the window step stores the windows
+    in ``answers`` (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    yes_no_asker
+    """
+
+    if answers['averaging']:
+        return True
+    info_printer('No averaging windows are set up, and this figure needs them.',
+                 depth=depth,
+                 )
+    if windows_adder is None:
+        info_printer('So this figure is not made.', depth=depth)
+        return False
+    if not yes_no_asker('Do you want to add them now?',
+                        True,
+                        depth=depth,
+                        number='4.6.1',
+                        ):
+        info_printer('This figure is not made.', depth=depth)
+        return False
+    if windows_adder():
+        return True
+    info_printer('There are still no averaging windows, so this figure is not made.',
+                 depth=depth,
+                 )
+    return False

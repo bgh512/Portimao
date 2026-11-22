@@ -12,9 +12,7 @@ import pytest
 from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-import config as settings
 from utils_shared import questions
-from utils_shared.survey import averaging_drag_reader
 from utils_viewer.viewer_gui import pointed_time_finder
 from utils_viewer.viewer_preview import time_axis_finder, TimeAxis
 
@@ -34,47 +32,6 @@ TIME_AXIS = TimeAxis(left=0.125,
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
-
-
-# ---- test_drag_gives_the_window_and_gap ----------------------------------------------
-def test_drag_gives_the_window_and_gap() -> None:
-    """
-    ---- Summary ----
-    Main function to check that a drag across one averaging window gives its length
-    and how long before the next addition it ends, in seconds rounded to whole 5 s,
-    worked out by hand for additions at 10 and 20 min.
-
-    ---- Inputs ----
-    None.
-
-    ---- Globals read ----
-    config.DRAG_STEP_SECONDS (5 s, checked first).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    18.5 to 19 min: 30 s long, 60 s before the addition at 20. 9 to 9.82 min: 49.2 s
-    -> 50 s, and 10.8 s before the addition at 10 -> 10 s. 25 to 25.4 min, after the
-    last addition: 24 s -> 25 s, no gap. 5 to 5.01 min: 0.6 s -> one step (5 s), and
-    299.4 s -> 300 s before the addition at 10.
-
-    ---- Helpers ----
-    None.
-    """
-
-    assert settings.DRAG_STEP_SECONDS == 5
-    additions = [10.0, 20.0]
-    assert averaging_drag_reader(additions, 18.5, 19.0) == pytest.approx((30.0, 60.0))
-    assert averaging_drag_reader(additions, 9.0, 9.82) == pytest.approx((50.0, 10.0))
-    length_s, gap_s = averaging_drag_reader(additions, 25.0, 25.4)
-    assert length_s == pytest.approx(25.0)
-    assert gap_s is None
-    assert averaging_drag_reader(additions, 5.0, 5.01) == pytest.approx((5.0, 300.0))
 
 
 # ---- test_pointed_time_inside_the_panels ---------------------------------------------

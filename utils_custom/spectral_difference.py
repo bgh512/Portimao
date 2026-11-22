@@ -3,12 +3,13 @@ Event-window spectral averages, their difference spectrum and its decomposition.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-from typing import Iterable, Optional
+from typing import Optional
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.averaging import window_span_lister
 from utils_shared.spectral_decomposer import spectrum_decomposer
 from utils_shared.user_notices import warning_shower
 
@@ -218,11 +219,12 @@ def spectral_averager(experiment: dict,
     window skipped (side effects).
 
     ---- Equations ----
-    None.
+    None. The windows fall as window_span_lister says; a window is left out when it
+    does not fit or holds no spectrum.
 
     ---- Helpers ----
     warning_shower
-    window_definer
+    window_span_lister
     """
 
     # ---- 1 Validate the inputs -------------------------------------------------------
@@ -250,20 +252,24 @@ def spectral_averager(experiment: dict,
                          )
 
     # ---- 2 Define the windows --------------------------------------------------------
-    boundaries = window_definer([event['time'] for event in events],
-                                float(np.max(times)),
-                                window_minutes,
-                                gap_minutes,
-                                final_window_gap_minutes,
-                                )
+    # The one rule of the averaging windows, so the windows are those the processing
+    # step showed.
+    if window_minutes <= 0:
+        raise ValueError('window_minutes must be positive.')
+    if gap_minutes < 0 or final_window_gap_minutes < 0:
+        raise ValueError('Averaging gaps cannot be negative.')
+    boundaries = window_span_lister(sorted(float(event['time']) for event in events),
+                                    (float(np.min(times)), float(np.max(times))),
+                                    window_minutes,
+                                    gap_minutes,
+                                    final_window_gap_minutes,
+                                    )
 
     # ---- 3 Average the spectra in each window ----------------------------------------
     windows, skipped = {}, {}
-    for window_name, start, end, previous in boundaries:
-        if previous is not None and start < previous:
-            skipped[window_name] = (f'it would start {previous - start:.2f} min before '
-                                    f'the previous addition'
-                                    )
+    for window_name, start, end, problem in boundaries:
+        if problem is not None:
+            skipped[window_name] = problem.rstrip('.')
             continue
         selected = spectra[(times >= start) & (times <= end)]
         if selected.shape[0] == 0:
@@ -303,65 +309,3 @@ def spectral_averager(experiment: dict,
                                        'roles': roles,
                                        }
     return experiment
-
-
-# ---- window_definer ------------------------------------------------------------------
-def window_definer(event_times: Iterable,
-                   recording_end: float,
-                   window_minutes: float,
-                   gap_minutes: float,
-                   final_window_gap_minutes: float,
-                   ) -> list:
-    """
-    ---- Summary ----
-    Helper function to lay out the averaging windows of one run.
-
-    ---- Inputs ----
-    event_times : Iterable
-        Event times in minutes.
-    recording_end : float
-        Last time of the recording in minutes.
-    window_minutes : float
-        Length of each window.
-    gap_minutes : float
-        Gap between the end of a window and the next addition.
-    final_window_gap_minutes : float
-        Gap between the last window and the end of the data.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    list
-        [(name, start, end, previous event time or None), ...].
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    average0 ends gap_minutes before the first addition; averageN ends gap_minutes
-    before addition N + 1; the last window ends final_window_gap_minutes before the end.
-    start = end - window_minutes.
-
-    ---- Helpers ----
-    None.
-    """
-
-    # ---- 1 Check the inputs ----------------------------------------------------------
-    if window_minutes <= 0:
-        raise ValueError('window_minutes must be positive.')
-    if gap_minutes < 0 or final_window_gap_minutes < 0:
-        raise ValueError('Averaging gaps cannot be negative.')
-
-    # ---- 2 Calculate the window ends -------------------------------------------------
-    event_times = sorted(float(t) for t in event_times)
-    ends = ([t - gap_minutes for t in event_times] + [recording_end -
-                                                      final_window_gap_minutes,
-                                                      ]
-            )
-
-    # ---- 3 Build the windows ---------------------------------------------------------
-    previous = [None] + event_times
-    return [(f'average{i}', end - window_minutes, end, previous[i])
-            for i, end in enumerate(ends)
-            ]

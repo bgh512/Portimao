@@ -52,7 +52,8 @@ def _ocr_and_haem_response_preparer(experiment: dict,
     experiment : dict
         Processed experiment (DATA_FORMAT.md).
     answers : dict
-        Terminal answers; uses the ho_* settings.
+        Terminal answers; uses the ho_* settings and the averaging windows of the
+        dataset (window_minutes, gap_minutes, final_gap_minutes).
     od_available : bool
         True when OD, volume and dilution factor were available for this experiment.
 
@@ -90,10 +91,10 @@ def _ocr_and_haem_response_preparer(experiment: dict,
 
     # ---- 3 Average the experiment ----------------------------------------------------
     prepared = dict(experiment)
-    final_gap = answers['ho_final_gap_minutes']
+    final_gap = answers['final_gap_minutes']
     experiment_averages_calculator(prepared,
-                                   window_minutes=answers['ho_window_minutes'],
-                                   gap_minutes=answers['ho_gap_minutes'],
+                                   window_minutes=answers['window_minutes'],
+                                   gap_minutes=answers['gap_minutes'],
                                    final_window_gap_minutes=final_gap,
                                    vo2_source=vo2_source,
                                    haem_source=haem_source,
@@ -121,8 +122,9 @@ def _time_response_preparer(experiment: dict,
     group : str
         Group the experiment belongs to.
     answers : dict
-        Terminal answers; uses decomposition_dataset, haem_background and the tr_*
-        windows.
+        Terminal answers; uses decomposition_dataset, haem_background and the
+        averaging windows of the dataset (window_minutes, gap_minutes,
+        final_gap_minutes).
     fit : dict
         Fit dictionary from import_fit.
 
@@ -154,9 +156,9 @@ def _time_response_preparer(experiment: dict,
     spectral_averager(prepared,
                       answers['decomposition_dataset'],
                       'attenuation',
-                      answers['tr_window_minutes'],
-                      answers['tr_gap_minutes'],
-                      answers['tr_final_gap_minutes'],
+                      answers['window_minutes'],
+                      answers['gap_minutes'],
+                      answers['final_gap_minutes'],
                       None,
                       )
 

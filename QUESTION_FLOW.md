@@ -1,4 +1,4 @@
-# Portimao question flow (V2.14)
+# Portimao question flow (V2.15)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -230,26 +230,29 @@ The **Δψ** row of the strip holds the numbers of the method, and shows only wh
 - **More**, unticked, leaves the other numbers as one grey line ("share 0.5 · 37 °C · given between 10 and 90 % reduced"); ticked, they are boxes: the **Share** of the membrane potential that lies between the two haems, the **Temperature** of the runs (°C, the value of 3.1.2) and the two limits (**Given between** ... **and** ... **% reduced**).
 - A number that cannot be used turns its box red, with one sentence under the row, and the number in use stays: something that is not a number; a share of 0 or less; a temperature outside 0 to 100 °C (as 3.1.2); a lowest limit that is not above 0 and below the highest; a highest limit that is not above the lowest and below 100.
 
-### 4.E Averaging around the events
+### 4.E The averaging windows
 
-The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Each window ends a set time before the next addition (the last one 0.5 min before the end of the recording), so it moves with that addition in every file and one setting fits the whole dataset. The window and the gap are given in seconds.
+An averaging window is the stretch before an addition that its average is taken over. The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Every window has the same length and ends the same time before the next addition (the last one 0.5 min before the end of the recording), so each moves with its addition in every file and one setting fits the whole dataset. The first window, before the first addition, is the baseline.
 
-You can set both with the mouse: while 4.6.1 waits, drag across one window on the plot of any file, just before an addition. A band follows the mouse, with its length above it. When you let go, the length goes into the answer box and the gap is offered in 4.6.2, both rounded to whole 5 s, so you can tidy them (to exactly 30 s, say) before pressing Enter.
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 4.6 | Do you want to average around the events? `(y/N)` | **4.6.1** | **5.1** (no averaging in the run) |
+- The windows are **shaded blue** on the plot of every file, 120 s long and ending 30 s before the next addition, or as they were saved with the dataset. They are over the plot only in this step; the steps before it show none.
+- **Pull the start** of any window, by its handle or its line, to change the length; **pull its end** to change the gap before the addition. Every window of every file follows, in steps of 5 s, and the plot is not drawn again. The end of the last window cannot be pulled: it stays 0.5 min before the end of the recording.
+- **Type** the two numbers in the row of the strip under the plot: **Window** and **Gap before the next addition**, in seconds. Press Enter or leave the box. A window of 0 s is not taken.
+- A window that **does not fit** (it would start before its own addition, or the baseline is shorter than 10 s) is shaded red with hatching. After Enter a warning names these windows for each file; they are left out of the averages.
+- **Averaging windows**, the tick box of that row, ticked when the step opens: untick it for no windows. The windows go from the plot, nothing is averaged, and the figures of each file show none.
+- The windows are saved with the dataset (in `portimao_settings.json`), ticked or not.
+- When none of the files has an addition, the step is not asked and one line says there are no averaging windows.
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.6.1 | How long a window (s) should the average be taken over? `[120]` | **4.6.2** |
-| 4.6.2 | How long before the next addition should the averaging window end (s)? `[30]`, or, after a drag in 4.6.1, the time from where you let go to the next addition (no default from a drag after the last addition). A drag here gives the gap alone. | the windows are drawn **(plot)**, then **4.7** |
+| 4.6 | Drag an edge of any window on the plot, or type the window and the gap in the strip under it. Press Enter when the windows look right, or untick Averaging windows in the strip for none. (above it, in grey: what the windows are, "Every window has the same length and ends the same time before the next addition, in every file; the last one ends 0.5 min before the end of the recording." and "Pull the start of any window to change the length, its end to change the gap before the addition.") | Enter with the answer box empty: one line says the windows chosen (or that there are none), a warning names those that do not fit, the plot is redrawn with the windows **(plot)**, then **5.1**. Anything typed in the answer box instead gets one line saying to type the numbers in the strip, and 4.6 goes on waiting. |
 
-Windows that do not fit are skipped; they are drawn red with a warning sign and listed in red in the terminal first.
+Three later figures need the averaging windows: the 2x2 grid (**6.3**), the time response (**7.1**) and the haem and OCR response (**7.2**). They use the windows chosen here and never ask for a window or a gap of their own. When you say yes to one of them and no windows are set up (Averaging windows unticked in 4.6, or no file with an addition), one line says "No averaging windows are set up, and this figure needs them.", and 4.6.1 is asked before the figure's own questions. It keeps this number wherever it is asked.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.7 | Do you accept these averaging windows? `(Y/n)` (above it: "Type n to change the window and gap.") | **5.1** | **4.6** |
+| 4.6.1 | Do you want to add them now? `(Y/n)` | **4.6** opens on the plot of every file, by itself (nothing else of the processing is asked again, and the strip stays greyed out apart from the row of the windows), with Averaging windows ticked. After Enter, with windows set up, the figure's own questions follow; with none still, one line says the figure is not made and the next figure is asked | one line says the figure is not made, and the next figure is asked |
+
+Once windows are added this way they are the dataset's windows: the later figures do not ask, and they are saved with the dataset.
 
 ---
 
@@ -360,13 +363,13 @@ If the figure cannot be previewed, a message says so and the figure is kept as i
 
 File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_then_bd_run1`. If no file name fits, the figure is skipped and the next step is **7.1**.
 
+The figure starts at the baseline averaging window, so it needs the averaging windows of 4.6. With none set up, **4.6.1** is asked first (section 4.E); without windows the figure is not made and the next step is **7.1**.
+
 | # | Question | Leads to |
 |---|---|---|
-| 6.3.1 | Which run number should be shown? | **6.3.2** if you said No to averaging in 4.6, otherwise **6.3.4** |
-| 6.3.2 | *(a message says the figure starts at the baseline averaging window, so the events are averaged as in the processing)* How long a window (s) should the average be taken over? `[120]` (typed; the plot shows figures here, so there is nothing to drag across) | **6.3.3** |
-| 6.3.3 | How long before the next addition should the averaging window end (s)? `[30]` | **6.3.4** |
-| 6.3.4 | Do you want the run name written faintly on each plot? `(Y/n)` | **6.3.5** |
-| 6.3.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then **6.4** |
+| 6.3.1 | Which run number should be shown? | **6.3.2** |
+| 6.3.2 | Do you want the run name written faintly on each plot? `(Y/n)` | **6.3.3** |
+| 6.3.3 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then **6.4** |
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
@@ -376,7 +379,7 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 
 ## 7. Experiment summaries
 
-As in section 6, the **Drawing ...** sign is on the plot while each picture is drawn. Both summary figures need the haem fit. If the haems were not decomposed in section 4 (or Haems was unticked), the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, so if you said No in 4.6 (and have not been asked since), a message says the averaging window is asked here, and the window and gap questions (**4.6.1**, **4.6.2**) are asked first.
+As in section 6, the **Drawing ...** sign is on the plot while each picture is drawn. Both summary figures need the haem fit. If the haems were not decomposed in section 4 (or Haems was unticked), the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, over the averaging windows of 4.6. With none set up, **4.6.1** is asked after the fit and before the figure's own questions (section 4.E); without windows the figure is not made and the next figure is asked.
 
 ### 7.A Time response
 

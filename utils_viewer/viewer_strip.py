@@ -82,6 +82,9 @@ ERROR_BACKGROUND = '#ffd6d6'
 ERROR_TEXT = '#b00020'
 NOTE_TEXT = '#404040'
 MINUTES_HELP = 'Type a number of minutes, 0 or more.'
+# What to type in a box of the edges row, by the unit of the step.
+UNIT_HELP = {'min': MINUTES_HELP, 's': 'Type a number of seconds, 0 or more.'}
+EVERY_FILE_TEXT = 'Every file'
 
 
 # ---- EdgeRow -------------------------------------------------------------------------
@@ -163,15 +166,17 @@ class EdgeRow:
         self.frame = tk.Frame(parent, bg=background)
         self._boxes_frame = tk.Frame(self.frame, bg=background)
         self._boxes_frame.pack(side='left')
+        self._help = UNIT_HELP['min']
         self._every_file = tk.BooleanVar(master=parent, value=True)
-        tk.Checkbutton(self.frame,
-                       text='Every file',
-                       variable=self._every_file,
-                       command=self._every_file_handler,
-                       bg=background,
-                       activebackground=background,
-                       highlightthickness=0,
-                       ).pack(side='left', padx=(12, 4))
+        self._tick = tk.Checkbutton(self.frame,
+                                    text=EVERY_FILE_TEXT,
+                                    variable=self._every_file,
+                                    command=self._every_file_handler,
+                                    bg=background,
+                                    activebackground=background,
+                                    highlightthickness=0,
+                                    )
+        self._tick.pack(side='left', padx=(12, 4))
         self._note = tk.Label(self.frame, text='', bg=background, fg=NOTE_TEXT)
         self._note.pack(side='left', padx=(0, 4))
 
@@ -243,10 +248,10 @@ class EdgeRow:
             return
         text = box.get().strip()
         if text != self._shown.get(key):
-            value, note = minutes_checker(text)
+            value, _ = minutes_checker(text)
             if value is None:
                 box.configure(bg=ERROR_BACKGROUND)
-                self._note.configure(text=note, fg=ERROR_TEXT)
+                self._note.configure(text=self._help, fg=ERROR_TEXT)
                 return
             self._note.configure(text='')
             self._on_value(key, value)
@@ -260,20 +265,27 @@ class EdgeRow:
     def fields_setter(self,
                       fields: List[Tuple[str, str]],
                       is_every_file: bool,
+                      unit: str = 'min',
+                      tick_text: str = EVERY_FILE_TEXT,
                       ) -> None:
         """
         ---- Summary ----
         Method to make one typing box for each field, each after its name, followed by
-        "min", and set the tick box.
+        the unit, and set the tick box and its words.
 
         ---- Inputs ----
         fields : List[Tuple[str, str]]
             [(field, name shown before its box)] in order.
         is_every_file : bool
-            Whether "Every file" is ticked.
+            Whether the tick box is ticked.
+        unit : str
+            The unit written after the boxes: 'min' or 's' (a key of UNIT_HELP).
+        tick_text : str
+            The words of the tick box: "Every file", or those of the step's own
+            switch.
 
         ---- Globals read ----
-        None.
+        EVERY_FILE_TEXT, UNIT_HELP.
 
         ---- Outputs ----
         None
@@ -312,9 +324,11 @@ class EdgeRow:
                      )
             box.bind('<FocusOut>', lambda event, name=key: self._value_handler(name))
             self._boxes[key] = box
-        tk.Label(self._boxes_frame, text='min', bg=background).pack(side='left',
-                                                                    padx=(4, 0),
-                                                                    )
+        tk.Label(self._boxes_frame, text=unit, bg=background).pack(side='left',
+                                                                   padx=(4, 0),
+                                                                   )
+        self._help = UNIT_HELP[unit]
+        self._tick.configure(text=tick_text)
         self._every_file.set(is_every_file)
         self._note.configure(text='')
 

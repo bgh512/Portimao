@@ -956,7 +956,21 @@ class ViewerGui:
             if choice is None:
                 self._edge_row.frame.pack_forget()
             else:
-                self._edge_row.fields_setter(choice.fields, choice.is_every_file)
+                if choice.switch is None:
+                    self._edge_row.fields_setter(choice.fields,
+                                                 choice.is_every_file,
+                                                 choice.unit,
+                                                 )
+                else:
+                    # the step's own tick box: ticked when its field is on in any file
+                    field, words = choice.switch
+                    self._edge_row.fields_setter(choice.fields,
+                                                 any(own.get(field)
+                                                     for own in choice.values.values()
+                                                     ),
+                                                 choice.unit,
+                                                 words,
+                                                 )
                 self._edge_row.frame.pack(side='bottom',
                                           pady=(0, 4),
                                           after=self._strip.frame,
@@ -1001,6 +1015,9 @@ class ViewerGui:
             self._renderer = PreviewRenderer(self._session, self._image_deliverer)
             self._renderer.start()
             self._is_pictures = False
+            # a session attached after the browser steps ended (the window step asked
+            # for by a later figure) draws its files again
+            self._is_browsing_over = False
             self._help_base = FILES_HELP
             self._help.configure(text=FILES_HELP)
             self._nav_state_setter(True)
@@ -1082,8 +1099,10 @@ class ViewerGui:
     def _every_file_taker(self, is_every_file: bool) -> None:
         """
         ---- Summary ----
-        Method to take the "Every file" tick box of the edges row: ticked, a moved or
-        typed edge moves on every file; unticked, on the file shown only.
+        Method to take the tick box of the edges row. As "Every file": ticked, a moved
+        or typed edge moves on every file; unticked, on the file shown only. As the
+        step's own switch (EdgeChoice.switch), it sets the field of the switch to 1 or
+        0 on every file.
 
         ---- Inputs ----
         is_every_file : bool
@@ -1103,9 +1122,14 @@ class ViewerGui:
         None.
 
         ---- Helpers ----
-        None.
+        _edges_refresher
         """
 
+        choice = self._edges.choice
+        if choice is not None and choice.switch is not None:
+            self._edges.field_setter(choice.switch[0], 1.0 if is_every_file else 0.0)
+            self._edges_refresher()
+            return
         self._edges.is_every_file = is_every_file
 
     # ---- _file_follower --------------------------------------------------------------
