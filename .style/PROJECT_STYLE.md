@@ -29,3 +29,21 @@ This project's own rules for its own kinds of file. They add to the shared style
 - A question that is asked only sometimes says when, in italics in its row or in a sentence above its table.
 - Plain sentences between the tables give what the program says or does without asking: messages, steps that are skipped and why, and what is written to the results folder.
 - Plain words throughout: no function, file or variable names from the code, apart from the files and folders a user sees.
+
+## Maths
+
+`MATHS.md`, in the project root, says how the program works out each of its haem numbers. It is written for a scientist who checks the maths without reading the code (the user's supervisor), so that they can say whether the program does what they want.
+
+**It changes with the program.** Maths that is added or changed (a new quantity, a changed equation, a changed number such as how many spectra a level is taken from, a changed rule for what is refused or left empty) is changed in the document in the same piece of work, with its test. A document that disagrees with the program is a fault, like a wrong docstring.
+
+**Layout**
+
+- The title is `# Portimao maths`, then a few lines on what the document is and the words used throughout (spectrum, median).
+- One `## <number>. <quantity>` heading for each quantity, in the order the program works them out, with a `---` line between them; a quantity worked out in steps has one `### <number>.<step>` heading per step.
+- Each quantity, or step, has these parts in this order:
+    - the equation, in a `text` block, one equation per line, in the form `y = m × x + c`: the quantity on the left, plain letters, `×` and `÷`, a level or a time told apart by a word after an underscore (`D_start`, `t_new`);
+    - a list of every letter in it, each with what it is, its unit in brackets and, when it comes from another section, which one;
+    - "Notes:", a list of what the equation does not show: what is skipped, kept, refused or left empty;
+    - "Example:", worked in numbers a reader can follow by hand, each step written out. Its numbers are the numbers of its test; when the test uses a smaller number than the program (3 spectra in place of 50), the example says so;
+    - "Checked by:", the name of each test and its file.
+- Plain words throughout: no function, file or variable names from the code, apart from the tests. No symbols a reader must look up (no Greek letters apart from Δ, no sums written as series, no matrices): a sum is written out in words.

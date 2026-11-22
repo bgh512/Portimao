@@ -251,9 +251,10 @@ def experiment_data_processor(info: dict,
                               in reference['window_by_haem'].items()
                               )
             print(f"  Decomposed with {a['fit_file']} and a "
-                  f"{BACKGROUND_LABELS[a['haem_background']]} background; delta A "
-                  f'zero is the median of the highest {window_points} points in a row '
-                  f"({reference['window_seconds']:.3g} s) of each haem: {spans}",
+                  f"{BACKGROUND_LABELS[a['haem_background']]} background; the zero "
+                  f'of ΔD is where each haem starts, the median of its first '
+                  f"{window_points} spectra ({reference['window_seconds']:.3g} s) "
+                  f'after the ignored start: {spans}',
                   )
             for note in fit.get('notes', []):
                 warning_shower(f'  {note}')

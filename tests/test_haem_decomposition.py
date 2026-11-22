@@ -1056,7 +1056,7 @@ def test_a_series_gives_its_amounts_back() -> None:
     ---- Summary ----
     Main function to check that a run of four spectra holding 1, 4, 3 and 2 times the
     known amounts decomposes into those amounts, and that the haem absorbances and
-    their change from the highest point follow from them.
+    their change from the start follow from them.
 
     ---- Inputs ----
     None.
@@ -1073,9 +1073,9 @@ def test_a_series_gives_its_amounts_back() -> None:
     ---- Equations ----
     amount of haem i in a spectrum = its multiple x AMOUNTS_i; absorbance (mOD) =
     amount x highest point of |shape_i| x HAEM_FACTOR x 1000; change = absorbance - the
-    highest absorbance of that haem (the second spectrum), so it is 0 there and
-    negative elsewhere. The reference window is one spectrum here, as the run has only
-    four.
+    absorbance of that haem at the start (the first spectrum), so it is 0 there and 3,
+    2 and 1 times the first absorbance after it. The start is taken from one spectrum
+    here, as the run has only four.
 
     ---- Helpers ----
     _background_builder
@@ -1118,7 +1118,7 @@ def test_a_series_gives_its_amounts_back() -> None:
                        atol=0.0,
                        )
     assert np.allclose(experiment['haem_delta_abs'][names].to_numpy(),
-                       absorbances - absorbances[1][None, :],
+                       absorbances - absorbances[0][None, :],
                        rtol=EXACT,
                        atol=EXACT * absorbances.max(),
                        )
@@ -1288,13 +1288,15 @@ def test_a_failed_decomposition_leaves_nothing() -> None:
         assert key not in experiment
 
 
-# ---- test_delta_a_zero_is_the_median_of_the_highest_points ---------------------------
-def test_delta_a_zero_is_the_median_of_the_highest_points() -> None:
+# ---- test_delta_d_zero_is_where_the_haem_starts --------------------------------------
+def test_delta_d_zero_is_where_the_haem_starts() -> None:
     """
     ---- Summary ----
-    Main function to check that the zero of delta A is the median of the highest points
-    in a row, so that one spike does not set it, and that a run with fewer points than
-    one window is refused in place of taking the zero from too few spectra.
+    Main function to check that the zero of delta D is where the haem starts: the
+    median of its first spectra after the ignored start, so that neither one spike nor
+    a higher stretch later in the run sets it; that a blank value is made up for by the
+    next spectrum; and that a run with too few spectra left is refused in place of
+    taking the zero from too few.
 
     ---- Inputs ----
     None.
@@ -1309,29 +1311,59 @@ def test_delta_a_zero_is_the_median_of_the_highest_points() -> None:
     None.
 
     ---- Equations ----
-    Absorbances 1, 2, 9, 3, 4, 5, 0, 0 at 0 to 7 min, three points in a row. Medians
-    of the six windows: 2, 3, 4, 4, 4, 0. The highest is 4, first reached by the
-    window 9, 3, 4 (2 to 4 min), so delta A = absorbance - 4 and the spike of 9 is not
-    the zero. A window of nine points does not fit in eight.
+    Absorbances 12, 30, 11, 9.5, 4, 5, 20, 20 at 0 to 7 min, the start taken from three
+    spectra. The first three are 12, 30, 11; in order 11, 12, 30, so their median is 12
+    and delta D = absorbance - 12: 0, 18, -1, -2.5, -8, -7, 8, 8. The spike of 30 is
+    not the zero, and nor is the stretch of 20 at the end (the highest three in a row,
+    5, 20, 20, have a median of 20). Three spectra one minute apart last 180 s.
+    With the first minute ignored the first three are 30, 11, 9.5 (1 to 3 min): median
+    11. With the value at 1 min blank they are 12, 11, 9.5 (0 to 3 min): median 11.
+    Nine spectra are not to be had from eight; with the last 6 min ignored only the
+    spectra at 0 and 1 min are left, fewer than three.
 
     ---- Helpers ----
     None.
     """
 
-    values = np.array([1.0, 2.0, 9.0, 3.0, 4.0, 5.0, 0.0, 0.0])
+    # ---- 1 The start of the whole run ------------------------------------------------
+    values = np.array([12.0, 30.0, 11.0, 9.5, 4.0, 5.0, 20.0, 20.0])
     frame = pd.DataFrame({TIME_COLUMN: np.arange(8, dtype=float),
                           SPECTRUM_INDEX_COLUMN: np.arange(1, 9),
                           'haem': values,
                           },
                          )
     result = delta_abs_calculator(frame, exclude_first_minutes=0.0, window_points=3)
-    assert np.allclose(result['haem'], values - 4.0)
+    assert np.allclose(result['haem'], [0.0, 18.0, -1.0, -2.5, -8.0, -7.0, 8.0, 8.0])
     record = result.attrs['delta_abs_baseline']
-    assert np.isclose(record['level_by_haem']['haem'], 4.0)
-    assert record['window_by_haem']['haem'] == (2.0, 4.0)
+    assert np.isclose(record['level_by_haem']['haem'], 12.0)
+    assert record['window_by_haem']['haem'] == (0.0, 2.0)
     assert np.isclose(record['window_seconds'], 180.0)
+
+    # ---- 2 After an ignored start, and over a blank value ----------------------------
+    ignored = delta_abs_calculator(frame, exclude_first_minutes=1.0, window_points=3)
+    assert np.allclose(ignored['haem'], values - 11.0)
+    assert ignored.attrs['delta_abs_baseline']['window_by_haem']['haem'] == (1.0, 3.0)
+    with_blank = frame.copy()
+    with_blank.loc[1, 'haem'] = np.nan
+    over_blank = delta_abs_calculator(with_blank,
+                                      exclude_first_minutes=0.0,
+                                      window_points=3,
+                                      )
+    assert np.allclose(over_blank['haem'].to_numpy()[[0, 2, 3]], [1.0, 0.0, -1.5])
+    assert np.isnan(over_blank['haem'].to_numpy()[1])
+    assert over_blank.attrs['delta_abs_baseline']['window_by_haem']['haem'] == (0.0,
+                                                                                3.0,
+                                                                                )
+
+    # ---- 3 Too few spectra left ------------------------------------------------------
     with pytest.raises(ValueError, match='Ignore less'):
         delta_abs_calculator(frame, exclude_first_minutes=0.0, window_points=9)
+    with pytest.raises(ValueError, match='Ignore less'):
+        delta_abs_calculator(frame,
+                             exclude_first_minutes=0.0,
+                             window_points=3,
+                             exclude_last_minutes=6.0,
+                             )
 
 
 # ---- test_the_gap_between_two_decompositions -----------------------------------------
@@ -1690,8 +1722,8 @@ def test_the_change_from_the_first_spectrum() -> None:
     ---- Summary ----
     Main function to check that fitting the change of each spectrum from the first, as
     the instrument does, gives each amount and absorbance minus that of the first
-    spectrum, and the same change from the highest point (delta A) as fitting the
-    spectra themselves; and that a first spectrum with a blank value is refused.
+    spectrum, and the same change from the start (delta D) as fitting the spectra
+    themselves; and that a first spectrum with a blank value is refused.
 
     ---- Inputs ----
     None.

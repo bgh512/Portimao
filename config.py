@@ -109,9 +109,14 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
 # 'haem_background' answer yet
 DEGREE_OF_SCATTER = 1
 HAEM_FACTOR = 1_000_000
-# points in a row whose median is a reference level: the 0 of delta A, the 0 % and the
-# 100 % of the % scale (50 points are 25 s when a point is taken every 0.5 s)
+# points whose median is a reference level (50 points are 25 s when a point is taken
+# every 0.5 s). The 0 of delta D is where each haem starts: its first points after the
+# ignored start. The 0 % and the 100 % of the % scale are the lowest and the highest
+# points in a row, wherever they are in the run.
 REFERENCE_WINDOW_POINTS = 50
+# least number of spectra an oxidised or a reduced region must hold for a haem's level
+# in it (its median there); a shorter region counts as not chosen (10 spectra are 5 s)
+REGION_MINIMUM_POINTS = 10
 # least data the baseline average (before the first addition) must span
 BASELINE_MINIMUM_SECONDS = 10
 # an averaging window dragged across the plot is rounded to whole steps of this

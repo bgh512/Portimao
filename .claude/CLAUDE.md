@@ -4,7 +4,7 @@ Portimao reads Espana Scientific Software `.paf` files, plots every experiment a
 
 - Run: `python main.py`, or a launcher (`Portimao.pyw`, `run.bat`, `run.sh`, all through `launchers/bootstrap.pyw`). On a Mac, users have the Mac app (built by `.github/workflows/mac_check.yml`, installed with `install_mac.sh`); `launchers/mac_app_mover.py` moves an old launcher install to it.
 - Folders: `utils_shared/` (reading, processing, plots and export of one experiment), `utils_viewer/` (the window, the questions and the previews), `utils_custom/` (the protocol-specific summary figures and their workbooks), `fits/` (the haem library in `haems/`, the presets in `presets/`, users' own fit files), `config.py` (defaults, journal sizes, colours).
-- Easy to get wrong: every question the program asks is listed in `QUESTION_FLOW.md`, so a changed question means a changed list; the `data_*/` folders in the root are local sample data and are not in git; `last_answers.json` is written by the program.
+- Easy to get wrong: every question the program asks is listed in `QUESTION_FLOW.md`, so a changed question means a changed list; the maths of the haem numbers is written in `MATHS.md` for the user's supervisor to check, so changed maths means a changed document; the `data_*/` folders in the root are local sample data and are not in git; `last_answers.json` is written by the program.
 
 <!-- >>> style guide (managed block, do not edit between these lines) -->
 ## Style guide

@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.6
-- **Date:** 21/11/2026
+- **Version:** V2.7
+- **Date:** 22/11/2026
 
 ## Contents
 
@@ -112,7 +112,7 @@
     - [`test_the_three_routes_give_the_same_amounts`](#test_the_three_routes_give_the_same_amounts)
     - [`test_same_shapes_give_a_plain_error`](#test_same_shapes_give_a_plain_error)
     - [`test_a_failed_decomposition_leaves_nothing`](#test_a_failed_decomposition_leaves_nothing)
-    - [`test_delta_a_zero_is_the_median_of_the_highest_points`](#test_delta_a_zero_is_the_median_of_the_highest_points)
+    - [`test_delta_d_zero_is_where_the_haem_starts`](#test_delta_d_zero_is_where_the_haem_starts)
     - [`test_the_gap_between_two_decompositions`](#test_the_gap_between_two_decompositions)
     - [`test_each_background_gives_back_the_amounts`](#test_each_background_gives_back_the_amounts)
     - [`test_an_unknown_background_is_refused`](#test_an_unknown_background_is_refused)
@@ -307,6 +307,11 @@
     - [`test_text_question_waits`](#test_text_question_waits)
     - [`test_typed_number_reader`](#test_typed_number_reader)
     - [`test_yes_no_endings`](#test_yes_no_endings)
+- [`tests/test_redox_regions.py`](#teststest_redox_regionspy)
+    - [`test_a_level_is_the_median_in_the_region`](#test_a_level_is_the_median_in_the_region)
+    - [`test_an_edge_is_copied_by_its_nearest_addition`](#test_an_edge_is_copied_by_its_nearest_addition)
+    - [`test_percent_oxidised_runs_between_the_two_levels`](#test_percent_oxidised_runs_between_the_two_levels)
+    - [`test_the_least_spectra_of_the_program`](#test_the_least_spectra_of_the_program)
 - [`tests/test_run_logging.py`](#teststest_run_loggingpy)
     - [`_typist_maker`](#_typist_maker)
     - [`_fresh_numbering`](#_fresh_numbering)
@@ -734,8 +739,15 @@
     - [`time_request_setter`](#time_request_setter)
     - [`typed_number_reader`](#typed_number_reader)
     - [`yes_no_asker`](#yes_no_asker)
+- [`utils_shared/redox_regions.py`](#utils_sharedredox_regionspy)
+    - [`edge_anchor_finder`](#edge_anchor_finder)
+    - [`edge_time_finder`](#edge_time_finder)
+    - [`percent_oxidised_calculator`](#percent_oxidised_calculator)
+    - [`region_level_finder`](#region_level_finder)
 - [`utils_shared/reference_level.py`](#utils_sharedreference_levelpy)
+    - [`_usable_point_keeper`](#_usable_point_keeper)
     - [`reference_level_finder`](#reference_level_finder)
+    - [`start_level_finder`](#start_level_finder)
     - [`window_seconds_calculator`](#window_seconds_calculator)
 - [`utils_shared/run_logging.py`](#utils_sharedrun_loggingpy)
     - [`_Tee`](#_tee)
@@ -4003,7 +4015,7 @@ _haem_spectrum_builder
 ---- Summary ----
 Main function to check that a run of four spectra holding 1, 4, 3 and 2 times the
 known amounts decomposes into those amounts, and that the haem absorbances and
-their change from the highest point follow from them.
+their change from the start follow from them.
 
 ---- Inputs ----
 None.
@@ -4020,9 +4032,9 @@ None.
 ---- Equations ----
 amount of haem i in a spectrum = its multiple x AMOUNTS_i; absorbance (mOD) =
 amount x highest point of |shape_i| x HAEM_FACTOR x 1000; change = absorbance - the
-highest absorbance of that haem (the second spectrum), so it is 0 there and
-negative elsewhere. The reference window is one spectrum here, as the run has only
-four.
+absorbance of that haem at the start (the first spectrum), so it is 0 there and 3,
+2 and 1 times the first absorbance after it. The start is taken from one spectrum
+here, as the run has only four.
 
 ---- Helpers ----
 _background_builder
@@ -4113,13 +4125,15 @@ The run lasts 1 min and its first 10 min are ignored, so nothing is left.
 _haem_spectrum_builder
 ```
 
-#### `test_delta_a_zero_is_the_median_of_the_highest_points`
+#### `test_delta_d_zero_is_where_the_haem_starts`
 
 ```text
 ---- Summary ----
-Main function to check that the zero of delta A is the median of the highest points
-in a row, so that one spike does not set it, and that a run with fewer points than
-one window is refused in place of taking the zero from too few spectra.
+Main function to check that the zero of delta D is where the haem starts: the
+median of its first spectra after the ignored start, so that neither one spike nor
+a higher stretch later in the run sets it; that a blank value is made up for by the
+next spectrum; and that a run with too few spectra left is refused in place of
+taking the zero from too few.
 
 ---- Inputs ----
 None.
@@ -4134,10 +4148,15 @@ None.
 None.
 
 ---- Equations ----
-Absorbances 1, 2, 9, 3, 4, 5, 0, 0 at 0 to 7 min, three points in a row. Medians
-of the six windows: 2, 3, 4, 4, 4, 0. The highest is 4, first reached by the
-window 9, 3, 4 (2 to 4 min), so delta A = absorbance - 4 and the spike of 9 is not
-the zero. A window of nine points does not fit in eight.
+Absorbances 12, 30, 11, 9.5, 4, 5, 20, 20 at 0 to 7 min, the start taken from three
+spectra. The first three are 12, 30, 11; in order 11, 12, 30, so their median is 12
+and delta D = absorbance - 12: 0, 18, -1, -2.5, -8, -7, 8, 8. The spike of 30 is
+not the zero, and nor is the stretch of 20 at the end (the highest three in a row,
+5, 20, 20, have a median of 20). Three spectra one minute apart last 180 s.
+With the first minute ignored the first three are 30, 11, 9.5 (1 to 3 min): median
+11. With the value at 1 min blank they are 12, 11, 9.5 (0 to 3 min): median 11.
+Nine spectra are not to be had from eight; with the last 6 min ignored only the
+spectra at 0 and 1 min are left, fewer than three.
 
 ---- Helpers ----
 None.
@@ -4331,8 +4350,8 @@ _haem_spectrum_builder
 ---- Summary ----
 Main function to check that fitting the change of each spectrum from the first, as
 the instrument does, gives each amount and absorbance minus that of the first
-spectrum, and the same change from the highest point (delta A) as fitting the
-spectra themselves; and that a first spectrum with a blank value is refused.
+spectrum, and the same change from the start (delta D) as fitting the spectra
+themselves; and that a first spectrum with a blank value is refused.
 
 ---- Inputs ----
 None.
@@ -9352,6 +9371,149 @@ None.
 _lines_reader
 _typist_setter
 yes_no_asker
+```
+
+## `tests/test_redox_regions.py`
+
+Tests that a haem's level in a region, % oxidised and an edge copied to another file
+
+### MAIN FUNCTIONS
+
+#### `test_a_level_is_the_median_in_the_region`
+
+```text
+---- Summary ----
+Main function to check that a haem's level in a region is the median of its values
+there, with the spectra at both edges counted, so that one spike does not set it
+and a blank value is left out; and that a region with too few spectra, or one that
+ends before it starts, is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+RUN, OXIDISED_MIN, REDUCED_MIN, FEW (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Oxidised region, 0 to 4 min. bH: 12, 13, 11, 12, 30; in order 11, 12, 12, 13, 30,
+so the median is 12 (the mean, 15.6, would follow the spike). cc: 6, 6, 8, 7 (the
+blank left out); in order 6, 6, 7, 8, so the median is (6 + 7) / 2 = 6.5. a605: 5.
+Reduced region, 6 to 9 min. bH: 4, 5, 3, 4; in order 3, 4, 4, 5, so the median is
+4. cc: 2. a605: 5.
+From 1 to 3 min bH is 13, 11, 12: median 12. From 1.5 to 3.5 min only the spectra
+at 2 and 3 min are inside: two, fewer than three. From 0 to 2 min cc has only two
+values (6, 6), as the one at 1 min is blank.
+
+---- Helpers ----
+None.
+```
+
+#### `test_an_edge_is_copied_by_its_nearest_addition`
+
+```text
+---- Summary ----
+Main function to check that an edge is copied to another file at the same distance
+from the addition nearest to it, counted in order; that an edge before the first
+addition goes by the first and one after the last by the last; and that a file
+with fewer additions, or with none, gives no time.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIRST_FILE, LATER_FILE, SHORT_FILE (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Additions of the first file at 5, 12, 20 and 30 min; of the later file at 6, 13,
+22 and 31 min.
+An edge at 18.5 min is 13.5, 6.5, 1.5 and 11.5 min from the four additions, so the
+third is nearest and the edge is 1.5 min before it: 20 - 1.5 = 18.5 min in the
+first file again, 22 - 1.5 = 20.5 min in the later file. The short file has no
+third addition.
+An edge at 2 min is 3 min before the first addition: 6 - 3 = 3 min in the later
+file. An edge at 33 min is 3 min after the fourth: 31 + 3 = 34 min.
+An edge at 8.5 min is 3.5 min from both the first and the second addition: the
+earlier is taken, so it is 3.5 min after the first: 6 + 3.5 = 9.5 min.
+
+---- Helpers ----
+None.
+```
+
+#### `test_percent_oxidised_runs_between_the_two_levels`
+
+```text
+---- Summary ----
+Main function to check that % oxidised is 100 at the oxidised level and 0 at the
+reduced one, with the right share in between; that values above 100 and below 0
+are kept; that a haem whose two levels are equal has an empty column; and that a
+haem without a level is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+RUN, OXIDISED_MIN, REDUCED_MIN, FEW (module constants); TIME_COLUMN,
+SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+percent = (D - D_red) / (D_ox - D_red) x 100, with the levels of
+test_a_level_is_the_median_in_the_region.
+bH: D_ox = 12, D_red = 4, so percent = (D - 4) / 8 x 100. D = 10 gives 6 / 8 x 100
+= 75 %; 12, 13, 11, 12, 30, 10, 4, 5, 3, 4 give 100, 112.5, 87.5, 100, 325, 75, 0,
+12.5, -12.5, 0.
+cc: D_ox = 6.5, D_red = 2, so percent = (D - 2) / 4.5 x 100. 6, blank, 6, 8, 7, 5,
+2, 2, 2, 2 give 800/9, blank, 800/9, 400/3, 1000/9, 200/3, 0, 0, 0, 0.
+a605: D_ox = D_red = 5, so there is nothing to divide by: an empty column.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_least_spectra_of_the_program`
+
+```text
+---- Summary ----
+Main function to check the least number of spectra the program asks of a region:
+ten, which are 5 s of a run with a spectrum every 0.5 s; a region of nine is
+refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.REGION_MINIMUM_POINTS; TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Twenty spectra 0.5 s apart, at 0/120, 1/120, ... 19/120 min, with the values 1 to
+20. From 0 to 9/120 min there are ten, 1 to 10: median (5 + 6) / 2 = 5.5. From 0
+to 8/120 min there are nine.
+
+---- Helpers ----
+None.
 ```
 
 ## `tests/test_run_logging.py`
@@ -23228,9 +23390,210 @@ _question_printer
 retry_teller
 ```
 
+## `utils_shared/redox_regions.py`
+
+The maths of the oxidised and reduced regions: a haem's level in a region, % oxidised
+
+### MAIN FUNCTIONS
+
+#### `edge_anchor_finder`
+
+```text
+---- Summary ----
+Main function to say where an edge of a region sits by the addition nearest to it:
+which addition of the file, counted in order, and how far from it. It is the first
+half of copying an edge to another file; edge_time_finder is the second.
+
+---- Inputs ----
+time_min : float
+    Time of the edge (min), on the same time axis as the additions.
+additions_min : Sequence[float]
+    Times of the additions of the file the edge was set on (min), in any order.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Tuple[int, float]]
+    (number of the nearest addition, counted in time order from 0; distance of the
+    edge from it in minutes, negative before the addition), or None when the file
+    has no addition or the time is blank, so the edge cannot be copied.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+nearest = the addition with the smallest |time - addition|; of two equally near,
+the earlier. distance = time - nearest. An edge before the first addition is
+nearest to the first, so it is copied by its distance to the first.
+
+---- Helpers ----
+None.
+```
+
+#### `edge_time_finder`
+
+```text
+---- Summary ----
+Main function to give the time of a copied edge in another file: the same distance
+from the addition of the same number.
+
+---- Inputs ----
+anchor : Tuple[int, float]
+    (number of the addition, counted in time order from 0; distance from it in
+    minutes), from edge_anchor_finder.
+additions_min : Sequence[float]
+    Times of the additions of the file the edge is copied to (min), in any order.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    Time of the edge in that file (min), on the time axis of its additions, or None
+    when the file has no addition of that number (it has fewer additions), so it
+    keeps the region it had. The time is not kept within the used part of the run;
+    the limits of the edges do that.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+time = time of the addition of the same number in this file + distance.
+
+---- Helpers ----
+None.
+```
+
+#### `percent_oxidised_calculator`
+
+```text
+---- Summary ----
+Main function to put every haem of a table on the % oxidised scale, which runs
+from its level in the reduced region (0 %) to its level in the oxidised region
+(100 %).
+
+---- Inputs ----
+haem_table : pd.DataFrame
+    Haem table (time, spectrum index and one column per haem), in any one unit:
+    the scale is the same for the amounts, the absorbances and delta D.
+oxidised_levels : Dict[str, float]
+    {haem: its level in the oxidised region}, in the unit of the table
+    (region_level_finder).
+reduced_levels : Dict[str, float]
+    {haem: its level in the reduced region}, in the same unit.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+pd.DataFrame
+    Copy of the table with every haem in %; values above 100 and below 0 are kept.
+    A haem whose two levels are equal, or blank, has an empty column (NaN), as no
+    scale can be made from them. result.attrs["percent_oxidised"] holds
+    {'oxidised_level_by_haem', 'reduced_level_by_haem': the levels used,
+    'empty_haems': the haems with an empty column}. Raises ValueError when a haem
+    of the table has no level in one of the two.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+percent = (D - D_red) / (D_ox - D_red) x 100, per haem, with D the value at one
+time, D_ox the oxidised level and D_red the reduced level.
+
+---- Helpers ----
+measurement_column_finder
+value_getter
+```
+
+#### `region_level_finder`
+
+```text
+---- Summary ----
+Main function to find the level of every haem of a table in one region: the median
+of its values there. One region serves every haem of the file.
+
+---- Inputs ----
+haem_table : pd.DataFrame
+    Haem table (time, spectrum index and one column per haem), in any one unit.
+start_min : float
+    First time of the region (min), on the time axis of the table.
+end_min : float
+    Last time of the region (min); the spectra at both edges count as inside.
+minimum_points : int
+    Least number of spectra with a value a haem must have in the region (>= 1;
+    config.REGION_MINIMUM_POINTS in the program).
+region : str
+    Name of the region in the messages: 'oxidised region' or 'reduced region'.
+label : str
+    Name of the file in the messages.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, float]
+    {haem: its level in the region}, in the unit of the table. Raises ValueError,
+    with a message for the user, when the region ends before it starts, a time is
+    blank, the table holds no haem, or a haem has fewer than minimum_points
+    spectra with a value in the region.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+level = median(D at every spectrum with start <= time <= end), per haem. A spectrum
+with a blank value for a haem is left out for that haem.
+
+---- Helpers ----
+measurement_column_finder
+time_getter
+value_getter
+```
+
 ## `utils_shared/reference_level.py`
 
-The one finder of the reference level of a trace: the median of its highest or lowest
+The finders of the reference level of a trace: the median of its highest or lowest
+
+### REFERENCE LEVEL HELPERS
+
+#### `_usable_point_keeper`
+
+```text
+---- Summary ----
+Helper function to keep the points of a trace a reference level may be taken from,
+in time order.
+
+---- Inputs ----
+times : np.ndarray
+    Time of each point in minutes, shape (n_timepoints).
+values : np.ndarray
+    Value at each point, shape (n_timepoints).
+start : float
+    Earliest time that may be used, in minutes.
+stop : float
+    Latest time that may be used, in minutes.
+n_points : int
+    Number of points the level is taken from (>= 1).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[np.ndarray, np.ndarray]
+    (times, values) of the usable points, in time order, each of shape
+    (n_usable). Raises ValueError when n_points is below 1.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A point is usable when its time and value are not blank and start <= time <= stop.
+
+---- Helpers ----
+None.
+```
 
 ### MAIN FUNCTIONS
 
@@ -23239,8 +23602,8 @@ The one finder of the reference level of a trace: the median of its highest or l
 ```text
 ---- Summary ----
 Main function to find the reference level of a trace: the median of its highest (or
-lowest) points in a row. It is the one rule behind the 0 of delta A and the 0 % and
-100 % of the % scale.
+lowest) points in a row. It is the one rule behind the 0 % and 100 % of the %
+scale.
 
 ---- Inputs ----
 times : np.ndarray
@@ -23277,7 +23640,48 @@ of median(window i). The windows are counted in points, not in time, and the las
 one ends at the last usable point.
 
 ---- Helpers ----
+_usable_point_keeper
+```
+
+#### `start_level_finder`
+
+```text
+---- Summary ----
+Main function to find the level a trace starts at: the median of its first points.
+It is the rule behind the 0 of delta D.
+
+---- Inputs ----
+times : np.ndarray
+    Time of each point in minutes, shape (n_timepoints).
+values : np.ndarray
+    Value at each point, shape (n_timepoints).
+start : float
+    Earliest time that may be used, in minutes (the end of the ignored start).
+stop : float
+    Latest time that may be used, in minutes.
+n_points : int
+    Number of points the level is taken from (>= 1).
+
+---- Globals read ----
 None.
+
+---- Outputs ----
+Optional[dict]
+    {'level': the median of the first n_points usable points, 'start_time' and
+    'end_time': the times of the first and the last of them (min), 'n_points':
+    n_points}, or None when fewer than n_points usable points lie between start
+    and stop. Raises ValueError when n_points is below 1.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The points are put in time order; points with a blank time or value, or outside
+start to stop, are dropped. level = median(the first n_points points left). The
+points are counted, not timed, so a blank point is made up for by the next one.
+
+---- Helpers ----
+_usable_point_keeper
 ```
 
 #### `window_seconds_calculator`
@@ -24315,10 +24719,9 @@ value_getter
 
 ```text
 ---- Summary ----
-Main function to shift each haem absorbance so that its reference level is 0, giving
-a change in absorbance (mOD). The reference level of each haem is the median of its
-highest points in a row (for example the fully oxidised point), wherever they occur
-in the run outside the ignored start and end.
+Main function to shift each haem absorbance so that it is 0 where the haem starts,
+giving delta D, the change from the start (mOD). The start of each haem is the
+median of its first spectra after the ignored start, so one spike does not set it.
 
 ---- Inputs ----
 haem_abs : pd.DataFrame
@@ -24326,11 +24729,12 @@ haem_abs : pd.DataFrame
 exclude_first_minutes : float
     Minutes after the first measurement that are ignored at the start.
 window_points : int
-    Number of spectra in a row that make the reference window (>= 1).
+    Number of spectra the start is taken from (>= 1).
 label : str
     Name used in error messages.
 exclude_last_minutes : float
-    Minutes before the last measurement that are ignored at the end.
+    Minutes before the last measurement that are ignored at the end; the start is
+    never taken from them.
 
 ---- Globals read ----
 None.
@@ -24339,22 +24743,22 @@ None.
 pd.DataFrame
     Shifted copy; result.attrs["delta_abs_baseline"] holds {'level_by_haem': the
     level subtracted from each haem (mOD), 'window_by_haem': the (first, last)
-    time of each haem's window (min), 'window_points', 'window_seconds': the
-    length of such a window}. Raises ValueError, with a message for the user, for
-    invalid settings or when fewer than window_points spectra are left after the
-    ignored parts.
+    time of the spectra each haem's start was taken from (min), 'window_points',
+    'window_seconds': how long that many spectra last}. Raises ValueError, with a
+    message for the user, for invalid settings or when fewer than window_points
+    spectra are left after the ignored parts.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-delta_abs = abs - max over windows of median(abs inside the window), per haem
-(reference_level_finder). Only a constant is subtracted, so differences between
-points are unchanged.
+delta D = D - D_start, per haem, with D_start = median(D of the first
+window_points spectra with a value after the ignored start) (start_level_finder).
+Only a constant is subtracted, so differences between points are unchanged.
 
 ---- Helpers ----
 measurement_column_finder
-reference_level_finder
+start_level_finder
 time_getter
 value_getter
 window_seconds_calculator
@@ -24379,15 +24783,16 @@ background : str
 haemfactor : float
     Scale factor applied to the haem basis spectra.
 delta_exclude_first_minutes : float
-    Minutes after the first spectrum that are ignored when finding the delta
-    absorbance reference.
+    Minutes after the first spectrum that are ignored when finding where each
+    haem starts, the 0 of delta D.
 delta_window_points : int
-    Number of spectra in a row that make the delta absorbance reference window.
+    Number of spectra after the ignored start that each haem's start is taken
+    from.
 spectrum_type : str
     Field of the dataset to decompose, e.g. 'attenuation'.
 delta_exclude_last_minutes : float
-    Minutes before the last spectrum that are ignored when finding the delta
-    absorbance reference.
+    Minutes before the last spectrum that are ignored; the start is never taken
+    from them.
 is_change_from_first : bool
     True fits the change of every spectrum from the first one (the first kept, in
     a trimmed run), as the instrument does; False fits the spectra themselves.
@@ -24413,9 +24818,9 @@ decomposition.
 a = each spectrum, or each spectrum - the first spectrum; c = the least-squares
 amounts of the basis S in a (basis_solver); haem_abs = c x peak amplitude of the
 haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs - median of the
-highest points in a row. The fit is linear, so with the same basis the change
-from the first spectrum gives each amount minus that of the first spectrum, and
-the same haem_delta_abs.
+haem's first spectra after the ignored start. The fit is linear, so with the same
+basis the change from the first spectrum gives each amount minus that of the first
+spectrum, and the same haem_delta_abs.
 
 ---- Helpers ----
 _wavelength_masker

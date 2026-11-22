@@ -338,6 +338,7 @@ Portimao/
     FUNCTION_LIST.md
     DATA_FORMAT.md
     QUESTION_FLOW.md        every question the program asks
+    MATHS.md                how each haem number is worked out, for checking the maths
     .style/                 this project's style guide settings, its own rules (PROJECT_STYLE.md), the VERSION file,
                             the release hook (release_hook.py) and the make_zip scripts
     .claude/                instructions for Claude (CLAUDE.md imports the style guide)
@@ -349,7 +350,8 @@ Portimao/
 - [FUNCTION_LIST.md](FUNCTION_LIST.md): every function and class, with its docstring.
 - [DATA_FORMAT.md](DATA_FORMAT.md): custom data structures, units and formats.
 - [QUESTION_FLOW.md](QUESTION_FLOW.md): every question the program asks, in order, with where each answer leads.
-- [.style/PROJECT_STYLE.md](.style/PROJECT_STYLE.md): this project's own rules, such as how the question list is laid out and kept.
+- [MATHS.md](MATHS.md): how each haem number is worked out, with an equation, a worked example and the test that checks it.
+- [.style/PROJECT_STYLE.md](.style/PROJECT_STYLE.md): this project's own rules, such as how the question list and the maths document are laid out and kept.
 - [style/rules/CODING_STYLE.md](style/rules/CODING_STYLE.md): the coding and formatting standards used in this project.
 
 ## 5. License
