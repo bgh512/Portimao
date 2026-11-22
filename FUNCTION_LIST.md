@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.14
+- **Version:** V2.15
 - **Date:** 22/11/2026
 
 ## Contents
@@ -71,11 +71,16 @@
     - [`test_unanswered_ask_is_asked_again`](#test_unanswered_ask_is_asked_again)
     - [`test_update_from_made_up_zip`](#test_update_from_made_up_zip)
 - [`tests/test_averaging_windows.py`](#teststest_averaging_windowspy)
+    - [`_response_experiment_builder`](#_response_experiment_builder)
+    - [`test_a_figure_asks_which_windows_only_with_both_kinds`](#test_a_figure_asks_which_windows_only_with_both_kinds)
     - [`test_a_figure_without_windows_offers_the_window_step`](#test_a_figure_without_windows_offers_the_window_step)
     - [`test_a_window_can_be_switched_off_and_set`](#test_a_window_can_be_switched_off_and_set)
     - [`test_a_pulled_end_gives_the_gap`](#test_a_pulled_end_gives_the_gap)
+    - [`test_a_pulled_quick_window_gives_its_start_and_length`](#test_a_pulled_quick_window_gives_its_start_and_length)
     - [`test_a_pulled_start_gives_the_length`](#test_a_pulled_start_gives_the_length)
     - [`test_the_plot_shows_the_windows`](#test_the_plot_shows_the_windows)
+    - [`test_the_quick_windows_fall_after_the_additions`](#test_the_quick_windows_fall_after_the_additions)
+    - [`test_both_kinds_are_averaged_from_one_baseline`](#test_both_kinds_are_averaged_from_one_baseline)
     - [`test_the_windows_fall_before_the_additions`](#test_the_windows_fall_before_the_additions)
 - [`tests/test_dataset_settings.py`](#teststest_dataset_settingspy)
     - [`_program_folder_maker`](#_program_folder_maker)
@@ -617,6 +622,9 @@
 - [`utils_shared/averaging.py`](#utils_sharedaveragingpy)
     - [`_baseline_change_adder`](#_baseline_change_adder)
     - [`experiment_averages_calculator`](#experiment_averages_calculator)
+    - [`kind_span_lister`](#kind_span_lister)
+    - [`quick_span_lister`](#quick_span_lister)
+    - [`window_kind_picker`](#window_kind_picker)
     - [`window_layout_finder`](#window_layout_finder)
     - [`window_pointer_reader`](#window_pointer_reader)
     - [`window_span_lister`](#window_span_lister)
@@ -898,6 +906,7 @@
     - [`trim_minutes_builder`](#trim_minutes_builder)
     - [`trim_minutes_setter`](#trim_minutes_setter)
     - [`trim_pointer_reader`](#trim_pointer_reader)
+    - [`window_kind_asker`](#window_kind_asker)
     - [`windows_ensurer`](#windows_ensurer)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
@@ -3057,9 +3066,70 @@ user_places_finder
 
 ## `tests/test_averaging_windows.py`
 
-Tests that the averaging windows fall, and follow a pulled edge, as worked out by hand,
+Tests that the averaging windows of both kinds (settled, ending before the next
+
+### HELPERS
+
+#### `_response_experiment_builder`
+
+```text
+---- Summary ----
+Helper function to build an experiment whose oxygen consumption dips just after
+each addition and then settles on another level, so the quick and the settled
+windows give different averages.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITIONS, VO2_COLUMN (module constants); TIME_COLUMN.
+
+---- Outputs ----
+dict
+    Experiment with a point every 0.25 min from 0 to 30 min and additions at 10
+    and 20 min. VoO2 is 10 before 10 min, 4 from 10 to 12 min, 6 from 12 to
+    20 min, 1 from 20 to 22 min and 2 from 22 min on.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
 
 ### MAIN FUNCTIONS
+
+#### `test_a_figure_asks_which_windows_only_with_both_kinds`
+
+```text
+---- Summary ----
+Main function to check which kind of window a figure uses: with both kinds set up
+one question (4.6.2) asks, offering the kind the figure used last time; with one
+kind the figure uses it and nothing is asked. The question is stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Puts the stand-in for the question in place, and takes it away afterwards.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
 
 #### `test_a_figure_without_windows_offers_the_window_step`
 
@@ -3149,6 +3219,40 @@ Pulled to 19.0 min: the nearest is 19.5, before the addition at 20, so 1 min =
 None.
 ```
 
+#### `test_a_pulled_quick_window_gives_its_start_and_length`
+
+```text
+---- Summary ----
+Main function to check that the start of a quick window pulled to a time gives how
+long after their addition the quick windows start (never below 0), and its end
+their length (at least one step), in whole steps of 5 s.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+The module constants.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The quick windows run from 10.5 to 11.5 and from 20.5 to 21.5 min. A start pulled
+to 21.0 min: the nearest is 20.5, of the addition at 20, so 1 min = 60 s. To
+10.07 min: nearest 10.5, addition at 10, 0.07 min = 4.2 s -> 5 s. To 9.8 min:
+before its addition at 10, -12 s -> 0 s. An end pulled to 12.0 min: the nearest
+is 11.5, of the window starting at 10.5, so 1.5 min = 90 s. To 21.93 min: nearest
+21.5, starting at 20.5, 1.43 min = 85.8 s -> 85 s. To 20.51 min: nearest 21.5,
+starting at 20.5, 0.6 s -> 0 -> one step, 5 s.
+
+---- Helpers ----
+None.
+```
+
 #### `test_a_pulled_start_gives_the_length`
 
 ```text
@@ -3210,6 +3314,73 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+#### `test_the_quick_windows_fall_after_the_additions`
+
+```text
+---- Summary ----
+Main function to check where the quick windows of a file fall and which do not
+fit, what a figure that uses one kind of window is given, and how the windows that
+do not fit are named.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+The module constants.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Starting 0.5 min after the addition and 1 min long: 10 + 0.5 = 10.5 to 11.5, and
+20 + 0.5 = 20.5 to 21.5. 12 min long: 10.5 to 22.5 ends after the addition at 20,
+and 20.5 to 32.5 after the end of the run at 30, so neither fits. Starting at the
+addition and 10 min long: 10 to 20 and 20 to 30 end exactly at the next addition
+and at the end of the run, so both fit.
+
+---- Helpers ----
+None.
+```
+
+#### `test_both_kinds_are_averaged_from_one_baseline`
+
+```text
+---- Summary ----
+Main function to check the averages of the settled and the quick windows of one
+file, their change from the one baseline, what a figure that uses one kind reads,
+and the averaged spectra of the quick windows.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The trace is 10 before 10 min, 4 until 12, 6 until 20, 1 until 22 and 2 after.
+Baseline 7.5 to 9.5: 10. Settled windows 17.5 to 19.5 and 27.5 to 29.5: 6 and 2,
+so 60 and 20 % of the baseline, -4 and -8 from it. Quick windows 10.5 to 11.5 and
+20.5 to 21.5: 4 and 1, so 40 and 10 %, -6 and -9. Spectra, one every 0.5 min for
+12 min with additions at 4 and 8 min: (2, 0) before 4 min, (5, 1) until 6, (3, 1)
+until 8, (9, 4) until 10 and (7, 4) after; the quick windows 4.5 to 5.5 and 8.5
+to 9.5 hold three spectra each, (5, 1) and (9, 4), where the settled ones would
+give (3, 1) and (7, 4).
+
+---- Helpers ----
+_response_experiment_builder
 ```
 
 #### `test_the_windows_fall_before_the_additions`
@@ -12939,7 +13110,8 @@ Main function to ask section 7: whether to plot a time response and a haem and
 OCR response, and the settings of each one chosen. Both need the haem fit, which
 is asked for here if it was not chosen in the processing, and the averaging
 windows of the processing: with none set up, the window step is offered and the
-figure is not made without them.
+figure is not made without them; with both kinds set up, each figure asks which
+it uses.
 
 ---- Inputs ----
 names : List[str]
@@ -12985,6 +13157,7 @@ _step_wirer
 _time_response_asker
 decomposition_asker
 info_printer
+window_kind_asker
 windows_ensurer
 yes_no_asker
 ```
@@ -13006,8 +13179,9 @@ response figures, on a copy of one experiment.
 experiment : dict
     Processed experiment (DATA_FORMAT.md).
 answers : dict
-    Terminal answers; uses the ho_* settings and the averaging windows of the
-    dataset (window_minutes, gap_minutes, final_gap_minutes).
+    Terminal answers; uses the ho_* settings (ho_window_kind is the kind of window
+    the figure uses) and the averaging windows of the dataset (window_minutes,
+    gap_minutes, final_gap_minutes, quick_minutes, delay_minutes).
 od_available : bool
     True when OD, volume and dilution factor were available for this experiment.
 
@@ -13029,6 +13203,7 @@ None.
 experiment_averages_calculator
 source_selector
 warning_shower
+window_kind_picker
 ```
 
 #### `_time_response_preparer`
@@ -13044,9 +13219,10 @@ experiment : dict
 group : str
     Group the experiment belongs to.
 answers : dict
-    Terminal answers; uses decomposition_dataset, haem_background and the
-    averaging windows of the dataset (window_minutes, gap_minutes,
-    final_gap_minutes).
+    Terminal answers; uses decomposition_dataset, haem_background, the kind of
+    window the figure uses (tr_window_kind) and the averaging windows of the
+    dataset (window_minutes, gap_minutes, final_gap_minutes, quick_minutes,
+    delay_minutes).
 fit : dict
     Fit dictionary from import_fit.
 
@@ -13086,8 +13262,8 @@ chosen : dict
 cfg : Config
     Figure style of this figure (its own journal).
 answers : dict
-    Terminal answers; uses haems, plot_haems and the ho_ex_* and ho_exemplar_run
-    settings.
+    Terminal answers; uses haems, plot_haems, the ho_ex_* and ho_exemplar_run
+    settings and the kind of window the figure shows (ex_window_kind).
 fit : Optional[dict]
     Fit dictionary, or None when the haems were not decomposed.
 export_root : Path
@@ -13111,6 +13287,7 @@ custom_figure_saver
 exemplar_config_builder
 exemplar_figure_plotter
 individual_config_builder
+window_kind_picker
 ```
 
 #### `experiment_preparer`
@@ -16729,7 +16906,8 @@ spectrum_decomposer
 
 ```text
 ---- Summary ----
-Main function to average the chosen spectra in each event window.
+Main function to average the chosen spectra in each event window: the baseline,
+then the settled or the quick window of each addition.
 
 ---- Inputs ----
 experiment : dict
@@ -16746,6 +16924,14 @@ final_window_gap_minutes : float
     Gap between the last window and the end of the data in minutes.
 expected_events : Optional[int]
     Raise if the run has a different number of events; None skips the check.
+kind : str
+    The kind of window averaged over after each addition: 'settled' (ending
+    before the next addition) or 'quick' (starting after its own).
+quick_minutes : float
+    Length of each quick window in minutes; used for the quick kind.
+delay_minutes : float
+    How long after its addition each quick window starts, in minutes; used for
+    the quick kind.
 
 ---- Globals read ----
 None.
@@ -16759,12 +16945,12 @@ None. Adds ``spectral_averages`` to the experiment and shows a warning for each
 window skipped (side effects).
 
 ---- Equations ----
-None. The windows fall as window_span_lister says; a window is left out when it
+None. The windows fall as kind_span_lister says; a window is left out when it
 does not fit or holds no spectrum.
 
 ---- Helpers ----
+kind_span_lister
 warning_shower
-window_span_lister
 ```
 
 ## `utils_custom/time_response_exporter.py`
@@ -18830,7 +19016,8 @@ None.
 ```text
 ---- Summary ----
 Main function to calculate event-window statistics for VoO2 and haem data and store
-them in the experiment.
+them in the experiment: the baseline, the settled windows (ending before the next
+addition) and, when asked for, the quick windows (starting after each addition).
 
 ---- Inputs ----
 experiment : dict
@@ -18849,6 +19036,12 @@ vo2_source : Optional[str]
     VoO2 source key (e.g. 'od', 'raw', 'percent'); None leaves VoO2 out.
 haem_source : Optional[str]
     Haem source key (e.g. 'abs', 'delta_abs_od'); None leaves the haems out.
+quick_minutes : Optional[float]
+    Length of each quick window, in minutes (> 0); None for no quick windows.
+delay_minutes : float
+    How long after its addition each quick window starts, in minutes (>= 0).
+is_settled : bool
+    False leaves the settled windows out (the baseline stays).
 
 ---- Globals read ----
 schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES.
@@ -18871,15 +19064,139 @@ its end, or at the start of the recording when that is later; it is skipped when
 the points inside it span less than baseline_minimum_seconds. averageN ends
 gap_minutes before event N+1 (final_window_gap_minutes before the end of the
 recording for the last event); each window starts window_minutes before its end
-and is skipped when that is before its own event. change = mean /
-mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0).
+and is skipped when that is before its own event. quickN starts delay_minutes
+after event N and ends quick_minutes later; it is skipped when that is after event
+N+1 (the end of the recording for the last event). change = mean /
+mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0),
+for the settled and the quick windows alike.
 
 ---- Helpers ----
 _baseline_change_adder
+quick_span_lister
 source_resolver
 time_getter
 window_span_lister
 window_statistics_calculator
+```
+
+#### `kind_span_lister`
+
+```text
+---- Summary ----
+Main function to give the windows a figure that uses one kind of window averages
+over: the baseline, then the window of that kind of each addition, all under the
+names of the settled windows, so the figure reads either kind in the same way.
+
+---- Inputs ----
+kind : str
+    'settled' or 'quick'.
+event_times_min : List[float]
+    Times of the additions (min), in order; at least one.
+recording_span_min : Tuple[float, float]
+    (first, last) time of the data (min).
+window_minutes : float
+    Length of the baseline and of each settled window, in minutes.
+gap_minutes : float
+    How long before the next addition the baseline and each settled window end, in
+    minutes.
+final_window_gap_minutes : float
+    How long before the end of the recording the last settled window ends, in
+    minutes.
+quick_minutes : float
+    Length of each quick window, in minutes.
+delay_minutes : float
+    How long after its addition each quick window starts, in minutes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Tuple[str, float, float, Optional[str]]]
+    [(name, start, end, problem)] in minutes: 'average0' (the baseline), then
+    'average1' for the first addition and so on, as window_span_lister gives them.
+    Raises ValueError for a kind that is neither.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+quick_span_lister
+window_span_lister
+```
+
+#### `quick_span_lister`
+
+```text
+---- Summary ----
+Main function to give where the quick windows of one file fall, and which do not
+fit: one window starting a set time after each addition. The averaging and the plot
+of the window step both use it.
+
+---- Inputs ----
+event_times_min : List[float]
+    Times of the additions (min), in order.
+recording_span_min : Tuple[float, float]
+    (first, last) time of the data (min).
+quick_minutes : float
+    Length of each quick window, in minutes.
+delay_minutes : float
+    How long after its addition each quick window starts, in minutes.
+
+---- Globals read ----
+FIT_TOLERANCE_MIN (module constant).
+
+---- Outputs ----
+List[Tuple[str, float, float, Optional[str]]]
+    [(name, start, end, problem)] in minutes, 'quick1' after the first addition and
+    so on. The problem is None for a window that fits, or one sentence saying why
+    it does not.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+quickN: start = addition N + delay; end = start + length; it does not fit when end
+> addition N + 1 (the end of the recording for the last addition).
+
+---- Helpers ----
+None.
+```
+
+#### `window_kind_picker`
+
+```text
+---- Summary ----
+Main function to give a figure that uses one kind of window the averages of an
+experiment with the baseline and the windows of that kind only, the quick windows
+under the names of the settled ones, so the figure reads either kind in the same
+way.
+
+---- Inputs ----
+averages : dict
+    experiment['averages'] (DATA_FORMAT.md); not changed.
+kind : str
+    'settled' or 'quick'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    A copy of the averages whose 'windows' and 'skipped' hold the baseline
+    ('average0') and the windows of the kind, named 'average1' ... by the number
+    of their addition. Raises ValueError for a kind that is neither.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `window_layout_finder`
@@ -18888,11 +19205,12 @@ window_statistics_calculator
 ---- Summary ----
 Main function to give what the window step draws on the plot of one file: the two
 edges of every averaging window, and the windows as parts to shade, those that do
-not fit apart. The first edge of each kind carries its words.
+not fit apart. The first edge of each kind carries its words. The baseline is
+there when either kind of window is switched on.
 
 ---- Inputs ----
 values : Dict[str, float]
-    {window_s, gap_s, is_on} of the file (WINDOW_KEYS).
+    The settled and the quick windows of the file (WINDOW_KEYS).
 event_times_min : List[float]
     Times of the file's additions on the time axis of the plot (min), in order,
     not those marked ignore.
@@ -18908,12 +19226,15 @@ None.
 
 ---- Outputs ----
 Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
-    ([(field, time in min, words, kind)], [(start, end, kind)]): the start of every
-    window is an edge of the field 'window_s' (kind 'average'), the end of every
-    window but the last an edge of 'gap_s' (kind 'average_end'; the last window
-    ends a fixed time before the end of the recording). A part has the kind
-    'average', or 'average_unfit' for a window that does not fit. Both lists are
-    empty when the windows are switched off or the file has no additions.
+    ([(field, time in min, words, kind)], [(start, end, kind)]). The baseline and
+    the settled windows first: the start of each is an edge of the field
+    'window_s' (kind 'average'), the end of each but the last settled window an
+    edge of 'gap_s' (kind 'average_end'; the last window ends a fixed time before
+    the end of the recording). Then the quick windows: the start of each is an
+    edge of 'delay_s' (kind 'quick'), its end an edge of 'quick_s' (kind
+    'quick_end'). A part has the kind 'average', 'quick', or 'average_unfit' for a
+    window that does not fit. Both lists are empty when both kinds are switched off
+    or the file has no additions.
 
 ---- Globals mutated ----
 None.
@@ -18922,6 +19243,7 @@ None.
 None.
 
 ---- Helpers ----
+quick_span_lister
 window_span_lister
 ```
 
@@ -18929,16 +19251,19 @@ window_span_lister
 
 ```text
 ---- Summary ----
-Main function to turn where the mouse holds an edge of an averaging window into the
-length of the windows (a start edge) or how long before the next addition they end
-(an end edge), in seconds rounded to whole steps. The edge held is the one of its
-kind nearest the mouse, which stays the same edge while it follows the mouse.
+Main function to turn where the mouse holds an edge of an averaging window into
+the value of its field, in seconds rounded to whole steps: for a settled window
+its length (a start edge) or how long before the next addition it ends (an end
+edge); for a quick window how long after its addition it starts (a start edge) or
+its length (an end edge). The edge held is the one of its kind nearest the mouse,
+which stays the same edge while it follows the mouse.
 
 ---- Inputs ----
 values : Dict[str, float]
-    {window_s, gap_s, is_on} of the file now (WINDOW_KEYS).
+    The settled and the quick windows of the file now (WINDOW_KEYS).
 key : str
-    'window_s' for a start edge, 'gap_s' for an end edge.
+    'window_s' for the start and 'gap_s' for the end of a settled window or the
+    baseline, 'delay_s' for the start and 'quick_s' for the end of a quick window.
 time_min : float
     Time under the mouse on the time axis of the plot (min).
 event_times_min : List[float]
@@ -18956,7 +19281,8 @@ None.
 ---- Outputs ----
 float
     The new value of the field, in seconds: a length of at least one step, or a
-    gap of at least 0. The value as it is when the file has no edge of that kind.
+    gap or a start after the addition of at least 0. The value as it is when the
+    file has no edge of that kind.
 
 ---- Globals mutated ----
 None.
@@ -18964,9 +19290,13 @@ None.
 ---- Equations ----
 length_s = round((end of the window held - time) x 60 / step) x step;
 gap_s = round((addition after the window held - time) x 60 / step) x step, with
-the addition after a window = its end + the gap now.
+the addition after a window = its end + the gap now;
+delay_s = round((time - addition of the quick window held) x 60 / step) x step,
+with the addition of a quick window = its start - the delay now;
+quick_s = round((time - start of the quick window held) x 60 / step) x step.
 
 ---- Helpers ----
+quick_span_lister
 window_span_lister
 ```
 
@@ -19055,24 +19385,27 @@ value_getter
 
 ```text
 ---- Summary ----
-Main function to set the length of the windows, how long before the next addition
-they end, or whether there are windows, as dragged, typed or ticked in the window
+Main function to set one value of the settled or the quick windows (a length, how
+long before the next addition or after its own a window ends or starts, or
+whether there are windows of that kind), as dragged, typed or ticked in the window
 step. A value that cannot be used leaves everything as it is.
 
 ---- Inputs ----
 values : Dict[str, float]
-    {window_s, gap_s, is_on} now (WINDOW_KEYS); not changed.
+    The settled and the quick windows now (WINDOW_KEYS); not changed.
 key : str
     The field set: one of WINDOW_KEYS.
 value : float
-    Its new value: seconds, or for 'is_on' anything but 0 for windows.
+    Its new value: seconds, or for 'is_on' and 'quick_is_on' anything but 0 for
+    windows.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 Dict[str, float]
-    The new values. A length of 0 or less, or a gap below 0, changes nothing.
+    The new values. A length of 0 or less, or a gap or a start after the addition
+    below 0, changes nothing.
 
 ---- Globals mutated ----
 None.
@@ -20626,8 +20959,8 @@ None.
 
 ---- Outputs ----
 pd.DataFrame
-    Columns Average, Start time (min), End time (min), then mean, SD and change from
-    baseline (%) for VoO2 and each haem.
+    Columns Average, Kind (baseline, settled or quick), Start time (min), End time
+    (min), then mean, SD and change from baseline (%) for VoO2 and each haem.
 
 ---- Globals mutated ----
 None.
@@ -21184,7 +21517,8 @@ config : dict
     config.py.
 
 ---- Globals read ----
-config keys PLOT_AVERAGING_WINDOWS and the AVERAGING_WINDOW_* appearance settings.
+config keys PLOT_AVERAGING_WINDOWS, the AVERAGING_WINDOW_* appearance settings and
+the QUICK_WINDOW_* colours of the quick windows.
 
 ---- Outputs ----
 None
@@ -28143,7 +28477,7 @@ None.
 Main function to ask the multi-experiment plots: the side-by-side figure of two
 experiments and the 2x2 figure of four experiments. The 2x2 figure needs the
 averaging windows: with none set up it offers the window step of the processing,
-and is not made without them.
+and is not made without them; with both kinds set up it asks which it uses.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -28184,6 +28518,7 @@ choice_asker
 info_printer
 run_name_lister
 size_asker
+window_kind_asker
 windows_ensurer
 yes_no_asker
 ```
@@ -28756,6 +29091,46 @@ Trim start = t. Trim end = duration - t. Ignore start = t - trim start. Ignore e
 
 ---- Helpers ----
 None.
+```
+
+#### `window_kind_asker`
+
+```text
+---- Summary ----
+Main function to settle which kind of averaging window a figure uses: the settled
+windows (ending before the next addition) or the quick windows (starting after
+each addition). It is asked only when both kinds are set up; with one, the figure
+uses that one and one line says so.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary; settled_windows and quick_windows say which kinds are set
+    up (windows_ensurer has made sure at least one is).
+defaults : dict
+    Default answers; holds the kind this figure used last time under ``key``.
+key : str
+    The answer the kind is stored under: 'ex_window_kind', 'tr_window_kind' or
+    'ho_window_kind'.
+depth : int
+    Depth of the question (how far it is set in).
+
+---- Globals read ----
+WINDOW_KIND_OPTIONS (module constant).
+
+---- Outputs ----
+str
+    'settled' or 'quick'.
+
+---- Globals mutated ----
+None. Stores the kind in ``answers``; reads from and prints to the terminal (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+info_printer
 ```
 
 #### `windows_ensurer`
@@ -30542,14 +30917,16 @@ _table_layout_setter
 
 ```text
 ---- Summary ----
-Method to take the tick box of the edges row. As "Every file": ticked, a moved
-or typed edge moves on every file; unticked, on the file shown only. As the
-step's own switch (EdgeChoice.switch), it sets the field of the switch to 1 or
-0 on every file.
+Method to take the tick box of a row of the edges. As "Every file": ticked, a
+moved or typed edge moves on every file; unticked, on the file shown only. As
+the step's own switch (EdgeChoice.switch, or second_switch for the second
+row), it sets the field of the switch to 1 or 0 on every file.
 
 ---- Inputs ----
 is_every_file : bool
     The new state of the tick box.
+is_second : bool
+    True for the tick box of the second row.
 
 ---- Globals read ----
 None.
@@ -34210,7 +34587,11 @@ not fit.
 
 ---- Inputs ----
 spans : List[Tuple[str, float, float, Optional[str]]]
-    The windows of the file, as window_span_lister gives them.
+    The baseline and the settled windows of the file, as window_span_lister gives
+    them (the baseline alone when there are no settled windows).
+quick : List[Tuple[str, float, float, Optional[str]]]
+    The quick windows of the file, as quick_span_lister gives them; empty when
+    there are none.
 
 ---- Globals read ----
 None.
@@ -34218,7 +34599,8 @@ None.
 ---- Outputs ----
 List[str]
     One name for each window with a problem: 'the baseline before addition 1',
-    'the one before addition 3', 'the one after the last addition'.
+    'the settled one before addition 3', 'the settled one after the last
+    addition', 'the quick one after addition 2'.
 
 ---- Globals mutated ----
 None.
@@ -34235,12 +34617,15 @@ None.
 ```text
 ---- Summary ----
 Helper function to run the window step on the plot of every file: the averaging
-windows are shaded on the plot, one length and one gap before the next addition
-for every window of every file. Pulling the start of any window changes the
-length, pulling its end the gap, or both are typed in the strip under the plot;
-unticking "Averaging windows" there means no windows. Enter accepts. The windows
-that do not fit are shaded red and named in a warning after Enter. When no file has
-an addition, nothing is asked and nothing is averaged.
+windows are shaded on the plot. The settled windows (blue) have one length and one
+gap before the next addition for every window of every file: pulling the start of
+any of them changes the length, pulling its end the gap. The quick windows (green)
+have one length and one start after their addition: pulling the start of any of
+them changes how long after the addition they start, pulling its end the length.
+All four are also typed in the two rows of the strip under the plot, where each
+kind has its tick box; with both unticked there are no windows. Enter accepts. The
+windows that do not fit are shaded red and named in a warning after Enter. When no
+file has an addition, nothing is asked and nothing is averaged.
 
 ---- Inputs ----
 session : ViewerSession
@@ -34249,8 +34634,8 @@ answers : dict
     Answers dictionary the values are stored in; final_gap_minutes is how long
     before the end of the recording the last window ends.
 defaults : dict
-    Default answers the step starts with (averaging, window_minutes,
-    gap_minutes).
+    Default answers the step starts with (averaging, settled_windows,
+    window_minutes, gap_minutes, quick_windows, quick_minutes, delay_minutes).
 limits : Dict[str, dict]
     Trim and ignore limits of every file.
 details : Dict[str, dict]
@@ -34258,16 +34643,19 @@ details : Dict[str, dict]
     ignored there.
 
 ---- Globals read ----
-WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_NUDGE, WINDOW_SWITCH (module constants);
-settings.BASELINE_MINIMUM_SECONDS, settings.DRAG_STEP_SECONDS.
+QUICK_FIELDS, QUICK_SWITCH, WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_NUDGE,
+WINDOW_SWITCH (module constants); settings.BASELINE_MINIMUM_SECONDS,
+settings.DRAG_STEP_SECONDS.
 
 ---- Outputs ----
 None
     Nothing.
 
 ---- Globals mutated ----
-None. Stores averaging, window_minutes and gap_minutes in ``answers``, reads from
-and prints to the terminal and draws on the plot window (side effects).
+None. Stores averaging (True with either kind ticked), settled_windows,
+window_minutes, gap_minutes, quick_windows, quick_minutes and delay_minutes in
+``answers``, reads from and prints to the terminal and draws on the plot window
+(side effects).
 
 ---- Equations ----
 minutes = seconds / 60. The data of a file runs from 0 to (trim end - trim start)
@@ -34278,6 +34666,7 @@ _addition_time_lister
 _unfit_windows_lister
 enter_waiter
 info_printer
+quick_span_lister
 warning_shower
 window_layout_finder
 window_pointer_reader

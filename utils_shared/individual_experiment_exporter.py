@@ -225,8 +225,8 @@ def averages_table_builder(averages: dict) -> pd.DataFrame:
 
     ---- Outputs ----
     pd.DataFrame
-        Columns Average, Start time (min), End time (min), then mean, SD and change from
-        baseline (%) for VoO2 and each haem.
+        Columns Average, Kind (baseline, settled or quick), Start time (min), End time
+        (min), then mean, SD and change from baseline (%) for VoO2 and each haem.
 
     ---- Globals mutated ----
     None.
@@ -252,7 +252,12 @@ def averages_table_builder(averages: dict) -> pd.DataFrame:
     # ---- 3 Build the rows ------------------------------------------------------------
     rows = []
     for window_name, window in windows.items():
+        # a record without a kind is the baseline or a settled window
+        kind = window.get('kind',
+                          'baseline' if window_name == 'average0' else 'settled',
+                          )
         row = {'Average': window_name,
+               'Kind': kind,
                'Start time (min)': window['start_time'],
                'End time (min)': window['end_time'],
                }
@@ -367,14 +372,25 @@ def experiment_workbook_exporter(experiment: dict,
                     if key
                     ]
             notes = ['; '.join(used) + '.',
-                     f"Windows are {settings['window_minutes']:g} min long, ending "
-                     f"{settings['gap_minutes']:g} min "
-                     f'before each addition and '
-                     f"{settings['final_window_gap_minutes']:g} min before the end of "
-                     f'the recording.',
-                     'Change from baseline = window mean as a percentage of the '
-                     'average0 mean (average0 = 100 %).',
+                     f"The baseline (average0) is {settings['window_minutes']:g} min "
+                     f"long and ends {settings['gap_minutes']:g} min before the first "
+                     'addition.',
                      ]
+            if settings.get('is_settled', True):
+                notes.append(f"Settled windows are {settings['window_minutes']:g} min "
+                             f"long, ending {settings['gap_minutes']:g} min before "
+                             'the next addition and '
+                             f"{settings['final_window_gap_minutes']:g} min before "
+                             'the end of the recording.',
+                             )
+            if settings.get('quick_minutes') is not None:
+                notes.append(f"Quick windows are {settings['quick_minutes']:g} min "
+                             f"long, starting {settings['delay_minutes']:g} min after "
+                             'their addition.',
+                             )
+            notes.append('Change from baseline = window mean as a percentage of the '
+                         'average0 mean (average0 = 100 %).',
+                         )
             if settings.get('haem_source') in DELTA_HAEM_SOURCES:
                 notes.append('Haem change from baseline (%) is not calculated for '
                              'delta abs sources (they start at 0).',

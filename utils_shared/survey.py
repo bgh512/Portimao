@@ -54,6 +54,10 @@ TEMPERATURE_LIMITS_C = (0.0, 100.0)
 TRIM_KEYS = ('trim_start', 'trim_end', 'ignore_start', 'ignore_end')
 # the units a label is tidied around; a name with numbers (nd-011992) is none of them
 UNIT_PATTERN = r'(?:[mµnpk]?(?:M|L|g|mol)|min|s|h|OD)'
+# the kinds of averaging window a figure can use, as its question offers them
+WINDOW_KIND_OPTIONS = [('settled', 'Settled, before the next addition'),
+                       ('quick', 'Quick, after each addition'),
+                       ]
 
 
 # ---- SURVEY HELPERS ------------------------------------------------------------------
@@ -1383,7 +1387,7 @@ def multi_experiment_asker(summaries: List[dict],
     Main function to ask the multi-experiment plots: the side-by-side figure of two
     experiments and the 2x2 figure of four experiments. The 2x2 figure needs the
     averaging windows: with none set up it offers the window step of the processing,
-    and is not made without them.
+    and is not made without them; with both kinds set up it asks which it uses.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1424,6 +1428,7 @@ def multi_experiment_asker(summaries: List[dict],
     info_printer
     run_name_lister
     size_asker
+    window_kind_asker
     windows_ensurer
     yes_no_asker
     """
@@ -1499,6 +1504,7 @@ def multi_experiment_asker(summaries: List[dict],
                 info_printer('No file name fits, so this figure is skipped.', depth=2)
             # the figure starts at the baseline averaging window
             elif windows_ensurer(answers, windows_adder):
+                window_kind_asker(answers, defaults, 'ex_window_kind')
                 old = defaults['ho_exemplar_run']
                 run = choice_asker('Which run number should be shown?',
                                    [(r, f'run {r}') for r in runs],
@@ -2382,6 +2388,67 @@ def trim_pointer_reader(summary: dict,
              'ignore_end': duration - minutes['trim_end'] - time_min,
              }[key]
     return round(max(float(found), 0.0), 1)
+
+
+# ---- window_kind_asker ---------------------------------------------------------------
+def window_kind_asker(answers: dict,
+                      defaults: dict,
+                      key: str,
+                      depth: int = 2,
+                      ) -> str:
+    """
+    ---- Summary ----
+    Main function to settle which kind of averaging window a figure uses: the settled
+    windows (ending before the next addition) or the quick windows (starting after
+    each addition). It is asked only when both kinds are set up; with one, the figure
+    uses that one and one line says so.
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary; settled_windows and quick_windows say which kinds are set
+        up (windows_ensurer has made sure at least one is).
+    defaults : dict
+        Default answers; holds the kind this figure used last time under ``key``.
+    key : str
+        The answer the kind is stored under: 'ex_window_kind', 'tr_window_kind' or
+        'ho_window_kind'.
+    depth : int
+        Depth of the question (how far it is set in).
+
+    ---- Globals read ----
+    WINDOW_KIND_OPTIONS (module constant).
+
+    ---- Outputs ----
+    str
+        'settled' or 'quick'.
+
+    ---- Globals mutated ----
+    None. Stores the kind in ``answers``; reads from and prints to the terminal (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    choice_asker
+    info_printer
+    """
+
+    if answers['settled_windows'] and answers['quick_windows']:
+        kinds = [kind for kind, _ in WINDOW_KIND_OPTIONS]
+        old = defaults.get(key)
+        answers[key] = choice_asker('Which windows should this figure use?',
+                                    WINDOW_KIND_OPTIONS,
+                                    old if old in kinds else kinds[0],
+                                    depth=depth,
+                                    number='4.6.2',
+                                    )
+        return answers[key]
+    answers[key] = 'quick' if answers['quick_windows'] else 'settled'
+    info_printer(f'This figure uses the {answers[key]} windows, the only kind set up.',
+                 depth=depth,
+                 )
+    return answers[key]
 
 
 # ---- windows_ensurer -----------------------------------------------------------------

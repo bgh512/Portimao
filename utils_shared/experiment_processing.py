@@ -402,6 +402,11 @@ def experiment_data_processor(info: dict,
                                                vo2_source=vo2_source,
                                                haem_source=average_haem_source,
                                                baseline_minimum_seconds=minimum_seconds,
+                                               quick_minutes=a['quick_minutes']
+                                               if a['quick_windows']
+                                               else None,
+                                               delay_minutes=a['delay_minutes'],
+                                               is_settled=a['settled_windows'],
                                                )
                 print(f"  Calculated {len(experiment['averages']['windows'])} event "
                       f'averages',

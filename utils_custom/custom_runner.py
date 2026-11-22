@@ -31,7 +31,7 @@ from utils_custom.spectral_difference import (difference_spectrum_calculator,
 from utils_custom.time_response_exporter import time_response_exporter
 from utils_custom.time_response_plotter import time_response_figure_plotter
 from utils_custom.triplicate_averager import triplicate_averager
-from utils_shared.averaging import experiment_averages_calculator
+from utils_shared.averaging import experiment_averages_calculator, window_kind_picker
 from utils_shared.user_notices import problem_shower, warning_shower
 
 
@@ -52,8 +52,9 @@ def _ocr_and_haem_response_preparer(experiment: dict,
     experiment : dict
         Processed experiment (DATA_FORMAT.md).
     answers : dict
-        Terminal answers; uses the ho_* settings and the averaging windows of the
-        dataset (window_minutes, gap_minutes, final_gap_minutes).
+        Terminal answers; uses the ho_* settings (ho_window_kind is the kind of window
+        the figure uses) and the averaging windows of the dataset (window_minutes,
+        gap_minutes, final_gap_minutes, quick_minutes, delay_minutes).
     od_available : bool
         True when OD, volume and dilution factor were available for this experiment.
 
@@ -75,6 +76,7 @@ def _ocr_and_haem_response_preparer(experiment: dict,
     experiment_averages_calculator
     source_selector
     warning_shower
+    window_kind_picker
     """
 
     # ---- 1 Check the inputs ----------------------------------------------------------
@@ -90,8 +92,11 @@ def _ocr_and_haem_response_preparer(experiment: dict,
     vo2_source, haem_source = source_selector(answers, od_available)
 
     # ---- 3 Average the experiment ----------------------------------------------------
+    # The figure reads one kind of window, the quick ones under the names of the
+    # settled ones.
     prepared = dict(experiment)
     final_gap = answers['final_gap_minutes']
+    is_quick = answers['ho_window_kind'] == 'quick'
     experiment_averages_calculator(prepared,
                                    window_minutes=answers['window_minutes'],
                                    gap_minutes=answers['gap_minutes'],
@@ -101,7 +106,15 @@ def _ocr_and_haem_response_preparer(experiment: dict,
                                    baseline_minimum_seconds=(
                                        settings.BASELINE_MINIMUM_SECONDS
                                    ),
+                                   quick_minutes=answers['quick_minutes']
+                                   if is_quick
+                                   else None,
+                                   delay_minutes=answers['delay_minutes'],
+                                   is_settled=not is_quick,
                                    )
+    prepared['averages'] = window_kind_picker(prepared['averages'],
+                                              answers['ho_window_kind'],
+                                              )
     return prepared
 
 
@@ -122,9 +135,10 @@ def _time_response_preparer(experiment: dict,
     group : str
         Group the experiment belongs to.
     answers : dict
-        Terminal answers; uses decomposition_dataset, haem_background and the
-        averaging windows of the dataset (window_minutes, gap_minutes,
-        final_gap_minutes).
+        Terminal answers; uses decomposition_dataset, haem_background, the kind of
+        window the figure uses (tr_window_kind) and the averaging windows of the
+        dataset (window_minutes, gap_minutes, final_gap_minutes, quick_minutes,
+        delay_minutes).
     fit : dict
         Fit dictionary from import_fit.
 
@@ -160,6 +174,9 @@ def _time_response_preparer(experiment: dict,
                       answers['gap_minutes'],
                       answers['final_gap_minutes'],
                       None,
+                      answers['tr_window_kind'],
+                      answers['quick_minutes'],
+                      answers['delay_minutes'],
                       )
 
     # ---- 3 Calculate and decompose the difference spectrum ---------------------------
@@ -195,8 +212,8 @@ def exemplar_runner(chosen: dict,
     cfg : Config
         Figure style of this figure (its own journal).
     answers : dict
-        Terminal answers; uses haems, plot_haems and the ho_ex_* and ho_exemplar_run
-        settings.
+        Terminal answers; uses haems, plot_haems, the ho_ex_* and ho_exemplar_run
+        settings and the kind of window the figure shows (ex_window_kind).
     fit : Optional[dict]
         Fit dictionary, or None when the haems were not decomposed.
     export_root : Path
@@ -220,10 +237,20 @@ def exemplar_runner(chosen: dict,
     exemplar_config_builder
     exemplar_figure_plotter
     individual_config_builder
+    window_kind_picker
     """
 
     # ---- 1 Choose the data plotted ---------------------------------------------------
-    experiments = {name: item['experiment'] for name, item in chosen.items()}
+    # The figure shows one kind of window, the quick ones under the names of the
+    # settled ones.
+    experiments = {}
+    for name, item in chosen.items():
+        experiments[name] = item['experiment']
+        if item['experiment'].get('averages'):
+            picked = window_kind_picker(item['experiment']['averages'],
+                                        answers['ex_window_kind'],
+                                        )
+            experiments[name] = dict(item['experiment'], averages=picked)
     first = next(iter(chosen.values()))
     shown = []
     if fit is not None and answers['plot_haems']:

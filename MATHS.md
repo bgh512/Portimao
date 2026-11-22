@@ -326,7 +326,14 @@ Checked by: `test_equal_haems_at_their_midpoints_give_120_mV`, `test_unequal_hae
 
 ## 7. The averaging windows
 
-An averaging window is the stretch of time before an addition over which a measurement (the OCR, a haem, a spectrum) is averaged, once it has settled after the addition before. Every window has the same length, w, and ends the same time, g, before the next addition, in every file of the dataset. The window before the first addition is the baseline. Every figure that averages around the additions uses these windows.
+An averaging window is a stretch of time over which a measurement (the OCR, a haem, a spectrum) is averaged. There are two kinds, and a dataset can have either or both:
+
+- A **settled window** is the stretch before an addition, once the measurement has settled after the addition before. Every settled window has the same length, w, and ends the same time, g, before the next addition, in every file of the dataset.
+- A **quick window** is the stretch just after an addition, for the quick response to it. Every quick window has the same length, q, and starts the same time, d, after its own addition, in every file of the dataset.
+
+The window before the first addition is the baseline, which both kinds are compared with. Every figure that averages around the additions uses these windows; a figure that averages files together uses one kind, which it asks for when the dataset has both.
+
+### 7.1 The baseline and the settled windows
 
 The baseline, before the first addition:
 
@@ -350,8 +357,8 @@ start_last = end_last − w
 ```
 
 - a_1, a_2, ...: the times of the additions, in order (min); an addition marked to be ignored is left out
-- w: the length of every window (min; typed in seconds in the program, 120 s to start with)
-- g: the gap between the end of a window and the next addition (min; typed in seconds, 30 s to start with)
+- w: the length of the baseline and of every settled window (min; typed in seconds in the program, 120 s to start with)
+- g: the gap between the end of the baseline or of a settled window and the next addition (min; typed in seconds, 30 s to start with)
 - T: the time of the last measurement of the file, after trimming (min)
 - f: the gap between the last window and the end of the file, 0.5 min
 - start, end: the first and last time of a window (min); the measurements from start to end, both included, are averaged
@@ -361,9 +368,54 @@ Notes:
 - When the baseline would start before the file does, it starts where the file starts, so it is shorter than w. A baseline with less than 10 s of data is left out, and the file then has no baseline.
 - A window that would start before its own addition (start_i before a_i) does not fit: the additions are too close together for a window of that length. It is left out and named in a warning, and is never shortened.
 - The average of a window is the mean of its measurements, and the spread is their standard deviation (dividing by their number − 1).
+- The baseline is there whenever the dataset has windows of either kind, with the length w and the gap g, also when it has quick windows only.
 
 Example 1: a file of 30 min with additions at 10 and 20 min, w = 2 min and g = 0.5 min. The baseline ends at 10 − 0.5 = 9.5 min and starts at 9.5 − 2 = 7.5 min. The window after the first addition ends at 20 − 0.5 = 19.5 min and starts at 17.5 min. The window after the last addition ends at 30 − 0.5 = 29.5 min and starts at 27.5 min.
 
 Example 2: the same file with w = 12 min. The baseline would start at 9.5 − 12 = −2.5 min, so it starts at 0 and runs to 9.5 min. The window after the first addition would start at 19.5 − 12 = 7.5 min, before its addition at 10 min, and the last would start at 29.5 − 12 = 17.5 min, before its addition at 20 min: neither fits, and both are left out.
 
 Checked by: `test_the_windows_fall_before_the_additions` in `tests/test_averaging_windows.py`; the averages inside the windows by `test_averages_around_the_additions` and `test_average_that_does_not_fit` in `tests/test_processing_maths.py`; the averaged spectra of the time response by `test_averaged_spectra_around_the_additions` and `test_baseline_starts_with_the_recording` in `tests/test_summary_maths.py`.
+
+### 7.2 The quick windows
+
+The quick window after addition number i:
+
+```text
+start_i = a_i + d
+end_i = start_i + q
+```
+
+- a_i: the time of addition number i (min)
+- d: how long after its addition a quick window starts (min; typed in seconds in the program, 10 s to start with)
+- q: the length of every quick window (min; typed in seconds, 30 s to start with)
+- start, end: the first and last time of the window (min); the measurements from start to end, both included, are averaged
+
+Notes:
+
+- A quick window that would end after the next addition (end_i after a_(i+1)), or after the last measurement of the file for the last addition, does not fit. It is left out and named in a warning, and is never shortened. One that ends exactly at the next addition fits.
+- A quick window may overlap the settled window of the same addition; the measurements they share are then counted in both.
+- The average and the spread are worked out as for a settled window.
+
+Example 1: a file of 30 min with additions at 10 and 20 min, d = 0.5 min and q = 1 min. The first quick window starts at 10 + 0.5 = 10.5 min and ends at 10.5 + 1 = 11.5 min. The second starts at 20.5 min and ends at 21.5 min.
+
+Example 2: the same file with q = 12 min. The first would end at 10.5 + 12 = 22.5 min, after the addition at 20 min, and the second at 20.5 + 12 = 32.5 min, after the end of the file at 30 min: neither fits, and both are left out.
+
+Checked by: `test_the_quick_windows_fall_after_the_additions` in `tests/test_averaging_windows.py`.
+
+### 7.3 The change from the baseline
+
+The change of a window, settled or quick, is measured from the one baseline of its file:
+
+```text
+difference = m − m_0
+change = m ÷ m_0 × 100
+```
+
+- m: the average of the measurement in the window (in the unit of the measurement)
+- m_0: its average in the baseline
+- difference: in the unit of the measurement
+- change: in % of the baseline; left empty for a haem shown as ΔD, which starts at 0
+
+Example: an OCR that averages 10 in the baseline (7.5 to 9.5 min), 4 in the quick window after the first addition (10.5 to 11.5 min) and 6 in the settled window before the second (17.5 to 19.5 min). The quick window gives a difference of 4 − 10 = −6 and a change of 4 ÷ 10 × 100 = 40 %; the settled window gives 6 − 10 = −4 and 6 ÷ 10 × 100 = 60 %.
+
+Checked by: `test_both_kinds_are_averaged_from_one_baseline` in `tests/test_averaging_windows.py`.

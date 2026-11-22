@@ -375,11 +375,20 @@ def everything_asker(folder: Path,
     print(f'  Δψ:               {psi_text}')
     averaging_text = 'none'
     if answers['averaging']:
-        averaging_text = ('%g s long, ending %g s before the next addition'
-                          % (round(answers['window_minutes'] * 60.0, 2),
-                             round(answers['gap_minutes'] * 60.0, 2),
-                             )
-                          )
+        kinds = []
+        if answers['settled_windows']:
+            kinds.append('settled, %g s long, ending %g s before the next addition'
+                         % (round(answers['window_minutes'] * 60.0, 2),
+                            round(answers['gap_minutes'] * 60.0, 2),
+                            ),
+                         )
+        if answers['quick_windows']:
+            kinds.append('quick, %g s long, starting %g s after their addition'
+                         % (round(answers['quick_minutes'] * 60.0, 2),
+                            round(answers['delay_minutes'] * 60.0, 2),
+                            ),
+                         )
+        averaging_text = '; '.join(kinds)
     print(f'  Averaging windows: {averaging_text}')
     haem_names = [haem_name_formatter(name) for name in answers['haems']]
     shown = [name

@@ -24,6 +24,7 @@ TRIM_COLOUR = '0.45'
 OXIDISED_COLOUR = '#d62728'  # red and blue, as oxidised and reduced blood are drawn
 REDUCED_COLOUR = '#1f77b4'
 AVERAGE_COLOUR = '#2878B5'  # the blue the averaging windows have in the figures
+QUICK_COLOUR = '#2E8B3D'  # the green the quick averaging windows have in the figures
 UNFIT_COLOUR = '#d62728'  # an averaging window that does not fit
 PREVIOUS_COLOUR = '#d62728'
 # How each kind of part looks: its colour, how strongly its shading covers the plot (0
@@ -36,6 +37,8 @@ PART_STYLES = {'trim': (TRIM_COLOUR, 0.25, True, 0),
                'average': (AVERAGE_COLOUR, 0.22, False, 0),
                'average_end': (AVERAGE_COLOUR, 0.22, False, 1),
                'average_unfit': (UNFIT_COLOUR, 0.22, True, 0),
+               'quick': (QUICK_COLOUR, 0.22, False, 0),
+               'quick_end': (QUICK_COLOUR, 0.22, False, 1),
                }
 HANDLE_ROW_PX = 22
 HANDLE_SIZE_PX = (9, 16)  # (width, height)
@@ -75,6 +78,8 @@ class EdgeChoice:
     value_copier: Optional[Callable[[str, str, str, float], Optional[float]]] = None
     unit: str = 'min'
     switch: Optional[Tuple[str, str]] = None
+    second_fields: List[Tuple[str, str]] = field(default_factory=list)
+    second_switch: Optional[Tuple[str, str]] = None
 
 
 # ---- EdgeOverlay ---------------------------------------------------------------------

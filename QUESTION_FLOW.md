@@ -1,4 +1,4 @@
-# Portimao question flow (V2.15)
+# Portimao question flow (V2.16)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -232,27 +232,40 @@ The **Δψ** row of the strip holds the numbers of the method, and shows only wh
 
 ### 4.E The averaging windows
 
-An averaging window is the stretch before an addition that its average is taken over. The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Every window has the same length and ends the same time before the next addition (the last one 0.5 min before the end of the recording), so each moves with its addition in every file and one setting fits the whole dataset. The first window, before the first addition, is the baseline.
+An averaging window is a stretch around an addition that an average is taken over. There are two kinds, and you can have either or both:
 
-- The windows are **shaded blue** on the plot of every file, 120 s long and ending 30 s before the next addition, or as they were saved with the dataset. They are over the plot only in this step; the steps before it show none.
-- **Pull the start** of any window, by its handle or its line, to change the length; **pull its end** to change the gap before the addition. Every window of every file follows, in steps of 5 s, and the plot is not drawn again. The end of the last window cannot be pulled: it stays 0.5 min before the end of the recording.
-- **Type** the two numbers in the row of the strip under the plot: **Window** and **Gap before the next addition**, in seconds. Press Enter or leave the box. A window of 0 s is not taken.
-- A window that **does not fit** (it would start before its own addition, or the baseline is shorter than 10 s) is shaded red with hatching. After Enter a warning names these windows for each file; they are left out of the averages.
-- **Averaging windows**, the tick box of that row, ticked when the step opens: untick it for no windows. The windows go from the plot, nothing is averaged, and the figures of each file show none.
+- A **settled window** ends a set time before the next addition (the last one 0.5 min before the end of the recording): the level once things have settled after the addition before.
+- A **quick window** starts a set time after its own addition: the quick response to it.
+
+The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Every window of a kind has the same length, so each moves with its addition in every file and one setting fits the whole dataset. The window before the first addition is the baseline, which both kinds are compared with; it is there whenever either kind is ticked, with the length and the gap of the settled windows.
+
+- The settled windows are **shaded blue** on the plot of every file, 120 s long and ending 30 s before the next addition; the quick windows are **shaded green**, 30 s long and starting 10 s after their addition; or both are as they were saved with the dataset. They are over the plot only in this step; the steps before it show none.
+- **Pull the start** of a settled window, by its handle or its line, to change its length; **pull its end** to change the gap before the addition. **Pull the start** of a quick window to change how long after the addition it starts (its length stays); **pull its end** to change its length. Every window of that kind in every file follows, in steps of 5 s, and the plot is not drawn again. The end of the last settled window cannot be pulled: it stays 0.5 min before the end of the recording.
+- **Type** the numbers in the two rows of the strip under the plot, in seconds: **Settled window** and **Gap before the next addition** in the first, **Quick window** and **Start after the addition** in the second. Press Enter or leave the box. A window of 0 s is not taken.
+- A window that **does not fit** is shaded red with hatching: a settled window that would start before its own addition, a quick window that would end after the next addition (or after the end of the recording), or a baseline shorter than 10 s. After Enter a warning names these windows for each file; they are left out of the averages.
+- **Settled windows** and **Quick windows**, the tick boxes of the two rows. Settled windows is ticked and Quick windows unticked when the step first opens on a dataset. Untick both for no windows: the windows go from the plot, nothing is averaged, and the figures of each file show none.
 - The windows are saved with the dataset (in `portimao_settings.json`), ticked or not.
 - When none of the files has an addition, the step is not asked and one line says there are no averaging windows.
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.6 | Drag an edge of any window on the plot, or type the window and the gap in the strip under it. Press Enter when the windows look right, or untick Averaging windows in the strip for none. (above it, in grey: what the windows are, "Every window has the same length and ends the same time before the next addition, in every file; the last one ends 0.5 min before the end of the recording." and "Pull the start of any window to change the length, its end to change the gap before the addition.") | Enter with the answer box empty: one line says the windows chosen (or that there are none), a warning names those that do not fit, the plot is redrawn with the windows **(plot)**, then **5.1**. Anything typed in the answer box instead gets one line saying to type the numbers in the strip, and 4.6 goes on waiting. |
+| 4.6 | Drag an edge of any window on the plot, or type the numbers in the strip under it, where each kind of window has its tick box. Press Enter when the windows look right, or untick both kinds for none. (above it, in grey: what the windows are, "A settled window (blue) ends a set time before the next addition, the last one 0.5 min before the end of the recording; a quick window (green) starts a set time after its addition. Each kind has one length, in every file." and which edge to pull for what) | Enter with the answer box empty: one line for each kind says the windows chosen (or one line that there are none), a warning names those that do not fit, the plot is redrawn with the windows **(plot)**, then **5.1**. Anything typed in the answer box instead gets one line saying to type the numbers in the strip, and 4.6 goes on waiting. |
 
-Three later figures need the averaging windows: the 2x2 grid (**6.3**), the time response (**7.1**) and the haem and OCR response (**7.2**). They use the windows chosen here and never ask for a window or a gap of their own. When you say yes to one of them and no windows are set up (Averaging windows unticked in 4.6, or no file with an addition), one line says "No averaging windows are set up, and this figure needs them.", and 4.6.1 is asked before the figure's own questions. It keeps this number wherever it is asked.
+Three later figures need the averaging windows: the 2x2 grid (**6.3**), the time response (**7.1**) and the haem and OCR response (**7.2**). They use the windows chosen here and never ask for a window or a gap of their own. When you say yes to one of them and no windows are set up (both kinds unticked in 4.6, or no file with an addition), one line says "No averaging windows are set up, and this figure needs them.", and 4.6.1 is asked before the figure's own questions. It keeps this number wherever it is asked.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.6.1 | Do you want to add them now? `(Y/n)` | **4.6** opens on the plot of every file, by itself (nothing else of the processing is asked again, and the strip stays greyed out apart from the row of the windows), with Averaging windows ticked. After Enter, with windows set up, the figure's own questions follow; with none still, one line says the figure is not made and the next figure is asked | one line says the figure is not made, and the next figure is asked |
+| 4.6.1 | Do you want to add them now? `(Y/n)` | **4.6** opens on the plot of every file, by itself (nothing else of the processing is asked again, and the strip stays greyed out apart from the rows of the windows), with Settled windows ticked. After Enter, with windows set up, the figure's own questions follow; with none still, one line says the figure is not made and the next figure is asked | one line says the figure is not made, and the next figure is asked |
 
 Once windows are added this way they are the dataset's windows: the later figures do not ask, and they are saved with the dataset.
+
+Each of the three figures uses one kind of window, with the baseline. With both kinds set up, 4.6.2 is asked before the figure's own questions (after 4.6.1 when that was asked); it keeps this number wherever it is asked, and each figure remembers its own answer. With one kind set up nothing is asked: one line says the figure uses that kind.
+
+| # | Question | Leads to |
+|---|---|---|
+| 4.6.2 | Which windows should this figure use? `(1/2)` 1) Settled, before the next addition; 2) Quick, after each addition | the figure's own questions |
+
+The plots and the workbook of each experiment (section 5) show both kinds: the quick windows green, the others blue, and a **Kind** column in the Averages sheet.
 
 ---
 
@@ -363,7 +376,7 @@ If the figure cannot be previewed, a message says so and the figure is kept as i
 
 File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_then_bd_run1`. If no file name fits, the figure is skipped and the next step is **7.1**.
 
-The figure starts at the baseline averaging window, so it needs the averaging windows of 4.6. With none set up, **4.6.1** is asked first (section 4.E); without windows the figure is not made and the next step is **7.1**.
+The figure starts at the baseline averaging window, so it needs the averaging windows of 4.6. With none set up, **4.6.1** is asked first (section 4.E); without windows the figure is not made and the next step is **7.1**. With both kinds of window set up, **4.6.2** then asks which kind the figure shows.
 
 | # | Question | Leads to |
 |---|---|---|
@@ -379,7 +392,7 @@ The figure starts at the baseline averaging window, so it needs the averaging wi
 
 ## 7. Experiment summaries
 
-As in section 6, the **Drawing ...** sign is on the plot while each picture is drawn. Both summary figures need the haem fit. If the haems were not decomposed in section 4 (or Haems was unticked), the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, over the averaging windows of 4.6. With none set up, **4.6.1** is asked after the fit and before the figure's own questions (section 4.E); without windows the figure is not made and the next figure is asked.
+As in section 6, the **Drawing ...** sign is on the plot while each picture is drawn. Both summary figures need the haem fit. If the haems were not decomposed in section 4 (or Haems was unticked), the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, over the averaging windows of 4.6. With none set up, **4.6.1** is asked after the fit and before the figure's own questions (section 4.E); without windows the figure is not made and the next figure is asked. With both kinds of window set up, **4.6.2** then asks which kind the figure averages over; in the time response, the difference spectrum is the last window of that kind minus the one before it.
 
 ### 7.A Time response
 

@@ -36,10 +36,23 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'decomposition_dataset': 'Cyt',
                    'normalise_od': False,
                    # the window step starts with windows, which the user can untick
+                   # 'averaging' is True when either kind of window is ticked: the
+                   # settled windows (ending gap_minutes before the next addition) or
+                   # the quick windows (starting delay_minutes after each addition)
                    'averaging': True,
+                   'settled_windows': True,
                    'window_minutes': 2.0,
                    'gap_minutes': 0.5,
                    'final_gap_minutes': 0.5,
+                   'quick_windows': False,
+                   'quick_minutes': 0.5,
+                   'delay_minutes': 10.0 / 60.0,
+                   # the kind of window ("settled" or "quick") the 2x2 grid, the time
+                   # response and the haem and OCR response average over, asked only
+                   # when both kinds are ticked
+                   'ex_window_kind': 'settled',
+                   'tr_window_kind': 'settled',
+                   'ho_window_kind': 'settled',
                    'plot_o2': True,
                    'plot_ocr': True,
                    # "raw", "od" or "percent"
@@ -531,6 +544,9 @@ class Config:
                 'AVERAGING_WINDOW_COLOUR': '#4C9BE8',
                 'AVERAGING_WINDOW_ALPHA': 0.18,
                 'AVERAGING_WINDOW_EDGE_COLOUR': '#2878B5',
+                # the quick windows (starting after each addition) are green
+                'QUICK_WINDOW_COLOUR': '#5DBB63',
+                'QUICK_WINDOW_EDGE_COLOUR': '#2E8B3D',
                 'AVERAGING_WINDOW_EDGE_LINE_WIDTH': style['thin_line_width'],
                 'AVERAGING_WINDOW_LABEL_FORMAT': '',
                 'AVERAGING_WINDOW_LABEL_FONT_SIZE': fonts['tick'],

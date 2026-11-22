@@ -9,7 +9,7 @@ from typing import Optional
 import numpy as np
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.averaging import window_span_lister
+from utils_shared.averaging import kind_span_lister
 from utils_shared.spectral_decomposer import spectrum_decomposer
 from utils_shared.user_notices import warning_shower
 
@@ -186,10 +186,14 @@ def spectral_averager(experiment: dict,
                       gap_minutes: float,
                       final_window_gap_minutes: float = 0.5,
                       expected_events: Optional[int] = None,
+                      kind: str = 'settled',
+                      quick_minutes: float = 0.5,
+                      delay_minutes: float = 0.0,
                       ) -> dict:
     """
     ---- Summary ----
-    Main function to average the chosen spectra in each event window.
+    Main function to average the chosen spectra in each event window: the baseline,
+    then the settled or the quick window of each addition.
 
     ---- Inputs ----
     experiment : dict
@@ -206,6 +210,14 @@ def spectral_averager(experiment: dict,
         Gap between the last window and the end of the data in minutes.
     expected_events : Optional[int]
         Raise if the run has a different number of events; None skips the check.
+    kind : str
+        The kind of window averaged over after each addition: 'settled' (ending
+        before the next addition) or 'quick' (starting after its own).
+    quick_minutes : float
+        Length of each quick window in minutes; used for the quick kind.
+    delay_minutes : float
+        How long after its addition each quick window starts, in minutes; used for
+        the quick kind.
 
     ---- Globals read ----
     None.
@@ -219,12 +231,12 @@ def spectral_averager(experiment: dict,
     window skipped (side effects).
 
     ---- Equations ----
-    None. The windows fall as window_span_lister says; a window is left out when it
+    None. The windows fall as kind_span_lister says; a window is left out when it
     does not fit or holds no spectrum.
 
     ---- Helpers ----
+    kind_span_lister
     warning_shower
-    window_span_lister
     """
 
     # ---- 1 Validate the inputs -------------------------------------------------------
@@ -258,12 +270,19 @@ def spectral_averager(experiment: dict,
         raise ValueError('window_minutes must be positive.')
     if gap_minutes < 0 or final_window_gap_minutes < 0:
         raise ValueError('Averaging gaps cannot be negative.')
-    boundaries = window_span_lister(sorted(float(event['time']) for event in events),
-                                    (float(np.min(times)), float(np.max(times))),
-                                    window_minutes,
-                                    gap_minutes,
-                                    final_window_gap_minutes,
-                                    )
+    if kind == 'quick' and (quick_minutes <= 0 or delay_minutes < 0):
+        raise ValueError('quick_minutes must be positive and delay_minutes cannot be '
+                         'negative.',
+                         )
+    boundaries = kind_span_lister(kind,
+                                  sorted(float(event['time']) for event in events),
+                                  (float(np.min(times)), float(np.max(times))),
+                                  window_minutes,
+                                  gap_minutes,
+                                  final_window_gap_minutes,
+                                  quick_minutes,
+                                  delay_minutes,
+                                  )
 
     # ---- 3 Average the spectra in each window ----------------------------------------
     windows, skipped = {}, {}
@@ -299,6 +318,9 @@ def spectral_averager(experiment: dict,
                 'window_minutes': window_minutes,
                 'gap_minutes': gap_minutes,
                 'final_window_gap_minutes': final_window_gap_minutes,
+                'kind': kind,
+                'quick_minutes': quick_minutes,
+                'delay_minutes': delay_minutes,
                 }
     roles = {'penultimate': penultimate_name, 'final': final_name}
     wavelengths = np.asarray(dataset['wavelengths'], dtype=float)

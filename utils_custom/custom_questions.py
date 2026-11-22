@@ -19,6 +19,7 @@ from utils_shared.survey import (decomposition_asker,
                                  haem_name_formatter,
                                  ocr_option_builder,
                                  size_asker,
+                                 window_kind_asker,
                                  windows_ensurer,
                                  )
 
@@ -658,7 +659,8 @@ def summary_figure_asker(names: List[str],
     OCR response, and the settings of each one chosen. Both need the haem fit, which
     is asked for here if it was not chosen in the processing, and the averaging
     windows of the processing: with none set up, the window step is offered and the
-    figure is not made without them.
+    figure is not made without them; with both kinds set up, each figure asks which
+    it uses.
 
     ---- Inputs ----
     names : List[str]
@@ -704,6 +706,7 @@ def summary_figure_asker(names: List[str],
     _time_response_asker
     decomposition_asker
     info_printer
+    window_kind_asker
     windows_ensurer
     yes_no_asker
     """
@@ -750,6 +753,12 @@ def summary_figure_asker(names: List[str],
             # ---- 2 Make sure the averaging windows are set up ------------------------
             if not windows_ensurer(answers, windows_adder):
                 break
+            window_kind_asker(answers,
+                              defaults,
+                              'tr_window_kind'
+                              if key == 'time_response'
+                              else 'ho_window_kind',
+                              )
 
             # ---- 3 Ask the settings of the figure ------------------------------------
             checker = _step_wirer(figure_checker, key, fit, result)

@@ -9,7 +9,8 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_shared.averaging import (window_layout_finder,
+from utils_shared.averaging import (quick_span_lister,
+                                    window_layout_finder,
                                     window_pointer_reader,
                                     window_span_lister,
                                     window_value_setter,
@@ -134,13 +135,19 @@ REGION_FIELDS = [('oxidised_start', 'Oxidised from'),
 REGION_KEY_TEXT = 'red = oxidised region, blue = reduced region'
 REGION_NUDGE = ('Type the times in the strip under the plot, or pull the regions out on '
                 'the plot; press Enter with this box empty when every file looks right.')
-# The boxes of the window step in the strip, and its tick box (averaging.WINDOW_KEYS).
-WINDOW_FIELDS = [('window_s', 'Window'), ('gap_s', 'Gap before the next addition')]
-WINDOW_SWITCH = ('is_on', 'Averaging windows')
-WINDOW_KEY_TEXT = 'blue = averaging window, red hatched = a window that does not fit'
-WINDOW_NUDGE = ('Type the window and the gap in the strip under the plot, or drag the '
-                'edges of a window; press Enter with this box empty when the windows '
-                'look right.')
+# The boxes of the window step in the strip, and its tick boxes (averaging.WINDOW_KEYS):
+# one row for the settled windows, one for the quick windows.
+WINDOW_FIELDS = [('window_s', 'Settled window'),
+                 ('gap_s', 'Gap before the next addition'),
+                 ]
+WINDOW_SWITCH = ('is_on', 'Settled windows')
+QUICK_FIELDS = [('quick_s', 'Quick window'), ('delay_s', 'Start after the addition')]
+QUICK_SWITCH = ('quick_is_on', 'Quick windows')
+WINDOW_KEY_TEXT = ('blue = settled window, green = quick window, red hatched = a '
+                   'window that does not fit')
+WINDOW_NUDGE = ('Type the numbers of the windows in the strip under the plot, or drag '
+                'the edges of a window; press Enter with this box empty when the '
+                'windows look right.')
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
@@ -1698,6 +1705,7 @@ def _table_filler(session: ViewerSession,
 
 # ---- _unfit_windows_lister -----------------------------------------------------------
 def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
+                          quick: List[Tuple[str, float, float, Optional[str]]],
                           ) -> List[str]:
     """
     ---- Summary ----
@@ -1706,7 +1714,11 @@ def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
 
     ---- Inputs ----
     spans : List[Tuple[str, float, float, Optional[str]]]
-        The windows of the file, as window_span_lister gives them.
+        The baseline and the settled windows of the file, as window_span_lister gives
+        them (the baseline alone when there are no settled windows).
+    quick : List[Tuple[str, float, float, Optional[str]]]
+        The quick windows of the file, as quick_span_lister gives them; empty when
+        there are none.
 
     ---- Globals read ----
     None.
@@ -1714,7 +1726,8 @@ def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
     ---- Outputs ----
     List[str]
         One name for each window with a problem: 'the baseline before addition 1',
-        'the one before addition 3', 'the one after the last addition'.
+        'the settled one before addition 3', 'the settled one after the last
+        addition', 'the quick one after addition 2'.
 
     ---- Globals mutated ----
     None.
@@ -1733,9 +1746,13 @@ def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
         if index == 0:
             names.append('the baseline before addition 1')
         elif index == len(spans) - 1:
-            names.append('the one after the last addition')
+            names.append('the settled one after the last addition')
         else:
-            names.append(f'the one before addition {index + 1}')
+            names.append(f'the settled one before addition {index + 1}')
+    names += [f'the quick one after addition {index}'
+              for index, (_, _, _, problem) in enumerate(quick, start=1)
+              if problem is not None
+              ]
     return names
 
 
@@ -1749,12 +1766,15 @@ def _windows_chooser(session: ViewerSession,
     """
     ---- Summary ----
     Helper function to run the window step on the plot of every file: the averaging
-    windows are shaded on the plot, one length and one gap before the next addition
-    for every window of every file. Pulling the start of any window changes the
-    length, pulling its end the gap, or both are typed in the strip under the plot;
-    unticking "Averaging windows" there means no windows. Enter accepts. The windows
-    that do not fit are shaded red and named in a warning after Enter. When no file has
-    an addition, nothing is asked and nothing is averaged.
+    windows are shaded on the plot. The settled windows (blue) have one length and one
+    gap before the next addition for every window of every file: pulling the start of
+    any of them changes the length, pulling its end the gap. The quick windows (green)
+    have one length and one start after their addition: pulling the start of any of
+    them changes how long after the addition they start, pulling its end the length.
+    All four are also typed in the two rows of the strip under the plot, where each
+    kind has its tick box; with both unticked there are no windows. Enter accepts. The
+    windows that do not fit are shaded red and named in a warning after Enter. When no
+    file has an addition, nothing is asked and nothing is averaged.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1763,8 +1783,8 @@ def _windows_chooser(session: ViewerSession,
         Answers dictionary the values are stored in; final_gap_minutes is how long
         before the end of the recording the last window ends.
     defaults : dict
-        Default answers the step starts with (averaging, window_minutes,
-        gap_minutes).
+        Default answers the step starts with (averaging, settled_windows,
+        window_minutes, gap_minutes, quick_windows, quick_minutes, delay_minutes).
     limits : Dict[str, dict]
         Trim and ignore limits of every file.
     details : Dict[str, dict]
@@ -1772,16 +1792,19 @@ def _windows_chooser(session: ViewerSession,
         ignored there.
 
     ---- Globals read ----
-    WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_NUDGE, WINDOW_SWITCH (module constants);
-    settings.BASELINE_MINIMUM_SECONDS, settings.DRAG_STEP_SECONDS.
+    QUICK_FIELDS, QUICK_SWITCH, WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_NUDGE,
+    WINDOW_SWITCH (module constants); settings.BASELINE_MINIMUM_SECONDS,
+    settings.DRAG_STEP_SECONDS.
 
     ---- Outputs ----
     None
         Nothing.
 
     ---- Globals mutated ----
-    None. Stores averaging, window_minutes and gap_minutes in ``answers``, reads from
-    and prints to the terminal and draws on the plot window (side effects).
+    None. Stores averaging (True with either kind ticked), settled_windows,
+    window_minutes, gap_minutes, quick_windows, quick_minutes and delay_minutes in
+    ``answers``, reads from and prints to the terminal and draws on the plot window
+    (side effects).
 
     ---- Equations ----
     minutes = seconds / 60. The data of a file runs from 0 to (trim end - trim start)
@@ -1792,6 +1815,7 @@ def _windows_chooser(session: ViewerSession,
     _unfit_windows_lister
     enter_waiter
     info_printer
+    quick_span_lister
     warning_shower
     window_layout_finder
     window_pointer_reader
@@ -1821,9 +1845,13 @@ def _windows_chooser(session: ViewerSession,
                                   )
 
     # ---- 2 The rules of the edges ----------------------------------------------------
+    is_averaging = bool(defaults['averaging'])
     start = {'window_s': round(defaults['window_minutes'] * 60.0, 2),
              'gap_s': round(defaults['gap_minutes'] * 60.0, 2),
-             'is_on': 1.0 if defaults['averaging'] else 0.0,
+             'is_on': 1.0 if is_averaging and defaults['settled_windows'] else 0.0,
+             'quick_s': round(defaults['quick_minutes'] * 60.0, 2),
+             'delay_s': round(defaults['delay_minutes'] * 60.0, 2),
+             'quick_is_on': 1.0 if is_averaging and defaults['quick_windows'] else 0.0,
              }
     choice = EdgeChoice(fields=list(WINDOW_FIELDS),
                         values={name: dict(start) for name in additions},
@@ -1848,26 +1876,32 @@ def _windows_chooser(session: ViewerSession,
                         key_text=WINDOW_KEY_TEXT,
                         unit='s',
                         switch=WINDOW_SWITCH,
+                        second_fields=list(QUICK_FIELDS),
+                        second_switch=QUICK_SWITCH,
                         )
 
     # ---- 3 Drag or type the windows until Enter --------------------------------------
-    info_printer('AVERAGING WINDOWS = the stretch before each addition that its '
-                 'average is taken over.',
+    info_printer('AVERAGING WINDOWS = the stretches around each addition that its '
+                 'averages are taken over.',
                  )
-    info_printer('Every window has the same length and ends the same time before the '
-                 'next addition, in every file; the last one ends '
-                 f'{final_gap:g} min before the end of the recording.',
+    info_printer('A settled window (blue) ends a set time before the next addition, '
+                 f'the last one {final_gap:g} min before the end of the recording; a '
+                 'quick window (green) starts a set time after its addition. Each '
+                 'kind has one length, in every file.',
                  tight=True,
                  )
-    info_printer('Pull the start of any window to change the length, its end to '
-                 'change the gap before the addition.',
+    info_printer('Pull the start of a settled window to change its length, its end to '
+                 'change the gap before the addition; pull the start of a quick window '
+                 'to change how long after the addition it starts, its end to change '
+                 'its length.',
                  tight=True,
                  )
     session.window.edges_shower(choice)
     try:
-        enter_waiter('Drag an edge of any window on the plot, or type the window and '
-                     'the gap in the strip under it. Press Enter when the windows look '
-                     'right, or untick Averaging windows in the strip for none.',
+        enter_waiter('Drag an edge of any window on the plot, or type the numbers in '
+                     'the strip under it, where each kind of window has its tick box. '
+                     'Press Enter when the windows look right, or untick both kinds '
+                     'for none.',
                      WINDOW_NUDGE,
                      number='4.6',
                      )
@@ -1876,35 +1910,64 @@ def _windows_chooser(session: ViewerSession,
         session.window.edges_hider()
 
     # ---- 4 Keep the windows and name those that do not fit ---------------------------
-    answers['averaging'] = bool(chosen['is_on'])
+    answers['settled_windows'] = bool(chosen['is_on'])
+    answers['quick_windows'] = bool(chosen['quick_is_on'])
+    answers['averaging'] = answers['settled_windows'] or answers['quick_windows']
     answers['window_minutes'] = chosen['window_s'] / 60.0
     answers['gap_minutes'] = chosen['gap_s'] / 60.0
+    answers['quick_minutes'] = chosen['quick_s'] / 60.0
+    answers['delay_minutes'] = chosen['delay_s'] / 60.0
     if not answers['averaging']:
         info_printer('No averaging windows: nothing is averaged around the additions.')
         return
-    info_printer(f"Averaging windows: {round(chosen['window_s'], 2):g} s long, ending "
-                 f"{round(chosen['gap_s'], 2):g} s before the next addition.",
-                 )
+    if answers['settled_windows']:
+        info_printer(f"Settled windows: {round(chosen['window_s'], 2):g} s long, "
+                     f"ending {round(chosen['gap_s'], 2):g} s before the next "
+                     'addition.',
+                     )
+    else:
+        info_printer(f"Baseline: {round(chosen['window_s'], 2):g} s long, ending "
+                     f"{round(chosen['gap_s'], 2):g} s before the first addition. No "
+                     'settled windows.',
+                     )
+    if answers['quick_windows']:
+        info_printer(f"Quick windows: {round(chosen['quick_s'], 2):g} s long, "
+                     f"starting {round(chosen['delay_s'], 2):g} s after their "
+                     'addition.',
+                     tight=True,
+                     )
     unfit = []
     for summary in session.summaries:
         name = summary['name']
         if not additions[name]:
             continue
-        names = _unfit_windows_lister(window_span_lister(additions[name],
-                                                         spans[name],
-                                                         answers['window_minutes'],
-                                                         answers['gap_minutes'],
-                                                         final_gap,
-                                                         minimum_s,
-                                                         ),
+        settled = window_span_lister(additions[name],
+                                     spans[name],
+                                     answers['window_minutes'],
+                                     answers['gap_minutes'],
+                                     final_gap,
+                                     minimum_s,
+                                     )
+        quick = (quick_span_lister(additions[name],
+                                   spans[name],
+                                   answers['quick_minutes'],
+                                   answers['delay_minutes'],
+                                   )
+                 if answers['quick_windows']
+                 else []
+                 )
+        names = _unfit_windows_lister(settled
+                                      if answers['settled_windows']
+                                      else settled[:1],
+                                      quick,
                                       )
         if names:
             unfit.append(f"{name}: {', '.join(names)}")
     if unfit:
         warning_shower('These averaging windows do not fit (not enough time), so they '
                        f"are left out: {'; '.join(unfit)}. They are red on the plot. "
-                       'Go back to the processing step to shorten the window or the '
-                       'gap if they are needed.',
+                       'Go back to the processing step to shorten them or move them '
+                       'if they are needed.',
                        )
 
 
@@ -3162,9 +3225,14 @@ def windows_stage_runner(context: dict) -> bool:
                        fit,
                        details,
                        )
+        # with neither kind kept, the settled windows are the ones ticked
+        is_any = answers['settled_windows'] or answers['quick_windows']
         _windows_chooser(session,
                          answers,
-                         dict(answers, averaging=True),
+                         dict(answers,
+                              averaging=True,
+                              settled_windows=answers['settled_windows'] or not is_any,
+                              ),
                          limits,
                          details,
                          )

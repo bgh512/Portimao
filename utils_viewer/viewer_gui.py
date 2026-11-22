@@ -887,6 +887,9 @@ class ViewerGui:
             self._edge_row.values_setter(
                 self._edges.values.get(self._names[self._index]),
                 )
+            self._second_row.values_setter(  # without boxes when the step has one row
+                self._edges.values.get(self._names[self._index]),
+                )
 
     # ---- _event_handler --------------------------------------------------------------
     def _event_handler(self, event: tuple) -> None:
@@ -953,9 +956,24 @@ class ViewerGui:
             # The row of the edges sits above the rest of the strip.
             choice = event[1]
             self._edges.choice_setter(choice)
+            self._second_row.frame.pack_forget()
             if choice is None:
                 self._edge_row.frame.pack_forget()
             else:
+                if choice.second_switch is not None:
+                    # the second row sits between the first and the rest of the strip
+                    field, words = choice.second_switch
+                    self._second_row.fields_setter(choice.second_fields,
+                                                   any(own.get(field)
+                                                       for own in choice.values.values()
+                                                       ),
+                                                   choice.unit,
+                                                   words,
+                                                   )
+                    self._second_row.frame.pack(side='bottom',
+                                                pady=(0, 4),
+                                                after=self._strip.frame,
+                                                )
                 if choice.switch is None:
                     self._edge_row.fields_setter(choice.fields,
                                                  choice.is_every_file,
@@ -973,7 +991,9 @@ class ViewerGui:
                                                  )
                 self._edge_row.frame.pack(side='bottom',
                                           pady=(0, 4),
-                                          after=self._strip.frame,
+                                          after=self._second_row.frame
+                                          if choice.second_switch is not None
+                                          else self._strip.frame,
                                           )
             self._picture_shower()
             self._edges_refresher()
@@ -1096,17 +1116,19 @@ class ViewerGui:
                                  )
 
     # ---- _every_file_taker -----------------------------------------------------------
-    def _every_file_taker(self, is_every_file: bool) -> None:
+    def _every_file_taker(self, is_every_file: bool, is_second: bool = False) -> None:
         """
         ---- Summary ----
-        Method to take the tick box of the edges row. As "Every file": ticked, a moved
-        or typed edge moves on every file; unticked, on the file shown only. As the
-        step's own switch (EdgeChoice.switch), it sets the field of the switch to 1 or
-        0 on every file.
+        Method to take the tick box of a row of the edges. As "Every file": ticked, a
+        moved or typed edge moves on every file; unticked, on the file shown only. As
+        the step's own switch (EdgeChoice.switch, or second_switch for the second
+        row), it sets the field of the switch to 1 or 0 on every file.
 
         ---- Inputs ----
         is_every_file : bool
             The new state of the tick box.
+        is_second : bool
+            True for the tick box of the second row.
 
         ---- Globals read ----
         None.
@@ -1126,11 +1148,15 @@ class ViewerGui:
         """
 
         choice = self._edges.choice
-        if choice is not None and choice.switch is not None:
-            self._edges.field_setter(choice.switch[0], 1.0 if is_every_file else 0.0)
+        switch = None
+        if choice is not None:
+            switch = choice.second_switch if is_second else choice.switch
+        if switch is not None:
+            self._edges.field_setter(switch[0], 1.0 if is_every_file else 0.0)
             self._edges_refresher()
             return
-        self._edges.is_every_file = is_every_file
+        if not is_second:
+            self._edges.is_every_file = is_every_file
 
     # ---- _file_follower --------------------------------------------------------------
     def _file_follower(self, name: str) -> None:
@@ -2449,6 +2475,15 @@ class ViewerGui:
                                  self._every_file_taker,
                                  self._entry.focus_set,
                                  )
+        self._second_row = EdgeRow(tk,  # for a step with two rows of edges
+                                   right,
+                                   PLOT_BACKGROUND,
+                                   self._typed_edge_taker,
+                                   lambda is_ticked: self._every_file_taker(is_ticked,
+                                                                            True,
+                                                                            ),
+                                   self._entry.focus_set,
+                                   )
         controls = tk.Frame(right, bg=PLOT_BACKGROUND)
         controls.pack(side='bottom', pady=(4, 6))
         self._help = tk.Label(right,

@@ -137,9 +137,11 @@ Event-window statistics of one experiment. Created by `experiment_averages_calcu
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key`, `baseline_minimum_seconds` |
-| `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window (it starts at the start of the recording when the recording starts later than the window would), then `average1` ... one per event |
-| `'skipped'` | dict | | | `{window name: {start_time, end_time, reason}}` of the windows that do not fit between two additions (or after the last one), and of `average0` when its data span less than `baseline_minimum_seconds` (the run then has no baseline); they have no record in `'windows'` and are drawn red in the previews |
+| `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key`, `baseline_minimum_seconds`, `quick_minutes` (None without quick windows), `delay_minutes`, `is_settled` (False without settled windows) |
+| `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window (it starts at the start of the recording when the recording starts later than the window would), then the settled windows `average1` ... one per event (ending before the next addition), then the quick windows `quick1` ... one per event (starting after their own addition) |
+| `'skipped'` | dict | | | `{window name: {start_time, end_time, reason, kind}}` of the windows that do not fit between two additions (or after the last one), and of `average0` when its data span less than `baseline_minimum_seconds` (the run then has no baseline); they have no record in `'windows'` and are drawn red in the previews |
+
+A figure that uses one kind of window reads the averages through `window_kind_picker` (`utils_shared/averaging.py`): the baseline and the windows of that kind only, the quick windows under the names of the settled ones (`quick2` as `average2`). The averages of the haem and OCR response and the 2x2 grid, and the `triplicate` built from them, are in this form.
 
 Window record:
 
@@ -147,6 +149,7 @@ Window record:
 |---|---|---|---|---|
 | `'start_time'` | float | | min | Start of the window |
 | `'end_time'` | float | | min | End of the window |
+| `'kind'` | str | | | `'baseline'`, `'settled'` or `'quick'` (`WINDOW_KINDS`) |
 | `'vo2'` | dict | | | `{measurement: statistics}` for the OCR |
 | `'haem'` | dict | | | `{haem name: statistics}` |
 
@@ -414,9 +417,9 @@ Defined in `utils_viewer/viewer_edges.py`. Created by a step that lets the user 
 
 | Field | Type | Shape | Units | Default | Description |
 |---|---|---|---|---|---|
-| `fields` | List[Tuple[str, str]] | (n_fields,) | | | `(field, name shown before its box in the strip)`, in order; in the trimming step `trim_start` "Trim start", `trim_end` "end", `ignore_start` "Ignore first", `ignore_end` "last"; in the regions step `oxidised_start` "Oxidised from", `oxidised_end` "to", `reduced_start` "Reduced from", `reduced_end` "to"; in the window step `window_s` "Window", `gap_s` "Gap before the next addition" |
-| `values` | Dict[str, Dict[str, float]] | | min | | `{file name: {field: value}}` the edges start at; in the trimming step the minutes taken off each edge (`trim_minutes_builder`): the trim end from the end of the recording, the ignore times from the trimmed edges; in the regions step the time of each edge on the time axis of the processing plot (`region_edges_builder`), a region not chosen having its two edges together (the step gives them back as times on the original recording); in the window step `window_s`, `gap_s` (seconds) and `is_on` (1 or 0), the same for every file (`WINDOW_KEYS`, `utils_shared/averaging.py`) |
-| `layout_finder` | Callable | | | | `(file name, its values) -> (edges, parts)`: edges as `[(field, time_min, words by its handle, kind)]`, shaded parts as `[(start_min, end_min, kind)]`, times on the time axis of the plot; kind is a key of `PART_STYLES` (`'trim'` grey and hatched, handles in the top row; `'ignore'` amber, handles in the row under it; `'oxidised'` red, top row; `'reduced'` blue, the row under it; `'average'` blue, top row, for an averaging window and its start; `'average_end'` blue, the row under it, for its end; `'average_unfit'` red and hatched, for a window that does not fit) |
+| `fields` | List[Tuple[str, str]] | (n_fields,) | | | `(field, name shown before its box in the strip)`, in order; in the trimming step `trim_start` "Trim start", `trim_end` "end", `ignore_start` "Ignore first", `ignore_end` "last"; in the regions step `oxidised_start` "Oxidised from", `oxidised_end` "to", `reduced_start` "Reduced from", `reduced_end` "to"; in the window step `window_s` "Settled window", `gap_s` "Gap before the next addition" |
+| `values` | Dict[str, Dict[str, float]] | | min | | `{file name: {field: value}}` the edges start at; in the trimming step the minutes taken off each edge (`trim_minutes_builder`): the trim end from the end of the recording, the ignore times from the trimmed edges; in the regions step the time of each edge on the time axis of the processing plot (`region_edges_builder`), a region not chosen having its two edges together (the step gives them back as times on the original recording); in the window step `window_s`, `gap_s` (seconds) and `is_on` (1 or 0) of the settled windows and `quick_s`, `delay_s` (seconds) and `quick_is_on` (1 or 0) of the quick windows, the same for every file (`WINDOW_KEYS`, `utils_shared/averaging.py`) |
+| `layout_finder` | Callable | | | | `(file name, its values) -> (edges, parts)`: edges as `[(field, time_min, words by its handle, kind)]`, shaded parts as `[(start_min, end_min, kind)]`, times on the time axis of the plot; kind is a key of `PART_STYLES` (`'trim'` grey and hatched, handles in the top row; `'ignore'` amber, handles in the row under it; `'oxidised'` red, top row; `'reduced'` blue, the row under it; `'average'` blue, top row, for the baseline or a settled averaging window and its start; `'average_end'` blue, the row under it, for its end; `'quick'` green, top row, for a quick averaging window and its start; `'quick_end'` green, the row under it, for its end; `'average_unfit'` red and hatched, for a window of either kind that does not fit) |
 | `pointer_reader` | Callable | | | | `(file name, its values, field, time_min pointed at) -> value` that puts that edge there |
 | `value_setter` | Callable | | | | `(file name, its values, field, value) -> its new values`, kept within the file's own limits |
 | `key_text` | str | | | `''` | Words under the plot explaining the colours |
@@ -424,7 +427,9 @@ Defined in `utils_viewer/viewer_edges.py`. Created by a step that lets the user 
 | `is_every_file` | bool | | | `True` | Whether "Every file" starts ticked: a moved or typed edge then moves on every file |
 | `value_copier` | Optional[Callable] | | | `None` | `(file shown, other file, field, value on the file shown) -> value for the other file`, or None to leave that file as it is. With it, an edge set on every file is set on the file shown first and each other file gets the value this rule gives, within its own limits (the regions step: the same distance from the addition of the same number), and the drop-down no longer marks files with times of their own. None: every file gets the same value (the trimming step) |
 | `unit` | str | | | `'min'` | The unit written after the boxes of the strip, `'min'` or `'s'`; the values of the fields are in it (the window step: `'s'`) |
-| `switch` | Optional[Tuple[str, str]] | | | `None` | `(field, words)` of a tick box shown in place of "Every file": ticking it sets that field to 1 on every file, unticking it to 0. The field has no box, so it is not in `fields`. In the window step `('is_on', 'Averaging windows')`: unticked, the file has no windows. None: the tick box is "Every file" |
+| `switch` | Optional[Tuple[str, str]] | | | `None` | `(field, words)` of a tick box shown in place of "Every file": ticking it sets that field to 1 on every file, unticking it to 0. The field has no box, so it is not in `fields`. In the window step `('is_on', 'Settled windows')`: unticked, the file has no settled windows. None: the tick box is "Every file" |
+| `second_fields` | List[Tuple[str, str]] | (n_fields,) | | empty | The fields of a second row of the strip, under the first, as `fields`; in the window step `quick_s` "Quick window", `delay_s` "Start after the addition". Shown only with `second_switch` |
+| `second_switch` | Optional[Tuple[str, str]] | | | `None` | `(field, words)` of the tick box of the second row, as `switch`; in the window step `('quick_is_on', 'Quick windows')`. None: the step has one row |
 
 #### `PreviewSpec`
 
@@ -589,7 +594,7 @@ The export of the import writes only `CcO2`, `CsO2`, `VoO2`, `Events` and `Metad
 | `spectrum_index` | int | | Spectrum number (haem sheets only) |
 | measurement columns | float | see `experiment` | One per trace or haem |
 
-The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End time (min)` and, per measurement, `<name> mean`, `<name> SD` and `<name> change from baseline (%)`.
+The `Averages` sheet has one row per window: `Average`, `Kind` (baseline, settled or quick), `Start time (min)`, `End time (min)` and, per measurement, `<name> mean`, `<name> SD` and `<name> change from baseline (%)`.
 
 #### `fit csv`
 

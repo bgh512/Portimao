@@ -564,7 +564,8 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
         config.py.
 
     ---- Globals read ----
-    config keys PLOT_AVERAGING_WINDOWS and the AVERAGING_WINDOW_* appearance settings.
+    config keys PLOT_AVERAGING_WINDOWS, the AVERAGING_WINDOW_* appearance settings and
+    the QUICK_WINDOW_* colours of the quick windows.
 
     ---- Outputs ----
     None
@@ -596,12 +597,17 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
         start, end = window['start_time'], window['end_time']
         if end <= start:
             continue
+        # a quick window (starting after its addition) is green, the others blue
+        is_quick = window.get('kind') == 'quick'
+        face = config.get('QUICK_WINDOW_COLOUR') if is_quick else None
+        edge = config.get('QUICK_WINDOW_EDGE_COLOUR') if is_quick else None
+        edge = edge or config['AVERAGING_WINDOW_EDGE_COLOUR']
         for ax in axes:
             ax.axvspan(start,
                        end,
-                       facecolor=config['AVERAGING_WINDOW_COLOUR'],
+                       facecolor=face or config['AVERAGING_WINDOW_COLOUR'],
                        alpha=config['AVERAGING_WINDOW_ALPHA'],
-                       edgecolor=config['AVERAGING_WINDOW_EDGE_COLOUR'],
+                       edgecolor=edge,
                        linewidth=config.get('AVERAGING_WINDOW_EDGE_LINE_WIDTH', 0.8),
                        zorder=0,
                        )
@@ -614,7 +620,7 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
                          ha='center',
                          va='top',
                          fontsize=config['AVERAGING_WINDOW_LABEL_FONT_SIZE'],
-                         color=config['AVERAGING_WINDOW_EDGE_COLOUR'],
+                         color=edge,
                          zorder=2,
                          )
 
