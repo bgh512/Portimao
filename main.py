@@ -359,6 +359,9 @@ def everything_asker(folder: Path,
           f"{BACKGROUND_SHORT_NAMES.get(answers['haem_background'], '?')} background",
           )
     print(f"  OD scaling:       {'yes' if answers['normalise_od'] else 'no'}")
+    print(f"  Temperature:      {answers['temperature_c']:g} °C")
+    psi_text = 'yes, for the files with both regions' if answers['delta_psi'] else 'no'
+    print(f'  Δψ:               {psi_text}')
     averaging_text = 'no'
     if answers['averaging']:
         averaging_text = ('%g s window, ending %g s before the next addition'
@@ -505,6 +508,7 @@ def experiment_processor(info: dict,
                                                        else None,
                                                        ignore_first,
                                                        ignore_last,
+                                                       delta_psi=a['delta_psi'],
                                                        ),
                                export_root,
                                )

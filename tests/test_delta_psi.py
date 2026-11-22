@@ -6,10 +6,11 @@ Tests that delta psi from the b haems comes out as worked out by hand on made-up
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_shared import experiment_processing
+from utils_shared import experiment_processing, survey
 from utils_shared.delta_psi import (b_haem_column_finder,
                                     BH_POTENTIAL_COLUMN,
                                     BL_POTENTIAL_COLUMN,
@@ -19,7 +20,9 @@ from utils_shared.delta_psi import (b_haem_column_finder,
                                     state_fractions_solver,
                                     thermal_voltage_finder,
                                     )
+from utils_shared.individual_experiment_plotter import experiment_drawer
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
+from utils_shared.survey import delta_psi_offer_checker
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -370,6 +373,72 @@ def test_the_numbers_the_program_starts_with() -> None:
                                                                          )
 
 
+# ---- test_the_panel_is_drawn_only_for_a_file_with_delta_psi --------------------------
+def test_the_panel_is_drawn_only_for_a_file_with_delta_psi() -> None:
+    """
+    ---- Summary ----
+    Main function to check the Δψ panel of the plot of one file: the lowest panel, one
+    line with gaps where Δψ is empty, and no panel for a file without Δψ or when the
+    figure does not ask for it.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    DELTA_PSI_COLUMN, TIME_COLUMN.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    experiment_drawer
+    """
+
+    # ---- 1 A made-up file: delta psi is empty in its first and last two points -------
+    times = np.arange(6, dtype=float)
+    delta_psi_mV = [np.nan, np.nan, 110.0, 120.0, np.nan, np.nan]
+    experiment = {'experiment_name': 'made_up',
+                  'CcO2': pd.DataFrame({TIME_COLUMN: times, 'Measured O2': 50.0}),
+                  'VoO2': pd.DataFrame({TIME_COLUMN: times, 'VoO2': 1.0}),
+                  'metadata': {'events': []},
+                  'delta_psi': pd.DataFrame({TIME_COLUMN: times,
+                                             DELTA_PSI_COLUMN: delta_psi_mV,
+                                             },
+                                            ),
+                  }
+    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS))
+
+    def drawer(shown: dict, is_asked: bool) -> list:
+        config = cfg.plot_config_builder('raw', None, 0.0, 0.0, delta_psi=is_asked)
+        fig = Figure()
+        axes, panels = experiment_drawer(fig,
+                                         fig.add_gridspec(1, 1)[0, 0],
+                                         shown,
+                                         config,
+                                         )
+        return [(panel['type'], ax) for panel, ax in zip(panels, axes)]
+
+    # ---- 2 The panel is the lowest, with the gaps ------------------------------------
+    drawn = drawer(experiment, True)
+    assert [kind for kind, _ in drawn] == ['oxygen', 'vo2', 'delta_psi']
+    ax = drawn[-1][1]
+    assert ax.get_ylabel() == 'Δψ (mV)'
+    (line,) = ax.get_lines()
+    assert np.isnan(line.get_ydata()).tolist() == [True, True, False, False, True, True]
+    assert line.get_ydata()[2:4].tolist() == [110.0, 120.0]
+
+    # ---- 3 No panel without delta psi, or when the figure does not ask for it --------
+    without = {key: value for key, value in experiment.items() if key != 'delta_psi'}
+    assert [kind for kind, _ in drawer(without, True)] == ['oxygen', 'vo2']
+    assert [kind for kind, _ in drawer(experiment, False)] == ['oxygen', 'vo2']
+
+
 # ---- test_the_processing_keeps_delta_psi_when_switched_on ----------------------------
 def test_the_processing_keeps_delta_psi_when_switched_on(
     monkeypatch: pytest.MonkeyPatch,
@@ -487,6 +556,65 @@ def test_the_processing_keeps_delta_psi_when_switched_on(
     # ---- 3 Switched off, or without regions: no delta psi ----------------------------
     assert 'delta_psi' not in processor(False, regions)
     assert 'delta_psi' not in processor(True, None)
+
+
+# ---- test_the_question_is_asked_only_when_delta_psi_can_be_worked_out ----------------
+def test_the_question_is_asked_only_when_delta_psi_can_be_worked_out(
+    monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+    """
+    ---- Summary ----
+    Main function to check when "Do you want to work out Δψ?" is asked: only with both
+    regions on at least one file and a fit with one bH and one bL. Otherwise nothing is
+    asked and the run has no Δψ.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the question, so nothing is read from the terminal.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    delta_psi_asker
+    delta_psi_offer_checker
+    """
+
+    # ---- 1 When it can be worked out -------------------------------------------------
+    with_both = ['Cyt $c_1$', 'Cyt $b_H$', 'Cyt $b_L$']
+    assert delta_psi_offer_checker(with_both, ['run1'])
+    assert not delta_psi_offer_checker(with_both, [])
+    assert not delta_psi_offer_checker(['Cyt $c_1$', 'Cyt $b_H$'], ['run1'])
+    assert not delta_psi_offer_checker(['bH', 'Cyt $b_H$', 'bL'], ['run1'])
+
+    # ---- 2 The question is asked then, with the saved answer as what Enter gives -----
+    asked = []
+
+    def asker(question: str, default: bool = False, **others: object) -> bool:
+        asked.append((question, default, others.get('number')))
+        return True
+
+    monkeypatch.setattr(survey, 'yes_no_asker', asker)
+    monkeypatch.setattr(survey, 'info_printer', lambda *texts, **others: None)
+    answers = {}
+    assert survey.delta_psi_asker(answers, {'delta_psi': False}, with_both, ['run1'])
+    assert answers == {'delta_psi': True}
+    assert asked == [('Do you want to work out Δψ?', False, '4.5')]
+
+    # ---- 3 Not asked otherwise: no delta psi, even for a dataset saved with it -------
+    answers = {'delta_psi': True}
+    assert not survey.delta_psi_asker(answers, {'delta_psi': True}, with_both, [])
+    assert answers == {'delta_psi': False}
+    assert len(asked) == 1
 
 
 # ---- test_unequal_haems_give_173_mV --------------------------------------------------

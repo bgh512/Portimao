@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.11
+- **Version:** V2.12
 - **Date:** 22/11/2026
 
 ## Contents
@@ -92,7 +92,9 @@
     - [`test_numbers_that_cannot_be_used_are_refused`](#test_numbers_that_cannot_be_used_are_refused)
     - [`test_the_b_haems_are_found_by_name`](#test_the_b_haems_are_found_by_name)
     - [`test_the_numbers_the_program_starts_with`](#test_the_numbers_the_program_starts_with)
+    - [`test_the_panel_is_drawn_only_for_a_file_with_delta_psi`](#test_the_panel_is_drawn_only_for_a_file_with_delta_psi)
     - [`test_the_processing_keeps_delta_psi_when_switched_on`](#test_the_processing_keeps_delta_psi_when_switched_on)
+    - [`test_the_question_is_asked_only_when_delta_psi_can_be_worked_out`](#test_the_question_is_asked_only_when_delta_psi_can_be_worked_out)
     - [`test_unequal_haems_give_173_mV`](#test_unequal_haems_give_173_mv)
 - [`tests/test_file_names.py`](#teststest_file_namespy)
     - [`test_dots_and_spaces_at_the_ends_go`](#test_dots_and_spaces_at_the_ends_go)
@@ -855,6 +857,8 @@
     - [`data_folder_lister`](#data_folder_lister)
     - [`data_folder_resolver`](#data_folder_resolver)
     - [`decomposition_asker`](#decomposition_asker)
+    - [`delta_psi_asker`](#delta_psi_asker)
+    - [`delta_psi_offer_checker`](#delta_psi_offer_checker)
     - [`event_asker`](#event_asker)
     - [`event_entries_builder`](#event_entries_builder)
     - [`files_asker`](#files_asker)
@@ -875,6 +879,7 @@
     - [`saved_values_reader`](#saved_values_reader)
     - [`signal_asker`](#signal_asker)
     - [`size_asker`](#size_asker)
+    - [`temperature_asker`](#temperature_asker)
     - [`tidy_labels_finder`](#tidy_labels_finder)
     - [`trim_layout_finder`](#trim_layout_finder)
     - [`trim_limits_builder`](#trim_limits_builder)
@@ -1125,6 +1130,9 @@ ignore_first : Optional[float]
     Minutes ignored at the start for the axis limits; None uses the answers.
 ignore_last : Optional[float]
     Minutes ignored at the end for the axis limits; None uses the answers.
+delta_psi : bool
+    True to draw a Δψ panel under the haems, for a file that has Δψ; the
+    figures of several files leave it out.
 
 ---- Globals read ----
 haem_colours (module function); the style, font and size attributes of the
@@ -3612,6 +3620,33 @@ s = 8.314462618 x (37 + 273.15) / 96485.33212 x 1000 = 26.72666 mV; at 25 °C,
 None.
 ```
 
+#### `test_the_panel_is_drawn_only_for_a_file_with_delta_psi`
+
+```text
+---- Summary ----
+Main function to check the Δψ panel of the plot of one file: the lowest panel, one
+line with gaps where Δψ is empty, and no panel for a file without Δψ or when the
+figure does not ask for it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+DELTA_PSI_COLUMN, TIME_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_drawer
+```
+
 #### `test_the_processing_keeps_delta_psi_when_switched_on`
 
 ```text
@@ -3643,6 +3678,35 @@ D_ox = 12 and D_red = 4 for bH, 20 and 10 for bL. From 10 to 20 min both are
 
 ---- Helpers ----
 None.
+```
+
+#### `test_the_question_is_asked_only_when_delta_psi_can_be_worked_out`
+
+```text
+---- Summary ----
+Main function to check when "Do you want to work out Δψ?" is asked: only with both
+regions on at least one file and a fit with one bH and one bL. Otherwise nothing is
+asked and the run has no Δψ.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the question, so nothing is read from the terminal.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+delta_psi_asker
+delta_psi_offer_checker
 ```
 
 #### `test_unequal_haems_give_173_mV`
@@ -20465,7 +20529,7 @@ Helper function to calculate the relative panel heights from PANEL_HEIGHT_RATIOS
 
 ---- Inputs ----
 panels : List[dict]
-    Panel specifications; each has a "type" of oxygen, vo2 or haem.
+    Panel specifications; each has a "type" of oxygen, vo2, haem or delta_psi.
 config : dict
     Individual-experiment plot settings, as built by Config.plot_config in
     config.py.
@@ -20482,7 +20546,7 @@ List[float]
 None.
 
 ---- Equations ----
-ratio = weight for oxygen and vo2 panels; HAEM_PANEL_WEIGHT for each haem panel if
+ratio = weight for oxygen, vo2 and delta psi panels; HAEM_PANEL_WEIGHT for each haem panel if
 set, else weight / n_haem; 1 for every panel when EQUAL_PANEL_HEIGHTS is set.
 
 ---- Helpers ----
@@ -20523,8 +20587,8 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to list the panels to draw: oxygen, VO2, then one for each
-configured haem panel with matching data.
+Helper function to list the panels to draw: oxygen, VO2, one for each configured
+haem panel with matching data, then delta psi for a file that has it.
 
 ---- Inputs ----
 experiment : dict
@@ -20536,13 +20600,14 @@ haem_data : Optional[pd.DataFrame]
     Haem data frame, or None.
 
 ---- Globals read ----
-config keys PLOT_SET_AND_MEASURED_O2, PLOT_VO2, O2_PANEL_TITLE, VO2_PANEL_TITLE and
-HAEM_PANELS.
+config keys PLOT_SET_AND_MEASURED_O2, PLOT_VO2, O2_PANEL_TITLE, VO2_PANEL_TITLE,
+HAEM_PANELS, PLOT_DELTA_PSI and DELTA_PSI_AXIS_LABEL.
 
 ---- Outputs ----
 List[dict]
-    Panel specifications {type, title, haems}. Raises ValueError when no panel is
-    selected.
+    Panel specifications {type, title, haems}; type is oxygen, vo2, haem or
+    delta_psi (the last only when PLOT_DELTA_PSI is set and the experiment has a
+    delta_psi table). Raises ValueError when no panel is selected.
 
 ---- Globals mutated ----
 None. Shows a warning for haems missing from the data (side effect).
@@ -20732,7 +20797,8 @@ None.
 ```text
 ---- Summary ----
 Main function to draw one experiment's stacked panels into a cell of an existing
-figure. It adds no title, adjusts no margins and saves nothing; event labels hang
+figure: the oxygen, the OCR, the haems and, for a file that has it, delta psi as
+one line with gaps where it cannot be given. It adds no title, adjusts no margins and saves nothing; event labels hang
 below the lowest axis, so room is needed underneath the cell.
 
 ---- Inputs ----
@@ -27296,6 +27362,74 @@ problem_teller
 yes_no_asker
 ```
 
+#### `delta_psi_asker`
+
+```text
+---- Summary ----
+Main function to ask whether to work out Δψ, the membrane potential. The question
+is asked only when Δψ can be worked out; otherwise the run has no Δψ, and a line
+says why when the dataset had it switched on.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the value is stored in.
+defaults : dict
+    Default answers (delta_psi).
+haems : List[str]
+    Names of the haems of the fit in use.
+region_files : List[str]
+    Names of the files with both an oxidised and a reduced region.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when Δψ is worked out in this run.
+
+---- Globals mutated ----
+None. Stores delta_psi in ``answers`` and reads from and prints to the terminal
+(side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+delta_psi_offer_checker
+info_printer
+yes_no_asker
+```
+
+#### `delta_psi_offer_checker`
+
+```text
+---- Summary ----
+Main function to say whether Δψ can be worked out, and so whether its question is
+asked: at least one file has both regions, and the fit has one bH and one bL.
+
+---- Inputs ----
+haems : List[str]
+    Names of the haems of the fit in use, however they are written.
+region_files : List[str]
+    Names of the files with both an oxidised and a reduced region.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when Δψ can be worked out for at least one file.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+b_haem_column_finder
+```
+
 #### `event_asker`
 
 ```text
@@ -27977,6 +28111,37 @@ None.
 ---- Helpers ----
 _columns_text_builder
 choice_asker
+number_asker
+```
+
+#### `temperature_asker`
+
+```text
+---- Summary ----
+Main function to ask the temperature of the runs, once for the dataset; Δψ is
+worked out with it.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the value is stored in.
+defaults : dict
+    Default answers (temperature_c).
+
+---- Globals read ----
+TEMPERATURE_LIMITS_C (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores temperature_c (°C) in ``answers`` and reads from and prints to the
+terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
 number_asker
 ```
 
@@ -33664,7 +33829,8 @@ preview_drawer
 ```text
 ---- Summary ----
 Main function to ask the last questions of the import, on the standard plot cut to
-the limits: the OD values, then the event labels, each in a table of the window.
+the limits: the OD values, the temperature of the runs, then the event labels, the
+OD values and the labels each in a table of the window.
 Once OD values are entered, the strip shows its per OD boxes and a line says so.
 The plot is redrawn with the labels once they are entered, and they are accepted or
 typed again; with no events in any file there is nothing to accept. Last, the
@@ -33695,7 +33861,8 @@ Dict[str, dict]
     only present when scaling by OD.
 
 ---- Globals mutated ----
-None. Stores normalise_od in ``answers`` and whether OD values were entered in the
+None. Stores normalise_od and temperature_c in ``answers`` and whether OD values
+were entered in the
 session, shows the strip and writes the export when one is chosen (side effects).
 
 ---- Equations ----
@@ -33714,6 +33881,7 @@ info_printer
 od_scaling_asker
 preview_drawer
 saved_values_reader
+temperature_asker
 ```
 
 #### `pca_stage_runner`
@@ -33840,7 +34008,8 @@ signal_asker
 Main function to talk the user through the processing, with the plot redrawn after
 each answer: first the haem fit, then, now that the haems are seen, an offer to
 change the trim and ignore times, then the oxidised and the reduced region of every
-file (when the haems are shown), and last the averaging around the events. A line
+file (when the haems are shown), then whether to work out Δψ (when it can be), and
+last the averaging around the events. A line
 points to the strip at the start, and another to its % oxidised once a file has
 both regions. The
 settings strip picks the fit and leaves the haems out, so the decomposition
@@ -33872,7 +34041,7 @@ regions : Optional[Dict[str, Dict[str, float]]]
     was answered in this run; None for regions not chosen.
 
 ---- Globals read ----
-None.
+settings.DELTA_PSI_REDUCED_LIMITS_PERCENT.
 
 ---- Outputs ----
 Optional[Dict[str, Dict[str, float]]]
@@ -33895,6 +34064,7 @@ _regions_chooser
 _strip_shower
 accept_asker
 decomposition_asker
+delta_psi_asker
 fit_names_lister
 info_printer
 pca_stage_runner

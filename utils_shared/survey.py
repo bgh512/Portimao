@@ -8,10 +8,14 @@ import tempfile
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import pandas as pd
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_custom.run_namer import run_name_lister
 from utils_shared.dataset_settings import dataset_settings_reader, SAVED_VALUE_KEYS
+from utils_shared.delta_psi import b_haem_column_finder
 from utils_shared.helpers import concentration_formatter, file_name_sanitiser
 from utils_shared.individual_experiment_exporter import saved_settings_reader
 from utils_shared.paf_reader import experiment_summary_reader, PafError
@@ -44,6 +48,8 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
 PCA_CHOICE = '__pca__'
 # raised form of the characters of an exponent typed as -1 or ^2
 SUPERSCRIPT_TABLE = str.maketrans('-+0123456789', '⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹')
+# the temperatures of a run the temperature question takes (°C): liquid water
+TEMPERATURE_LIMITS_C = (0.0, 100.0)
 # the four edges of the trimming step, in the order they are shown
 TRIM_KEYS = ('trim_start', 'trim_end', 'ignore_start', 'ignore_end')
 # the units a label is tidied around; a name with numbers (nd-011992) is none of them
@@ -895,6 +901,103 @@ def decomposition_asker(summaries: List[dict],
     if dataset is None:
         return none_chosen
     return True, fit_file, fit, dataset
+
+
+# ---- delta_psi_asker -----------------------------------------------------------------
+def delta_psi_asker(answers: dict,
+                    defaults: dict,
+                    haems: List[str],
+                    region_files: List[str],
+                    ) -> bool:
+    """
+    ---- Summary ----
+    Main function to ask whether to work out Δψ, the membrane potential. The question
+    is asked only when Δψ can be worked out; otherwise the run has no Δψ, and a line
+    says why when the dataset had it switched on.
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary the value is stored in.
+    defaults : dict
+        Default answers (delta_psi).
+    haems : List[str]
+        Names of the haems of the fit in use.
+    region_files : List[str]
+        Names of the files with both an oxidised and a reduced region.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when Δψ is worked out in this run.
+
+    ---- Globals mutated ----
+    None. Stores delta_psi in ``answers`` and reads from and prints to the terminal
+    (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    delta_psi_offer_checker
+    info_printer
+    yes_no_asker
+    """
+
+    # ---- 1 Leave the question out when delta psi cannot be worked out ----------------
+    if not delta_psi_offer_checker(haems, region_files):
+        if defaults['delta_psi']:
+            info_printer('Δψ is not worked out: it needs an oxidised and a reduced '
+                         'region on at least one file, and a fit with one bH and one '
+                         'bL.',
+                         )
+        answers['delta_psi'] = False
+        return False
+
+    # ---- 2 Ask -----------------------------------------------------------------------
+    answers['delta_psi'] = yes_no_asker(
+        'Do you want to work out Δψ?',
+        defaults['delta_psi'],
+        note='Δψ is the membrane potential, worked out from how reduced bH and bL are.',
+        number='4.5',
+        )
+    return answers['delta_psi']
+
+
+# ---- delta_psi_offer_checker ---------------------------------------------------------
+def delta_psi_offer_checker(haems: List[str], region_files: List[str]) -> bool:
+    """
+    ---- Summary ----
+    Main function to say whether Δψ can be worked out, and so whether its question is
+    asked: at least one file has both regions, and the fit has one bH and one bL.
+
+    ---- Inputs ----
+    haems : List[str]
+        Names of the haems of the fit in use, however they are written.
+    region_files : List[str]
+        Names of the files with both an oxidised and a reduced region.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when Δψ can be worked out for at least one file.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    b_haem_column_finder
+    """
+
+    if not region_files:
+        return False
+    return b_haem_column_finder(pd.DataFrame(columns=list(haems))) is not None
 
 
 # ---- event_asker ---------------------------------------------------------------------
@@ -2088,6 +2191,46 @@ def size_asker(answers: dict,
                                            maximum=1,
                                            depth=depth + 1,
                                            )
+
+
+# ---- temperature_asker ---------------------------------------------------------------
+def temperature_asker(answers: dict, defaults: dict) -> None:
+    """
+    ---- Summary ----
+    Main function to ask the temperature of the runs, once for the dataset; Δψ is
+    worked out with it.
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary the value is stored in.
+    defaults : dict
+        Default answers (temperature_c).
+
+    ---- Globals read ----
+    TEMPERATURE_LIMITS_C (module constant).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Stores temperature_c (°C) in ``answers`` and reads from and prints to the
+    terminal (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    number_asker
+    """
+
+    answers['temperature_c'] = number_asker('What was the temperature of the runs '
+                                            '(°C)?',
+                                            defaults['temperature_c'],
+                                            minimum=TEMPERATURE_LIMITS_C[0],
+                                            maximum=TEMPERATURE_LIMITS_C[1],
+                                            number='3.1.2',
+                                            )
 
 
 # ---- tidy_labels_finder --------------------------------------------------------------

@@ -311,8 +311,8 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 |---|---|---|---|---|
 | `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`results`), otherwise the full path |
 | `'answers'` | dict | | | Terminal answers |
-| `'answers'['delta_psi']` | bool | | | Whether Δψ is worked out for the files with both regions (`utils_shared/delta_psi.py`); off unless switched on |
-| `'answers'['temperature_c']` | float | | °C | Temperature of the sample, for Δψ; 37 unless changed |
+| `'answers'['delta_psi']` | bool | | | Whether Δψ is worked out for the files with both regions (`utils_shared/delta_psi.py`) and drawn as the lowest panel of the plot of each; off unless switched on at question 4.5, which is asked only when a file has both regions and the fit has one bH and one bL |
+| `'answers'['temperature_c']` | float | | °C | Temperature of the runs, for Δψ; asked once per dataset in the import (question 3.1.2), from 0 to 100, 37 unless changed |
 | `'answers'['psi_bH_first_mV']`, `['psi_bL_first_mV']`, `['psi_bH_second_mV']`, `['psi_bL_second_mV']` | float | | mV | The midpoint potentials of the Δψ maths: of bH and of bL with the other haem oxidised (first) and reduced (second); +40, −20, −30 and −90 unless changed. `config.DELTA_PSI_MIDPOINT_ANSWERS` names them for the maths |
 | `'answers'['psi_share']` | float | | | Share of the membrane potential between bH and bL; 0.5 unless changed |
 | `'files'` | dict | | | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end', 'OD', 'volume', 'dilution_factor', 'events', 'regions'}}`, built by `file_settings_merger`; a file or key may be missing (a dataset saved before the OD values and labels were kept has only the four limits) |

@@ -1012,6 +1012,8 @@ def preview_figure_builder(session: ViewerSession,
                                                   else None,
                                                   info['ignore_start'],
                                                   info['ignore_end'],
+                                                  delta_psi=preview_answers[
+                                                      'delta_psi'],
                                                   )
             plot_config.update({'SAVE_FIGURES': False,
                                 'SHOW_INDIVIDUAL_FIGURES': False,

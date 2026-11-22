@@ -1,4 +1,4 @@
-# Portimao question flow (V2.12)
+# Portimao question flow (V2.13)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -29,7 +29,7 @@ Every question in the order it is asked, with where each answer leads. The quest
     - The strip is greyed out while you choose the folder, during the questions of 4.A.1, and from section 6 on.
     - In section 2 the strip has one more row, above the others: the times of the trimmed and ignored edges of the file shown, and **Every file** (see section 2). While **4.4** waits, that row holds the times of the oxidised and the reduced region instead (see 4.C).
 - While the program draws a picture of its own (the components found from the data, the figures of sections 6 and 7), a yellow **Drawing ...** sign is on the plot. It goes when the picture is shown or the next question is asked.
-- Sections **1** to **3** are the import: your files, the parts of them that are used, and what is known about each run (the OD values and the labels). The processing starts with section **4**.
+- Sections **1** to **3** are the import: your files, the parts of them that are used, and what is known about each run (the OD values, the temperature and the labels). The processing starts with section **4**.
 
 ---
 
@@ -44,7 +44,7 @@ Every question in the order it is asked, with where each answer leads. The quest
 |---|---|---|---|
 | 1.2.1 | *(only when the folder already holds results of these files; above it: "results already holds results of 12 of these 12 files.")* Do you want to write over them? `(y/N)` | the standard plot is drawn **(plot)**, then **2.1**; results written later replace those there | **1.2** again, offering a free name beside it (`results_2`), with the line "Type another folder, or a new name: a name without a path is made inside the data folder." |
 
-The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. The haems are worked out with the standard fit (the preset `bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
+The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. A dataset saved with Δψ switched on (4.5) also has its Δψ panel, the lowest, on the files with both regions. The haems are worked out with the standard fit (the preset `bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
 
 ---
 
@@ -67,21 +67,27 @@ If you exported the data at 3.4 and this step is asked again (**4.3**, or going 
 
 ## 3. OD values and event labels
 
-The last part of the import: what is known about each run, then the offer to export what was imported. The OD values and event labels saved for the dataset are offered as defaults. For a dataset whose settings file holds none yet, those found in the workbooks of an earlier run are offered instead, and a message says so. The plot is the standard plot, cut to the limits of section 2.
+The last part of the import: what is known about each run (the OD values, the temperature and the event labels), then the offer to export what was imported. The OD values and event labels saved for the dataset are offered as defaults. For a dataset whose settings file holds none yet, those found in the workbooks of an earlier run are offered instead, and a message says so. The plot is the standard plot, cut to the limits of section 2.
 
-### 3.A OD values
+### 3.A OD values and temperature
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.1 | Do you want to scale by OD? `(y/N)` (above it, in grey: "Scaling by OD divides the OCR and the haems by dilution factor × OD × volume; a per OD box for each then shows in the strip under the plot.") | **3.1.1** | **3.2** (no OD scaling anywhere in the run) |
+| 3.1 | Do you want to scale by OD? `(y/N)` (above it, in grey: "Scaling by OD divides the OCR and the haems by dilution factor × OD × volume; a per OD box for each then shows in the strip under the plot.") | **3.1.1** | **3.1.2** (no OD scaling anywhere in the run) |
 
 The OD table opens on the terminal side, with one row per file and a column each for the OD, the volume (mL) and the dilution factor. The values stored for a file are filled in, and the dilution factor is 1 when none is stored. Clicking a cell of a file shows that file on the plot.
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.1.1 | Fill in the OD, volume and dilution of each file, then press Confirm. (above it, in grey: "One row per file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run.") | If a cell is empty or not a number above 0, one line names those cells and the table stays open. Otherwise the table closes, the values of every file are listed and the next step is **3.2**. |
+| 3.1.1 | Fill in the OD, volume and dilution of each file, then press Confirm. (above it, in grey: "One row per file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run.") | If a cell is empty or not a number above 0, one line names those cells and the table stays open. Otherwise the table closes, the values of every file are listed and the next step is **3.1.2**. |
 
 Once the values are in, the strip under the plot shows its two boxes, **per OD** (the haems) and **OCR per OD**, and a message says so: "The OCR and the haems can now be shown per OD: tick or untick the two per OD boxes in the strip under the plot." The plot follows the boxes from here on, and so does the figure saved for each file.
+
+The temperature is asked of every dataset, whether or not you scale by OD: one value for all its runs, kept with the dataset. Δψ (4.5) is worked out with it; nothing else uses it.
+
+| # | Question | Leads to |
+|---|---|---|
+| 3.1.2 | What was the temperature of the runs (°C)? `[37]` | a number from 0 to 100; then **3.2** |
 
 ### 3.B Event labels
 
@@ -132,13 +138,13 @@ The haems on the plot are those of the import, worked out with the standard fit,
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.1 | *(only when no haems are shown)* Do you want to decompose the haems? `(Y/n)`, or `(y/N)` when Haems was unticked in the strip or the dataset was saved without haems | **4.1.1** | **4.5** (no haems, unless you tick Haems in the strip later) |
+| 4.1 | *(only when no haems are shown)* Do you want to decompose the haems? `(Y/n)`, or `(y/N)` when Haems was unticked in the strip or the dataset was saved without haems | **4.1.1** | **4.6** (no haems, unless you tick Haems in the strip later) |
 
 If the `fits/` folder holds no preset and no fit file, 4.1 is still asked, and 4.1.1 then offers only *Find the components from the data*.
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.1.1 | Which fit would you like to use? (a numbered list of the presets of the haem library, then your own fit files in the `fits/` folder, and *Find the components from the data (principal component analysis)* last; the fit in the strip is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.4**. |
+| 4.1.1 | Which fit would you like to use? (a numbered list of the presets of the haem library, then your own fit files in the `fits/` folder, and *Find the components from the data (principal component analysis)* last; the fit in the strip is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.6**. |
 | 4.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **4.2** (or **4.1.1.1** when the components are being found) |
 
 The section starts with a message pointing to the strip: "Use the strip under the plot to change the fit, the background, the spectrometer (Spectra) and how the haems are shown (Haems as); the plot is redrawn after each change." (the spectrometer is named only when your files share more than one).
@@ -151,11 +157,11 @@ While 4.2 waits, the strip under the plot changes the decomposition, and the plo
 - **Build a fit**: folds out a tick box for each haem of the library, one line each for the a, b and c haems; the boxes start with the haems of the preset in use. Ticking or unticking a box works the haems out with the ones ticked, and the Fit drop-down reads *Your own haems*. Ticking a haem with the same name as one already ticked (c1_myco and c1_037v are both Cyt cc) unticks the other, and the last box cannot be unticked; a note beside the height says so. Click the button again to fold the boxes away.
 - **Keep to compare**: keeps the decomposition on the plot (its fit and background), and a line in the strip says which one is kept. Change the fit, the haems ticked or the background, and the kept haems are drawn as dashed, paler lines in the same colours under the new ones, on every file. Under the plot, each haem in both has two numbers, largest / average: the largest and the average distance between its two traces, in the units of the haem panels. The button reads *Stop comparing* while one is kept; click it to take the dashed lines away. Each file takes about twice as long to draw while one is kept.
 
-To leave the haems out, untick Haems in the strip; answering yes then goes on without haems, to **4.5**.
+To leave the haems out, untick Haems in the strip; answering yes then goes on without haems, to **4.6**.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.2 | Do you accept this decomposition? `(Y/n)` (above it: "Type n to find the components from the data.") | **4.3** (**4.5** when Haems was unticked) | **4.1.1.1** (the questions of 4.A.1, then 4.2 again with the components) |
+| 4.2 | Do you accept this decomposition? `(Y/n)` (above it: "Type n to find the components from the data.") | **4.3** (**4.6** when Haems was unticked) | **4.1.1.1** (the questions of 4.A.1, then 4.2 again with the components) |
 
 #### 4.A.1 Components from the data (principal component analysis)
 
@@ -200,32 +206,42 @@ Asked when the last choice of 4.1.1, or No at 4.2, is taken. The strip is greyed
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.4 | Pull the oxidised and the reduced region out on the plot, or type their times in the strip under it. Press Enter when every file looks right, or straight away for no regions. (above it, in grey: what the regions are, "Red is oxidised, blue is reduced; with "Every file" ticked, an edge is copied to every file at the same distance from its nearest addition.", "Leave both as "not chosen" for no regions." and "With no regions the haems cannot be shown in % oxidised; everything else is the same.") | Enter with the answer box empty: with no region on any file, or both regions on every file, the regions are listed, then **4.5**; with both regions on some files only, **4.4.1**. A warning names the files that kept an edge of their own because they have fewer additions. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 4.4 goes on waiting. |
+| 4.4 | Pull the oxidised and the reduced region out on the plot, or type their times in the strip under it. Press Enter when every file looks right, or straight away for no regions. (above it, in grey: what the regions are, "Red is oxidised, blue is reduced; with "Every file" ticked, an edge is copied to every file at the same distance from its nearest addition.", "Leave both as "not chosen" for no regions." and "With no regions the haems cannot be shown in % oxidised; everything else is the same.") | Enter with the answer box empty: with no region on any file, or both regions on every file, the regions are listed, then **4.5** (**4.6** when Δψ cannot be worked out); with both regions on some files only, **4.4.1**. A warning names the files that kept an edge of their own because they have fewer additions. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 4.4 goes on waiting. |
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.4.1 | *(only when some files have both regions and others do not)* Do you want to continue without them? `(y/N)` (above it, in grey: the files without both an oxidised and a reduced region, and "A file needs both to be shown in % oxidised.") | the regions of every file are listed, then **4.5** | **4.4** again, with the edges where you left them |
+| 4.4.1 | *(only when some files have both regions and others do not)* Do you want to continue without them? `(y/N)` (above it, in grey: the files without both an oxidised and a reduced region, and "A file needs both to be shown in % oxidised.") | the regions of every file are listed, then **4.5** (**4.6** when Δψ cannot be worked out) | **4.4** again, with the edges where you left them |
 
-### 4.D Averaging around the events
+### 4.D Δψ, the membrane potential
+
+Δψ is worked out from how reduced the two b haems, bH and bL, are, at the temperature of 3.1.2 (the maths is in `MATHS.md`). It can be worked out for a file with both regions (4.4), when the fit has one bH and one bL. 4.5 is asked only when at least one file has both regions and the fit has the two haems. Otherwise nothing is asked and the run has no Δψ; for a dataset saved with Δψ switched on, a message says what it needs.
+
+| # | Question | Yes → | No → |
+|---|---|---|---|
+| 4.5 | *(only when Δψ can be worked out)* Do you want to work out Δψ? `(y/N)` (above it, in grey: "Δψ is the membrane potential, worked out from how reduced bH and bL are.") | the plot is redrawn **(plot)** with a **Δψ (mV)** panel under the haems, and a message says where it is; then **4.6** | **4.6** (no Δψ in the run) |
+
+The Δψ panel is the lowest panel of the plot of each file with both regions: one line, with gaps where bH or bL is less than 10 % or more than 90 % reduced, as Δψ cannot be given there. A file without both regions has no Δψ panel. The panel is also in the figure saved for each file (section 5), and Δψ is in the workbook of each file when every table is exported (8.1).
+
+### 4.E Averaging around the events
 
 The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Each window ends a set time before the next addition (the last one 0.5 min before the end of the recording), so it moves with that addition in every file and one setting fits the whole dataset. The window and the gap are given in seconds.
 
-You can set both with the mouse: while 4.5.1 waits, drag across one window on the plot of any file, just before an addition. A band follows the mouse, with its length above it. When you let go, the length goes into the answer box and the gap is offered in 4.5.2, both rounded to whole 5 s, so you can tidy them (to exactly 30 s, say) before pressing Enter.
+You can set both with the mouse: while 4.6.1 waits, drag across one window on the plot of any file, just before an addition. A band follows the mouse, with its length above it. When you let go, the length goes into the answer box and the gap is offered in 4.6.2, both rounded to whole 5 s, so you can tidy them (to exactly 30 s, say) before pressing Enter.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.5 | Do you want to average around the events? `(y/N)` | **4.5.1** | **5.1** (no averaging in the run) |
+| 4.6 | Do you want to average around the events? `(y/N)` | **4.6.1** | **5.1** (no averaging in the run) |
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.5.1 | How long a window (s) should the average be taken over? `[120]` | **4.5.2** |
-| 4.5.2 | How long before the next addition should the averaging window end (s)? `[30]`, or, after a drag in 4.5.1, the time from where you let go to the next addition (no default from a drag after the last addition). A drag here gives the gap alone. | the windows are drawn **(plot)**, then **4.6** |
+| 4.6.1 | How long a window (s) should the average be taken over? `[120]` | **4.6.2** |
+| 4.6.2 | How long before the next addition should the averaging window end (s)? `[30]`, or, after a drag in 4.6.1, the time from where you let go to the next addition (no default from a drag after the last addition). A drag here gives the gap alone. | the windows are drawn **(plot)**, then **4.7** |
 
 Windows that do not fit are skipped; they are drawn red with a warning sign and listed in red in the terminal first.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.6 | Do you accept these averaging windows? `(Y/n)` (above it: "Type n to change the window and gap.") | **5.1** | **4.5** |
+| 4.7 | Do you accept these averaging windows? `(Y/n)` (above it: "Type n to change the window and gap.") | **5.1** | **4.6** |
 
 ---
 
@@ -236,6 +252,7 @@ The figure saved for each file is drawn at once **(plot)**, at its real size and
 - the set and measured oxygen;
 - the OCR per OD (µM min⁻¹ OD⁻¹) if you said yes to OD scaling in 3.1, otherwise the OCR in µM min⁻¹;
 - when the haems were decomposed in 4.A, every haem of the fit as ΔD, the change from the start (scaled by OD as well if you said yes in 3.1);
+- Δψ (mV) as the lowest panel, if you said yes in 4.5, for a file with both regions;
 - the event labels at 45°;
 - Nature, 1 column wide and 0.5 of a page tall.
 
@@ -337,7 +354,7 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 
 | # | Question | Leads to |
 |---|---|---|
-| 6.3.1 | Which run number should be shown? | **6.3.2** if you said No to averaging in 4.5, otherwise **6.3.4** |
+| 6.3.1 | Which run number should be shown? | **6.3.2** if you said No to averaging in 4.6, otherwise **6.3.4** |
 | 6.3.2 | *(a message says the figure starts at the baseline averaging window, so the events are averaged as in the processing)* How long a window (s) should the average be taken over? `[120]` (typed; the plot shows figures here, so there is nothing to drag across) | **6.3.3** |
 | 6.3.3 | How long before the next addition should the averaging window end (s)? `[30]` | **6.3.4** |
 | 6.3.4 | Do you want the run name written faintly on each plot? `(Y/n)` | **6.3.5** |
@@ -351,7 +368,7 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 
 ## 7. Experiment summaries
 
-As in section 6, the **Drawing ...** sign is on the plot while each picture is drawn. Both summary figures need the haem fit. If the haems were not decomposed in section 4 (or Haems was unticked), the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, so if you said No in 4.4 (and have not been asked since), a message says the averaging window is asked here, and the window and gap questions (**4.4.1**, **4.4.2**) are asked first.
+As in section 6, the **Drawing ...** sign is on the plot while each picture is drawn. Both summary figures need the haem fit. If the haems were not decomposed in section 4 (or Haems was unticked), the fit questions (**4.1.1**, and **4.1.2** if needed) are asked first; only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, so if you said No in 4.6 (and have not been asked since), a message says the averaging window is asked here, and the window and gap questions (**4.6.1**, **4.6.2**) are asked first.
 
 ### 7.A Time response
 
@@ -424,7 +441,7 @@ Every experiment always gets a workbook with CcO2, CsO2, VoO2, the events and yo
 
 ## 9. Summary
 
-A summary of all your answers is printed (files, results folder, trimming, ignoring, decomposition, OD scaling, averaging, plots, figure sizes, workbooks).
+A summary of all your answers is printed (files, results folder, trimming, ignoring, decomposition, OD scaling, temperature, Δψ, averaging, plots, figure sizes, workbooks).
 
 | # | Question | Yes → | No → |
 |---|---|---|---|

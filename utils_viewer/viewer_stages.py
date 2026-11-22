@@ -56,6 +56,7 @@ from utils_shared.spectral_decomposer import (answers_fit_loader,
                                               )
 from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
+                                 delta_psi_asker,
                                  event_asker,
                                  haem_choice_asker,
                                  IGNORE_LABEL,
@@ -64,6 +65,7 @@ from utils_shared.survey import (averaging_asker,
                                  od_scaling_asker,
                                  saved_values_reader,
                                  signal_asker,
+                                 temperature_asker,
                                  trim_layout_finder,
                                  trim_limits_builder,
                                  trim_minutes_builder,
@@ -1791,7 +1793,8 @@ def details_stage_runner(session: ViewerSession,
     """
     ---- Summary ----
     Main function to ask the last questions of the import, on the standard plot cut to
-    the limits: the OD values, then the event labels, each in a table of the window.
+    the limits: the OD values, the temperature of the runs, then the event labels, the
+    OD values and the labels each in a table of the window.
     Once OD values are entered, the strip shows its per OD boxes and a line says so.
     The plot is redrawn with the labels once they are entered, and they are accepted or
     typed again; with no events in any file there is nothing to accept. Last, the
@@ -1822,7 +1825,8 @@ def details_stage_runner(session: ViewerSession,
         only present when scaling by OD.
 
     ---- Globals mutated ----
-    None. Stores normalise_od in ``answers`` and whether OD values were entered in the
+    None. Stores normalise_od and temperature_c in ``answers`` and whether OD values
+    were entered in the
     session, shows the strip and writes the export when one is chosen (side effects).
 
     ---- Equations ----
@@ -1841,6 +1845,7 @@ def details_stage_runner(session: ViewerSession,
     od_scaling_asker
     preview_drawer
     saved_values_reader
+    temperature_asker
     """
 
     # ---- 1 Read the values of earlier runs -------------------------------------------
@@ -1875,6 +1880,10 @@ def details_stage_runner(session: ViewerSession,
         info_printer('The OCR and the haems can now be shown per OD: tick or untick '
                      'the two per OD boxes in the strip under the plot.',
                      )
+
+    # ---- 2.1 The temperature of the runs ---------------------------------------------
+    # One value for the dataset, asked of everyone: delta psi is worked out with it.
+    temperature_asker(answers, defaults)
 
     # ---- 3 Event labels --------------------------------------------------------------
     # The table opens again with the labels as last typed until they are accepted.
@@ -2279,7 +2288,8 @@ def processing_stage_runner(session: ViewerSession,
     Main function to talk the user through the processing, with the plot redrawn after
     each answer: first the haem fit, then, now that the haems are seen, an offer to
     change the trim and ignore times, then the oxidised and the reduced region of every
-    file (when the haems are shown), and last the averaging around the events. A line
+    file (when the haems are shown), then whether to work out Δψ (when it can be), and
+    last the averaging around the events. A line
     points to the strip at the start, and another to its % oxidised once a file has
     both regions. The
     settings strip picks the fit and leaves the haems out, so the decomposition
@@ -2311,7 +2321,7 @@ def processing_stage_runner(session: ViewerSession,
         was answered in this run; None for regions not chosen.
 
     ---- Globals read ----
-    None.
+    settings.DELTA_PSI_REDUCED_LIMITS_PERCENT.
 
     ---- Outputs ----
     Optional[Dict[str, Dict[str, float]]]
@@ -2334,6 +2344,7 @@ def processing_stage_runner(session: ViewerSession,
     _strip_shower
     accept_asker
     decomposition_asker
+    delta_psi_asker
     fit_names_lister
     info_printer
     pca_stage_runner
@@ -2450,7 +2461,33 @@ def processing_stage_runner(session: ViewerSession,
                          'Haems as in the strip under the plot.',
                          )
 
-    # ---- 4 Averaging around the events -----------------------------------------------
+    # ---- 4 Delta psi -----------------------------------------------------------------
+    # Asked only when it can be worked out; the plot then gets or loses its panel.
+    if answers['decompose'] and session.fit is not None:
+        was_on = bool(answers['delta_psi'])
+        is_on = delta_psi_asker(answers,
+                                defaults,
+                                list(session.fit['haem_list']),
+                                region_files_lister(summaries,
+                                                    limits,
+                                                    regions,
+                                                    answers.get('decomposition_dataset',
+                                                                ),
+                                                    ),
+                                )
+        if is_on != was_on:
+            redraw()
+        if is_on:
+            lowest, highest = settings.DELTA_PSI_REDUCED_LIMITS_PERCENT
+            info_printer('Δψ (mV) is the lowest panel of the plot, for the files with '
+                         'both regions; it has gaps where bH or bL is less than '
+                         f'{lowest:g} % or more than {highest:g} % reduced.',
+                         )
+    else:
+        # without haems there is no delta psi, whatever the dataset was saved with
+        answers['delta_psi'] = False
+
+    # ---- 5 Averaging around the events -----------------------------------------------
     _averaging_reviewer(session, answers, defaults, limits, details, redraw)
     return regions
 

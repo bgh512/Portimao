@@ -18,6 +18,7 @@ from matplotlib.legend import Legend
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.delta_psi import DELTA_PSI_COLUMN
 from utils_shared.figure_layout import figure_canvas_fitter
 from utils_shared.helpers import concentration_formatter, figure_saver, name_simplifier
 from utils_shared.schema import (HAEM_KEYS,
@@ -280,7 +281,7 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
 
     ---- Inputs ----
     panels : List[dict]
-        Panel specifications; each has a "type" of oxygen, vo2 or haem.
+        Panel specifications; each has a "type" of oxygen, vo2, haem or delta_psi.
     config : dict
         Individual-experiment plot settings, as built by Config.plot_config in
         config.py.
@@ -297,7 +298,7 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
     None.
 
     ---- Equations ----
-    ratio = weight for oxygen and vo2 panels; HAEM_PANEL_WEIGHT for each haem panel if
+    ratio = weight for oxygen, vo2 and delta psi panels; HAEM_PANEL_WEIGHT for each haem panel if
     set, else weight / n_haem; 1 for every panel when EQUAL_PANEL_HEIGHTS is set.
 
     ---- Helpers ----
@@ -367,8 +368,8 @@ def _panel_builder(experiment: dict,
                    ) -> List[dict]:
     """
     ---- Summary ----
-    Helper function to list the panels to draw: oxygen, VO2, then one for each
-    configured haem panel with matching data.
+    Helper function to list the panels to draw: oxygen, VO2, one for each configured
+    haem panel with matching data, then delta psi for a file that has it.
 
     ---- Inputs ----
     experiment : dict
@@ -380,13 +381,14 @@ def _panel_builder(experiment: dict,
         Haem data frame, or None.
 
     ---- Globals read ----
-    config keys PLOT_SET_AND_MEASURED_O2, PLOT_VO2, O2_PANEL_TITLE, VO2_PANEL_TITLE and
-    HAEM_PANELS.
+    config keys PLOT_SET_AND_MEASURED_O2, PLOT_VO2, O2_PANEL_TITLE, VO2_PANEL_TITLE,
+    HAEM_PANELS, PLOT_DELTA_PSI and DELTA_PSI_AXIS_LABEL.
 
     ---- Outputs ----
     List[dict]
-        Panel specifications {type, title, haems}. Raises ValueError when no panel is
-        selected.
+        Panel specifications {type, title, haems}; type is oxygen, vo2, haem or
+        delta_psi (the last only when PLOT_DELTA_PSI is set and the experiment has a
+        delta_psi table). Raises ValueError when no panel is selected.
 
     ---- Globals mutated ----
     None. Shows a warning for haems missing from the data (side effect).
@@ -426,6 +428,8 @@ def _panel_builder(experiment: dict,
                                'haems': matched,
                                },
                               )
+    if config.get('PLOT_DELTA_PSI') and 'delta_psi' in experiment:
+        panels.append({'type': 'delta_psi', 'title': config['DELTA_PSI_AXIS_LABEL']})
 
     # ---- 2 Check there is something to plot ------------------------------------------
     if not panels:
@@ -717,7 +721,8 @@ def experiment_drawer(fig: Figure,
     """
     ---- Summary ----
     Main function to draw one experiment's stacked panels into a cell of an existing
-    figure. It adds no title, adjusts no margins and saves nothing; event labels hang
+    figure: the oxygen, the OCR, the haems and, for a file that has it, delta psi as
+    one line with gaps where it cannot be given. It adds no title, adjusts no margins and saves nothing; event labels hang
     below the lowest axis, so room is needed underneath the cell.
 
     ---- Inputs ----
@@ -862,6 +867,30 @@ def experiment_drawer(fig: Figure,
                                              config['VO2_Y_HEADROOM'],
                                              )
             ax.set_ylim(config['VO2_Y_MIN'], y_max)
+        elif panel['type'] == 'delta_psi':
+            # Empty values (bH or bL outside the limits) leave gaps in the line.
+            table = experiment['delta_psi']
+            t = time_getter(table)
+            y = np.asarray(value_getter(table, DELTA_PSI_COLUMN), dtype=float)
+            ax.plot(t,
+                    y,
+                    label=panel['title'],
+                    color=config['DELTA_PSI_COLOUR'],
+                    linewidth=config['LINE_WIDTH'],
+                    zorder=3,
+                    )
+            ax.set_ylabel(panel['title'],
+                          labelpad=config['Y_LABEL_PAD'],
+                          multialignment='center',
+                          )
+            ignore_last = config.get('Y_SCALE_IGNORE_LAST_MINUTES', 0.0)
+            limits = _ylim_calculator(t,
+                                      [y],
+                                      config['Y_SCALE_IGNORE_FIRST_MINUTES'],
+                                      ignore_last_minutes=ignore_last,
+                                      )
+            if limits:
+                ax.set_ylim(*limits)
         else:  # haem
             t = time_getter(haem_data)
             for haem in panel['haems']:

@@ -424,6 +424,7 @@ class Config:
                             haem_source: Optional[str],
                             ignore_first: Optional[float] = None,
                             ignore_last: Optional[float] = None,
+                            delta_psi: bool = False,
                             ) -> dict:
         """
         ---- Summary ----
@@ -438,6 +439,9 @@ class Config:
             Minutes ignored at the start for the axis limits; None uses the answers.
         ignore_last : Optional[float]
             Minutes ignored at the end for the axis limits; None uses the answers.
+        delta_psi : bool
+            True to draw a Δψ panel under the haems, for a file that has Δψ; the
+            figures of several files leave it out.
 
         ---- Globals read ----
         haem_colours (module function); the style, font and size attributes of the
@@ -484,7 +488,11 @@ class Config:
                 'TITLE_FONT_SIZE': fonts['title'],
                 'LABEL_FONT_SIZE': fonts['label'],
                 'SUBPLOT_HSPACE': 0.0,
-                'PANEL_HEIGHT_RATIOS': {'oxygen': 2, 'vo2': 2, 'haem': 5},
+                'PANEL_HEIGHT_RATIOS': {'oxygen': 2,
+                                        'vo2': 2,
+                                        'haem': 5,
+                                        'delta_psi': 2,
+                                        },
                 'EQUAL_PANEL_HEIGHTS': True,
                 # Time axis
                 'TIME_AXIS_LABEL': 'Time (minutes)',
@@ -570,8 +578,16 @@ class Config:
                 'HAEM_SPAN_LABEL_PAD': style['label_pad'],
                 'HAEM_PANELS': [{'label': '', 'haems': [name]} for name in haems],
                 'HAEM_COLOURS': haem_colour_mapper(haems),
+                # Delta psi panel (the lowest, only for a file that has delta psi)
+                'PLOT_DELTA_PSI': bool(delta_psi),
+                'DELTA_PSI_AXIS_LABEL': 'Δψ (mV)',
+                'DELTA_PSI_COLOUR': '0.15',
                 # Legend
-                'SHOW_LEGENDS': {'oxygen': True, 'vo2': False, 'haem': True},
+                'SHOW_LEGENDS': {'oxygen': True,
+                                 'vo2': False,
+                                 'haem': True,
+                                 'delta_psi': False,
+                                 },
                 'LEGEND_FONT_SIZE': fonts['tick'],
                 'LEGEND_LOCATION': 'upper right',
                 'LEGEND_COLUMNS': 1,
