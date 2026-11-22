@@ -7,13 +7,16 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.redox_regions import REGION_KEYS, REGION_NAMES
+
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 # what is known about each run, kept beside its trim and ignore limits
 SAVED_VALUE_KEYS = ('OD', 'volume', 'dilution_factor', 'events')
 SETTINGS_FILE_NAME = 'portimao_settings.json'
 # Only cells are measured, so the haem amounts, which depend on the size of each shape,
-# are no longer shown: a dataset saved showing them opens showing delta A.
+# are no longer shown: a dataset saved showing them opens showing delta D.
 RETIRED_HAEM_MODES = {'conc': 'delta'}
 RETIRED_HAEM_MODE_KEYS = ('haem_mode', 'ho_haem_mode')
 
@@ -252,13 +255,14 @@ def dataset_settings_saver(folder: Path,
 def file_settings_merger(remembered: Dict[str, dict],
                          limits: Dict[str, dict],
                          details: Dict[str, dict],
+                         regions: Optional[Dict[str, Dict[str, float]]] = None,
                          ) -> Dict[str, dict]:
     """
     ---- Summary ----
     Main function to build the files part of the dataset's settings: for each file of
-    this run its limits, OD values and events laid over what was saved before. A value
-    not asked this run (the OD when not scaling by OD) stays as it was saved, so it is
-    offered next time; files not in this run are kept as they were.
+    this run its limits, OD values, events and regions laid over what was saved before.
+    A value not asked this run (the OD when not scaling by OD) stays as it was saved,
+    so it is offered next time; files not in this run are kept as they were.
 
     ---- Inputs ----
     remembered : Dict[str, dict]
@@ -270,14 +274,20 @@ def file_settings_merger(remembered: Dict[str, dict],
     details : Dict[str, dict]
         {file name: {'OD', 'volume', 'dilution_factor', 'events'}} of this run; the OD
         values only when scaling by OD.
+    regions : Optional[Dict[str, Dict[str, float]]]
+        {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} of
+        this run, as times on the original recording (min); a region not chosen has
+        its two edges together. None when the regions were not handled this run, so
+        those saved before stay.
 
     ---- Globals read ----
-    SAVED_VALUE_KEYS (module constant).
+    SAVED_VALUE_KEYS (module constant); REGION_KEYS, REGION_NAMES.
 
     ---- Outputs ----
     Dict[str, dict]
-        {file name: limits, then 'OD', 'volume', 'dilution_factor' (floats) and
-        'events' (DATA_FORMAT.md, dataset_settings) where known}.
+        {file name: limits, then 'OD', 'volume', 'dilution_factor' (floats),
+        'events' and 'regions' (DATA_FORMAT.md, dataset_settings) where known}. A
+        file of this run with neither region chosen has no 'regions'.
 
     ---- Globals mutated ----
     None.
@@ -301,4 +311,16 @@ def file_settings_merger(remembered: Dict[str, dict],
                           if key == 'events'
                           else float(values[key])
                           )
+        if regions is None:
+            continue
+        own = regions.get(name) or {}
+        is_chosen = (all(key in own for key in REGION_KEYS) and
+                     any(own[f'{region}_end'] > own[f'{region}_start']
+                         for region in REGION_NAMES
+                         )
+                     )
+        if is_chosen:
+            entry['regions'] = {key: float(own[key]) for key in REGION_KEYS}
+        else:
+            entry.pop('regions', None)
     return files

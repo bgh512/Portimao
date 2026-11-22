@@ -1,6 +1,7 @@
 """
-The maths of the oxidised and reduced regions: a haem's level in a region, % oxidised
-from the two levels, and an edge copied to another file by its nearest addition.
+The maths of the oxidised and reduced regions: a haem's level in a region, the two
+levels of a file, % oxidised from them, and an edge copied to another file by its
+nearest addition.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -155,6 +156,89 @@ def edge_time_finder(anchor: Tuple[int, float],
     if not 0 <= number < additions.size:
         return None
     return float(additions[number]) + float(distance)
+
+
+# ---- haem_levels_finder --------------------------------------------------------------
+def haem_levels_finder(haem_table: pd.DataFrame,
+                       regions: Optional[Dict[str, float]],
+                       shift_min: float,
+                       used_span: Tuple[float, float],
+                       minimum_points: int,
+                       label: str = 'This file',
+                       ) -> Optional[dict]:
+    """
+    ---- Summary ----
+    Main function to find the oxidised and the reduced level of every haem of a file
+    from the two regions kept for it. A file needs both regions: with none, with only
+    one, or with one that no longer holds enough spectra in the used part of the run
+    (the trim or the ignored parts changed), it has no levels.
+
+    ---- Inputs ----
+    haem_table : pd.DataFrame
+        Haem table (time, spectrum index and one column per haem), in any one unit,
+        on the time axis of the trimmed data.
+    regions : Optional[Dict[str, float]]
+        {oxidised_start, oxidised_end, reduced_start, reduced_end} as times on the
+        original recording (min), or None when nothing is kept for the file.
+    shift_min : float
+        Trim start (min): what is taken off a time on the recording for the time on
+        the trimmed data.
+    used_span : Tuple[float, float]
+        (first, last) time of the used part of the run (min), on the trimmed data.
+    minimum_points : int
+        Least number of spectra a region must hold (config.REGION_MINIMUM_POINTS).
+    label : str
+        Name of the file in the messages.
+
+    ---- Globals read ----
+    REGION_NAMES.
+
+    ---- Outputs ----
+    Optional[dict]
+        {'oxidised': {haem: level}, 'reduced': {haem: level}, in the unit of the
+        table; 'oxidised_region', 'reduced_region': (start_min, end_min) on the time
+        axis of the table, kept within the used part}, or None when the file does not
+        have both regions. Raises ValueError (region_level_finder) when a haem has too
+        few values inside a region that holds enough spectra.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    start = max(start on the recording - shift, first); end = min(end on the
+    recording - shift, last). A region counts when it holds at least minimum_points
+    spectra with start <= time <= end. level: region_level_finder.
+
+    ---- Helpers ----
+    region_level_finder
+    time_getter
+    """
+
+    if not regions:
+        return None
+    first, last = float(used_span[0]), float(used_span[1])
+    times = time_getter(haem_table)
+    result: dict = {}
+    for region in REGION_NAMES:
+        try:
+            start = max(float(regions[f'{region}_start']) - float(shift_min), first)
+            end = min(float(regions[f'{region}_end']) - float(shift_min), last)
+        except (KeyError, TypeError, ValueError):  # not the four times of a file
+            return None
+        if not (np.isfinite(start) and np.isfinite(end)) or end <= start:
+            return None
+        inside = np.isfinite(times) & (times >= start) & (times <= end)
+        if int(inside.sum()) < minimum_points:
+            return None
+        result[region] = region_level_finder(haem_table,
+                                             start,
+                                             end,
+                                             minimum_points,
+                                             region=f'{region} region',
+                                             label=label,
+                                             )
+        result[f'{region}_region'] = (start, end)
+    return result
 
 
 # ---- percent_oxidised_calculator -----------------------------------------------------
@@ -629,3 +713,47 @@ def region_span_reader(values: Dict[str, float],
                      )
             for region in REGION_NAMES
             }
+
+
+# ---- short_region_closer -------------------------------------------------------------
+def short_region_closer(values: Dict[str, float],
+                        minimum_min: float,
+                        ) -> Dict[str, float]:
+    """
+    ---- Summary ----
+    Main function to give the edges of a file with every region that is too short to
+    count closed: its two edges together, where its handle is. A region is then
+    chosen exactly when its end is after its start, which is how it is kept with the
+    dataset.
+
+    ---- Inputs ----
+    values : Dict[str, float]
+        {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min).
+    minimum_min : float
+        Least length of a region (min); a shorter one is not chosen.
+
+    ---- Globals read ----
+    REGION_NAMES, CLOSED_KEYS.
+
+    ---- Outputs ----
+    Dict[str, float]
+        New values of the file; the dictionary given is not changed.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    A region with end - start < least length: start = end = the edge that opens it
+    (the end of the oxidised region, the start of the reduced one).
+
+    ---- Helpers ----
+    _region_open_checker
+    """
+
+    closed = {key: float(value) for key, value in values.items()}
+    for region in REGION_NAMES:
+        if not _region_open_checker(values, region, minimum_min):
+            edge = closed[CLOSED_KEYS[region]]
+            closed[f'{region}_start'] = edge
+            closed[f'{region}_end'] = edge
+    return closed

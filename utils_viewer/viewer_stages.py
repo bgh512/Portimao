@@ -44,6 +44,7 @@ from utils_shared.redox_regions import (REGION_KEYS,
                                         region_layout_finder,
                                         region_pointer_reader,
                                         region_span_reader,
+                                        short_region_closer,
                                         )
 from utils_shared.spectral_decomposer import (answers_fit_loader,
                                               BACKGROUND_SHORT_NAMES,
@@ -587,12 +588,17 @@ def _export_refresher(session: ViewerSession,
 
 
 # ---- _figure_starter -----------------------------------------------------------------
-def _figure_starter(answers: dict, defaults: dict, fit: Optional[dict]) -> None:
+def _figure_starter(answers: dict,
+                    defaults: dict,
+                    fit: Optional[dict],
+                    include_percent: bool = True,
+                    ) -> None:
     """
     ---- Summary ----
     Helper function to set the figure of each file from the standard settings or the
     ones last saved for the dataset, keeping only what this run allows: the OCR per OD
-    and the haems scaled by OD only when OD values were entered, and the haems only
+    and the haems scaled by OD only when OD values were entered, the haems in %
+    oxidised only when a file has both regions (delta D otherwise), and the haems only
     when they are decomposed, limited to those of the fit in use (all of them when none
     of the saved ones is in it). The Haems box of the settings strip says whether the
     haems are worked out and shown, so the figure has them whenever they are decomposed.
@@ -608,6 +614,9 @@ def _figure_starter(answers: dict, defaults: dict, fit: Optional[dict]) -> None:
         haem_per_od, event_label_angle).
     fit : Optional[dict]
         Fit dictionary (haem_list), or None when the haems are not decomposed.
+    include_percent : bool
+        True when at least one file has an oxidised and a reduced region, so the
+        haems can be shown in % oxidised.
 
     ---- Globals read ----
     None.
@@ -627,6 +636,9 @@ def _figure_starter(answers: dict, defaults: dict, fit: Optional[dict]) -> None:
     """
 
     kinds = ocr_kind_lister(answers['normalise_od'])
+    haem_mode = defaults['haem_mode']
+    if haem_mode == 'percent' and not include_percent:
+        haem_mode = 'delta'
     has_haems = bool(answers['decompose'] and fit is not None)
     haem_list = list(fit['haem_list']) if has_haems else []
     haems = [name for name in defaults['haems'] if name in haem_list]
@@ -638,10 +650,10 @@ def _figure_starter(answers: dict, defaults: dict, fit: Optional[dict]) -> None:
                                  ),
                     'plot_haems': has_haems,
                     'haems': haems or haem_list,
-                    'haem_mode': defaults['haem_mode'],
+                    'haem_mode': haem_mode,
                     'haem_per_od': bool(defaults['haem_per_od'] and
                                         answers['normalise_od'] and
-                                        defaults['haem_mode'] != 'percent',
+                                        haem_mode != 'percent',
                                         ),
                     'event_label_angle': defaults['event_label_angle'],
                     },
@@ -1066,9 +1078,11 @@ def _regions_chooser(session: ViewerSession,
     Helper function to run the regions step on the plot of every file: the oxidised and
     the reduced region are pulled out on the plot or typed in the strip under it, and
     Enter accepts them. With "Every file" ticked, an edge set on the file shown is
-    copied to every file at the same distance from its nearest addition. The regions
-    are then listed, with the files that have only one region and the files a copy
-    could not reach.
+    copied to every file at the same distance from its nearest addition. Enter with no
+    region on any file means no regions; when only some files have both, a question
+    names the others and asks whether to continue without them, and No goes back to
+    the edges as they were. The regions are then listed, with the files a copy could
+    not reach.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1092,7 +1106,8 @@ def _regions_chooser(session: ViewerSession,
     Dict[str, Dict[str, float]]
         {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
         times on the original recording (min), so a later change of the trim leaves
-        them on the same data. A region not chosen has its two edges together.
+        them on the same data. A region not chosen, or too short to count, has its two
+        edges together.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal and draws on the plot window (side
@@ -1112,6 +1127,9 @@ def _regions_chooser(session: ViewerSession,
     region_edges_builder
     region_layout_finder
     region_pointer_reader
+    region_span_reader
+    short_region_closer
+    yes_no_asker
     EdgeChoice
     """
 
@@ -1173,16 +1191,47 @@ def _regions_chooser(session: ViewerSession,
                  'addition.',
                  tight=True,
                  )
-    info_printer('Leave both as "not chosen" for no regions.', tight=True)
+    info_printer('With no regions the haems cannot be shown in % oxidised; everything '
+                 'else is the same.',
+                 tight=True,
+                 )
     session.window.edges_shower(choice)
     try:
-        enter_waiter('Pull the oxidised and the reduced region out on the plot, or '
-                     'type their times in the strip under it. Press Enter when every '
-                     'file looks right.',
-                     REGION_NUDGE,
-                     number='4.4',
-                     )
-        values = session.window.edges_reader()
+        while True:
+            enter_waiter('Pull the oxidised and the reduced region out on the plot, '
+                         'or type their times in the strip under it. Press Enter when '
+                         'every file looks right, or straight away for no regions.',
+                         REGION_NUDGE,
+                         number='4.4',
+                         )
+            values = {name: short_region_closer(own, rules[name]['minimum_min'])
+                      for name, own in session.window.edges_reader().items()
+                      }
+
+            # ---- 3.1 Ask again when only some files have both regions ----------------
+            # No region anywhere means none are wanted, so nothing is asked.
+            spans = {name: region_span_reader(own, rules[name]['minimum_min'])
+                     for name, own in values.items()
+                     }
+            missing = [summary['name']
+                       for summary in session.summaries
+                       if None in spans[summary['name']].values()
+                       ]
+            is_any_open = any(span is not None
+                              for own in spans.values()
+                              for span in own.values()
+                              )
+            if not missing or not is_any_open:
+                break
+            info_printer(f"Without both an oxidised and a reduced region: "
+                         f"{', '.join(missing)}. A file needs both to be shown in % "
+                         'oxidised.',
+                         )
+            if yes_no_asker('Do you want to continue without them?',
+                            False,
+                            number='4.4.1',
+                            ):
+                break
     finally:
         session.window.edges_hider()
 
@@ -1206,9 +1255,8 @@ def _regions_lister(summaries: List[dict],
     """
     ---- Summary ----
     Helper function to print the two regions of every file in one list, then name the
-    files with only one region (which count as having none) and the files that kept an
-    edge of their own because they have fewer additions than the file it was copied
-    from.
+    files that kept an edge of their own because they have fewer additions than the
+    file it was copied from.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -1241,7 +1289,6 @@ def _regions_lister(summaries: List[dict],
     """
 
     info_printer('Regions (minutes on the plot):')
-    alone = []
     for summary in summaries:
         name = summary['name']
         spans = region_span_reader(values[name], rules[name]['minimum_min'])
@@ -1251,14 +1298,6 @@ def _regions_lister(summaries: List[dict],
                  for region, span in spans.items()
                  ]
         info_printer(f"  {name}: {', '.join(texts)}")
-        if sum(span is not None for span in spans.values()) == 1:
-            alone.append(name)
-    if alone:
-        counts = 'it counts' if len(alone) == 1 else 'they count'
-        warning_shower(f"{', '.join(alone)}: only one of the two regions was chosen, "
-                       f'so {counts} as having none. Go back to the processing step '
-                       'to choose the other.',
-                       )
     if unreached:
         kept = ('has fewer additions, so it kept the region it had'
                 if len(unreached) == 1
@@ -2062,11 +2101,13 @@ def plots_stage_runner(session: ViewerSession,
     are asked, with the current choices as the defaults, and the figure is drawn and
     asked about again. The settings strip turns the haems on or off and sets the
     journal and size, so 'which haems' asks only which ones in which order, and the
-    journal and size are not asked.
+    journal and size are not asked. The haems can be shown in % oxidised when at least
+    one file has both regions.
 
     ---- Inputs ----
     session : ViewerSession
-        The browser session; its fit is the one in use, and its redraw is set.
+        The browser session; its fit is the one in use, its regions say which files
+        have % oxidised, and its redraw is set.
     answers : dict
         Answers dictionary the values are stored in.
     defaults : dict
@@ -2101,6 +2142,7 @@ def plots_stage_runner(session: ViewerSession,
     info_printer
     label_angle_asker
     preview_drawer
+    region_files_lister
     signal_asker
     """
 
@@ -2109,7 +2151,14 @@ def plots_stage_runner(session: ViewerSession,
                  'or with the ones last saved for this dataset. Change only what you '
                  'want different; you can look at every file before accepting it.',
                  )
-    _figure_starter(answers, defaults, session.fit)
+    # % oxidised is offered when at least one file has both regions.
+    include_percent = bool(region_files_lister(session.summaries,
+                                               limits,
+                                               session.regions,
+                                               answers.get('decomposition_dataset'),
+                                               ),
+                           )
+    _figure_starter(answers, defaults, session.fit, include_percent)
     _strip_shower(session, answers)
     def is_plotted() -> bool:
         return bool(answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems'])
@@ -2155,7 +2204,7 @@ def plots_stage_runner(session: ViewerSession,
         elif choice == 'haems':
             haem_choice_asker(answers, current, session.fit)
         elif choice == 'form':
-            haem_form_asker(answers, current)
+            haem_form_asker(answers, current, include_percent)
             haem_scaling_asker(answers, current)
         else:
             label_angle_asker(answers, current)
@@ -2323,6 +2372,68 @@ def processing_stage_runner(session: ViewerSession,
     return regions
 
 
+# ---- region_files_lister -------------------------------------------------------------
+def region_files_lister(summaries: List[dict],
+                        limits: Dict[str, dict],
+                        regions: Optional[Dict[str, Dict[str, float]]],
+                        dataset: Optional[str],
+                        ) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to list the files that have both an oxidised and a reduced region
+    under the trim and ignore limits as they are now: the files whose haems have two
+    levels, and so a % oxidised.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    regions : Optional[Dict[str, Dict[str, float]]]
+        {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+        times on the original recording (min); None, or a file missing, for none.
+    dataset : Optional[str]
+        The spectrometer whose spectra hold the haems; None when it is not known.
+
+    ---- Globals read ----
+    REGION_KEYS.
+
+    ---- Outputs ----
+    List[str]
+        Names of the files with both regions, in the order of the summaries.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    time on the plot = time on the recording - trim start; a region kept within the
+    used part of the run counts when it is at least the least length.
+
+    ---- Helpers ----
+    _region_rules_lister
+    region_edges_builder
+    region_span_reader
+    """
+
+    rules = _region_rules_lister(summaries, limits, dataset)
+    names = []
+    for summary in summaries:
+        name = summary['name']
+        own = (regions or {}).get(name)
+        if not own or any(key not in own for key in REGION_KEYS):
+            continue
+        rule = rules[name]
+        values = region_edges_builder(rule['used_span'],
+                                      {key: own[key] - rule['shift']
+                                       for key in REGION_KEYS
+                                       },
+                                      rule['minimum_min'],
+                                      )
+        if None not in region_span_reader(values, rule['minimum_min']).values():
+            names.append(name)
+    return names
+
+
 # ---- trim_stage_runner ---------------------------------------------------------------
 def trim_stage_runner(session: ViewerSession,
                       answers: dict,
@@ -2441,14 +2552,20 @@ def viewer_asker(summaries: List[dict],
                  fits_folder: Path,
                  export_root: Path,
                  exported: Optional[List[Path]] = None,
-                 ) -> Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]:
+                 ) -> Tuple[Dict[str, dict],
+                            Optional[dict],
+                            Dict[str, dict],
+                            bool,
+                            Dict[str, Dict[str, float]],
+                            ]:
     """
     ---- Summary ----
     Main function to ask the questions of the experiment browser: the file browser,
     trimming and ignoring, the OD values and the event labels (which end the import),
     the processing (the haem fit, the trim and ignore times again if wanted, the
-    oxidised and reduced regions, the averaging) and the individual figures. The standard plot of every file (oxygen, OCR
-    and the haems of the dataset's fit) is shown first, with no question asked. The
+    oxidised and reduced regions, which start where they were saved with the dataset,
+    the averaging) and the individual figures. The standard plot of every file (oxygen,
+    OCR and the haems of the dataset's fit) is shown first, with no question asked. The
     plot window is redrawn after each answer, and at the end any step can be gone back
     to. The settings strip can be changed while these questions wait (except those of
     the components found from the data); it is greyed out afterwards.
@@ -2461,8 +2578,8 @@ def viewer_asker(summaries: List[dict],
     defaults : dict
         Default answers offered by the questions.
     remembered : Dict[str, dict]
-        The files part of the dataset's settings: {file name: limits, OD values and
-        events} from the last run (dataset_settings, DATA_FORMAT.md).
+        The files part of the dataset's settings: {file name: limits, OD values,
+        events and regions} from the last run (dataset_settings, DATA_FORMAT.md).
     fits_folder : Path
         Folder holding the fit .csv files.
     export_root : Path
@@ -2473,13 +2590,15 @@ def viewer_asker(summaries: List[dict],
         when the caller does not need to know.
 
     ---- Globals read ----
-    STAGE_TITLES (module constant); settings.STANDARD_FIT.
+    STAGE_TITLES (module constant); settings.STANDARD_FIT; REGION_KEYS.
 
     ---- Outputs ----
-    Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
-        (limits, fit, details, plotted): the trim and ignore limits of every file, the
-        fit (None when the haems are not decomposed), the OD values and events of every
-        file, and whether the figure of each file has at least one panel.
+    Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool, Dict[str, dict]]
+        (limits, fit, details, plotted, regions): the trim and ignore limits of every
+        file, the fit (None when the haems are not decomposed), the OD values and
+        events of every file, whether the figure of each file has at least one panel,
+        and the oxidised and reduced region of every file as _regions_chooser gives
+        them (those saved with the dataset when the step was not asked).
 
     ---- Globals mutated ----
     None. Stores the answers in ``answers``, reads from and prints to the terminal,
@@ -2515,7 +2634,17 @@ def viewer_asker(summaries: List[dict],
     if exported is not None:
         session.exported = exported  # the same list, so the caller sees what is added
     window.session_attacher(session)
-    state: dict = {}
+    # The regions saved with the dataset are where the regions step starts, and give
+    # the first plots their % oxidised.
+    saved_regions = {name: dict(entry['regions'])
+                     for name, entry in remembered.items()
+                     if isinstance(entry.get('regions'), dict) and
+                     all(isinstance(entry['regions'].get(key), (int, float))
+                         for key in REGION_KEYS
+                         )
+                     }
+    state: dict = {'regions': saved_regions}
+    session.regions = saved_regions
 
     # ---- 1 Load the fit of the standard plot -----------------------------------------
     # A dataset saved without haems has no fit name; the strip then offers the standard
@@ -2569,7 +2698,8 @@ def viewer_asker(summaries: List[dict],
                                                    state['details'],
                                                    run_trim,
                                                    state.get('regions'),
-                                                   )
+                                                   ) or {}
+        session.regions = state['regions']
         state['fit_asked'] = True
     def run_plots() -> None:
         old_defaults = dict(answers) if state.get('plots_asked') else defaults
@@ -2630,4 +2760,4 @@ def viewer_asker(summaries: List[dict],
     # ---- 5 Return the answers --------------------------------------------------------
     # Read now: the strip may have changed the haems after the figure was accepted.
     plotted = bool(answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems'])
-    return state['limits'], session.fit, state['details'], plotted
+    return state['limits'], session.fit, state['details'], plotted, state['regions']

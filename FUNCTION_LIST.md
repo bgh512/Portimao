@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.8
+- **Version:** V2.9
 - **Date:** 22/11/2026
 
 ## Contents
@@ -81,7 +81,8 @@
     - [`test_results_folder_is_checked`](#test_results_folder_is_checked)
     - [`test_results_folder_names_and_old_results`](#test_results_folder_names_and_old_results)
     - [`test_results_folder_outside_is_kept_whole`](#test_results_folder_outside_is_kept_whole)
-    - [`test_saved_haem_amounts_open_as_delta_a`](#test_saved_haem_amounts_open_as_delta_a)
+    - [`test_regions_are_kept_with_the_dataset`](#test_regions_are_kept_with_the_dataset)
+    - [`test_saved_haem_amounts_open_as_delta_d`](#test_saved_haem_amounts_open_as_delta_d)
     - [`test_settings_are_read_back`](#test_settings_are_read_back)
     - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
 - [`tests/test_file_names.py`](#teststest_file_namespy)
@@ -272,6 +273,7 @@
     - [`test_reference_level_from_points_in_a_row`](#test_reference_level_from_points_in_a_row)
     - [`test_window_mean_and_spread`](#test_window_mean_and_spread)
     - [`test_averages_around_the_additions`](#test_averages_around_the_additions)
+    - [`test_a_file_with_both_regions_gets_percent_oxidised`](#test_a_file_with_both_regions_gets_percent_oxidised)
     - [`test_average_that_does_not_fit`](#test_average_that_does_not_fit)
     - [`test_baseline_needs_ten_seconds_of_data`](#test_baseline_needs_ten_seconds_of_data)
     - [`test_trimming_keeps_exactly_the_chosen_times`](#test_trimming_keeps_exactly_the_chosen_times)
@@ -309,6 +311,7 @@
     - [`test_yes_no_endings`](#test_yes_no_endings)
 - [`tests/test_redox_regions.py`](#teststest_redox_regionspy)
     - [`test_a_level_is_the_median_in_the_region`](#test_a_level_is_the_median_in_the_region)
+    - [`test_a_file_needs_both_regions_for_its_levels`](#test_a_file_needs_both_regions_for_its_levels)
     - [`test_an_edge_is_copied_by_its_nearest_addition`](#test_an_edge_is_copied_by_its_nearest_addition)
     - [`test_percent_oxidised_runs_between_the_two_levels`](#test_percent_oxidised_runs_between_the_two_levels)
     - [`test_the_least_spectra_of_the_program`](#test_the_least_spectra_of_the_program)
@@ -754,6 +757,7 @@
     - [`_region_open_checker`](#_region_open_checker)
     - [`edge_anchor_finder`](#edge_anchor_finder)
     - [`edge_time_finder`](#edge_time_finder)
+    - [`haem_levels_finder`](#haem_levels_finder)
     - [`percent_oxidised_calculator`](#percent_oxidised_calculator)
     - [`region_edge_copier`](#region_edge_copier)
     - [`region_edge_setter`](#region_edge_setter)
@@ -762,6 +766,7 @@
     - [`region_level_finder`](#region_level_finder)
     - [`region_pointer_reader`](#region_pointer_reader)
     - [`region_span_reader`](#region_span_reader)
+    - [`short_region_closer`](#short_region_closer)
 - [`utils_shared/reference_level.py`](#utils_sharedreference_levelpy)
     - [`_usable_point_keeper`](#_usable_point_keeper)
     - [`reference_level_finder`](#reference_level_finder)
@@ -952,6 +957,7 @@
     - [`pca_stage_runner`](#pca_stage_runner)
     - [`plots_stage_runner`](#plots_stage_runner)
     - [`processing_stage_runner`](#processing_stage_runner)
+    - [`region_files_lister`](#region_files_lister)
     - [`trim_stage_runner`](#trim_stage_runner)
     - [`viewer_asker`](#viewer_asker)
 - [`utils_viewer/viewer_strip.py`](#utils_viewerviewer_strippy)
@@ -1062,8 +1068,9 @@ figure_style_checker
 
 ```text
 ---- Summary ----
-Method to say whether the percent-of-range versions of the OCR and haem data
-have to be calculated.
+Method to say whether the percent-of-range version of the OCR has to be
+calculated. The % oxidised of the haems needs no asking: every file with an
+oxidised and a reduced region has it.
 
 ---- Inputs ----
 None.
@@ -1072,8 +1079,8 @@ None.
 None.
 
 ---- Outputs ----
-Tuple[bool, bool]
-    (OCR percent needed, haem percent needed).
+bool
+    True when the OCR is plotted as a % of its range.
 
 ---- Globals mutated ----
 None.
@@ -2175,6 +2182,7 @@ haem_name_formatter
 last_answers_saver
 multi_experiment_asker
 multi_figure_checker_builder
+region_files_lister
 section_starter
 special_figures_maker
 summary_figure_asker
@@ -3284,13 +3292,44 @@ None.
 None.
 ```
 
-#### `test_saved_haem_amounts_open_as_delta_a`
+#### `test_regions_are_kept_with_the_dataset`
+
+```text
+---- Summary ----
+Main function to check that the oxidised and the reduced region of each file are
+saved with the dataset and read back: a lone region is kept as it was left, a file
+with neither region chosen has none saved (one saved before is cleared), a file
+not in this run keeps its own, and a run that did not handle the regions leaves
+those saved before.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+FILES, ANSWERS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_saved_haem_amounts_open_as_delta_d`
 
 ```text
 ---- Summary ----
 Main function to check that, with only cells measured, the haem amounts are not
-offered as a way of showing the haems, and that a dataset saved showing them opens
-showing delta A, the other answers unchanged.
+offered as a way of showing the haems, that % oxidised is offered only when asked
+for, and that a dataset saved showing the amounts opens showing delta D, the other
+answers unchanged.
 
 ---- Inputs ----
 tmp_path : Path
@@ -8036,7 +8075,7 @@ None.
 
 ## `tests/test_processing_maths.py`
 
-Tests that the attenuation, normalising, percent, averaging and trimming give the results
+Tests that the attenuation, normalising, percent, averaging, trimming and the % oxidised
 
 ### HELPERS
 
@@ -8409,6 +8448,40 @@ difference = 0, -5, -8.
 
 ---- Helpers ----
 _plateau_experiment_builder
+```
+
+#### `test_a_file_with_both_regions_gets_percent_oxidised`
+
+```text
+---- Summary ----
+Main function to check that the processing of a file with both regions keeps each
+haem's two levels and its % oxidised line, with the regions (kept as times on the
+recording) put on the time of the trimmed data, and that a file without regions
+has neither and is shown as delta D when % oxidised is asked for. The reading of
+the spectra and the decomposition are stood in for by a made-up haem.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the decomposition.
+
+---- Globals read ----
+TIME_COLUMN (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Sixty spectra, one every 0.5 min from 0 to 29.5 min of the trimmed data, which
+was trimmed 2 min from its start. D is 12 mOD before 10 min, 10 mOD from 10 to
+20 min and 4 mOD from 20 min on. Regions on the recording: oxidised 2 to 8 min,
+reduced 24 to 30 min; on the trimmed data 0 to 6 and 22 to 28 min, 13 spectra
+each. D_ox = 12, D_red = 4, so P = (D - 4) / 8 x 100: 100 %, 75 % and 0 %.
+
+---- Helpers ----
+None.
 ```
 
 #### `test_average_that_does_not_fit`
@@ -9430,6 +9503,44 @@ Reduced region, 6 to 9 min. bH: 4, 5, 3, 4; in order 3, 4, 4, 5, so the median i
 From 1 to 3 min bH is 13, 11, 12: median 12. From 1.5 to 3.5 min only the spectra
 at 2 and 3 min are inside: two, fewer than three. From 0 to 2 min cc has only two
 values (6, 6), as the one at 1 min is blank.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_file_needs_both_regions_for_its_levels`
+
+```text
+---- Summary ----
+Main function to check the two levels of every haem of a file from the regions
+kept for it: the regions are kept as times on the recording, so the trim start is
+taken off; a region is kept within the used part of the run; and a file with no
+regions, with only one, or with one that no longer holds enough spectra has no
+levels. A region too short to count is closed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+RUN, OXIDISED_MIN, REDUCED_MIN, FEW (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The run was trimmed 2 min from its start, so its regions, 0 to 4 and 6 to 9 min
+on the run, are 2 to 6 and 8 to 11 min on the recording. The levels are those of
+test_a_level_is_the_median_in_the_region: bH 12 and 4, cc 6.5 and 2, a605 5 and 5.
+With the first minute ignored the used part is 1 to 9 min, and the oxidised region
+is kept to 1 to 4 min. bH: 13, 11, 12, 30; in order 11, 12, 13, 30, so the median
+is (12 + 13) / 2 = 12.5. cc: 6, 8, 7 (the blank left out), median 7.
+With the last two minutes ignored the used part ends at 7 min: the reduced region
+is kept to 6 to 7 min, two spectra, fewer than three, so the file has no levels.
+A region of 0.05 min with a least length of 0.1 min is closed at the edge that
+opens it: the end of the oxidised region, the start of the reduced one.
 
 ---- Helpers ----
 None.
@@ -11789,7 +11900,9 @@ hours_parser
 
 ```text
 ---- Summary ----
-Helper function to ask the settings of the haem and OCR response figure (6.2.x).
+Helper function to ask the settings of the haem and OCR response figure (7.2.x).
+The figure averages files together, so the haems are offered in % oxidised only
+when every file of the figure has an oxidised and a reduced region.
 
 ---- Inputs ----
 names : List[str]
@@ -11797,9 +11910,12 @@ names : List[str]
 answers : dict
     Answers dictionary the settings are stored in.
 defaults : dict
-    Default answers.
+    Default answers; % oxidised as the default gives delta D when it is not
+    offered.
 fit : dict
     Fit dictionary (haem_list) used to list the haems.
+percent_names : Optional[List[str]]
+    Names of the files with both regions; None when no file has them.
 step_checker : Optional[Callable[[object, str, str], bool]]
     Function (names, question, change label) that draws the figure as built so far,
     asks whether it is accepted and returns True when it is; None skips the
@@ -12104,6 +12220,9 @@ figure_checker : Optional[Callable[[str, dict], bool]]
     Function called after the questions of each figure with (key, {'fit': fit,
     'custom': result so far}); it shows the figure and returns True when the user
     accepts it. When it returns False the figure's questions are asked again.
+percent_names : Optional[List[str]]
+    Names of the files with an oxidised and a reduced region, whose haems have a
+    % oxidised; None when no file has them.
 
 ---- Globals read ----
 None.
@@ -18378,9 +18497,9 @@ _export_folder_shortener
 ```text
 ---- Summary ----
 Main function to build the files part of the dataset's settings: for each file of
-this run its limits, OD values and events laid over what was saved before. A value
-not asked this run (the OD when not scaling by OD) stays as it was saved, so it is
-offered next time; files not in this run are kept as they were.
+this run its limits, OD values, events and regions laid over what was saved before.
+A value not asked this run (the OD when not scaling by OD) stays as it was saved,
+so it is offered next time; files not in this run are kept as they were.
 
 ---- Inputs ----
 remembered : Dict[str, dict]
@@ -18392,14 +18511,20 @@ limits : Dict[str, dict]
 details : Dict[str, dict]
     {file name: {'OD', 'volume', 'dilution_factor', 'events'}} of this run; the OD
     values only when scaling by OD.
+regions : Optional[Dict[str, Dict[str, float]]]
+    {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} of
+    this run, as times on the original recording (min); a region not chosen has
+    its two edges together. None when the regions were not handled this run, so
+    those saved before stay.
 
 ---- Globals read ----
-SAVED_VALUE_KEYS (module constant).
+SAVED_VALUE_KEYS (module constant); REGION_KEYS, REGION_NAMES.
 
 ---- Outputs ----
 Dict[str, dict]
-    {file name: limits, then 'OD', 'volume', 'dilution_factor' (floats) and
-    'events' (DATA_FORMAT.md, dataset_settings) where known}.
+    {file name: limits, then 'OD', 'volume', 'dilution_factor' (floats),
+    'events' and 'regions' (DATA_FORMAT.md, dataset_settings) where known}. A
+    file of this run with neither region chosen has no 'regions'.
 
 ---- Globals mutated ----
 None.
@@ -18486,13 +18611,15 @@ None.
 ```text
 ---- Summary ----
 Main function to read (or take) one experiment and process its data: trim, decompose
-into haems, scale by OD, convert to percentages, choose the plotted sources and
-average around the events. It draws and saves nothing.
+into haems, find each haem's oxidised and reduced level and its % oxidised (a file
+with both regions), scale by OD, put the OCR on its % of the range, choose the
+plotted sources and average around the events. It draws and saves nothing.
 
 ---- Inputs ----
 info : dict
     Per-file information from everything_asker: path, name, trim and ignore times,
-    OD values and events.
+    OD values, events and, when kept for the file, 'regions' (the four edges of
+    its oxidised and reduced region, as times on the original recording, min).
 cfg : settings.Config
     Figure style and settings derived from the answers (config.py).
 fit : Optional[dict]
@@ -18504,12 +18631,16 @@ experiment : Optional[dict]
 
 ---- Globals read ----
 settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
-settings.BASELINE_MINIMUM_SECONDS; BACKGROUND_LABELS.
+settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS;
+BACKGROUND_LABELS.
 
 ---- Outputs ----
 dict
-    {experiment, od_available, vo2_source, haem_source}. Prints progress and the
-    reason when a step is skipped (side effect).
+    {experiment, od_available, vo2_source, haem_source}. A file with both regions
+    has experiment['haem_levels'] and experiment['haem_percent'] (DATA_FORMAT.md);
+    when % oxidised is asked for a file without them, its haem source is
+    'delta_abs'. Prints progress and the reason when a step is skipped (side
+    effect).
 
 ---- Globals mutated ----
 None. Processes the experiment dictionary in place (side effect).
@@ -18527,9 +18658,12 @@ experiment_normaliser
 experiment_paf_loader
 experiment_trimmer
 fit_range_finder
+haem_levels_finder
 percent_converter
 percent_need_checker
+percent_oxidised_calculator
 source_chooser
+time_getter
 warning_shower
 ```
 
@@ -23695,7 +23829,7 @@ retry_teller
 
 ## `utils_shared/redox_regions.py`
 
-The maths of the oxidised and reduced regions: a haem's level in a region, % oxidised
+The maths of the oxidised and reduced regions: a haem's level in a region, the two
 
 ### REGION HELPERS
 
@@ -23800,6 +23934,56 @@ time = time of the addition of the same number in this file + distance.
 
 ---- Helpers ----
 None.
+```
+
+#### `haem_levels_finder`
+
+```text
+---- Summary ----
+Main function to find the oxidised and the reduced level of every haem of a file
+from the two regions kept for it. A file needs both regions: with none, with only
+one, or with one that no longer holds enough spectra in the used part of the run
+(the trim or the ignored parts changed), it has no levels.
+
+---- Inputs ----
+haem_table : pd.DataFrame
+    Haem table (time, spectrum index and one column per haem), in any one unit,
+    on the time axis of the trimmed data.
+regions : Optional[Dict[str, float]]
+    {oxidised_start, oxidised_end, reduced_start, reduced_end} as times on the
+    original recording (min), or None when nothing is kept for the file.
+shift_min : float
+    Trim start (min): what is taken off a time on the recording for the time on
+    the trimmed data.
+used_span : Tuple[float, float]
+    (first, last) time of the used part of the run (min), on the trimmed data.
+minimum_points : int
+    Least number of spectra a region must hold (config.REGION_MINIMUM_POINTS).
+label : str
+    Name of the file in the messages.
+
+---- Globals read ----
+REGION_NAMES.
+
+---- Outputs ----
+Optional[dict]
+    {'oxidised': {haem: level}, 'reduced': {haem: level}, in the unit of the
+    table; 'oxidised_region', 'reduced_region': (start_min, end_min) on the time
+    axis of the table, kept within the used part}, or None when the file does not
+    have both regions. Raises ValueError (region_level_finder) when a haem has too
+    few values inside a region that holds enough spectra.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+start = max(start on the recording - shift, first); end = min(end on the
+recording - shift, last). A region counts when it holds at least minimum_points
+spectra with start <= time <= end. level: region_level_finder.
+
+---- Helpers ----
+region_level_finder
+time_getter
 ```
 
 #### `percent_oxidised_calculator`
@@ -24095,6 +24279,39 @@ None.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+_region_open_checker
+```
+
+#### `short_region_closer`
+
+```text
+---- Summary ----
+Main function to give the edges of a file with every region that is too short to
+count closed: its two edges together, where its handle is. A region is then
+chosen exactly when its end is after its start, which is how it is kept with the
+dataset.
+
+---- Inputs ----
+values : Dict[str, float]
+    {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min).
+minimum_min : float
+    Least length of a region (min); a shorter one is not chosen.
+
+---- Globals read ----
+REGION_NAMES, CLOSED_KEYS.
+
+---- Outputs ----
+Dict[str, float]
+    New values of the file; the dictionary given is not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A region with end - start < least length: start = end = the edge that opens it
+(the end of the oxidised region, the start of the reduced one).
 
 ---- Helpers ----
 _region_open_checker
@@ -26705,14 +26922,17 @@ multi_asker
 
 ```text
 ---- Summary ----
-Main function to ask how the haems are shown (absorbance change, concentration,
-percentage and so on).
+Main function to ask how the haems are shown: absorbance, delta D or, when a file
+has an oxidised and a reduced region, % oxidised.
 
 ---- Inputs ----
 answers : dict
     Answers dictionary the values are stored in.
 defaults : dict
-    Default answers.
+    Default answers; % oxidised as the default gives delta D when it is not
+    offered.
+include_percent : bool
+    True to offer % oxidised: at least one file has both regions.
 
 ---- Globals read ----
 None.
@@ -26737,11 +26957,12 @@ haem_form_option_builder
 ```text
 ---- Summary ----
 Helper function to build the (key, label) choices for the 'how to show the
-haems' questions. The delta A line explains itself in italics.
+haems' questions. The delta D line explains itself in italics.
 
 ---- Inputs ----
 include_percent : bool
-    True to offer the % oxidised choice.
+    True to offer the % oxidised choice: the files asked about have an oxidised
+    and a reduced region.
 
 ---- Globals read ----
 None.
@@ -30874,8 +31095,9 @@ answers : dict
 fit : Optional[dict]
     Fit dictionary, or None.
 context : dict
-    {summaries, limits, details, export_root} of the run so far. The processed
-    files are kept in it (key '_processed') while one figure is being built.
+    {summaries, limits, details, regions, export_root} of the run so far. The
+    processed files are kept in it (key '_processed') while one figure is being
+    built.
 
 ---- Globals read ----
 None.
@@ -31198,6 +31420,9 @@ limits : dict
     lack the file.
 details : dict
     {file name: {OD, volume, dilution_factor, events}}; may lack the file.
+regions : Optional[dict]
+    {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+    times on the original recording (min); None, or a file missing, for none.
 
 ---- Globals read ----
 None.
@@ -31417,8 +31642,8 @@ problem_teller
 ```text
 ---- Summary ----
 Main function to show the answers given so far in the window: the window is given
-the settings, with the decomposition kept to compare with (session.kept), and draws
-every file the user looks at with them. Problems are reported, never raised, so the
+the settings, with the decomposition kept to compare with (session.kept) and the
+oxidised and reduced regions (session.regions), and draws every file the user looks at with them. Problems are reported, never raised, so the
 questions carry on.
 
 ---- Inputs ----
@@ -32259,7 +32484,8 @@ text_colourer
 ---- Summary ----
 Helper function to set the figure of each file from the standard settings or the
 ones last saved for the dataset, keeping only what this run allows: the OCR per OD
-and the haems scaled by OD only when OD values were entered, and the haems only
+and the haems scaled by OD only when OD values were entered, the haems in %
+oxidised only when a file has both regions (delta D otherwise), and the haems only
 when they are decomposed, limited to those of the fit in use (all of them when none
 of the saved ones is in it). The Haems box of the settings strip says whether the
 haems are worked out and shown, so the figure has them whenever they are decomposed.
@@ -32275,6 +32501,9 @@ defaults : dict
     haem_per_od, event_label_angle).
 fit : Optional[dict]
     Fit dictionary (haem_list), or None when the haems are not decomposed.
+include_percent : bool
+    True when at least one file has an oxidised and a reduced region, so the
+    haems can be shown in % oxidised.
 
 ---- Globals read ----
 None.
@@ -32549,9 +32778,11 @@ None.
 Helper function to run the regions step on the plot of every file: the oxidised and
 the reduced region are pulled out on the plot or typed in the strip under it, and
 Enter accepts them. With "Every file" ticked, an edge set on the file shown is
-copied to every file at the same distance from its nearest addition. The regions
-are then listed, with the files that have only one region and the files a copy
-could not reach.
+copied to every file at the same distance from its nearest addition. Enter with no
+region on any file means no regions; when only some files have both, a question
+names the others and asks whether to continue without them, and No goes back to
+the edges as they were. The regions are then listed, with the files a copy could
+not reach.
 
 ---- Inputs ----
 session : ViewerSession
@@ -32575,7 +32806,8 @@ REGION_FIELDS, REGION_KEY_TEXT, REGION_NUDGE (module constants).
 Dict[str, Dict[str, float]]
     {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
     times on the original recording (min), so a later change of the trim leaves
-    them on the same data. A region not chosen has its two edges together.
+    them on the same data. A region not chosen, or too short to count, has its two
+    edges together.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal and draws on the plot window (side
@@ -32595,6 +32827,9 @@ region_edge_setter
 region_edges_builder
 region_layout_finder
 region_pointer_reader
+region_span_reader
+short_region_closer
+yes_no_asker
 EdgeChoice
 ```
 
@@ -32603,9 +32838,8 @@ EdgeChoice
 ```text
 ---- Summary ----
 Helper function to print the two regions of every file in one list, then name the
-files with only one region (which count as having none) and the files that kept an
-edge of their own because they have fewer additions than the file it was copied
-from.
+files that kept an edge of their own because they have fewer additions than the
+file it was copied from.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -33002,11 +33236,13 @@ how the haems are shown, the angle of the event labels): only that part's questi
 are asked, with the current choices as the defaults, and the figure is drawn and
 asked about again. The settings strip turns the haems on or off and sets the
 journal and size, so 'which haems' asks only which ones in which order, and the
-journal and size are not asked.
+journal and size are not asked. The haems can be shown in % oxidised when at least
+one file has both regions.
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session; its fit is the one in use, and its redraw is set.
+    The browser session; its fit is the one in use, its regions say which files
+    have % oxidised, and its redraw is set.
 answers : dict
     Answers dictionary the values are stored in.
 defaults : dict
@@ -33041,6 +33277,7 @@ haem_scaling_asker
 info_printer
 label_angle_asker
 preview_drawer
+region_files_lister
 signal_asker
 ```
 
@@ -33111,6 +33348,45 @@ preview_drawer
 yes_no_asker
 ```
 
+#### `region_files_lister`
+
+```text
+---- Summary ----
+Main function to list the files that have both an oxidised and a reduced region
+under the trim and ignore limits as they are now: the files whose haems have two
+levels, and so a % oxidised.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+regions : Optional[Dict[str, Dict[str, float]]]
+    {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+    times on the original recording (min); None, or a file missing, for none.
+dataset : Optional[str]
+    The spectrometer whose spectra hold the haems; None when it is not known.
+
+---- Globals read ----
+REGION_KEYS.
+
+---- Outputs ----
+List[str]
+    Names of the files with both regions, in the order of the summaries.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+time on the plot = time on the recording - trim start; a region kept within the
+used part of the run counts when it is at least the least length.
+
+---- Helpers ----
+_region_rules_lister
+region_edges_builder
+region_span_reader
+```
+
 #### `trim_stage_runner`
 
 ```text
@@ -33169,8 +33445,9 @@ EdgeChoice
 Main function to ask the questions of the experiment browser: the file browser,
 trimming and ignoring, the OD values and the event labels (which end the import),
 the processing (the haem fit, the trim and ignore times again if wanted, the
-oxidised and reduced regions, the averaging) and the individual figures. The standard plot of every file (oxygen, OCR
-and the haems of the dataset's fit) is shown first, with no question asked. The
+oxidised and reduced regions, which start where they were saved with the dataset,
+the averaging) and the individual figures. The standard plot of every file (oxygen,
+OCR and the haems of the dataset's fit) is shown first, with no question asked. The
 plot window is redrawn after each answer, and at the end any step can be gone back
 to. The settings strip can be changed while these questions wait (except those of
 the components found from the data); it is greyed out afterwards.
@@ -33183,8 +33460,8 @@ answers : dict
 defaults : dict
     Default answers offered by the questions.
 remembered : Dict[str, dict]
-    The files part of the dataset's settings: {file name: limits, OD values and
-    events} from the last run (dataset_settings, DATA_FORMAT.md).
+    The files part of the dataset's settings: {file name: limits, OD values,
+    events and regions} from the last run (dataset_settings, DATA_FORMAT.md).
 fits_folder : Path
     Folder holding the fit .csv files.
 export_root : Path
@@ -33195,13 +33472,15 @@ exported : Optional[List[Path]]
     when the caller does not need to know.
 
 ---- Globals read ----
-STAGE_TITLES (module constant); settings.STANDARD_FIT.
+STAGE_TITLES (module constant); settings.STANDARD_FIT; REGION_KEYS.
 
 ---- Outputs ----
-Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
-    (limits, fit, details, plotted): the trim and ignore limits of every file, the
-    fit (None when the haems are not decomposed), the OD values and events of every
-    file, and whether the figure of each file has at least one panel.
+Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool, Dict[str, dict]]
+    (limits, fit, details, plotted, regions): the trim and ignore limits of every
+    file, the fit (None when the haems are not decomposed), the OD values and
+    events of every file, whether the figure of each file has at least one panel,
+    and the oxidised and reduced region of every file as _regions_chooser gives
+    them (those saved with the dataset when the step was not asked).
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers``, reads from and prints to the terminal,

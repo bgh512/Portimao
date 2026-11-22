@@ -43,7 +43,7 @@ FIT_FILE_FORMAT = 1
 # The haem library: one fit file per haem, each at the size its source fit gives it, in
 # this folder of the fits folder; and the presets, each a list of library files (with
 # the haems per protein of each beside it, for the reader only), in the other. Only cells
-# are measured, so a shape's size never changes the absorbance, delta A or %. A preset's
+# are measured, so a shape's size never changes the absorbance, delta D or %. A preset's
 # first cell is PRESET_FILE_MARK, its second the format.
 HAEMS_FOLDER_NAME = 'haems'
 PRESETS_FOLDER_NAME = 'presets'

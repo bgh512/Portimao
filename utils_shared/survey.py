@@ -1248,17 +1248,23 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
 
 
 # ---- haem_form_asker -----------------------------------------------------------------
-def haem_form_asker(answers: dict, defaults: dict) -> None:
+def haem_form_asker(answers: dict,
+                    defaults: dict,
+                    include_percent: bool = True,
+                    ) -> None:
     """
     ---- Summary ----
-    Main function to ask how the haems are shown (absorbance change, concentration,
-    percentage and so on).
+    Main function to ask how the haems are shown: absorbance, delta D or, when a file
+    has an oxidised and a reduced region, % oxidised.
 
     ---- Inputs ----
     answers : dict
         Answers dictionary the values are stored in.
     defaults : dict
-        Default answers.
+        Default answers; % oxidised as the default gives delta D when it is not
+        offered.
+    include_percent : bool
+        True to offer % oxidised: at least one file has both regions.
 
     ---- Globals read ----
     None.
@@ -1278,9 +1284,13 @@ def haem_form_asker(answers: dict, defaults: dict) -> None:
     haem_form_option_builder
     """
 
+    options = haem_form_option_builder(include_percent)
+    default = defaults['haem_mode']
+    if default not in [key for key, _ in options]:
+        default = 'delta'
     answers['haem_mode'] = choice_asker('How would you like to plot the haems?',
-                                        haem_form_option_builder(True),
-                                        defaults['haem_mode'],
+                                        options,
+                                        default,
                                         )
 
 
@@ -1289,11 +1299,12 @@ def haem_form_option_builder(include_percent: bool) -> List[Tuple[str, str]]:
     """
     ---- Summary ----
     Helper function to build the (key, label) choices for the 'how to show the
-    haems' questions. The delta A line explains itself in italics.
+    haems' questions. The delta D line explains itself in italics.
 
     ---- Inputs ----
     include_percent : bool
-        True to offer the % oxidised choice.
+        True to offer the % oxidised choice: the files asked about have an oxidised
+        and a reduced region.
 
     ---- Globals read ----
     None.
@@ -1313,13 +1324,16 @@ def haem_form_option_builder(include_percent: bool) -> List[Tuple[str, str]]:
     """
 
     # No concentration: only cells are measured, and a haem amount depends on the size
-    # of its shape, which the absorbance, delta A and % do not.
-    delta = f"ΔA (mOD), {text_italiser('the change in absorbance from the start')}"
+    # of its shape, which the absorbance, delta D and % do not.
+    delta = f"ΔD (mOD), {text_italiser('the change from the start')}"
     options = [('abs', 'Absorbance (mOD)'),
                ('delta', delta),
                ]
     if include_percent:
-        options.append(('percent', '% oxidised (lowest to highest = 0 to 100 %)'))
+        options.append(('percent',
+                        '% oxidised (reduced region = 0 %, oxidised region = 100 %)',
+                        ),
+                       )
     return options
 
 

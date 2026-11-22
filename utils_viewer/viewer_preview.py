@@ -83,6 +83,7 @@ class PreviewSpec:
     show_trim: bool = False
     show_ignored: bool = True
     kept: Optional[dict] = None
+    regions: dict = field(default_factory=dict)
 
 
 # ---- TimeAxis ------------------------------------------------------------------------
@@ -120,6 +121,7 @@ class ViewerSession:
     cache: OrderedDict = field(default_factory=OrderedDict)
     fit: Optional[dict] = None
     kept: Optional[dict] = None
+    regions: Dict[str, Dict[str, float]] = field(default_factory=dict)
     redraw: Optional[Callable[[], bool]] = None
     is_figure: bool = False
     export_choice: Optional[str] = None
@@ -484,7 +486,11 @@ def _overlay_drawer(axes: list, regions: List[Tuple[float, float]]) -> None:
 
 
 # ---- preview_info_builder ------------------------------------------------------------
-def preview_info_builder(summary: dict, limits: dict, details: dict) -> dict:
+def preview_info_builder(summary: dict,
+                         limits: dict,
+                         details: dict,
+                         regions: Optional[dict] = None,
+                         ) -> dict:
     """
     ---- Summary ----
     Helper function to build the per-file information dictionary that
@@ -498,6 +504,9 @@ def preview_info_builder(summary: dict, limits: dict, details: dict) -> dict:
         lack the file.
     details : dict
         {file name: {OD, volume, dilution_factor, events}}; may lack the file.
+    regions : Optional[dict]
+        {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+        times on the original recording (min); None, or a file missing, for none.
 
     ---- Globals read ----
     None.
@@ -525,6 +534,7 @@ def preview_info_builder(summary: dict, limits: dict, details: dict) -> dict:
             'trim_end': own.get('trim_end'),
             'ignore_start': own.get('ignore_start') or 0.0,
             'ignore_end': own.get('ignore_end') or 0.0,
+            'regions': (regions or {}).get(name),
             }
     info.update(details.get(name, {}))
     return info
@@ -858,8 +868,8 @@ def preview_drawer(session: ViewerSession,
     """
     ---- Summary ----
     Main function to show the answers given so far in the window: the window is given
-    the settings, with the decomposition kept to compare with (session.kept), and draws
-    every file the user looks at with them. Problems are reported, never raised, so the
+    the settings, with the decomposition kept to compare with (session.kept) and the
+    oxidised and reduced regions (session.regions), and draws every file the user looks at with them. Problems are reported, never raised, so the
     questions carry on.
 
     ---- Inputs ----
@@ -907,6 +917,7 @@ def preview_drawer(session: ViewerSession,
                        show_trim=show_trim,
                        show_ignored=show_ignored,
                        kept=session.kept,
+                       regions=copy.deepcopy(session.regions),
                        )
 
     # ---- 2 Hand them to the window ---------------------------------------------------
@@ -969,6 +980,7 @@ def preview_figure_builder(session: ViewerSession,
     info = preview_info_builder(summary,
                                 {name: {} if spec.show_trim else own},
                                 spec.details,
+                                spec.regions,
                                 )
     preview_answers = dict(settings.DEFAULT_ANSWERS,
                            **dict(spec.answers, export_spectra=False),

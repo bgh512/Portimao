@@ -5,12 +5,17 @@ Reading and processing of one experiment (everything before the figure and the e
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from typing import List, Optional
 
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import numpy as np
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.averaging import experiment_averages_calculator
 from utils_shared.normalisation import experiment_normaliser, percent_converter
 from utils_shared.paf_reader import experiment_paf_loader, PafError
+from utils_shared.redox_regions import haem_levels_finder, percent_oxidised_calculator
+from utils_shared.schema import time_getter
 from utils_shared.spectral_decomposer import (BACKGROUND_LABELS,
                                               experiment_decomposer,
                                               fit_range_finder,
@@ -120,13 +125,15 @@ def experiment_data_processor(info: dict,
     """
     ---- Summary ----
     Main function to read (or take) one experiment and process its data: trim, decompose
-    into haems, scale by OD, convert to percentages, choose the plotted sources and
-    average around the events. It draws and saves nothing.
+    into haems, find each haem's oxidised and reduced level and its % oxidised (a file
+    with both regions), scale by OD, put the OCR on its % of the range, choose the
+    plotted sources and average around the events. It draws and saves nothing.
 
     ---- Inputs ----
     info : dict
         Per-file information from everything_asker: path, name, trim and ignore times,
-        OD values and events.
+        OD values, events and, when kept for the file, 'regions' (the four edges of
+        its oxidised and reduced region, as times on the original recording, min).
     cfg : settings.Config
         Figure style and settings derived from the answers (config.py).
     fit : Optional[dict]
@@ -138,12 +145,16 @@ def experiment_data_processor(info: dict,
 
     ---- Globals read ----
     settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
-    settings.BASELINE_MINIMUM_SECONDS; BACKGROUND_LABELS.
+    settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS;
+    BACKGROUND_LABELS.
 
     ---- Outputs ----
     dict
-        {experiment, od_available, vo2_source, haem_source}. Prints progress and the
-        reason when a step is skipped (side effect).
+        {experiment, od_available, vo2_source, haem_source}. A file with both regions
+        has experiment['haem_levels'] and experiment['haem_percent'] (DATA_FORMAT.md);
+        when % oxidised is asked for a file without them, its haem source is
+        'delta_abs'. Prints progress and the reason when a step is skipped (side
+        effect).
 
     ---- Globals mutated ----
     None. Processes the experiment dictionary in place (side effect).
@@ -161,9 +172,12 @@ def experiment_data_processor(info: dict,
     experiment_paf_loader
     experiment_trimmer
     fit_range_finder
+    haem_levels_finder
     percent_converter
     percent_need_checker
+    percent_oxidised_calculator
     source_chooser
+    time_getter
     warning_shower
     """
 
@@ -263,8 +277,39 @@ def experiment_data_processor(info: dict,
     elif a['export_spectra']:
         experiment_attenuation_adder(experiment)
 
-    # ---- 4.3 Normalise by OD ---------------------------------------------------------
-    # OD scaling and relative (%) scaling.
+    # ---- 4.3 Find each haem's two levels and its % oxidised --------------------------
+    # Only for a file with both regions; any other has no % oxidised.
+    if 'haem_abs' in experiment:
+        try:
+            times = time_getter(experiment['haem_abs'])
+            last = float(np.nanmax(times)) - ignore_last
+            levels = haem_levels_finder(experiment['haem_abs'],
+                                        info.get('regions'),
+                                        info.get('trim_start') or 0.0,
+                                        (ignore_first, max(last, ignore_first)),
+                                        settings.REGION_MINIMUM_POINTS,
+                                        label=info['name'],
+                                        )
+            if levels is not None:
+                experiment['haem_levels'] = levels
+                experiment['haem_percent'] = percent_oxidised_calculator(
+                    experiment['haem_abs'],
+                    levels['oxidised'],
+                    levels['reduced'],
+                    )
+                spans = ', '.join(f'{region} {start:.2f}-{end:.2f} min'
+                                  for region, (start, end)
+                                  in (('oxidised', levels['oxidised_region']),
+                                      ('reduced', levels['reduced_region']),
+                                      )
+                                  )
+                print(f"  Each haem's oxidised and reduced level is its median in "
+                      f'the regions: {spans}',
+                      )
+        except (KeyError, ValueError, TypeError) as exc:
+            _skip_reporter('the % oxidised of the haems', exc)
+
+    # ---- 4.4 Normalise by OD ---------------------------------------------------------
     if od_available:
         try:
             experiment_normaliser(experiment)
@@ -275,28 +320,30 @@ def experiment_data_processor(info: dict,
             od_available = False
             _skip_reporter('the scaling by OD', exc)
 
-    # ---- 4.4 Convert to percentages --------------------------------------------------
-    percent_vo2, percent_haem = cfg.percent_need_checker()
-    for needed, source_key, target_key, what in (
-        (percent_haem, 'haem_conc', 'haem_percent', 'the haems'),
-        (percent_vo2, 'VoO2', 'VoO2_percent', 'the oxygen consumption'),
-        ):
-        if needed and source_key in experiment:
-            try:
-                percent_converter(experiment,
-                                  source_key,
-                                  target_key,
-                                  exclude_first_minutes=ignore_first,
-                                  exclude_last_minutes=ignore_last,
-                                  window_points=window_points,
-                                  )
-            except (KeyError, ValueError, TypeError) as exc:
-                _skip_reporter(f'the % scale of {what}', exc)
+    # ---- 4.5 Put the OCR on its % of the range ---------------------------------------
+    if cfg.percent_need_checker() and 'VoO2' in experiment:
+        try:
+            percent_converter(experiment,
+                              'VoO2',
+                              'VoO2_percent',
+                              exclude_first_minutes=ignore_first,
+                              exclude_last_minutes=ignore_last,
+                              window_points=window_points,
+                              )
+        except (KeyError, ValueError, TypeError) as exc:
+            _skip_reporter('the % scale of the oxygen consumption', exc)
 
     # ---- 5 Choose the sources and average --------------------------------------------
     vo2_source, haem_source = cfg.source_chooser(od_available)
     if haem_source is not None and not (a['plot_haems'] or a['averaging']):
         haem_source = None
+    # A file without both regions has no % oxidised, so its haems stay in delta D.
+    if haem_source == 'percent' and 'haem_percent' not in experiment:
+        haem_source = 'delta_abs'
+        if 'haem_delta_abs' in experiment:
+            print('  This file has no oxidised and reduced region, so its haems are '
+                  'shown as ΔD.',
+                  )
     # Event-window averages.
     if a['averaging']:
         if not metadata['events']:

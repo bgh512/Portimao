@@ -49,8 +49,9 @@ def _kept_builder(names: List[str],
     fit : Optional[dict]
         Fit dictionary, or None.
     context : dict
-        {summaries, limits, details, export_root} of the run so far. The processed
-        files are kept in it (key '_processed') while one figure is being built.
+        {summaries, limits, details, regions, export_root} of the run so far. The
+        processed files are kept in it (key '_processed') while one figure is being
+        built.
 
     ---- Globals read ----
     None.
@@ -79,6 +80,7 @@ def _kept_builder(names: List[str],
         info = preview_info_builder(by_name[name],
                                     context['limits'],
                                     context['details'],
+                                    context.get('regions'),
                                     )
         info['custom'] = customs.get(name,
                                      {'time_response_group': None,

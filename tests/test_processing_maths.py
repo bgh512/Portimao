@@ -1,7 +1,10 @@
 """
-Tests that the attenuation, normalising, percent, averaging and trimming give the results
-worked out by hand from small made-up data.
+Tests that the attenuation, normalising, percent, averaging, trimming and the % oxidised
+of a processed file give the results worked out by hand from small made-up data.
 """
+
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
+from typing import Optional
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
@@ -9,6 +12,8 @@ import pandas as pd
 import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+import config as settings
+from utils_shared import experiment_processing
 from utils_shared.attenuation import attenuation_converter, experiment_attenuation_adder
 from utils_shared.averaging import (experiment_averages_calculator,
                                     window_statistics_calculator,
@@ -20,7 +25,7 @@ from utils_shared.normalisation import (data_normaliser,
 from utils_shared.reference_level import (reference_level_finder,
                                           window_seconds_calculator,
                                           )
-from utils_shared.schema import TIME_COLUMN
+from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
 from utils_shared.trimming import experiment_trimmer
 
 
@@ -619,6 +624,131 @@ def test_averages_around_the_additions() -> None:
         assert np.isclose(stats['sd'], 0.0)
         assert np.isclose(stats['change'], change)
         assert np.isclose(stats['delta'], delta)
+
+
+# ---- test_a_file_with_both_regions_gets_percent_oxidised -----------------------------
+def test_a_file_with_both_regions_gets_percent_oxidised(monkeypatch: pytest.MonkeyPatch,
+                                                        ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the processing of a file with both regions keeps each
+    haem's two levels and its % oxidised line, with the regions (kept as times on the
+    recording) put on the time of the trimmed data, and that a file without regions
+    has neither and is shown as delta D when % oxidised is asked for. The reading of
+    the spectra and the decomposition are stood in for by a made-up haem.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Pytest's tool for standing in for the decomposition.
+
+    ---- Globals read ----
+    TIME_COLUMN (module constant).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Sixty spectra, one every 0.5 min from 0 to 29.5 min of the trimmed data, which
+    was trimmed 2 min from its start. D is 12 mOD before 10 min, 10 mOD from 10 to
+    20 min and 4 mOD from 20 min on. Regions on the recording: oxidised 2 to 8 min,
+    reduced 24 to 30 min; on the trimmed data 0 to 6 and 22 to 28 min, 13 spectra
+    each. D_ox = 12, D_red = 4, so P = (D - 4) / 8 x 100: 100 %, 75 % and 0 %.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 A made-up file, its decomposition stood in for ----------------------------
+    times = np.arange(60) * 0.5
+    values = np.where(times < 10, 12.0, np.where(times < 20, 10.0, 4.0))
+
+    def decomposer(experiment: dict, *_args: object, **_kwargs: object) -> None:
+        table = pd.DataFrame({TIME_COLUMN: times,
+                              SPECTRUM_INDEX_COLUMN: np.arange(1, 61),
+                              'bH': values,
+                              },
+                             )
+        delta = table.copy()
+        delta['bH'] = values - 12.0
+        delta.attrs['delta_abs_baseline'] = {'window_by_haem': {'bH': (0.0, 24.5)},
+                                             'window_seconds': 1470.0,
+                                             }
+        experiment.update({'haem_conc': table.copy(),
+                           'haem_abs': table,
+                           'haem_delta_abs': delta,
+                           },
+                          )
+
+    monkeypatch.setattr(experiment_processing, 'experiment_decomposer', decomposer)
+    monkeypatch.setattr(experiment_processing,
+                        'experiment_attenuation_adder',
+                        lambda *args, **kwargs: None,
+                        )
+    monkeypatch.setattr(experiment_processing,
+                        'experiment_trimmer',
+                        lambda *args, **kwargs: None,
+                        )
+    monkeypatch.setattr(experiment_processing,
+                        'fit_range_finder',
+                        lambda data: (500.0, 630.0),
+                        )
+
+    def processor(regions: Optional[dict]) -> dict:
+        experiment = {'experiment_name': 'made_up',
+                      'CcO2': pd.DataFrame({TIME_COLUMN: times, 'Measured O2': 0.0}),
+                      'VoO2': pd.DataFrame({TIME_COLUMN: times, 'VoO2': 1.0}),
+                      'raw_spectra': {},
+                      'metadata': {'events': []},
+                      }
+        info = {'path': 'made_up.paf',
+                'name': 'made_up',
+                'trim_start': 2.0,
+                'trim_end': None,
+                'ignore_start': 0.0,
+                'ignore_end': 0.0,
+                'regions': regions,
+                }
+        answers = dict(settings.DEFAULT_ANSWERS,
+                       decompose=True,
+                       plot_haems=True,
+                       haem_mode='percent',
+                       haem_per_od=False,
+                       )
+        return experiment_processing.experiment_data_processor(info,
+                                                               settings.Config(answers),
+                                                               {'haem_list': ['bH'],
+                                                                'data': None,
+                                                                },
+                                                               experiment,
+                                                               )
+
+    # ---- 2 Both regions: the two levels and the % line -------------------------------
+    regions = {'oxidised_start': 2.0,
+               'oxidised_end': 8.0,
+               'reduced_start': 24.0,
+               'reduced_end': 30.0,
+               }
+    processed = processor(regions)
+    experiment = processed['experiment']
+    assert experiment['haem_levels'] == {'oxidised': {'bH': 12.0},
+                                         'oxidised_region': (0.0, 6.0),
+                                         'reduced': {'bH': 4.0},
+                                         'reduced_region': (22.0, 28.0),
+                                         }
+    percent = experiment['haem_percent']['bH'].to_numpy(dtype=float)
+    expected = np.where(times < 10, 100.0, np.where(times < 20, 75.0, 0.0))
+    assert np.allclose(percent, expected)
+    assert processed['haem_source'] == 'percent'
+
+    # ---- 3 No regions, or only one: shown as delta D ---------------------------------
+    for missing in (None, dict(regions, reduced_start=30.0)):
+        processed = processor(missing)
+        assert 'haem_levels' not in processed['experiment']
+        assert 'haem_percent' not in processed['experiment']
+        assert processed['haem_source'] == 'delta_abs'
 
 
 # ---- test_average_that_does_not_fit --------------------------------------------------

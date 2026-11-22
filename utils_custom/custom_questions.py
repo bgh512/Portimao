@@ -65,10 +65,13 @@ def _haem_ocr_asker(names: List[str],
                     defaults: dict,
                     fit: dict,
                     step_checker: Optional[Callable[[object, str, str], bool]] = None,
+                    percent_names: Optional[List[str]] = None,
                     ) -> Optional[List[str]]:
     """
     ---- Summary ----
-    Helper function to ask the settings of the haem and OCR response figure (6.2.x).
+    Helper function to ask the settings of the haem and OCR response figure (7.2.x).
+    The figure averages files together, so the haems are offered in % oxidised only
+    when every file of the figure has an oxidised and a reduced region.
 
     ---- Inputs ----
     names : List[str]
@@ -76,9 +79,12 @@ def _haem_ocr_asker(names: List[str],
     answers : dict
         Answers dictionary the settings are stored in.
     defaults : dict
-        Default answers.
+        Default answers; % oxidised as the default gives delta D when it is not
+        offered.
     fit : dict
         Fit dictionary (haem_list) used to list the haems.
+    percent_names : Optional[List[str]]
+        Names of the files with both regions; None when no file has them.
     step_checker : Optional[Callable[[object, str, str], bool]]
         Function (names, question, change label) that draws the figure as built so far,
         asks whether it is accepted and returns True when it is; None skips the
@@ -147,7 +153,11 @@ def _haem_ocr_asker(names: List[str],
     # ---- 2 What is shown, drawn as each choice is made -------------------------------
     names_used = [r['name'] for r in usable]
     ocr_keys = ['raw'] + (['od'] if answers['normalise_od'] else []) + ['percent']
-    answers.update({'ho_haem_mode': defaults['ho_haem_mode'],
+    include_percent = all(name in (percent_names or []) for name in names_used)
+    mode_default = defaults['ho_haem_mode']
+    if mode_default == 'percent' and not include_percent:
+        mode_default = 'delta'
+    answers.update({'ho_haem_mode': mode_default,
                     'ho_per_od': False,
                     'ho_metric': 'delta',
                     'ho_haems': [],
@@ -173,10 +183,10 @@ def _haem_ocr_asker(names: List[str],
         ocr_default = answers['ho_ocr_mode']
     # All the haems are drawn as soon as the way to show them is chosen.
     answers['ho_blocks'] = ('baseline', 'ocr_response', 'haem_response')
-    mode_default = defaults['ho_haem_mode']
     while True:
         answers['ho_haem_mode'] = choice_asker('How would you like to show the haems?',
-                                               haem_form_option_builder(True),
+                                               haem_form_option_builder(include_percent,
+                                                                        ),
                                                mode_default,
                                                depth=2,
                                                )
@@ -683,6 +693,7 @@ def summary_figure_asker(names: List[str],
                          fit: Optional[dict],
                          fits_folder: Path,
                          figure_checker: Optional[Callable[[str, dict], bool]] = None,
+                         percent_names: Optional[List[str]] = None,
                          ) -> tuple:
     """
     ---- Summary ----
@@ -707,6 +718,9 @@ def summary_figure_asker(names: List[str],
         Function called after the questions of each figure with (key, {'fit': fit,
         'custom': result so far}); it shows the figure and returns True when the user
         accepts it. When it returns False the figure's questions are asked again.
+    percent_names : Optional[List[str]]
+        Names of the files with an oxidised and a reduced region, whose haems have a
+        % oxidised; None when no file has them.
 
     ---- Globals read ----
     None.
@@ -777,7 +791,13 @@ def summary_figure_asker(names: List[str],
             if key == 'time_response':
                 result[key] = _time_response_asker(names, answers, defaults, checker)
             else:
-                result[key] = _haem_ocr_asker(names, answers, defaults, fit, checker)
+                result[key] = _haem_ocr_asker(names,
+                                              answers,
+                                              defaults,
+                                              fit,
+                                              checker,
+                                              percent_names,
+                                              )
             answers[f'plot_{key}'] = result[key] is not None
             if (result[key] is None or figure_checker is None or
                     figure_checker(key, {'fit': fit, 'custom': result})

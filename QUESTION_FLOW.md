@@ -1,4 +1,4 @@
-# Portimao question flow (V2.9)
+# Portimao question flow (V2.10)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -188,10 +188,16 @@ Asked when the last choice of 4.1.1, or No at 4.2, is taken. The strip is greyed
 - A region shorter than 10 spectra (5 s when a spectrum is taken every 0.5 s) counts as not chosen: its shading goes and its handle reads "not chosen" again.
 - **Every file**, ticked when the step opens: an edge set on the file shown is copied to every file at the same distance from the addition nearest to it, counted in order (1.5 min before the 3rd addition of the file shown is 1.5 min before the 3rd addition of every file), then kept within that file's own limits. A file with fewer additions keeps the edge it had. Unticked, only the file shown changes.
 - If you go back to the processing step later in the run, the regions are where you left them, on the same data even when the trim has changed.
+- The regions are saved with the dataset (in `portimao_settings.json`), so they are on the plot the next time it is opened.
+- The regions are optional. A file with both has each haem's oxidised and reduced level, and its haems can be shown in % oxidised (5.5, 7.2.2); a file with none, or with only one, cannot, and nothing else changes for it.
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.4 | Pull the oxidised and the reduced region out on the plot, or type their times in the strip under it. Press Enter when every file looks right. (above it, in grey: what the regions are, "Red is oxidised, blue is reduced; with "Every file" ticked, an edge is copied to every file at the same distance from its nearest addition." and "Leave both as "not chosen" for no regions.") | Enter with the answer box empty: the regions of every file are listed, then **4.5**. A file with only one of the two regions counts as having none, and a warning names it; a warning also names the files that kept an edge of their own because they have fewer additions. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 4.4 goes on waiting. |
+| 4.4 | Pull the oxidised and the reduced region out on the plot, or type their times in the strip under it. Press Enter when every file looks right, or straight away for no regions. (above it, in grey: what the regions are, "Red is oxidised, blue is reduced; with "Every file" ticked, an edge is copied to every file at the same distance from its nearest addition.", "Leave both as "not chosen" for no regions." and "With no regions the haems cannot be shown in % oxidised; everything else is the same.") | Enter with the answer box empty: with no region on any file, or both regions on every file, the regions are listed, then **4.5**; with both regions on some files only, **4.4.1**. A warning names the files that kept an edge of their own because they have fewer additions. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 4.4 goes on waiting. |
+
+| # | Question | Yes → | No → |
+|---|---|---|---|
+| 4.4.1 | *(only when some files have both regions and others do not)* Do you want to continue without them? `(y/N)` (above it, in grey: the files without both an oxidised and a reduced region, and "A file needs both to be shown in % oxidised.") | the regions of every file are listed, then **4.5** | **4.4** again, with the edges where you left them |
 
 ### 4.D Averaging around the events
 
@@ -222,7 +228,7 @@ The figure saved for each file is drawn at once **(plot)**, at its real size and
 
 - the set and measured oxygen;
 - the OCR per OD (µM min⁻¹ OD⁻¹) if you said yes to OD scaling in 3.1, otherwise the OCR in µM min⁻¹;
-- when the haems were decomposed in 4.A, every haem of the fit as ΔA, the change from the start (scaled by OD as well if you said yes in 3.1);
+- when the haems were decomposed in 4.A, every haem of the fit as ΔD, the change from the start (scaled by OD as well if you said yes in 3.1);
 - the event labels at 45°;
 - Nature, 1 column wide and 0.5 of a page tall.
 
@@ -254,7 +260,7 @@ Whether the haems are plotted at all is the Haems box in the strip; this questio
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.5 | How would you like to plot the haems? Options: absorbance (mOD), ΔA (mOD) the change from the start, % oxidised (no concentration: only cells are measured, and a haem amount depends on the size of its shape; a dataset saved with concentration opens with ΔA) | **5.5.1** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise the figure is drawn **(plot)**, then **5.1** |
+| 5.5 | How would you like to plot the haems? Options: absorbance (mOD); ΔD (mOD), the change from the start; % oxidised (reduced region = 0 %, oxidised region = 100 %), *only offered when at least one file has both regions (4.4)*. A file without both regions stays in ΔD, as its axis says, while the files with both are in %. A dataset saved with % oxidised opens with ΔD when no file has both regions any more. (No concentration: only cells are measured, and a haem amount depends on the size of its shape; a dataset saved with concentration opens with ΔD.) | **5.5.1** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise the figure is drawn **(plot)**, then **5.1** |
 | 5.5.1 | Do you want to scale the haems by OD as well? `(Y/n)` | the figure is drawn **(plot)**, then **5.1** |
 
 ### 5.D Event labels
@@ -379,7 +385,7 @@ The figure is built up in the plot window in stages. First only the baseline OCR
 | # | Question | Leads to |
 |---|---|---|
 | 7.2.1 | Which OCR would you like to use? (the same options as 5.3.1) | the OCR plots are drawn **(plot)**, accept question, then **7.2.2** |
-| 7.2.2 | How would you like to show the haems? (the same options as 5.5) | **7.2.3** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **7.2.4** |
+| 7.2.2 | How would you like to show the haems? (the same options as 5.5, but % oxidised is offered only when every file of the figure has both regions, as the figure averages the files together) | **7.2.3** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **7.2.4** |
 | 7.2.3 | Do you want to scale the haems by OD as well? `(Y/n)` | all the haems are drawn **(plot)**, accept question, then **7.2.4** |
 | 7.2.4 | Which haems should get a row, and in which order? | drawn **(plot)**, accept question, then **7.2.5** |
 | 7.2.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then the final accept question |

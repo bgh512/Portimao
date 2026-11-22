@@ -48,7 +48,8 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    # the haems of the fit, when decomposed, in the figure of each file
                    'plot_haems': True,
                    'haems': [],
-                   # "abs", "delta" or "percent"; no haem amounts, as only cells are
+                   # "abs", "delta" or "percent" (% oxidised, for the files with an
+                   # oxidised and a reduced region); no haem amounts, as only cells are
                    # measured and an amount depends on the size of its shape
                    'haem_mode': 'delta',
                    # divide the haem values (not "percent") by OD x volume x dilution
@@ -111,8 +112,8 @@ DEGREE_OF_SCATTER = 1
 HAEM_FACTOR = 1_000_000
 # points whose median is a reference level (50 points are 25 s when a point is taken
 # every 0.5 s). The 0 of delta D is where each haem starts: its first points after the
-# ignored start. The 0 % and the 100 % of the % scale are the lowest and the highest
-# points in a row, wherever they are in the run.
+# ignored start. The 0 % and the 100 % of the OCR's % of the range are its lowest and
+# its highest points in a row, wherever they are in the run.
 REFERENCE_WINDOW_POINTS = 50
 # least number of spectra an oxidised or a reduced region must hold for a haem's level
 # in it (its median there); a shorter region counts as not chosen (10 spectra are 5 s)
@@ -362,11 +363,12 @@ class Config:
     # ---- MAIN METHODS ----------------------------------------------------------------
 
     # ---- percent_need_checker --------------------------------------------------------
-    def percent_need_checker(self) -> Tuple[bool, bool]:
+    def percent_need_checker(self) -> bool:
         """
         ---- Summary ----
-        Method to say whether the percent-of-range versions of the OCR and haem data
-        have to be calculated.
+        Method to say whether the percent-of-range version of the OCR has to be
+        calculated. The % oxidised of the haems needs no asking: every file with an
+        oxidised and a reduced region has it.
 
         ---- Inputs ----
         None.
@@ -375,8 +377,8 @@ class Config:
         None.
 
         ---- Outputs ----
-        Tuple[bool, bool]
-            (OCR percent needed, haem percent needed).
+        bool
+            True when the OCR is plotted as a % of its range.
 
         ---- Globals mutated ----
         None.
@@ -389,9 +391,7 @@ class Config:
         """
 
         a = self.answers
-        return (a['plot_ocr'] and a['ocr_mode'] == 'percent',
-                a['decompose'] and a['plot_haems'] and a['haem_mode'] == 'percent',
-                )
+        return bool(a['plot_ocr'] and a['ocr_mode'] == 'percent')
 
     # ---- plot_config_builder ---------------------------------------------------------
     def plot_config_builder(self,
@@ -536,8 +536,8 @@ class Config:
                                      'percent': 'Oxidised haem (%)',
                                      'abs': 'Haem absorbance (mOD)',
                                      'abs_od': 'Haem absorbance (mOD OD$^{-1}$)',
-                                     'delta_abs': 'ΔA (mOD)',
-                                     'delta_abs_od': 'ΔA (mOD OD$^{-1}$)',
+                                     'delta_abs': 'ΔD (mOD)',
+                                     'delta_abs_od': 'ΔD (mOD OD$^{-1}$)',
                                      },
                 'HAEM_Y_MIN': None,
                 'HAEM_Y_MAX': None,

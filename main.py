@@ -55,7 +55,7 @@ from utils_shared.user_places import (app_output_logger,
                                       )
 from utils_viewer.viewer_gui import gui_runner, GuiUnavailableError
 from utils_viewer.viewer_multi import multi_figure_checker_builder
-from utils_viewer.viewer_stages import viewer_asker
+from utils_viewer.viewer_stages import region_files_lister, viewer_asker
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -215,6 +215,7 @@ def everything_asker(folder: Path,
     last_answers_saver
     multi_experiment_asker
     multi_figure_checker_builder
+    region_files_lister
     section_starter
     special_figures_maker
     summary_figure_asker
@@ -232,14 +233,20 @@ def everything_asker(folder: Path,
 
     # ---- 2 Ask the questions ---------------------------------------------------------
     # ---- 2.1 Trimming and ignoring, analysis and individual plots --------------------
-    limits, fit, details, plotted = viewer_asker(summaries,
-                                                 answers,
-                                                 defaults,
-                                                 remembered,
-                                                 PLACES.fits_folder,
-                                                 export_root,
-                                                 exported,
-                                                 )
+    limits, fit, details, plotted, regions = viewer_asker(summaries,
+                                                          answers,
+                                                          defaults,
+                                                          remembered,
+                                                          PLACES.fits_folder,
+                                                          export_root,
+                                                          exported,
+                                                          )
+    # the files with an oxidised and a reduced region: their haems have a % oxidised
+    percent_names = region_files_lister(summaries,
+                                        limits,
+                                        regions,
+                                        answers.get('decomposition_dataset'),
+                                        )
 
     # ---- 2.2 Multi-experiment plots --------------------------------------------------
     context = {'answers': answers,
@@ -247,6 +254,7 @@ def everything_asker(folder: Path,
                'summaries': summaries,
                'limits': limits,
                'details': details,
+               'regions': regions,
                'export_root': export_root,
                }
     checker = multi_figure_checker_builder(context,
@@ -271,6 +279,7 @@ def everything_asker(folder: Path,
                                        fit,
                                        PLACES.fits_folder,
                                        checker,
+                                       percent_names,
                                        )
 
     # ---- 2.4 Data export -------------------------------------------------------------
@@ -299,6 +308,7 @@ def everything_asker(folder: Path,
                 'trim_end': limits[name]['trim_end'],
                 'ignore_start': limits[name]['ignore_start'],
                 'ignore_end': limits[name]['ignore_end'],
+                'regions': regions.get(name),
                 'custom': {'time_response_group': (custom['time_response'] or {}
                                                    ).get(name),
                            'haem_ocr': name in (custom['haem_ocr'] or []),
@@ -406,7 +416,11 @@ def everything_asker(folder: Path,
     last_answers_saver({'data_folder': str(folder.resolve())})
     if not dataset_settings_saver(folder,
                                   export_root,
-                                  file_settings_merger(remembered, limits, details),
+                                  file_settings_merger(remembered,
+                                                       limits,
+                                                       details,
+                                                       regions,
+                                                       ),
                                   {k: v
                                    for k, v in answers.items()
                                    if k not in ('haems', 'ho_haems') or v

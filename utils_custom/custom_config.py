@@ -23,14 +23,14 @@ GROUP_STYLES = {'knockdown': {'colour': '#0072B2', 'linestyle': '-', 'marker': '
                 }
 HAEM_AXIS_LABELS = {'raw': 'Haem concentration',
                     'od': 'Haem concentration (/OD)',
-                    'percent': 'Oxidised haem (% of range)',
+                    'percent': 'Oxidised haem (%)',
                     'abs': 'Haem absorbance (mOD)',
                     'abs_od': 'Absorbance (mOD OD$^{-1}$)',
-                    'delta_abs': 'ΔA (mOD)',
-                    'delta_abs_od': 'ΔA (mOD OD$^{-1}$)',
+                    'delta_abs': 'ΔD (mOD)',
+                    'delta_abs_od': 'ΔD (mOD OD$^{-1}$)',
                     }
 SAVE_FORMATS = ('svg', 'png')
-DELTA_A_OD_LABEL = '$\\Delta$A (mOD OD$^{-1}$)'
+DELTA_D_OD_LABEL = '$\\Delta$D (mOD OD$^{-1}$)'
 HAEM_ABS_OD_LABEL = 'Haem absorbance (mOD OD$^{-1}$)'
 
 
@@ -284,10 +284,10 @@ def ocr_and_haem_response_config_builder(cfg: Config,
                                  },
              'VO2_Y_MIN': 0,
              'OCR_RESPONSE_AXIS_LABEL': '% of baseline OCR',
-             'HAEM_RESPONSE_AXIS_LABELS': {'delta': {'abs': '$\\Delta$A (mOD)',
-                                                     'abs_od': DELTA_A_OD_LABEL,
-                                                     'delta_abs': '$\\Delta$A (mOD)',
-                                                     'delta_abs_od': DELTA_A_OD_LABEL,
+             'HAEM_RESPONSE_AXIS_LABELS': {'delta': {'abs': '$\\Delta$D (mOD)',
+                                                     'abs_od': DELTA_D_OD_LABEL,
+                                                     'delta_abs': '$\\Delta$D (mOD)',
+                                                     'delta_abs_od': DELTA_D_OD_LABEL,
                                                      'percent': 'Change in oxidised '
                                                      'haem (%)',
                                                      'default': 'Change from baseline',
@@ -295,8 +295,8 @@ def ocr_and_haem_response_config_builder(cfg: Config,
                                            'change': 'Change from baseline (%)',
                                            'value': {'abs': 'Haem absorbance (mOD)',
                                                      'abs_od': HAEM_ABS_OD_LABEL,
-                                                     'delta_abs': '$\\Delta$A (mOD)',
-                                                     'delta_abs_od': DELTA_A_OD_LABEL,
+                                                     'delta_abs': '$\\Delta$D (mOD)',
+                                                     'delta_abs_od': DELTA_D_OD_LABEL,
                                                      'default': 'Haem signal',
                                                      },
                                            },

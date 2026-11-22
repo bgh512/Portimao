@@ -471,13 +471,90 @@ def test_results_folder_outside_is_kept_whole(tmp_path: Path) -> None:
     assert dataset_settings_reader(dataset)['export_folder'] == results.resolve()
 
 
-# ---- test_saved_haem_amounts_open_as_delta_a -----------------------------------------
-def test_saved_haem_amounts_open_as_delta_a(tmp_path: Path) -> None:
+# ---- test_regions_are_kept_with_the_dataset ------------------------------------------
+def test_regions_are_kept_with_the_dataset(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the oxidised and the reduced region of each file are
+    saved with the dataset and read back: a lone region is kept as it was left, a file
+    with neither region chosen has none saved (one saved before is cleared), a file
+    not in this run keeps its own, and a run that did not handle the regions leaves
+    those saved before.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    FILES, ANSWERS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Saved before: regions for run2 and for a file not in this run -------------
+    both = {'oxidised_start': 6.0,
+            'oxidised_end': 9.5,
+            'reduced_start': 41.0,
+            'reduced_end': 44.0,
+            }
+    old = {'oxidised_start': 1.0,
+           'oxidised_end': 2.0,
+           'reduced_start': 8.0,
+           'reduced_end': 9.0,
+           }
+    remembered = {'run2': {'trim_start': None, 'regions': dict(old)},
+                  'old_run': {'trim_start': None, 'regions': dict(old)},
+                  }
+    limits = {name: {'trim_start': 3.0,
+                     'trim_end': 50.0,
+                     'ignore_start': 5.0,
+                     'ignore_end': 0.0,
+                     }
+              for name in ('run1', 'run2', 'run3')
+              }
+
+    # ---- 2 This run: both for run1, neither for run2, only the oxidised for run3 -----
+    regions = {'run1': {key: np.float64(value) for key, value in both.items()},
+               'run2': dict(both, oxidised_end=6.0, reduced_start=44.0),
+               'run3': dict(both, reduced_start=44.0),
+               }
+    files = file_settings_merger(remembered, limits, {}, regions)
+    assert files['run1']['regions'] == both
+    assert all(type(value) is float for value in files['run1']['regions'].values())
+    assert 'regions' not in files['run2']
+    assert files['run3']['regions'] == dict(both, reduced_start=44.0)
+    assert files['old_run']['regions'] == old
+
+    # ---- 3 Saved and read back -------------------------------------------------------
+    assert dataset_settings_saver(tmp_path, tmp_path / 'results', files, ANSWERS)
+    saved = dataset_settings_reader(tmp_path)['files']
+    assert saved['run1']['regions'] == both
+    assert 'regions' not in saved['run2']
+
+    # ---- 4 A run that did not handle the regions leaves them -------------------------
+    kept = file_settings_merger(remembered, limits, {})
+    assert kept['run2']['regions'] == old
+    assert 'regions' not in kept['run1']
+
+
+# ---- test_saved_haem_amounts_open_as_delta_d -----------------------------------------
+def test_saved_haem_amounts_open_as_delta_d(tmp_path: Path) -> None:
     """
     ---- Summary ----
     Main function to check that, with only cells measured, the haem amounts are not
-    offered as a way of showing the haems, and that a dataset saved showing them opens
-    showing delta A, the other answers unchanged.
+    offered as a way of showing the haems, that % oxidised is offered only when asked
+    for, and that a dataset saved showing the amounts opens showing delta D, the other
+    answers unchanged.
 
     ---- Inputs ----
     tmp_path : Path
@@ -502,7 +579,10 @@ def test_saved_haem_amounts_open_as_delta_a(tmp_path: Path) -> None:
     for include_percent in (True, False):
         keys = [key for key, _ in haem_form_option_builder(include_percent)]
         assert 'conc' not in keys
-        assert keys[:2] == ['abs', 'delta']
+        assert keys == ['abs', 'delta'] + (['percent'] if include_percent else [])
+    labels = dict(haem_form_option_builder(True))
+    assert labels['delta'].startswith('ΔD (mOD)')
+    assert labels['percent'].startswith('% oxidised')
     old = dict(ANSWERS, haem_mode='conc', ho_haem_mode='conc')
     assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, old)
     answers = dataset_settings_reader(tmp_path)['answers']

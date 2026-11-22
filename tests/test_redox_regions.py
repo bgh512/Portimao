@@ -12,8 +12,10 @@ import pytest
 import config as settings
 from utils_shared.redox_regions import (edge_anchor_finder,
                                         edge_time_finder,
+                                        haem_levels_finder,
                                         percent_oxidised_calculator,
                                         region_level_finder,
+                                        short_region_closer,
                                         )
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
 
@@ -103,6 +105,95 @@ def test_a_level_is_the_median_in_the_region() -> None:
                             *OXIDISED_MIN,
                             minimum_points=FEW,
                             )
+
+
+# ---- test_a_file_needs_both_regions_for_its_levels -----------------------------------
+def test_a_file_needs_both_regions_for_its_levels() -> None:
+    """
+    ---- Summary ----
+    Main function to check the two levels of every haem of a file from the regions
+    kept for it: the regions are kept as times on the recording, so the trim start is
+    taken off; a region is kept within the used part of the run; and a file with no
+    regions, with only one, or with one that no longer holds enough spectra has no
+    levels. A region too short to count is closed.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    RUN, OXIDISED_MIN, REDUCED_MIN, FEW (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The run was trimmed 2 min from its start, so its regions, 0 to 4 and 6 to 9 min
+    on the run, are 2 to 6 and 8 to 11 min on the recording. The levels are those of
+    test_a_level_is_the_median_in_the_region: bH 12 and 4, cc 6.5 and 2, a605 5 and 5.
+    With the first minute ignored the used part is 1 to 9 min, and the oxidised region
+    is kept to 1 to 4 min. bH: 13, 11, 12, 30; in order 11, 12, 13, 30, so the median
+    is (12 + 13) / 2 = 12.5. cc: 6, 8, 7 (the blank left out), median 7.
+    With the last two minutes ignored the used part ends at 7 min: the reduced region
+    is kept to 6 to 7 min, two spectra, fewer than three, so the file has no levels.
+    A region of 0.05 min with a least length of 0.1 min is closed at the edge that
+    opens it: the end of the oxidised region, the start of the reduced one.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Both regions, on a run trimmed at its start -------------------------------
+    regions = {'oxidised_start': 2.0,
+               'oxidised_end': 6.0,
+               'reduced_start': 8.0,
+               'reduced_end': 11.0,
+               }
+    levels = haem_levels_finder(RUN, regions, 2.0, (0.0, 9.0), FEW)
+    assert levels == {'oxidised': {'bH': 12.0, 'cc': 6.5, 'a605': 5.0},
+                      'oxidised_region': OXIDISED_MIN,
+                      'reduced': {'bH': 4.0, 'cc': 2.0, 'a605': 5.0},
+                      'reduced_region': REDUCED_MIN,
+                      }
+
+    # ---- 2 A region is kept within the used part -------------------------------------
+    ignored = haem_levels_finder(RUN, regions, 2.0, (1.0, 9.0), FEW)
+    assert ignored['oxidised'] == {'bH': 12.5, 'cc': 7.0, 'a605': 5.0}
+    assert ignored['oxidised_region'] == (1.0, 4.0)
+    assert ignored['reduced'] == levels['reduced']
+
+    # ---- 3 No regions, only one, or one with too few spectra left --------------------
+    assert haem_levels_finder(RUN, None, 2.0, (0.0, 9.0), FEW) is None
+    assert haem_levels_finder(RUN, {}, 2.0, (0.0, 9.0), FEW) is None
+    alone = dict(regions, reduced_start=11.0)
+    assert haem_levels_finder(RUN, alone, 2.0, (0.0, 9.0), FEW) is None
+    assert haem_levels_finder(RUN, regions, 2.0, (0.0, 7.0), FEW) is None
+    assert haem_levels_finder(RUN,
+                              {'oxidised_start': 2.0},
+                              2.0,
+                              (0.0, 9.0),
+                              FEW,
+                              ) is None
+
+    # ---- 4 A region too short to count is closed -------------------------------------
+    short = {'oxidised_start': 0.0,
+             'oxidised_end': 0.05,
+             'reduced_start': 8.95,
+             'reduced_end': 9.0,
+             }
+    assert short_region_closer(short, 0.1) == {'oxidised_start': 0.05,
+                                               'oxidised_end': 0.05,
+                                               'reduced_start': 8.95,
+                                               'reduced_end': 8.95,
+                                               }
+    kept = {'oxidised_start': 0.0,
+            'oxidised_end': 4.0,
+            'reduced_start': 6.0,
+            'reduced_end': 9.0,
+            }
+    assert short_region_closer(kept, 0.1) == kept
 
 
 # ---- test_an_edge_is_copied_by_its_nearest_addition ----------------------------------

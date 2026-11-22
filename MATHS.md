@@ -192,6 +192,25 @@ Example: D_ox = 12, D_red = 4 and D = 10 mOD give P = (10 − 4) ÷ (12 − 4) �
 
 Checked by: `test_percent_oxidised_runs_between_the_two_levels` in `tests/test_redox_regions.py`.
 
+### 4.1 Which files are shown in % oxidised
+
+The regions are optional, and each file has its own. A file has a % oxidised only when it has both regions:
+
+- both the oxidised and the reduced region were marked on it;
+- each still holds at least 10 spectra inside the used part of the run (not trimmed, not ignored). A region that reaches into a trimmed or ignored part is cut back to the used part first.
+
+For such a file the program keeps D_ox and D_red of every haem, and P for every spectrum.
+
+What happens otherwise:
+
+- A file with no regions, or with only one, has no levels and no P. Nothing is guessed for it: when % oxidised is chosen for the plots, that file is drawn as ΔD, as its axis says, and the files with both regions are drawn in %.
+- With no file having both regions, % oxidised is not offered at all.
+- A figure that averages files together (the haem and OCR response) offers % oxidised only when every file in it has both regions, so a % is never averaged with a ΔD.
+
+Example: a run is trimmed 2 min from its start. Its regions were marked at 2 to 8 min (oxidised) and 24 to 30 min (reduced) of the recording, which is 0 to 6 min and 22 to 28 min of the trimmed run. The haem is 12 mOD before 10 min, 10 mOD from 10 to 20 min and 4 mOD after: D_ox = 12 and D_red = 4, so P is 100 %, (10 − 4) ÷ 8 × 100 = 75 % and 0 %. The same run without its reduced region has no P and is shown as ΔD.
+
+Checked by: `test_a_file_needs_both_regions_for_its_levels` in `tests/test_redox_regions.py` and `test_a_file_with_both_regions_gets_percent_oxidised` in `tests/test_processing_maths.py`.
+
 ---
 
 ## 5. An edge copied to another file

@@ -21,7 +21,8 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum; a change from the first spectrum when `haem_conc` is |
 | `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. ΔD, the change from the start: `haem_abs` shifted so that each haem is 0 where it starts, the median of its first 50 spectra with a value after the ignored start (`REFERENCE_WINDOW_POINTS` in `config.py`). `attrs['delta_abs_baseline']` holds what was subtracted: `'level_by_haem'` (mOD), `'window_by_haem'` (the first and last time, in min, of the spectra each start was taken from), `'window_points'` and `'window_seconds'`. The maths is in `MATHS.md` |
 | `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. The matching tables divided by dilution factor x OD x volume |
-| `'haem_percent'` | pd.DataFrame | (n_spectra, 2 + n_haems) | % | Optional. `haem_conc` scaled to 0-100 % |
+| `'haem_percent'` | pd.DataFrame | (n_spectra, 2 + n_haems) | % | Optional: only for a file with both an oxidised and a reduced region. % oxidised: `haem_abs` put between each haem's reduced level (0 %) and its oxidised level (100 %) by `percent_oxidised_calculator`; values above 100 and below 0 are kept, and a haem whose two levels are equal has an empty column. `attrs['percent_oxidised']` holds the levels used. The maths is in `MATHS.md` |
+| `'haem_levels'` | dict | | mOD, min | Optional: only for a file with both regions (`haem_levels_finder`). `'oxidised'` and `'reduced'`: `{haem: its level}`, the median of `haem_abs` in that region (mOD); `'oxidised_region'` and `'reduced_region'`: `(start, end)` of the region on the time of the trimmed data (min), kept within the used part of the run |
 | `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; every spectrum has a time, and the transmission is NaN where it cannot be worked out (zero counts in the reference); dropped after the special figures are prepared |
 | `'averages'` | dict | | | Event-window statistics (see `averages`) |
 
@@ -309,10 +310,11 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 |---|---|---|---|---|
 | `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`results`), otherwise the full path |
 | `'answers'` | dict | | | Terminal answers |
-| `'files'` | dict | | | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end', 'OD', 'volume', 'dilution_factor', 'events'}}`, built by `file_settings_merger`; a file or key may be missing (a dataset saved before the OD values and labels were kept has only the four limits) |
+| `'files'` | dict | | | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end', 'OD', 'volume', 'dilution_factor', 'events', 'regions'}}`, built by `file_settings_merger`; a file or key may be missing (a dataset saved before the OD values and labels were kept has only the four limits) |
 | `'files'[name]['trim_start']`, `['trim_end']`, `['ignore_start']`, `['ignore_end']` | Optional[float] | | min | Trim times are on the original recording (`None` for no trim), ignore times count from the new 0 after trimming |
 | `'files'[name]['OD']`, `['volume']`, `['dilution_factor']` | float | | OD, mL, none | The OD values last entered (3.1.1); kept when a later run does not scale by OD, so they are offered again |
 | `'files'[name]['events']` | List[dict] | (n_events,) | | `[{'datapoint': int, 'label': str ('ignore' for an event left out), 'concentration_uM': Optional[float] (µM), 'ignored': bool}]`, one per event of the file, in its order |
+| `'files'[name]['regions']` | Dict[str, float] | | min | `{'oxidised_start', 'oxidised_end', 'reduced_start', 'reduced_end'}`: the oxidised and the reduced region of the file as times on the original recording, so a later change of the trim leaves them on the same data. A region not chosen has its two edges together; a file with neither chosen has no `'regions'` |
 
 #### `strip_values`
 
@@ -418,6 +420,7 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every 
 | `show_trim` | bool | | | `False` | Draw the whole recording without shading, for the trimming step (the window draws the edges and the shading over it) |
 | `show_ignored` | bool | | | `True` | Shade the ignored start and end (not with `show_trim`) |
 | `kept` | Optional[dict] | | | `None` | The `kept_decomposition` drawn dashed over the haems, or None |
+| `regions` | dict | | min | `{}` | The oxidised and reduced region of every file (`ViewerSession.regions`), which give a file with both its % oxidised |
 
 #### `UserPlaces`
 
@@ -458,6 +461,7 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by 
 | `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the files nearest the one being looked at (`WINDOW_KEPT_FILES` in `config.py`, 3: that file and the one on each side); each preview works on a deep copy |
 | `fit` | Optional[dict] | | | `None` | The `fit` the haems are worked out with: the standard or saved fit at first, then the one chosen in the processing or the strip; `None` when the haems are left out |
 | `kept` | Optional[dict] | | | `None` | The `kept_decomposition` to compare with, set by *Keep to compare* in the strip; `None` when none is kept |
+| `regions` | Dict[str, Dict[str, float]] | | min | `{}` | `{file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}}` as times on the original recording: those saved with the dataset at first, then those of the regions step (4.4). A region not chosen has its two edges together |
 | `redraw` | Optional[Callable[[], bool]] | | | `None` | Draws the plot of the step being asked again (set by each stage runner), for a change in the strip |
 | `is_figure` | bool | | | `False` | True while the plot is the figure of each file at its saved size (section 5), so a new journal or size in the strip redraws it |
 | `export_choice` | Optional[str] | | | `None` | What the export of the import (3.4) wrote: `'summary'`, `'trimmed'` or `'all'`; `None` before anything is exported. New edges export again with it |
@@ -552,7 +556,7 @@ What the file holds, each item marked **recorded** (taken as true), **calculated
 | Property | Value |
 |---|---|
 | File type | xlsx |
-| Sheets | `CcO2`, `CsO2`, `VoO2` and, for the full export, `VoO2_OD`, `VoO2_percent`, `haem_abs`, `haem_delta_abs`, `haem_abs_OD`, `haem_delta_abs_OD`, `haem_percent` (no haem amounts: only cells are measured, and an amount depends on the size of its shape); plus `Averages`, `Events` and `Metadata` when available |
+| Sheets | `CcO2`, `CsO2`, `VoO2` and, for the full export, `VoO2_OD`, `VoO2_percent`, `haem_abs`, `haem_delta_abs`, `haem_abs_OD`, `haem_delta_abs_OD`, `haem_percent` (% oxidised, for a file with both regions; no haem amounts: only cells are measured, and an amount depends on the size of its shape); plus `Averages`, `Events` and `Metadata` when available |
 | Location and name | `<results>/<experiment>/<experiment>.xlsx`: the trimmed data (all of it when the file is not trimmed), written by the export at the end of the import and again, with the run's results added, by the run; for a trimmed file the export of the import also writes `<results>/<experiment>/full/<experiment>.xlsx`, the whole recording |
 
 The export of the import writes only `CcO2`, `CsO2`, `VoO2`, `Events` and `Metadata`. In the trimmed workbook the Metadata holds the edges (`trimmed_before_minutes`, `trimmed_after_minutes` when trimmed, `ignore_first_minutes`, `ignore_last_minutes`); the whole recording's holds none, so it does not change when they do.
@@ -630,7 +634,7 @@ A preset is a set of haems of the library, offered by its name in the fit questi
 | `Holds,<text>` | No | What the preset is, in words |
 | (empty line) | Yes | Ends the heading lines |
 | `Haem file,Haems per protein` | No | Names the columns |
-| `<file>.csv,<number>`, one per line | The file name only | A file of `fits/haems/`, in any order: the haems are put in the order a, b, c. A missing file, a file of more than one haem, and two haems of the same name are refused, each with a message. The number, for the reader only, is how many haems the shape was drawn for in its source fit: 2 for `c1_037v.csv` (the two haems of the cc), 1 for every other. Only cells are measured, so a shape's size never changes the absorbance, ΔA or % |
+| `<file>.csv,<number>`, one per line | The file name only | A file of `fits/haems/`, in any order: the haems are put in the order a, b, c. A missing file, a file of more than one haem, and two haems of the same name are refused, each with a message. The number, for the reader only, is how many haems the shape was drawn for in its source fit: 2 for `c1_037v.csv` (the two haems of the cc), 1 for every other. Only cells are measured, so a shape's size never changes the absorbance, ΔD or % |
 
 Example (`fits/presets/temp_fit_037v.csv`):
 
