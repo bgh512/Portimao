@@ -318,7 +318,7 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 
 #### `strip_values`
 
-What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/viewer_strip.py`). Built from the answers by `strip_values_builder`, given by `ViewerGui.strip_reader`, and taken in part or whole by `ViewerGui.strip_setter` (checked by `strip_values_checker`). Each change the user makes is told once, as a dict of the values it changed (a new journal can change the width and the height too), to the function registered with `ViewerGui.strip_listener_setter`. That function runs on the program thread while a question waits. `size_answers_builder` turns the journal, width and height back into answers. The names are those of the answers in `config.DEFAULT_ANSWERS`.
+What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/viewer_strip.py`). Built from the answers by `strip_values_builder`, given by `ViewerGui.strip_reader`, and taken in part or whole by `ViewerGui.strip_setter` (checked by `strip_values_checker`). Each change the user makes is told once, as a dict of the values it changed (a new journal can change the width and the height too), to the function registered with `ViewerGui.strip_listener_setter`. That function runs on the program thread while a question waits. `size_answers_builder` turns the journal, width and height back into answers, and `form_answers_builder` the spectrometer, the way of showing the haems and the per OD boxes. The names are those of the answers in `config.DEFAULT_ANSWERS`, except `spectra` and `ocr_per_od`. What the strip offers is given apart, with `ViewerGui.strip_choices_setter(spectra, has_percent, has_od)`: the spectrometers every file has (the drop-down shows only with more than one), whether at least one file has both regions (% oxidised is then in the list, `haem_form_choices_lister`), and whether OD values were entered (the per OD boxes then show).
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
@@ -328,6 +328,10 @@ What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/vie
 | `'haem_files'` | List[str] | (n_haems,) | | The library files ticked under Build a fit: those of the fit in use (a preset's, or your own haems), none for a fit file of the user's own or components from the data. The library itself is given with `ViewerGui.strip_library_setter` (`library_haems_lister`: `[{'file', 'haem', 'type'}]`, in the order a, b, c). The answer of the same name keeps the haems ticked, used when `fit_file` is `'Your own haems'` and saved with the dataset's settings |
 | `'compare'` | bool | | | Whether a decomposition is kept to compare with: the button reads *Stop comparing* when True. The user's click changes it; the program then keeps the decomposition in use (`kept_decomposition`) or drops the kept one |
 | `'kept'` | str | | | The kept decomposition in words (the `'text'` of `kept_decomposition`), shown in a line of the strip; `''` when none is kept. Set by the program only |
+| `'spectra'` | str | | | The spectrometer whose spectra hold the haems (the answer `decomposition_dataset`), e.g. `'Cyt'`; `''` when none is known |
+| `'haem_mode'` | str | | | How the haems are shown: `'delta'` (ΔD), `'percent'` (% oxidised) or `'abs'` (absorbance), the keys of `viewer_strip.HAEM_FORM_TEXTS` (the words of the drop-down) |
+| `'haem_per_od'` | bool | | | Whether the haems are scaled by OD (the answer of the same name); not used for % oxidised |
+| `'ocr_per_od'` | bool | | | Whether the OCR is per OD: True for the answer `ocr_mode` `'od'`, False for `'raw'` and `'percent'`. A click gives `'od'` or `'raw'` |
 | `'journal'` | str | | | `'none'` (the standard size, on the page of the standard journal) or a key of `config.JOURNAL_SPECS` |
 | `'columns'` | float | | columns | Width, one of the widths the journal allows (`'widths_mm'`) |
 | `'height'` | float | | fraction of a page | Height, above 0 and up to 1 |
@@ -462,6 +466,8 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by 
 | `fit` | Optional[dict] | | | `None` | The `fit` the haems are worked out with: the standard or saved fit at first, then the one chosen in the processing or the strip; `None` when the haems are left out |
 | `kept` | Optional[dict] | | | `None` | The `kept_decomposition` to compare with, set by *Keep to compare* in the strip; `None` when none is kept |
 | `regions` | Dict[str, Dict[str, float]] | | min | `{}` | `{file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}}` as times on the original recording: those saved with the dataset at first, then those of the regions step (4.4). A region not chosen has its two edges together |
+| `limits` | Dict[str, dict] | | | `{}` | The trim and ignore limits of every file as last answered (section 2), which say whether a file's regions still hold; empty before the trimming step |
+| `has_od` | bool | | | `False` | True once OD values were entered in this run (3.1): the strip then shows its per OD boxes and the plots can be per OD |
 | `redraw` | Optional[Callable[[], bool]] | | | `None` | Draws the plot of the step being asked again (set by each stage runner), for a change in the strip |
 | `is_figure` | bool | | | `False` | True while the plot is the figure of each file at its saved size (section 5), so a new journal or size in the strip redraws it |
 | `export_choice` | Optional[str] | | | `None` | What the export of the import (3.4) wrote: `'summary'`, `'trimmed'` or `'all'`; `None` before anything is exported. New edges export again with it |

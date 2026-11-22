@@ -58,8 +58,6 @@ from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
                                  event_asker,
                                  haem_choice_asker,
-                                 haem_form_asker,
-                                 haem_scaling_asker,
                                  IGNORE_LABEL,
                                  label_angle_asker,
                                  ocr_kind_lister,
@@ -84,7 +82,9 @@ from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
-from utils_viewer.viewer_strip import (kept_decomposition_builder,
+from utils_viewer.viewer_strip import (form_answers_builder,
+                                       HAEM_FORM_TEXTS,
+                                       kept_decomposition_builder,
                                        size_answers_builder,
                                        strip_values_builder,
                                        )
@@ -184,11 +184,17 @@ def _addition_time_lister(summaries: List[dict],
 
 
 # ---- _answers_previewer --------------------------------------------------------------
-def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
+def _answers_previewer(answers: dict,
+                       fit: Optional[dict],
+                       kind: str,
+                       has_od: bool = False,
+                       ) -> dict:
     """
     ---- Summary ----
     Helper function to build the answers used to draw a preview: the raw data while
-    browsing and trimming, and the processing chosen so far afterwards.
+    browsing and trimming, and the processing chosen so far afterwards. The haems and
+    the OCR are shown as the answers say (the strip under the plot sets them), per OD
+    only once OD values were entered.
 
     ---- Inputs ----
     answers : dict
@@ -196,10 +202,13 @@ def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
     fit : Optional[dict]
         Fit dictionary, used to list the haems to show.
     kind : str
-        'raw' (O2 and the raw OCR only), 'standard' (the standard plot: O2, the raw OCR
-        and, when a fit is given, every haem of it as the change from the start),
-        'analysis' (also the haems and the averaging windows, still without OD
-        scaling) or 'final' (exactly as the figure will be).
+        'raw' (O2 and the raw OCR only), 'standard' (the standard plot: O2, the OCR
+        and, when a fit is given, every haem of it), 'analysis' (also the averaging
+        windows, and the haems only when they are decomposed) or 'final' (exactly as
+        the figure will be).
+    has_od : bool
+        True when OD values were entered in this run; without them nothing is per OD,
+        whatever the answers say.
 
     ---- Globals read ----
     BROWSING_ANSWERS (module constant).
@@ -223,29 +232,21 @@ def _answers_previewer(answers: dict, fit: Optional[dict], kind: str) -> dict:
         return result
     result.update(BROWSING_ANSWERS)
     result.update({'plot_o2': True, 'plot_ocr': True, 'plot_haems': False})
+    if not (has_od and result['normalise_od']) or kind == 'raw':
+        result.update({'normalise_od': False, 'haem_per_od': False})
+        if result['ocr_mode'] == 'od' or kind == 'raw':
+            result['ocr_mode'] = 'raw'
     if kind in ('raw', 'standard'):
-        result.update({'decompose': False,
-                       'normalise_od': False,
-                       'averaging': False,
-                       'ocr_mode': 'raw',
-                       },
-                      )
+        result.update({'decompose': False, 'averaging': False})
         if kind == 'standard' and fit is not None:
             result.update({'decompose': True,
                            'plot_haems': True,
                            'haems': list(fit['haem_list']),
-                           'haem_mode': 'delta',
-                           'haem_per_od': False,
                            },
                           )
         return result
-    result.update({'normalise_od': False, 'ocr_mode': 'raw', 'haem_per_od': False})
     if result['decompose'] and fit is not None:
-        result.update({'plot_haems': True,
-                       'haems': list(fit['haem_list']),
-                       'haem_mode': 'delta',
-                       },
-                      )
+        result.update({'plot_haems': True, 'haems': list(fit['haem_list'])})
     return result
 
 
@@ -602,16 +603,15 @@ def _figure_starter(answers: dict,
     when they are decomposed, limited to those of the fit in use (all of them when none
     of the saved ones is in it). The Haems box of the settings strip says whether the
     haems are worked out and shown, so the figure has them whenever they are decomposed.
-    The journal and size are left as the answers hold them, which the settings strip
-    may have changed.
+    How the haems and the OCR are shown, the journal and the size are left as the
+    answers hold them, which the settings strip may have changed.
 
     ---- Inputs ----
     answers : dict
-        Answers dictionary the figure settings are stored in; must hold normalise_od
-        and decompose.
+        Answers dictionary the figure settings are stored in; must hold normalise_od,
+        decompose, ocr_mode, haem_mode and haem_per_od.
     defaults : dict
-        The standard or saved answers (plot_o2, plot_ocr, ocr_mode, haems, haem_mode,
-        haem_per_od, event_label_angle).
+        The standard or saved answers (plot_o2, plot_ocr, haems, event_label_angle).
     fit : Optional[dict]
         Fit dictionary (haem_list), or None when the haems are not decomposed.
     include_percent : bool
@@ -636,24 +636,25 @@ def _figure_starter(answers: dict,
     """
 
     kinds = ocr_kind_lister(answers['normalise_od'])
-    haem_mode = defaults['haem_mode']
+    haem_mode = answers['haem_mode']
     if haem_mode == 'percent' and not include_percent:
         haem_mode = 'delta'
     has_haems = bool(answers['decompose'] and fit is not None)
     haem_list = list(fit['haem_list']) if has_haems else []
     haems = [name for name in defaults['haems'] if name in haem_list]
+    # The per OD box of the haems keeps its tick while they are in % oxidised, which
+    # has no per OD, so it is as it was when they go back to delta D.
     answers.update({'plot_o2': defaults['plot_o2'],
                     'plot_ocr': defaults['plot_ocr'],
-                    'ocr_mode': (defaults['ocr_mode']
-                                 if defaults['ocr_mode'] in kinds
+                    'ocr_mode': (answers['ocr_mode']
+                                 if answers['ocr_mode'] in kinds
                                  else kinds[0]
                                  ),
                     'plot_haems': has_haems,
                     'haems': haems or haem_list,
                     'haem_mode': haem_mode,
-                    'haem_per_od': bool(defaults['haem_per_od'] and
-                                        answers['normalise_od'] and
-                                        haem_mode != 'percent',
+                    'haem_per_od': bool(answers['haem_per_od'] and
+                                        answers['normalise_od'],
                                         ),
                     'event_label_angle': defaults['event_label_angle'],
                     },
@@ -1471,7 +1472,9 @@ def _strip_change_applier(session: ViewerSession,
     Helper function to make a change in the settings strip what the run uses, and
     redraw the plot of the step being asked. Unticking the haems leaves them out of the
     run; ticking them, picking a fit or ticking library haems under Build a fit works
-    them out with the fit in the strip; a new background works them out again. A fit
+    them out with the fit in the strip; a new background works them out again, and so
+    does another spectrometer. A new way of showing the haems, or a per OD box, redraws
+    the plot with it. A fit
     that cannot be used is reported and the strip is set back. Keep to compare keeps
     the fit and background in use, drawn dashed over the haems until Stop comparing or
     the haems are left out. A new journal, width or height redraws only the figure of
@@ -1505,6 +1508,7 @@ def _strip_change_applier(session: ViewerSession,
     ---- Helpers ----
     _standard_fit_loader
     _strip_shower
+    form_answers_builder
     info_printer
     kept_decomposition_builder
     size_answers_builder
@@ -1522,6 +1526,24 @@ def _strip_change_applier(session: ViewerSession,
                      f"{BACKGROUND_SHORT_NAMES[answers['haem_background']]}.",
                      )
         is_redrawn = is_redrawn or session.fit is not None
+
+    # ---- 2.1 The spectrometer, and how the haems and the OCR are shown ---------------
+    forms = form_answers_builder(changes)
+    answers.update(forms)
+    if 'spectra' in changes:
+        info_printer(f"The haems are now read from the {changes['spectra']} spectra.")
+    if 'haem_mode' in changes:
+        info_printer('The haems are now shown as '
+                     f"{HAEM_FORM_TEXTS[changes['haem_mode']]}.",
+                     )
+    for name, subject in (('haem_per_od', 'The haems are'),
+                          ('ocr_per_od', 'The OCR is'),
+                          ):
+        if name in changes:
+            info_printer(f"{subject} {'now' if changes[name] else 'no longer'} shown "
+                         'per OD.',
+                         )
+    is_redrawn = is_redrawn or bool(forms)
 
     # ---- 3 The haems and the fit -----------------------------------------------------
     if changes.get('plot_haems') is False:
@@ -1591,11 +1613,16 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     ---- Summary ----
     Helper function to show in the settings strip what the run uses now: the haems
     ticked when they are worked out, the fit, the decomposition kept to compare with,
-    the journal and the size.
+    the spectrometer, how the haems and the OCR are shown, the journal and the size.
+    It also says what the strip offers: the spectrometers every file has, % oxidised
+    when at least one file has both regions, and the per OD boxes when OD values were
+    entered. Haems in % oxidised go back to delta D when no file has both regions any
+    more.
 
     ---- Inputs ----
     session : ViewerSession
-        The browser session (its window and fit).
+        The browser session (its window, fit, limits, regions and whether OD values
+        were entered).
     answers : dict
         Answers so far.
 
@@ -1607,15 +1634,29 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
         Nothing.
 
     ---- Globals mutated ----
-    None. Shows the values in the strip (side effect).
+    None. May change haem_mode in ``answers``, and shows the values in the strip
+    (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    region_files_lister
     strip_values_builder
     """
 
+    common = set(session.summaries[0]['datasets'])
+    for summary in session.summaries[1:]:
+        common &= set(summary['datasets'])
+    has_percent = bool(region_files_lister(session.summaries,
+                                           session.limits,
+                                           session.regions,
+                                           answers.get('decomposition_dataset'),
+                                           ),
+                       )
+    if answers['haem_mode'] == 'percent' and not has_percent:
+        answers['haem_mode'] = 'delta'
+    session.window.strip_choices_setter(sorted(common), has_percent, session.has_od)
     fit = session.fit
     session.window.strip_setter(strip_values_builder(answers,
                                                      fit is not None,
@@ -1725,7 +1766,11 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
 
     def redraw() -> bool:
         return preview_drawer(session,
-                              _answers_previewer(answers, session.fit, 'standard'),
+                              _answers_previewer(answers,
+                                                 session.fit,
+                                                 'standard',
+                                                 session.has_od,
+                                                 ),
                               {},
                               session.fit,
                               {},
@@ -1747,7 +1792,7 @@ def details_stage_runner(session: ViewerSession,
     ---- Summary ----
     Main function to ask the last questions of the import, on the standard plot cut to
     the limits: the OD values, then the event labels, each in a table of the window.
-    The OD values are only checked: the data is scaled by OD in the individual plots.
+    Once OD values are entered, the strip shows its per OD boxes and a line says so.
     The plot is redrawn with the labels once they are entered, and they are accepted or
     typed again; with no events in any file there is nothing to accept. Last, the
     export of what was imported is offered. The haems are those of the session's fit.
@@ -1777,8 +1822,8 @@ def details_stage_runner(session: ViewerSession,
         only present when scaling by OD.
 
     ---- Globals mutated ----
-    None. Stores normalise_od in ``answers`` and writes the export when one is chosen
-    (side effects).
+    None. Stores normalise_od in ``answers`` and whether OD values were entered in the
+    session, shows the strip and writes the export when one is chosen (side effects).
 
     ---- Equations ----
     None.
@@ -1789,8 +1834,10 @@ def details_stage_runner(session: ViewerSession,
     _label_table_filler
     _od_lister
     _od_table_filler
+    _strip_shower
     accept_asker
     event_asker
+    info_printer
     od_scaling_asker
     preview_drawer
     saved_values_reader
@@ -1804,7 +1851,11 @@ def details_stage_runner(session: ViewerSession,
         saved[name] = dict(saved.get(name) or {}, **values)
     def redraw() -> bool:
         return preview_drawer(session,
-                              _answers_previewer(answers, session.fit, 'standard'),
+                              _answers_previewer(answers,
+                                                 session.fit,
+                                                 'standard',
+                                                 session.has_od,
+                                                 ),
                               limits,
                               session.fit,
                               details,
@@ -1812,13 +1863,18 @@ def details_stage_runner(session: ViewerSession,
     session.redraw = redraw
 
     # ---- 2 OD values -----------------------------------------------------------------
-    # Only checked here; the data is scaled by OD in the individual plots. They are
-    # filled in in a table, which is its own check.
+    # They are filled in in a table, which is its own check. The per OD boxes of the
+    # strip then say whether the OCR and the haems are scaled by them.
     def table_filler(rows: Dict[str, dict]) -> Dict[str, dict]:
         return _od_table_filler(session, rows)
     details = od_scaling_asker(summaries, answers, defaults, saved, table_filler)
+    session.has_od = bool(answers['normalise_od'])
+    _strip_shower(session, answers)
     if answers['normalise_od']:
         _od_lister(details)
+        info_printer('The OCR and the haems can now be shown per OD: tick or untick '
+                     'the two per OD boxes in the strip under the plot.',
+                     )
 
     # ---- 3 Event labels --------------------------------------------------------------
     # The table opens again with the labels as last typed until they are accepted.
@@ -2097,12 +2153,11 @@ def plots_stage_runner(session: ViewerSession,
     Main function to show the figure saved for each file, drawn as it will be saved
     from the standard settings or the ones last saved for the dataset, and ask whether
     it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
-    how the haems are shown, the angle of the event labels): only that part's questions
-    are asked, with the current choices as the defaults, and the figure is drawn and
-    asked about again. The settings strip turns the haems on or off and sets the
-    journal and size, so 'which haems' asks only which ones in which order, and the
-    journal and size are not asked. The haems can be shown in % oxidised when at least
-    one file has both regions.
+    the angle of the event labels): only that part's questions are asked, with the
+    current choices as the defaults, and the figure is drawn and asked about again. The
+    settings strip turns the haems on or off and sets how they are shown, the per OD
+    scaling, the journal and the size, so 'which haems' asks only which ones in which
+    order, and none of those is asked.
 
     ---- Inputs ----
     session : ViewerSession
@@ -2137,8 +2192,6 @@ def plots_stage_runner(session: ViewerSession,
     _strip_shower
     accept_asker
     haem_choice_asker
-    haem_form_asker
-    haem_scaling_asker
     info_printer
     label_angle_asker
     preview_drawer
@@ -2150,6 +2203,10 @@ def plots_stage_runner(session: ViewerSession,
     info_printer('The figure saved for each file is drawn with the standard settings, '
                  'or with the ones last saved for this dataset. Change only what you '
                  'want different; you can look at every file before accepting it.',
+                 )
+    info_printer('How the haems are shown, the journal and the size are in the strip '
+                 'under the plot; each change redraws the figure.',
+                 tight=True,
                  )
     # % oxidised is offered when at least one file has both regions.
     include_percent = bool(region_files_lister(session.summaries,
@@ -2185,12 +2242,11 @@ def plots_stage_runner(session: ViewerSession,
                          )
 
         # ---- 2.2 Ask whether it is accepted, or which part to change -----------------
-        # The Haems box turns the haems on and off, and the strip holds the journal and
-        # size.
+        # The Haems box turns the haems on and off, and the strip holds how they are
+        # shown, the journal and the size.
         changes = [('signals', 'change the oxygen and OCR')]
         if answers['plot_haems']:
             changes.append(('haems', 'change which haems are shown'))
-            changes.append(('form', 'change how the haems are shown'))
         if plotted:
             changes.append(('angle', 'change the angle of the event labels'))
         choice = accept_asker('Do you accept this figure?', changes)
@@ -2203,11 +2259,9 @@ def plots_stage_runner(session: ViewerSession,
             signal_asker(answers, current)
         elif choice == 'haems':
             haem_choice_asker(answers, current, session.fit)
-        elif choice == 'form':
-            haem_form_asker(answers, current, include_percent)
-            haem_scaling_asker(answers, current)
         else:
             label_angle_asker(answers, current)
+        _strip_shower(session, answers)  # the OCR chosen may untick its per OD box
 
 
 # ---- processing_stage_runner ---------------------------------------------------------
@@ -2225,7 +2279,9 @@ def processing_stage_runner(session: ViewerSession,
     Main function to talk the user through the processing, with the plot redrawn after
     each answer: first the haem fit, then, now that the haems are seen, an offer to
     change the trim and ignore times, then the oxidised and the reduced region of every
-    file (when the haems are shown), and last the averaging around the events. The
+    file (when the haems are shown), and last the averaging around the events. A line
+    points to the strip at the start, and another to its % oxidised once a file has
+    both regions. The
     settings strip picks the fit and leaves the haems out, so the decomposition
     question only offers to find the components from the data instead. While those
     questions are asked the strip is greyed out.
@@ -2282,13 +2338,18 @@ def processing_stage_runner(session: ViewerSession,
     info_printer
     pca_stage_runner
     preview_drawer
+    region_files_lister
     yes_no_asker
     """
 
     summaries = session.summaries
     def redraw() -> bool:
         return preview_drawer(session,
-                              _answers_previewer(answers, session.fit, 'analysis'),
+                              _answers_previewer(answers,
+                                                 session.fit,
+                                                 'analysis',
+                                                 session.has_od,
+                                                 ),
                               limits,
                               session.fit,
                               details,
@@ -2310,6 +2371,16 @@ def processing_stage_runner(session: ViewerSession,
             session.window.strip_state_setter(True)
 
     # ---- 1 The haem fit --------------------------------------------------------------
+    # The strip is pointed to first, as it changes the decomposition at any time.
+    common = set(summaries[0]['datasets'])
+    for summary in summaries[1:]:
+        common &= set(summary['datasets'])
+    info_printer('Use the strip under the plot to change the fit, the background'
+                 f"{', the spectrometer (Spectra)' if len(common) > 1 else ''} and how "
+                 'the haems are shown (Haems as); the plot is redrawn after each '
+                 'change.',
+                 )
+
     # ---- 1.1 Ask whether to decompose, when no haems are shown yet -------------------
     if session.fit is None:
         # the Haems box and the fit of the strip are the defaults
@@ -2364,8 +2435,20 @@ def processing_stage_runner(session: ViewerSession,
         redraw()
 
     # ---- 3 The oxidised and the reduced region ---------------------------------------
+    # The regions go to the session at once, so the plots that follow and the strip
+    # have their % oxidised.
     if answers['decompose']:
         regions = _regions_chooser(session, answers, limits, details, regions)
+        session.regions = regions or {}
+        _strip_shower(session, answers)
+        if region_files_lister(summaries,
+                               limits,
+                               regions,
+                               answers.get('decomposition_dataset'),
+                               ):
+            info_printer('The haems can now be shown in % oxidised: choose it under '
+                         'Haems as in the strip under the plot.',
+                         )
 
     # ---- 4 Averaging around the events -----------------------------------------------
     _averaging_reviewer(session, answers, defaults, limits, details, redraw)
@@ -2493,7 +2576,11 @@ def trim_stage_runner(session: ViewerSession,
     def draw(limits: Optional[Dict[str, dict]] = None) -> bool:
         # None: the whole recording, for the edges; limits: the data they keep
         return preview_drawer(session,
-                              _answers_previewer(answers, session.fit, 'standard'),
+                              _answers_previewer(answers,
+                                                 session.fit,
+                                                 'standard',
+                                                 session.has_od,
+                                                 ),
                               limits or {},
                               session.fit,
                               {},
@@ -2669,6 +2756,9 @@ def viewer_asker(summaries: List[dict],
     def run_trim() -> Dict[str, dict]:
         old = state.get('limits') or remembered
         state['limits'] = trim_stage_runner(session, answers, old, state.get('limits'))
+        # the strip offers % oxidised for the regions that hold under these limits
+        session.limits = state['limits']
+        _strip_shower(session, answers)
         answers['ignore_first_minutes'] = max(v['ignore_start']
                                               for v in state['limits'].values()
                                               )

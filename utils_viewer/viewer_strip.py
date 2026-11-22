@@ -1,7 +1,7 @@
 """
 The settings strip under the plot: the haems, the fit, the background, the decomposition
-kept to compare with, the journal, the figure size and the times of the edges dragged on
-the plot.
+kept to compare with, the spectrometer, how the haems and the OCR are shown, the journal,
+the figure size and the times of the edges dragged on the plot.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -27,10 +27,19 @@ VALUE_NAMES = ('plot_haems',
                'haem_files',
                'compare',
                'kept',
+               'spectra',
+               'haem_mode',
+               'haem_per_od',
+               'ocr_per_od',
                'journal',
                'columns',
                'height',
                )
+# The ways of showing the haems, in the order of the "Haems as" drop-down, with its words.
+HAEM_FORM_TEXTS = {'delta': 'ΔD (mOD)',
+                   'percent': '% oxidised',
+                   'abs': 'Absorbance (mOD)',
+                   }
 # The button that folds the tick boxes of the library haems out and away.
 BUILD_CLOSED_TEXT = 'Build a fit ▸'
 BUILD_OPEN_TEXT = 'Build a fit ▾'
@@ -325,8 +334,11 @@ class SettingsStrip:
     haems, a drop-down of the fits, a drop-down of the backgrounds, a button that folds
     out a tick box for each haem of the library (Build a fit), a button that keeps the
     decomposition in use to compare the next ones with (with a line saying which one is
-    kept), a drop-down of the journal, a drop-down of the widths that journal allows and
-    a typing box for the height. It tells the window what the user changed and can be
+    kept), a drop-down of the spectrometer whose spectra hold the haems (shown when the
+    files share more than one), a drop-down of how the haems are shown with a "per OD"
+    box, an "OCR per OD" box (both boxes shown only when OD values were entered), a
+    drop-down of the journal, a drop-down of the widths that journal allows and a typing
+    box for the height. It tells the window what the user changed and can be
     set by the program; it changes nothing by itself. It starts greyed out, until the
     program says it is listening. Every method runs on the window thread, except
     values_reader.
@@ -346,12 +358,16 @@ class SettingsStrip:
     _change_reporter
     _compare_handler
     _fit_handler
+    _form_handler
     _haems_handler
     _height_handler
     _journal_handler
+    _per_od_handler
     _size_refresher
+    _spectra_handler
     _tick_handler
     _width_handler
+    choices_setter
     fits_setter
     library_setter
     state_setter
@@ -404,10 +420,13 @@ class SettingsStrip:
         _build_toggler
         _compare_handler
         _fit_handler
+        _form_handler
         _haems_handler
         _height_handler
         _journal_handler
+        _per_od_handler
         _size_refresher
+        _spectra_handler
         _width_handler
         """
 
@@ -422,6 +441,10 @@ class SettingsStrip:
                                         'haem_files': [],
                                         'compare': False,
                                         'kept': '',
+                                        'spectra': standard['decomposition_dataset'],
+                                        'haem_mode': standard['haem_mode'],
+                                        'haem_per_od': bool(standard['haem_per_od']),
+                                        'ocr_per_od': standard['ocr_mode'] == 'od',
                                         'journal': NO_JOURNAL,
                                         'columns': standard['columns'],
                                         'height': standard['height'],
@@ -429,6 +452,10 @@ class SettingsStrip:
         self._journals = [NO_JOURNAL] + list(JOURNAL_NAMES)
         self._backgrounds = list(BACKGROUND_SHORT_NAMES)
         self._width_columns: List[float] = []
+        self._spectra_names: List[str] = []
+        self._form_keys: List[str] = []
+        self._has_percent = False
+        self._has_od = False
         self._fit_names: List[str] = [self._values['fit_file']]
         self._haems_by_file: Dict[str, str] = {}
         self._tick_vars: Dict[str, Any] = {}
@@ -493,7 +520,37 @@ class SettingsStrip:
                                     anchor='w',
                                     )
 
-        # ---- 3 Second row: the journal, the width and the height ---------------------
+        # ---- 3 Second row: the spectrometer and how the haems and the OCR are shown --
+        # _size_refresher places the parts in use: the spectrometer only when there is
+        # a choice, the per OD boxes only when OD values were entered.
+        middle = tk.Frame(self.frame, bg=background)
+        middle.pack(pady=(0, 3))
+        self._spectra_label = tk.Label(middle, text='Spectra', bg=background)
+        self._spectra_combo = ttk.Combobox(middle, state='readonly', width=8)
+        self._form_label = tk.Label(middle, text='Haems as', bg=background)
+        self._form_combo = ttk.Combobox(middle, state='readonly', width=17)
+        self._haem_od = tk.BooleanVar(master=parent, value=self._values['haem_per_od'])
+        self._haem_od_box = tk.Checkbutton(
+            middle,
+            text='per OD',
+            variable=self._haem_od,
+            command=lambda: self._per_od_handler('haem_per_od'),
+            bg=background,
+            activebackground=background,
+            highlightthickness=0,
+            )
+        self._ocr_od = tk.BooleanVar(master=parent, value=self._values['ocr_per_od'])
+        self._ocr_od_box = tk.Checkbutton(
+            middle,
+            text='OCR per OD',
+            variable=self._ocr_od,
+            command=lambda: self._per_od_handler('ocr_per_od'),
+            bg=background,
+            activebackground=background,
+            highlightthickness=0,
+            )
+
+        # ---- 4 Third row: the journal, the width and the height ----------------------
         lower = tk.Frame(self.frame, bg=background)
         lower.pack()
         self._lower = lower
@@ -521,8 +578,10 @@ class SettingsStrip:
         self._note = tk.Label(lower, text='', bg=background, fg=NOTE_TEXT, anchor='w')
         self._note.pack(side='left', padx=(0, 4))
 
-        # ---- 4 What the user does ----------------------------------------------------
+        # ---- 5 What the user does ----------------------------------------------------
         self._fit_combo.bind('<<ComboboxSelected>>', self._fit_handler)
+        self._spectra_combo.bind('<<ComboboxSelected>>', self._spectra_handler)
+        self._form_combo.bind('<<ComboboxSelected>>', self._form_handler)
         self._background_combo.bind('<<ComboboxSelected>>', self._background_handler)
         self._journal_combo.bind('<<ComboboxSelected>>', self._journal_handler)
         self._width_combo.bind('<<ComboboxSelected>>', self._width_handler)
@@ -704,6 +763,40 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _form_handler ---------------------------------------------------------------
+    def _form_handler(self, event: Any = None) -> None:
+        """
+        ---- Summary ----
+        Method to take the way of showing the haems picked in the drop-down.
+
+        ---- Inputs ----
+        event : Any
+            The Tk event (unused).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        """
+
+        before = dict(self._values)
+        self._values['haem_mode'] = self._form_keys[self._form_combo.current()]
+        self._form_combo.selection_clear()
+        self._size_refresher()
+        self._change_reporter(before)
+
     # ---- _haems_handler --------------------------------------------------------------
     def _haems_handler(self) -> None:
         """
@@ -825,6 +918,38 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _per_od_handler -------------------------------------------------------------
+    def _per_od_handler(self, name: str) -> None:
+        """
+        ---- Summary ----
+        Method to take one of the two per OD tick boxes.
+
+        ---- Inputs ----
+        name : str
+            'haem_per_od' or 'ocr_per_od', the value of the box clicked.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        """
+
+        before = dict(self._values)
+        box = self._haem_od if name == 'haem_per_od' else self._ocr_od
+        self._values[name] = bool(box.get())
+        self._change_reporter(before)
+
     # ---- _size_refresher -------------------------------------------------------------
     def _size_refresher(self) -> None:
         """
@@ -832,14 +957,16 @@ class SettingsStrip:
         Method to show the kept values in every part of the strip: the widths offered
         follow the journal, the width and the height are greyed for "None", the button
         that keeps a decomposition is greyed while no haems are shown, the line saying
-        which one is kept shows only while one is, and the whole strip is greyed while
-        the program is not listening.
+        which one is kept shows only while one is, the spectrometer shows only when
+        there is a choice, the per OD boxes only when OD values were entered (the one
+        of the haems greyed for % oxidised, which has no per OD), and the whole strip
+        is greyed while the program is not listening.
 
         ---- Inputs ----
         None.
 
         ---- Globals read ----
-        KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
+        HAEM_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
 
         ---- Outputs ----
         None
@@ -852,6 +979,7 @@ class SettingsStrip:
         None.
 
         ---- Helpers ----
+        haem_form_choices_lister
         height_checker
         width_choices_lister
         """
@@ -907,10 +1035,75 @@ class SettingsStrip:
             self._kept_label.pack(before=self._lower, pady=(0, 3), fill='x')
         else:
             self._kept_label.pack_forget()
+        haem_state = choice_state if values['plot_haems'] else 'disabled'
+        forms = haem_form_choices_lister(self._has_percent)
+        self._form_keys = [key for key, _ in forms]
+        self._form_combo.configure(state='readonly', values=[text for _, text in forms])
+        if values['haem_mode'] in self._form_keys:
+            self._form_combo.current(self._form_keys.index(values['haem_mode']))
+        else:
+            self._form_combo.set(HAEM_FORM_TEXTS.get(values['haem_mode'], ''))
+        self._form_combo.configure(state=haem_state)
+        self._spectra_combo.configure(state='readonly', values=self._spectra_names)
+        self._spectra_combo.set(values['spectra'])
+        self._spectra_combo.configure(state=haem_state)
+        self._haem_od.set(values['haem_per_od'])
+        self._ocr_od.set(values['ocr_per_od'])
+        can_scale = (self._is_enabled and
+                     values['plot_haems'] and
+                     values['haem_mode'] != 'percent'
+                     )
+        self._haem_od_box.configure(state='normal' if can_scale else 'disabled')
+        self._ocr_od_box.configure(state=button_state)
+        has_choice = len(self._spectra_names) > 1
+        parts = [(self._spectra_label, has_choice, (4, 4)),
+                 (self._spectra_combo, has_choice, (0, 12)),
+                 (self._form_label, True, (4, 4)),
+                 (self._form_combo, True, (0, 4)),
+                 (self._haem_od_box, self._has_od, (0, 12)),
+                 (self._ocr_od_box, self._has_od, (0, 4)),
+                 ]
+        for part, _, _ in parts:
+            part.pack_forget()
+        for part, is_shown, gap in parts:
+            if is_shown:
+                part.pack(side='left', padx=gap)
         self._journal_combo.configure(state=choice_state)
         if is_standard or not self._is_enabled:
             self._width_combo.configure(state='disabled')
             self._height_entry.configure(state='disabled')
+
+    # ---- _spectra_handler ------------------------------------------------------------
+    def _spectra_handler(self, event: Any = None) -> None:
+        """
+        ---- Summary ----
+        Method to take the spectrometer picked in the drop-down.
+
+        ---- Inputs ----
+        event : Any
+            The Tk event (unused).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        """
+
+        before = dict(self._values)
+        self._values['spectra'] = self._spectra_combo.get()
+        self._spectra_combo.selection_clear()
+        self._change_reporter(before)
 
     # ---- _tick_handler ---------------------------------------------------------------
     def _tick_handler(self, name: str) -> None:
@@ -994,6 +1187,48 @@ class SettingsStrip:
         self._change_reporter(before)
 
     # ---- STRIP FUNCTIONS -------------------------------------------------------------
+
+    # ---- choices_setter --------------------------------------------------------------
+    def choices_setter(self,
+                       spectra: List[str],
+                       has_percent: bool,
+                       has_od: bool,
+                       ) -> None:
+        """
+        ---- Summary ----
+        Method to say what the strip offers: the spectrometers of the "Spectra"
+        drop-down (shown only with more than one), whether % oxidised is in the "Haems
+        as" drop-down, and whether the two per OD boxes are shown. The values stay.
+
+        ---- Inputs ----
+        spectra : List[str]
+            The spectrometers every file has, as they are to be listed.
+        has_percent : bool
+            True when at least one file has both regions, so % oxidised is offered.
+        has_od : bool
+            True when OD values were entered, so the per OD boxes are shown.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _size_refresher
+        """
+
+        self._spectra_names = list(spectra)
+        self._has_percent = bool(has_percent)
+        self._has_od = bool(has_od)
+        self._size_refresher()
 
     # ---- fits_setter -----------------------------------------------------------------
     def fits_setter(self, names: List[str]) -> None:
@@ -1223,6 +1458,83 @@ def _page_journal_finder(journal: str) -> str:
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- form_answers_builder ------------------------------------------------------------
+def form_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to turn the spectrometer and the ways of showing the haems and the
+    OCR of the strip into the answers of the run.
+
+    ---- Inputs ----
+    values : Dict[str, Any]
+        Some or all of the strip values (DATA_FORMAT.md), as checked by
+        strip_values_checker.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, Any]
+        The answers to update: decomposition_dataset for the spectrometer, haem_mode
+        and haem_per_od as given, and ocr_mode 'od' for the OCR per OD box ticked,
+        'raw' for it unticked. Empty when the values hold none of them.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    answers: Dict[str, Any] = {}
+    if 'spectra' in values:
+        answers['decomposition_dataset'] = values['spectra']
+    for name in ('haem_mode', 'haem_per_od'):
+        if name in values:
+            answers[name] = values[name]
+    if 'ocr_per_od' in values:
+        answers['ocr_mode'] = 'od' if values['ocr_per_od'] else 'raw'
+    return answers
+
+
+# ---- haem_form_choices_lister --------------------------------------------------------
+def haem_form_choices_lister(has_percent: bool) -> List[Tuple[str, str]]:
+    """
+    ---- Summary ----
+    Main function to list the ways of showing the haems the "Haems as" drop-down
+    offers, each with its words.
+
+    ---- Inputs ----
+    has_percent : bool
+        True when at least one file has both regions, so % oxidised is offered.
+
+    ---- Globals read ----
+    HAEM_FORM_TEXTS.
+
+    ---- Outputs ----
+    List[Tuple[str, str]]
+        [(haem_mode, words)] in the order of the drop-down: delta D, % oxidised when
+        offered, absorbance.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return [(key, text)
+            for key, text in HAEM_FORM_TEXTS.items()
+            if key != 'percent' or has_percent
+            ]
 
 
 # ---- haem_ticks_resolver -------------------------------------------------------------
@@ -1462,8 +1774,9 @@ def strip_values_builder(answers: dict,
 
     ---- Inputs ----
     answers : dict
-        The answers (fit_file, haem_background, journal, columns, height, size_mode);
-        a fit_file of None shows an empty fit.
+        The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
+        haem_per_od, ocr_mode, journal, columns, height, size_mode); a fit_file of None
+        shows an empty fit.
     has_haems : bool
         True when the haems are worked out and shown, which ticks the box.
     haem_files : Sequence[str]
@@ -1479,7 +1792,9 @@ def strip_values_builder(answers: dict,
     ---- Outputs ----
     Dict[str, Any]
         All the strip values (DATA_FORMAT.md). A figure of the standard size
-        (size_mode other than 'custom') shows the journal as "None".
+        (size_mode other than 'custom') shows the journal as "None"; the OCR per OD
+        box is ticked for the OCR per OD, unticked for the plain OCR and its % of the
+        range.
 
     ---- Globals mutated ----
     None.
@@ -1498,6 +1813,10 @@ def strip_values_builder(answers: dict,
             'haem_files': list(haem_files),
             'compare': bool(kept),
             'kept': str(kept),
+            'spectra': str(answers.get('decomposition_dataset') or ''),
+            'haem_mode': answers['haem_mode'],
+            'haem_per_od': bool(answers['haem_per_od']),
+            'ocr_per_od': answers['ocr_mode'] == 'od',
             'journal': answers['journal'] if is_custom else NO_JOURNAL,
             'columns': answers['columns'],
             'height': answers['height'],
@@ -1510,7 +1829,8 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
     ---- Summary ----
     Main function to check values meant for the strip before they are shown: the
     names, the background, the haems ticked, whether a decomposition is kept and its
-    words, the journal, a width the journal allows and a height the page allows. The
+    words, the spectrometer, the way of showing the haems, the per OD boxes, the
+    journal, a width the journal allows and a height the page allows. The
     width and the height are checked against the journal given with them.
 
     ---- Inputs ----
@@ -1518,7 +1838,7 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         Some or all of the strip values (DATA_FORMAT.md).
 
     ---- Globals read ----
-    VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES.
+    VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS.
 
     ---- Outputs ----
     None
@@ -1563,6 +1883,19 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         raise ValueError('The decomposition kept in the strip is given in words; '
                          f"{values['kept']!r} is not.",
                          )
+    if 'spectra' in values and not isinstance(values['spectra'], str):
+        raise ValueError('The spectrometer of the strip is given by its name; '
+                         f"{values['spectra']!r} is not.",
+                         )
+    if 'haem_mode' in values and values['haem_mode'] not in HAEM_FORM_TEXTS:
+        raise ValueError(f"The strip cannot show the haems as '{values['haem_mode']}'; "
+                         f"it has {', '.join(HAEM_FORM_TEXTS)}.",
+                         )
+    for name in ('haem_per_od', 'ocr_per_od'):
+        if name in values and not isinstance(values[name], bool):
+            raise ValueError('A per OD box of the strip is True or False; '
+                             f'{values[name]!r} is not.',
+                             )
     if 'journal' in values:
         _page_journal_finder(values['journal'])
         if 'columns' in values and values['journal'] != NO_JOURNAL:

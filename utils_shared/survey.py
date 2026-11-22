@@ -1247,59 +1247,13 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
     return answers['plot_haems']
 
 
-# ---- haem_form_asker -----------------------------------------------------------------
-def haem_form_asker(answers: dict,
-                    defaults: dict,
-                    include_percent: bool = True,
-                    ) -> None:
-    """
-    ---- Summary ----
-    Main function to ask how the haems are shown: absorbance, delta D or, when a file
-    has an oxidised and a reduced region, % oxidised.
-
-    ---- Inputs ----
-    answers : dict
-        Answers dictionary the values are stored in.
-    defaults : dict
-        Default answers; % oxidised as the default gives delta D when it is not
-        offered.
-    include_percent : bool
-        True to offer % oxidised: at least one file has both regions.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Stores the answer in ``answers`` (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    choice_asker
-    haem_form_option_builder
-    """
-
-    options = haem_form_option_builder(include_percent)
-    default = defaults['haem_mode']
-    if default not in [key for key, _ in options]:
-        default = 'delta'
-    answers['haem_mode'] = choice_asker('How would you like to plot the haems?',
-                                        options,
-                                        default,
-                                        )
-
-
 # ---- haem_form_option_builder --------------------------------------------------------
 def haem_form_option_builder(include_percent: bool) -> List[Tuple[str, str]]:
     """
     ---- Summary ----
     Helper function to build the (key, label) choices for the 'how to show the
-    haems' questions. The delta D line explains itself in italics.
+    haems' question of the haem and OCR response. The delta D line explains itself in
+    italics.
 
     ---- Inputs ----
     include_percent : bool
@@ -1368,47 +1322,6 @@ def haem_name_formatter(name: str) -> str:
 
     # ---- 1 Convert the maths spans ---------------------------------------------------
     return re.sub(r'\$([^$]*)\$', _maths_converter, str(name))
-
-
-# ---- haem_scaling_asker --------------------------------------------------------------
-def haem_scaling_asker(answers: dict, defaults: dict) -> bool:
-    """
-    ---- Summary ----
-    Main function to ask whether the haems are also scaled by OD. Nothing is asked when
-    no OD values were entered or the haems are shown as percentages.
-
-    ---- Inputs ----
-    answers : dict
-        Answers dictionary the values are stored in.
-    defaults : dict
-        Default answers.
-        Must hold normalise_od and haem_mode.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    bool
-        True when the question was asked.
-
-    ---- Globals mutated ----
-    None. Stores the answer in ``answers`` (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    yes_no_asker
-    """
-
-    answers['haem_per_od'] = False
-    if not answers['normalise_od'] or answers['haem_mode'] == 'percent':
-        return False
-    answers['haem_per_od'] = yes_no_asker('Do you want to scale the haems by OD as '
-                                          'well?',
-                                          defaults['haem_per_od'],
-                                          )
-    return True
 
 
 # ---- label_angle_asker ---------------------------------------------------------------
@@ -1775,9 +1688,9 @@ def od_scaling_asker(summaries: List[dict],
     answers['normalise_od'] = yes_no_asker(
         'Do you want to scale by OD?',
         defaults['normalise_od'],
-        note='Scaling by OD divides the OCR (and the '
-        'haems, if you choose so in section 5) by '
-        'dilution factor × OD × volume.',
+        note='Scaling by OD divides the OCR and the haems by '
+        'dilution factor × OD × volume; a per OD box for '
+        'each then shows in the strip under the plot.',
         number='3.1',
         )
     details = {s['name']: {} for s in summaries}

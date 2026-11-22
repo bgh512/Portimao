@@ -211,6 +211,7 @@ class ViewerGui:
     run
     session_attacher
     spec_publisher
+    strip_choices_setter
     strip_fits_setter
     strip_library_setter
     strip_listener_setter
@@ -896,7 +897,8 @@ class ViewerGui:
         ---- Inputs ----
         event : tuple
             (kind, ...) with kind 'prompt', 'spec', 'session', 'pictures', 'extra',
-            'image', 'time', 'edges', 'strip', 'strip_fits', 'strip_state', 'busy',
+            'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
+            'strip_library', 'strip_state', 'busy',
             'table_show', 'table_hide', 'closed' or 'finished'. The "Drawing ..."
             sign of 'busy' stays until the next question, preview or picture shown.
             With close_after_s, 'finished' also closes the window after that time.
@@ -968,6 +970,8 @@ class ViewerGui:
                                      )
         elif kind == 'strip':
             self._strip.values_setter(event[1])
+        elif kind == 'strip_choices':
+            self._strip.choices_setter(*event[1:])
         elif kind == 'strip_fits':
             self._strip.fits_setter(event[1])
         elif kind == 'strip_library':
@@ -2908,6 +2912,47 @@ class ViewerGui:
         """
 
         self._events.put(('spec', spec, name))
+
+    # ---- strip_choices_setter --------------------------------------------------------
+    def strip_choices_setter(self,
+                             spectra: List[str],
+                             has_percent: bool,
+                             has_od: bool,
+                             ) -> None:
+        """
+        ---- Summary ----
+        Method to tell the settings strip what it offers: the spectrometers of its
+        "Spectra" drop-down, whether % oxidised is in "Haems as", and whether the per
+        OD boxes are shown.
+
+        ---- Inputs ----
+        spectra : List[str]
+            The spectrometers every file has.
+        has_percent : bool
+            True when at least one file has both regions.
+        has_od : bool
+            True when OD values were entered.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the choices for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(
+            ('strip_choices', list(spectra), bool(has_percent), bool(has_od)),
+            )
 
     # ---- strip_fits_setter -----------------------------------------------------------
     def strip_fits_setter(self, names: List[str]) -> None:

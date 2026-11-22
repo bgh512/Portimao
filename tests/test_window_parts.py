@@ -1,7 +1,8 @@
 """
 Tests of the parts of the window that need no window: the widths a journal allows, the
 check of a typed height, the check of values meant for the strip, the answers shown in
-the strip and taken back from it, the cells and rows of the OD and labels tables and
+the strip and taken back from it, the ways of showing the haems it offers and the
+answers each kind of plot is drawn with, the cells and rows of the OD and labels tables and
 the sentence said when one is confirmed too early, the way a turn of the mouse wheel
 scrolls, the time axis title of a preview and which files the window keeps read and
 redraws.
@@ -28,7 +29,10 @@ from utils_viewer.viewer_preview import (_loaded_experiment_getter,
                                          time_title_chooser,
                                          ViewerSession,
                                          )
-from utils_viewer.viewer_strip import (haem_ticks_resolver,
+from utils_viewer.viewer_stages import _answers_previewer
+from utils_viewer.viewer_strip import (form_answers_builder,
+                                       haem_form_choices_lister,
+                                       haem_ticks_resolver,
                                        height_checker,
                                        kept_decomposition_builder,
                                        NO_JOURNAL,
@@ -450,8 +454,9 @@ def test_answers_shown_in_the_strip() -> None:
     ---- Summary ----
     Main function to check that the answers of a run are shown in the strip as they
     are meant (the standard size as the journal "None", a chosen journal by its name,
-    the box ticked only when the haems are worked out), that the strip can show them,
-    and that its journal, width and height give the same answers back.
+    the box ticked only when the haems are worked out, the OCR per OD box ticked only
+    for the OCR per OD), that the strip can show them, and that its journal, width and
+    height give the same answers back.
 
     ---- Inputs ----
     None.
@@ -482,6 +487,10 @@ def test_answers_shown_in_the_strip() -> None:
                       'haem_files': ['c1_myco.csv', 'bH_bswitch.csv'],
                       'compare': False,
                       'kept': '',
+                      'spectra': 'Cyt',
+                      'haem_mode': 'delta',
+                      'haem_per_od': True,
+                      'ocr_per_od': True,
                       'journal': NO_JOURNAL,
                       'columns': 1,
                       'height': 0.5,
@@ -501,6 +510,10 @@ def test_answers_shown_in_the_strip() -> None:
                   size_mode='custom',
                   fit_file=None,
                   haem_background='linear',
+                  decomposition_dataset='NADH',
+                  haem_mode='percent',
+                  haem_per_od=False,
+                  ocr_mode='percent',
                   )
     values = strip_values_builder(chosen, False, [], kept='made_up.csv, Valencia')
     assert values == {'plot_haems': False,
@@ -509,6 +522,10 @@ def test_answers_shown_in_the_strip() -> None:
                       'haem_files': [],
                       'compare': True,
                       'kept': 'made_up.csv, Valencia',
+                      'spectra': 'NADH',
+                      'haem_mode': 'percent',
+                      'haem_per_od': False,
+                      'ocr_per_od': False,
                       'journal': 'cell',
                       'columns': 1.5,
                       'height': 0.75,
@@ -532,7 +549,9 @@ def test_values_meant_for_the_strip() -> None:
     Main function to check that values the strip can show pass, and that an unknown
     name, an unknown journal, a width the journal does not allow, a height over a page,
     an unknown background, haems ticked that are not a list of names, a comparing that
-    is not True or False and a kept decomposition not in words are each refused.
+    is not True or False, a kept decomposition not in words, a spectrometer not given
+    by its name, a way of showing the haems the strip does not have and a per OD box
+    that is not True or False are each refused.
 
     ---- Inputs ----
     None.
@@ -563,6 +582,12 @@ def test_values_meant_for_the_strip() -> None:
                          )
     strip_values_checker({'journal': NO_JOURNAL})
     strip_values_checker({'haem_background': 'valencia', 'haem_files': ['bL_og.csv']})
+    strip_values_checker({'spectra': 'NADH',
+                          'haem_mode': 'percent',
+                          'haem_per_od': False,
+                          'ocr_per_od': True,
+                          },
+                         )
     strip_values_checker({})
     for wrong in ({'colour': 'red'},
                   {'journal': 'lancet'},
@@ -574,9 +599,158 @@ def test_values_meant_for_the_strip() -> None:
                   {'haem_files': [3]},
                   {'compare': 'yes'},
                   {'kept': None},
+                  {'spectra': None},
+                  {'haem_mode': 'conc'},
+                  {'haem_per_od': 'yes'},
+                  {'ocr_per_od': 1},
                   ):
         with pytest.raises(ValueError):
             strip_values_checker(wrong)
+
+
+# ---- test_haems_and_ocr_shown_from_the_strip -----------------------------------------
+def test_haems_and_ocr_shown_from_the_strip() -> None:
+    """
+    ---- Summary ----
+    Main function to check the "Haems as" drop-down and the per OD boxes: % oxidised is
+    in the list only when a file has both regions, and the spectrometer, the way of
+    showing the haems and the two boxes give the answers of the run (the OCR per OD
+    box ticked is the OCR per OD, unticked the plain OCR), only for what changed.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The list of the drop-down -------------------------------------------------
+    assert haem_form_choices_lister(False) == [('delta', 'ΔD (mOD)'),
+                                               ('abs', 'Absorbance (mOD)'),
+                                               ]
+    assert haem_form_choices_lister(True) == [('delta', 'ΔD (mOD)'),
+                                              ('percent', '% oxidised'),
+                                              ('abs', 'Absorbance (mOD)'),
+                                              ]
+
+    # ---- 2 The strip values as answers -----------------------------------------------
+    assert form_answers_builder({'spectra': 'NADH',
+                                 'haem_mode': 'percent',
+                                 'haem_per_od': False,
+                                 'ocr_per_od': True,
+                                 },
+                                ) == {'decomposition_dataset': 'NADH',
+                                      'haem_mode': 'percent',
+                                      'haem_per_od': False,
+                                      'ocr_mode': 'od',
+                                      }
+    assert form_answers_builder({'ocr_per_od': False}) == {'ocr_mode': 'raw'}
+    assert form_answers_builder({'journal': 'cell', 'plot_haems': True}) == {}
+
+
+# ---- test_plots_follow_the_strip -----------------------------------------------------
+def test_plots_follow_the_strip() -> None:
+    """
+    ---- Summary ----
+    Main function to check the answers each kind of plot is drawn with: the standard
+    and the processing plot show the haems and the OCR as the answers say (the strip
+    sets them), per OD only once OD values were entered; the figure of each file is
+    drawn with the answers as they are.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    settings.DEFAULT_ANSWERS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    fit = {'haem_list': ['Cyt bH', 'Cyt c1']}
+    answers = dict(settings.DEFAULT_ANSWERS,
+                   normalise_od=True,
+                   decompose=True,
+                   haem_mode='percent',
+                   haem_per_od=True,
+                   ocr_mode='od',
+                   averaging=True,
+                   plot_ocr=False,
+                   )
+    def shown(result: dict) -> dict:
+        return {key: result[key]
+                for key in ('normalise_od',
+                            'ocr_mode',
+                            'haem_mode',
+                            'haem_per_od',
+                            'decompose',
+                            'plot_haems',
+                            'haems',
+                            'averaging',
+                            'plot_ocr',
+                            )
+                }
+
+    # ---- 1 Before the OD values are entered: nothing per OD --------------------------
+    assert shown(_answers_previewer(answers, fit, 'standard')) == {
+        'normalise_od': False,
+        'ocr_mode': 'raw',
+        'haem_mode': 'percent',
+        'haem_per_od': False,
+        'decompose': True,
+        'plot_haems': True,
+        'haems': ['Cyt bH', 'Cyt c1'],
+        'averaging': False,
+        'plot_ocr': True,
+        }
+
+    # ---- 2 Once they are: as the answers say -----------------------------------------
+    assert shown(_answers_previewer(answers, fit, 'analysis', True)) == {
+        'normalise_od': True,
+        'ocr_mode': 'od',
+        'haem_mode': 'percent',
+        'haem_per_od': True,
+        'decompose': True,
+        'plot_haems': True,
+        'haems': ['Cyt bH', 'Cyt c1'],
+        'averaging': True,
+        'plot_ocr': True,
+        }
+    # the OCR's % of the range is no per OD, so it stays without OD values too
+    ranged = _answers_previewer(dict(answers, ocr_mode='percent'), None, 'standard')
+    assert (ranged['ocr_mode'], ranged['plot_haems']) == ('percent', False)
+
+    # ---- 3 The raw plot and the figure of each file ----------------------------------
+    raw = shown(_answers_previewer(answers, fit, 'raw', True))
+    assert (raw['ocr_mode'], raw['normalise_od'], raw['plot_haems']) == ('raw',
+                                                                         False,
+                                                                         False,
+                                                                         )
+    assert _answers_previewer(answers, fit, 'final') == answers
+    assert answers['haem_mode'] == 'percent'  # the answers themselves are not changed
 
 
 # ---- test_haems_ticked_in_the_strip --------------------------------------------------

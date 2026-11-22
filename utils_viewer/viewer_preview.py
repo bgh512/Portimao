@@ -122,6 +122,8 @@ class ViewerSession:
     fit: Optional[dict] = None
     kept: Optional[dict] = None
     regions: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    limits: Dict[str, dict] = field(default_factory=dict)
+    has_od: bool = False
     redraw: Optional[Callable[[], bool]] = None
     is_figure: bool = False
     export_choice: Optional[str] = None

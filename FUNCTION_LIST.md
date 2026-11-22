@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.9
+- **Version:** V2.10
 - **Date:** 22/11/2026
 
 ## Contents
@@ -384,6 +384,8 @@
     - [`test_the_decomposition_kept_to_compare`](#test_the_decomposition_kept_to_compare)
     - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
     - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
+    - [`test_haems_and_ocr_shown_from_the_strip`](#test_haems_and_ocr_shown_from_the_strip)
+    - [`test_plots_follow_the_strip`](#test_plots_follow_the_strip)
     - [`test_haems_ticked_in_the_strip`](#test_haems_ticked_in_the_strip)
     - [`test_widths_of_each_journal`](#test_widths_of_each_journal)
     - [`test_time_title_of_a_preview`](#test_time_title_of_a_preview)
@@ -842,10 +844,8 @@
     - [`files_asker`](#files_asker)
     - [`free_folder_finder`](#free_folder_finder)
     - [`haem_choice_asker`](#haem_choice_asker)
-    - [`haem_form_asker`](#haem_form_asker)
     - [`haem_form_option_builder`](#haem_form_option_builder)
     - [`haem_name_formatter`](#haem_name_formatter)
-    - [`haem_scaling_asker`](#haem_scaling_asker)
     - [`label_angle_asker`](#label_angle_asker)
     - [`label_tidier`](#label_tidier)
     - [`multi_experiment_asker`](#multi_experiment_asker)
@@ -964,6 +964,8 @@
     - [`EdgeRow`](#edgerow)
     - [`SettingsStrip`](#settingsstrip)
     - [`_page_journal_finder`](#_page_journal_finder)
+    - [`form_answers_builder`](#form_answers_builder)
+    - [`haem_form_choices_lister`](#haem_form_choices_lister)
     - [`haem_ticks_resolver`](#haem_ticks_resolver)
     - [`height_checker`](#height_checker)
     - [`kept_decomposition_builder`](#kept_decomposition_builder)
@@ -11403,8 +11405,9 @@ None.
 ---- Summary ----
 Main function to check that the answers of a run are shown in the strip as they
 are meant (the standard size as the journal "None", a chosen journal by its name,
-the box ticked only when the haems are worked out), that the strip can show them,
-and that its journal, width and height give the same answers back.
+the box ticked only when the haems are worked out, the OCR per OD box ticked only
+for the OCR per OD), that the strip can show them, and that its journal, width and
+height give the same answers back.
 
 ---- Inputs ----
 None.
@@ -11433,13 +11436,73 @@ None.
 Main function to check that values the strip can show pass, and that an unknown
 name, an unknown journal, a width the journal does not allow, a height over a page,
 an unknown background, haems ticked that are not a list of names, a comparing that
-is not True or False and a kept decomposition not in words are each refused.
+is not True or False, a kept decomposition not in words, a spectrometer not given
+by its name, a way of showing the haems the strip does not have and a per OD box
+that is not True or False are each refused.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
 None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_haems_and_ocr_shown_from_the_strip`
+
+```text
+---- Summary ----
+Main function to check the "Haems as" drop-down and the per OD boxes: % oxidised is
+in the list only when a file has both regions, and the spectrometer, the way of
+showing the haems and the two boxes give the answers of the run (the OCR per OD
+box ticked is the OCR per OD, unticked the plain OCR), only for what changed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_plots_follow_the_strip`
+
+```text
+---- Summary ----
+Main function to check the answers each kind of plot is drawn with: the standard
+and the processing plot show the haems and the OCR as the answers say (the strip
+sets them), per OD only once OD values were entered; the figure of each file is
+drawn with the answers as they are.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
 
 ---- Outputs ----
 None
@@ -26918,46 +26981,13 @@ haem_name_formatter
 multi_asker
 ```
 
-#### `haem_form_asker`
-
-```text
----- Summary ----
-Main function to ask how the haems are shown: absorbance, delta D or, when a file
-has an oxidised and a reduced region, % oxidised.
-
----- Inputs ----
-answers : dict
-    Answers dictionary the values are stored in.
-defaults : dict
-    Default answers; % oxidised as the default gives delta D when it is not
-    offered.
-include_percent : bool
-    True to offer % oxidised: at least one file has both regions.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Stores the answer in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-choice_asker
-haem_form_option_builder
-```
-
 #### `haem_form_option_builder`
 
 ```text
 ---- Summary ----
 Helper function to build the (key, label) choices for the 'how to show the
-haems' questions. The delta D line explains itself in italics.
+haems' question of the haem and OCR response. The delta D line explains itself in
+italics.
 
 ---- Inputs ----
 include_percent : bool
@@ -27008,37 +27038,6 @@ None.
 
 ---- Helpers ----
 _maths_converter
-```
-
-#### `haem_scaling_asker`
-
-```text
----- Summary ----
-Main function to ask whether the haems are also scaled by OD. Nothing is asked when
-no OD values were entered or the haems are shown as percentages.
-
----- Inputs ----
-answers : dict
-    Answers dictionary the values are stored in.
-defaults : dict
-    Default answers.
-    Must hold normalise_od and haem_mode.
-
----- Globals read ----
-None.
-
----- Outputs ----
-bool
-    True when the question was asked.
-
----- Globals mutated ----
-None. Stores the answer in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-yes_no_asker
 ```
 
 #### `label_angle_asker`
@@ -28955,6 +28954,7 @@ pictures_publisher
 run
 session_attacher
 spec_publisher
+strip_choices_setter
 strip_fits_setter
 strip_library_setter
 strip_listener_setter
@@ -29395,7 +29395,8 @@ Method to carry out one message from the other threads, on the window thread.
 ---- Inputs ----
 event : tuple
     (kind, ...) with kind 'prompt', 'spec', 'session', 'pictures', 'extra',
-    'image', 'time', 'edges', 'strip', 'strip_fits', 'strip_state', 'busy',
+    'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
+    'strip_library', 'strip_state', 'busy',
     'table_show', 'table_hide', 'closed' or 'finished'. The "Drawing ..."
     sign of 'busy' stays until the next question, preview or picture shown.
     With close_after_s, 'finished' also closes the window after that time.
@@ -30565,6 +30566,39 @@ None
 
 ---- Globals mutated ----
 None. Queues the settings for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_choices_setter`
+
+```text
+---- Summary ----
+Method to tell the settings strip what it offers: the spectrometers of its
+"Spectra" drop-down, whether % oxidised is in "Haems as", and whether the per
+OD boxes are shown.
+
+---- Inputs ----
+spectra : List[str]
+    The spectrometers every file has.
+has_percent : bool
+    True when at least one file has both regions.
+has_od : bool
+    True when OD values were entered.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the choices for the window (side effect).
 
 ---- Equations ----
 None.
@@ -32252,7 +32286,9 @@ None.
 ```text
 ---- Summary ----
 Helper function to build the answers used to draw a preview: the raw data while
-browsing and trimming, and the processing chosen so far afterwards.
+browsing and trimming, and the processing chosen so far afterwards. The haems and
+the OCR are shown as the answers say (the strip under the plot sets them), per OD
+only once OD values were entered.
 
 ---- Inputs ----
 answers : dict
@@ -32260,10 +32296,13 @@ answers : dict
 fit : Optional[dict]
     Fit dictionary, used to list the haems to show.
 kind : str
-    'raw' (O2 and the raw OCR only), 'standard' (the standard plot: O2, the raw OCR
-    and, when a fit is given, every haem of it as the change from the start),
-    'analysis' (also the haems and the averaging windows, still without OD
-    scaling) or 'final' (exactly as the figure will be).
+    'raw' (O2 and the raw OCR only), 'standard' (the standard plot: O2, the OCR
+    and, when a fit is given, every haem of it), 'analysis' (also the averaging
+    windows, and the haems only when they are decomposed) or 'final' (exactly as
+    the figure will be).
+has_od : bool
+    True when OD values were entered in this run; without them nothing is per OD,
+    whatever the answers say.
 
 ---- Globals read ----
 BROWSING_ANSWERS (module constant).
@@ -32489,16 +32528,15 @@ oxidised only when a file has both regions (delta D otherwise), and the haems on
 when they are decomposed, limited to those of the fit in use (all of them when none
 of the saved ones is in it). The Haems box of the settings strip says whether the
 haems are worked out and shown, so the figure has them whenever they are decomposed.
-The journal and size are left as the answers hold them, which the settings strip
-may have changed.
+How the haems and the OCR are shown, the journal and the size are left as the
+answers hold them, which the settings strip may have changed.
 
 ---- Inputs ----
 answers : dict
-    Answers dictionary the figure settings are stored in; must hold normalise_od
-    and decompose.
+    Answers dictionary the figure settings are stored in; must hold normalise_od,
+    decompose, ocr_mode, haem_mode and haem_per_od.
 defaults : dict
-    The standard or saved answers (plot_o2, plot_ocr, ocr_mode, haems, haem_mode,
-    haem_per_od, event_label_angle).
+    The standard or saved answers (plot_o2, plot_ocr, haems, event_label_angle).
 fit : Optional[dict]
     Fit dictionary (haem_list), or None when the haems are not decomposed.
 include_percent : bool
@@ -32959,7 +32997,9 @@ problem_teller
 Helper function to make a change in the settings strip what the run uses, and
 redraw the plot of the step being asked. Unticking the haems leaves them out of the
 run; ticking them, picking a fit or ticking library haems under Build a fit works
-them out with the fit in the strip; a new background works them out again. A fit
+them out with the fit in the strip; a new background works them out again, and so
+does another spectrometer. A new way of showing the haems, or a per OD box, redraws
+the plot with it. A fit
 that cannot be used is reported and the strip is set back. Keep to compare keeps
 the fit and background in use, drawn dashed over the haems until Stop comparing or
 the haems are left out. A new journal, width or height redraws only the figure of
@@ -32993,6 +33033,7 @@ None.
 ---- Helpers ----
 _standard_fit_loader
 _strip_shower
+form_answers_builder
 info_printer
 kept_decomposition_builder
 size_answers_builder
@@ -33004,11 +33045,16 @@ size_answers_builder
 ---- Summary ----
 Helper function to show in the settings strip what the run uses now: the haems
 ticked when they are worked out, the fit, the decomposition kept to compare with,
-the journal and the size.
+the spectrometer, how the haems and the OCR are shown, the journal and the size.
+It also says what the strip offers: the spectrometers every file has, % oxidised
+when at least one file has both regions, and the per OD boxes when OD values were
+entered. Haems in % oxidised go back to delta D when no file has both regions any
+more.
 
 ---- Inputs ----
 session : ViewerSession
-    The browser session (its window and fit).
+    The browser session (its window, fit, limits, regions and whether OD values
+    were entered).
 answers : dict
     Answers so far.
 
@@ -33020,12 +33066,14 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Shows the values in the strip (side effect).
+None. May change haem_mode in ``answers``, and shows the values in the strip
+(side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+region_files_lister
 strip_values_builder
 ```
 
@@ -33112,7 +33160,7 @@ preview_drawer
 ---- Summary ----
 Main function to ask the last questions of the import, on the standard plot cut to
 the limits: the OD values, then the event labels, each in a table of the window.
-The OD values are only checked: the data is scaled by OD in the individual plots.
+Once OD values are entered, the strip shows its per OD boxes and a line says so.
 The plot is redrawn with the labels once they are entered, and they are accepted or
 typed again; with no events in any file there is nothing to accept. Last, the
 export of what was imported is offered. The haems are those of the session's fit.
@@ -33142,8 +33190,8 @@ Dict[str, dict]
     only present when scaling by OD.
 
 ---- Globals mutated ----
-None. Stores normalise_od in ``answers`` and writes the export when one is chosen
-(side effects).
+None. Stores normalise_od in ``answers`` and whether OD values were entered in the
+session, shows the strip and writes the export when one is chosen (side effects).
 
 ---- Equations ----
 None.
@@ -33154,8 +33202,10 @@ _export_asker
 _label_table_filler
 _od_lister
 _od_table_filler
+_strip_shower
 accept_asker
 event_asker
+info_printer
 od_scaling_asker
 preview_drawer
 saved_values_reader
@@ -33232,12 +33282,11 @@ yes_no_asker
 Main function to show the figure saved for each file, drawn as it will be saved
 from the standard settings or the ones last saved for the dataset, and ask whether
 it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
-how the haems are shown, the angle of the event labels): only that part's questions
-are asked, with the current choices as the defaults, and the figure is drawn and
-asked about again. The settings strip turns the haems on or off and sets the
-journal and size, so 'which haems' asks only which ones in which order, and the
-journal and size are not asked. The haems can be shown in % oxidised when at least
-one file has both regions.
+the angle of the event labels): only that part's questions are asked, with the
+current choices as the defaults, and the figure is drawn and asked about again. The
+settings strip turns the haems on or off and sets how they are shown, the per OD
+scaling, the journal and the size, so 'which haems' asks only which ones in which
+order, and none of those is asked.
 
 ---- Inputs ----
 session : ViewerSession
@@ -33272,8 +33321,6 @@ _figure_starter
 _strip_shower
 accept_asker
 haem_choice_asker
-haem_form_asker
-haem_scaling_asker
 info_printer
 label_angle_asker
 preview_drawer
@@ -33288,7 +33335,9 @@ signal_asker
 Main function to talk the user through the processing, with the plot redrawn after
 each answer: first the haem fit, then, now that the haems are seen, an offer to
 change the trim and ignore times, then the oxidised and the reduced region of every
-file (when the haems are shown), and last the averaging around the events. The
+file (when the haems are shown), and last the averaging around the events. A line
+points to the strip at the start, and another to its % oxidised once a file has
+both regions. The
 settings strip picks the fit and leaves the haems out, so the decomposition
 question only offers to find the components from the data instead. While those
 questions are asked the strip is greyed out.
@@ -33345,6 +33394,7 @@ fit_names_lister
 info_printer
 pca_stage_runner
 preview_drawer
+region_files_lister
 yes_no_asker
 ```
 
@@ -33703,8 +33753,11 @@ The strip under the plot that always shows the current choices: a tick box for t
 haems, a drop-down of the fits, a drop-down of the backgrounds, a button that folds
 out a tick box for each haem of the library (Build a fit), a button that keeps the
 decomposition in use to compare the next ones with (with a line saying which one is
-kept), a drop-down of the journal, a drop-down of the widths that journal allows and
-a typing box for the height. It tells the window what the user changed and can be
+kept), a drop-down of the spectrometer whose spectra hold the haems (shown when the
+files share more than one), a drop-down of how the haems are shown with a "per OD"
+box, an "OCR per OD" box (both boxes shown only when OD values were entered), a
+drop-down of the journal, a drop-down of the widths that journal allows and a typing
+box for the height. It tells the window what the user changed and can be
 set by the program; it changes nothing by itself. It starts greyed out, until the
 program says it is listening. Every method runs on the window thread, except
 values_reader.
@@ -33724,12 +33777,16 @@ _build_toggler
 _change_reporter
 _compare_handler
 _fit_handler
+_form_handler
 _haems_handler
 _height_handler
 _journal_handler
+_per_od_handler
 _size_refresher
+_spectra_handler
 _tick_handler
 _width_handler
+choices_setter
 fits_setter
 library_setter
 state_setter
@@ -33776,10 +33833,13 @@ _background_handler
 _build_toggler
 _compare_handler
 _fit_handler
+_form_handler
 _haems_handler
 _height_handler
 _journal_handler
+_per_od_handler
 _size_refresher
+_spectra_handler
 _width_handler
 ```
 
@@ -33922,6 +33982,34 @@ _change_reporter
 _size_refresher
 ```
 
+##### `_form_handler`
+
+```text
+---- Summary ----
+Method to take the way of showing the haems picked in the drop-down.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+```
+
 ##### `_haems_handler`
 
 ```text
@@ -34010,6 +34098,33 @@ _size_refresher
 width_choices_lister
 ```
 
+##### `_per_od_handler`
+
+```text
+---- Summary ----
+Method to take one of the two per OD tick boxes.
+
+---- Inputs ----
+name : str
+    'haem_per_od' or 'ocr_per_od', the value of the box clicked.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+```
+
 ##### `_size_refresher`
 
 ```text
@@ -34017,14 +34132,16 @@ width_choices_lister
 Method to show the kept values in every part of the strip: the widths offered
 follow the journal, the width and the height are greyed for "None", the button
 that keeps a decomposition is greyed while no haems are shown, the line saying
-which one is kept shows only while one is, and the whole strip is greyed while
-the program is not listening.
+which one is kept shows only while one is, the spectrometer shows only when
+there is a choice, the per OD boxes only when OD values were entered (the one
+of the haems greyed for % oxidised, which has no per OD), and the whole strip
+is greyed while the program is not listening.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
+HAEM_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
 
 ---- Outputs ----
 None
@@ -34037,8 +34154,36 @@ None. Changes the widgets (side effect).
 None.
 
 ---- Helpers ----
+haem_form_choices_lister
 height_checker
 width_choices_lister
+```
+
+##### `_spectra_handler`
+
+```text
+---- Summary ----
+Method to take the spectrometer picked in the drop-down.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
 ```
 
 ##### `_tick_handler`
@@ -34099,6 +34244,39 @@ None.
 
 ---- Helpers ----
 _change_reporter
+```
+
+##### `choices_setter`
+
+```text
+---- Summary ----
+Method to say what the strip offers: the spectrometers of the "Spectra"
+drop-down (shown only with more than one), whether % oxidised is in the "Haems
+as" drop-down, and whether the two per OD boxes are shown. The values stay.
+
+---- Inputs ----
+spectra : List[str]
+    The spectrometers every file has, as they are to be listed.
+has_percent : bool
+    True when at least one file has both regions, so % oxidised is offered.
+has_od : bool
+    True when OD values were entered, so the per OD boxes are shown.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_refresher
 ```
 
 ##### `fits_setter`
@@ -34275,6 +34453,66 @@ None.
 
 ### MAIN FUNCTIONS
 
+#### `form_answers_builder`
+
+```text
+---- Summary ----
+Main function to turn the spectrometer and the ways of showing the haems and the
+OCR of the strip into the answers of the run.
+
+---- Inputs ----
+values : Dict[str, Any]
+    Some or all of the strip values (DATA_FORMAT.md), as checked by
+    strip_values_checker.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Any]
+    The answers to update: decomposition_dataset for the spectrometer, haem_mode
+    and haem_per_od as given, and ocr_mode 'od' for the OCR per OD box ticked,
+    'raw' for it unticked. Empty when the values hold none of them.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `haem_form_choices_lister`
+
+```text
+---- Summary ----
+Main function to list the ways of showing the haems the "Haems as" drop-down
+offers, each with its words.
+
+---- Inputs ----
+has_percent : bool
+    True when at least one file has both regions, so % oxidised is offered.
+
+---- Globals read ----
+HAEM_FORM_TEXTS.
+
+---- Outputs ----
+List[Tuple[str, str]]
+    [(haem_mode, words)] in the order of the drop-down: delta D, % oxidised when
+    offered, absorbance.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `haem_ticks_resolver`
 
 ```text
@@ -34443,8 +34681,9 @@ Main function to give the strip values that show the answers of the run.
 
 ---- Inputs ----
 answers : dict
-    The answers (fit_file, haem_background, journal, columns, height, size_mode);
-    a fit_file of None shows an empty fit.
+    The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
+    haem_per_od, ocr_mode, journal, columns, height, size_mode); a fit_file of None
+    shows an empty fit.
 has_haems : bool
     True when the haems are worked out and shown, which ticks the box.
 haem_files : Sequence[str]
@@ -34460,7 +34699,9 @@ NO_JOURNAL.
 ---- Outputs ----
 Dict[str, Any]
     All the strip values (DATA_FORMAT.md). A figure of the standard size
-    (size_mode other than 'custom') shows the journal as "None".
+    (size_mode other than 'custom') shows the journal as "None"; the OCR per OD
+    box is ticked for the OCR per OD, unticked for the plain OCR and its % of the
+    range.
 
 ---- Globals mutated ----
 None.
@@ -34478,7 +34719,8 @@ None.
 ---- Summary ----
 Main function to check values meant for the strip before they are shown: the
 names, the background, the haems ticked, whether a decomposition is kept and its
-words, the journal, a width the journal allows and a height the page allows. The
+words, the spectrometer, the way of showing the haems, the per OD boxes, the
+journal, a width the journal allows and a height the page allows. The
 width and the height are checked against the journal given with them.
 
 ---- Inputs ----
@@ -34486,7 +34728,7 @@ values : Dict[str, Any]
     Some or all of the strip values (DATA_FORMAT.md).
 
 ---- Globals read ----
-VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES.
+VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS.
 
 ---- Outputs ----
 None

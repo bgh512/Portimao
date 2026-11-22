@@ -1,4 +1,4 @@
-# Portimao question flow (V2.10)
+# Portimao question flow (V2.11)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -18,7 +18,10 @@ Every question in the order it is asked, with where each answer leads. The quest
 - In sections 1 to 3 the numbers on screen are the numbers here. A question asked again keeps its number, and when a question is skipped the next one keeps its own, so 3.3 follows 3.2 when 3.2.1 is not asked. From section 4 on, the numbers here are for reference: on screen they are given in the order the questions are asked, so when a branch is skipped the later numbers move up, and every "Do you accept...?" question takes a number of its own.
 - A "Do you accept...?" question with one way to change is a yes or no question, `(Y/n)`: the grey line just above it says what **n** does ("Type n to change the labels again."). One with more ways to change is a numbered list starting with **1) Yes, accept**, which moves on; its other answers (**2) No, ...**, and **3**, **4** ... where there are more) each say what is asked again, with your last answers as the defaults.
 - The plot on the right is redrawn after each step marked **(plot)**. You can flick through the files with the arrows or the drop-down at any time while a question waits. The file shown and the one on each side of it are redrawn at once; any other file is drawn when you go to it, with its last plot under the **Drawing ...** sign meanwhile. From section 6 on, a file you did not look at after your last change says it was not drawn with your final settings.
-- The **strip** under the plot shows what the run uses: **Haems** (ticked when the haems are worked out and shown), the **Fit**, the **Journal**, the **Width** and the **Height** of the figure of each file.
+- The **strip** under the plot shows what the run uses: **Haems** (ticked when the haems are worked out and shown), the **Fit** and the **Background**; **Spectra** (the spectrometer whose spectra hold the haems), **Haems as** (how the haems are shown) and the two **per OD** boxes; the **Journal**, the **Width** and the **Height** of the figure of each file.
+    - **Spectra** is shown only when your files share more than one spectrometer (Cyt and NADH). Picking the other one works the haems out from its spectra.
+    - **Haems as** swaps the haems between ΔD (mOD), the change from the start; % oxidised (reduced region = 0 %, oxidised region = 100 %); and Absorbance (mOD). % oxidised is in the list only when at least one file has both regions (4.4); a file without both stays in ΔD, as its axis says. The choice holds for every plot of your files and for the figure saved for each file.
+    - **per OD** (beside Haems as) scales the haems by OD, and **OCR per OD** the OCR. Both boxes are shown only once you have entered OD values (3.1), and a message says so then. The haems' box is greyed while they are in % oxidised, which has no per OD.
     - While your files are on the plot (sections 2 to 5), you can change it whenever a question waits. The plot is redrawn at once, the run uses the change, and the question goes on waiting.
     - Unticking Haems leaves the haems out of the run. Ticking it, or picking a fit, works them out with the fit shown and ticks the box.
     - If a fit cannot be used, one line says why and the strip goes back to what it showed.
@@ -70,7 +73,7 @@ The last part of the import: what is known about each run, then the offer to exp
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.1 | Do you want to scale by OD? `(y/N)` (above it, in grey: "Scaling by OD divides the OCR (and the haems, if you choose so in section 5) by dilution factor × OD × volume.") | **3.1.1** | **3.2** (no OD scaling anywhere in the run) |
+| 3.1 | Do you want to scale by OD? `(y/N)` (above it, in grey: "Scaling by OD divides the OCR and the haems by dilution factor × OD × volume; a per OD box for each then shows in the strip under the plot.") | **3.1.1** | **3.2** (no OD scaling anywhere in the run) |
 
 The OD table opens on the terminal side, with one row per file and a column each for the OD, the volume (mL) and the dilution factor. The values stored for a file are filled in, and the dilution factor is 1 when none is stored. Clicking a cell of a file shows that file on the plot.
 
@@ -78,7 +81,7 @@ The OD table opens on the terminal side, with one row per file and a column each
 |---|---|---|
 | 3.1.1 | Fill in the OD, volume and dilution of each file, then press Confirm. (above it, in grey: "One row per file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run.") | If a cell is empty or not a number above 0, one line names those cells and the table stays open. Otherwise the table closes, the values of every file are listed and the next step is **3.2**. |
 
-The data is **not** scaled by OD here. The values are only checked; the scaling is chosen in section 5.
+Once the values are in, the strip under the plot shows its two boxes, **per OD** (the haems) and **OCR per OD**, and a message says so: "The OCR and the haems can now be shown per OD: tick or untick the two per OD boxes in the strip under the plot." The plot follows the boxes from here on, and so does the figure saved for each file.
 
 ### 3.B Event labels
 
@@ -138,8 +141,12 @@ If the `fits/` folder holds no preset and no fit file, 4.1 is still asked, and 4
 | 4.1.1 | Which fit would you like to use? (a numbered list of the presets of the haem library, then your own fit files in the `fits/` folder, and *Find the components from the data (principal component analysis)* last; the fit in the strip is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.4**. |
 | 4.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **4.2** (or **4.1.1.1** when the components are being found) |
 
+The section starts with a message pointing to the strip: "Use the strip under the plot to change the fit, the background, the spectrometer (Spectra) and how the haems are shown (Haems as); the plot is redrawn after each change." (the spectrometer is named only when your files share more than one).
+
 While 4.2 waits, the strip under the plot changes the decomposition, and the plot is redrawn after each change:
 - **Fit**: another preset or fit file of your own.
+- **Spectra** *(only when the files share more than one spectrometer)*: the spectrometer whose spectra hold the haems, Cyt or NADH.
+- **Haems as**: ΔD (mOD), % oxidised (once a file has both regions, 4.4) or Absorbance (mOD), with **per OD** beside it when OD values were entered.
 - **Background**: the background fitted under the haems (Rowan scatter, the standard; Valencia; flat + 1/wavelength; flat + 1/wavelength + 1/wavelength²; straight line).
 - **Build a fit**: folds out a tick box for each haem of the library, one line each for the a, b and c haems; the boxes start with the haems of the preset in use. Ticking or unticking a box works the haems out with the ones ticked, and the Fit drop-down reads *Your own haems*. Ticking a haem with the same name as one already ticked (c1_myco and c1_037v are both Cyt cc) unticks the other, and the last box cannot be unticked; a note beside the height says so. Click the button again to fold the boxes away.
 - **Keep to compare**: keeps the decomposition on the plot (its fit and background), and a line in the strip says which one is kept. Change the fit, the haems ticked or the background, and the kept haems are drawn as dashed, paler lines in the same colours under the new ones, on every file. Under the plot, each haem in both has two numbers, largest / average: the largest and the average distance between its two traces, in the units of the haem panels. The button reads *Stop comparing* while one is kept; click it to take the dashed lines away. Each file takes about twice as long to draw while one is kept.
@@ -189,7 +196,7 @@ Asked when the last choice of 4.1.1, or No at 4.2, is taken. The strip is greyed
 - **Every file**, ticked when the step opens: an edge set on the file shown is copied to every file at the same distance from the addition nearest to it, counted in order (1.5 min before the 3rd addition of the file shown is 1.5 min before the 3rd addition of every file), then kept within that file's own limits. A file with fewer additions keeps the edge it had. Unticked, only the file shown changes.
 - If you go back to the processing step later in the run, the regions are where you left them, on the same data even when the trim has changed.
 - The regions are saved with the dataset (in `portimao_settings.json`), so they are on the plot the next time it is opened.
-- The regions are optional. A file with both has each haem's oxidised and reduced level, and its haems can be shown in % oxidised (5.5, 7.2.2); a file with none, or with only one, cannot, and nothing else changes for it.
+- The regions are optional. A file with both has each haem's oxidised and reduced level, and its haems can be shown in % oxidised (Haems as in the strip, and 7.2.2); a file with none, or with only one, cannot, and nothing else changes for it. Once a file has both, a message says: "The haems can now be shown in % oxidised: choose it under Haems as in the strip under the plot."
 
 | # | Question | Leads to |
 |---|---|---|
@@ -232,11 +239,11 @@ The figure saved for each file is drawn at once **(plot)**, at its real size and
 - the event labels at 45°;
 - Nature, 1 column wide and 0.5 of a page tall.
 
-The haems are in the figure when Haems is ticked in the strip. The journal, width and height are set in the strip too: each change redraws the figure at once.
+The haems are in the figure when Haems is ticked in the strip. How the haems are shown (Haems as), the two per OD boxes, the journal, the width and the height are set in the strip too, as you left them in the earlier sections: each change redraws the figure at once. A message under the first one says so.
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.1 | Do you accept this figure? `(1/2/3/4/5)` | **1) Yes, accept**: **5.8**. **2) No, change the oxygen and OCR**: **5.2**. **3) No, change which haems are shown** *(only when the haems are plotted)*: **5.4.1**. **4) No, change how the haems are shown** *(only when the haems are plotted)*: **5.5**. **5) No, change the angle of the event labels** *(only when something is plotted)*: **5.6**. When nothing is plotted, the oxygen and OCR are the only change, so it is a yes or no question `(Y/n)`: **No** leads to **5.2**. |
+| 5.1 | Do you accept this figure? `(1/2/3/4)` | **1) Yes, accept**: **5.8**. **2) No, change the oxygen and OCR**: **5.2**. **3) No, change which haems are shown** *(only when the haems are plotted)*: **5.4.1**. **4) No, change the angle of the event labels** *(only when something is plotted)*: **5.6**. When nothing is plotted, the oxygen and OCR are the only change, so it is a yes or no question `(Y/n)`: **No** leads to **5.2**. |
 
 Each part's questions offer your current choices as the defaults. After them the figure is drawn again **(plot)** and **5.1** is asked again; the numbers on screen keep counting up. If nothing is plotted (5.2 and 5.3 No, and Haems unticked), a message says no individual figures will be made, nothing is drawn, and 5.1 is asked again so you can turn a panel back on; accepting then makes no individual figures.
 
@@ -248,6 +255,8 @@ Each part's questions offer your current choices as the defaults. After them the
 | 5.3 | Do you want to plot the OCR? `(Y/n)` | **Yes**: **5.3.1**. **No**: the figure is drawn **(plot)**, then **5.1**. |
 | 5.3.1 | Which OCR would you like to plot? 1) OCR (µM min⁻¹) 2) OCR / OD (µM min⁻¹ OD⁻¹), *only offered if you said yes to OD scaling in 3.1*. 3) OCR (% of the range) | the figure is drawn **(plot)**, then **5.1** |
 
+The first two are the **OCR per OD** box of the strip, unticked and ticked; the box is unticked for the % of the range, and ticking or unticking it then leaves the % of the range.
+
 ### 5.B Which haems
 
 Whether the haems are plotted at all is the Haems box in the strip; this question picks which of them, and their order.
@@ -258,10 +267,11 @@ Whether the haems are plotted at all is the Haems box in the strip; this questio
 
 ### 5.C How the haems are shown
 
-| # | Question | Leads to |
-|---|---|---|
-| 5.5 | How would you like to plot the haems? Options: absorbance (mOD); ΔD (mOD), the change from the start; % oxidised (reduced region = 0 %, oxidised region = 100 %), *only offered when at least one file has both regions (4.4)*. A file without both regions stays in ΔD, as its axis says, while the files with both are in %. A dataset saved with % oxidised opens with ΔD when no file has both regions any more. (No concentration: only cells are measured, and a haem amount depends on the size of its shape; a dataset saved with concentration opens with ΔD.) | **5.5.1** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise the figure is drawn **(plot)**, then **5.1** |
-| 5.5.1 | Do you want to scale the haems by OD as well? `(Y/n)` | the figure is drawn **(plot)**, then **5.1** |
+No question is asked: **Haems as** in the strip under the plot swaps the haems between ΔD (mOD), the change from the start; % oxidised (reduced region = 0 %, oxidised region = 100 %), *only offered when at least one file has both regions (4.4)*; and Absorbance (mOD). The **per OD** box beside it scales them by OD as well *(shown only if you said yes to OD scaling in 3.1; greyed for % oxidised)*. Each change redraws the figure at once. There is no 5.5: the numbers of the later questions are kept.
+
+- A file without both regions stays in ΔD, as its axis says, while the files with both are in %.
+- A dataset saved with % oxidised opens with ΔD when no file has both regions any more.
+- No concentration: only cells are measured, and a haem amount depends on the size of its shape; a dataset saved with concentration opens with ΔD.
 
 ### 5.D Event labels
 
@@ -385,7 +395,7 @@ The figure is built up in the plot window in stages. First only the baseline OCR
 | # | Question | Leads to |
 |---|---|---|
 | 7.2.1 | Which OCR would you like to use? (the same options as 5.3.1) | the OCR plots are drawn **(plot)**, accept question, then **7.2.2** |
-| 7.2.2 | How would you like to show the haems? (the same options as 5.5, but % oxidised is offered only when every file of the figure has both regions, as the figure averages the files together) | **7.2.3** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **7.2.4** |
+| 7.2.2 | How would you like to show the haems? (the same options as Haems as in the strip, but % oxidised is offered only when every file of the figure has both regions, as the figure averages the files together) | **7.2.3** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **7.2.4** |
 | 7.2.3 | Do you want to scale the haems by OD as well? `(Y/n)` | all the haems are drawn **(plot)**, accept question, then **7.2.4** |
 | 7.2.4 | Which haems should get a row, and in which order? | drawn **(plot)**, accept question, then **7.2.5** |
 | 7.2.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then the final accept question |
