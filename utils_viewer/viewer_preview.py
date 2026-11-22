@@ -20,6 +20,7 @@ from matplotlib.figure import Figure
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.experiment_processing import experiment_data_processor
+from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_exporter import (experiment_workbook_exporter,
                                                          FULL_FOLDER,
                                                          )
@@ -28,6 +29,14 @@ from utils_shared.paf_reader import experiment_paf_loader
 from utils_shared.pca_plotter import (pca_example_figure_builder,
                                       pca_figure_builder,
                                       )
+from utils_shared.schema import (HAEM_KEYS,
+                                 measurement_column_finder,
+                                 time_getter,
+                                 value_getter,
+                                 )
+from utils_shared.spectral_decomposer import (decomposition_gap_calculator,
+                                              haem_name_plainer,
+                                              )
 from utils_shared.trimming import experiment_trimmer
 from utils_shared.user_notices import problem_teller
 
@@ -40,6 +49,14 @@ BROWSING_ANSWERS = {key: settings.DEFAULT_ANSWERS[key]
                     }
 _cache_lock = threading.Lock()
 KEY_PREFIX = 'Key: '
+# the dashes of the kept decomposition's haem traces: points of line, points of gap
+KEPT_DASHES = (4, 2)
+# how solid they are drawn (1 is solid): paler than the haems in use, so the two can be
+# told apart where a noisy trace hides its dashes
+KEPT_ALPHA = 0.55
+# the share of a kept trace's range left free above and below it when a haem panel is
+# widened to hold it, as the panels leave around the haems in use
+KEPT_MARGIN = 0.05
 IGNORE_COLOUR = '#e8a317'  # also the ignored parts in the trimming step (viewer_edges)
 # what the export of the import writes: the workbooks only, with the trimmed spectra, or
 # with the spectra of the whole recordings as well
@@ -65,6 +82,7 @@ class PreviewSpec:
     details: dict
     show_trim: bool = False
     show_ignored: bool = True
+    kept: Optional[dict] = None
 
 
 # ---- TimeAxis ------------------------------------------------------------------------
@@ -101,6 +119,7 @@ class ViewerSession:
     current: int = 0
     cache: OrderedDict = field(default_factory=OrderedDict)
     fit: Optional[dict] = None
+    kept: Optional[dict] = None
     redraw: Optional[Callable[[], bool]] = None
     is_figure: bool = False
     export_choice: Optional[str] = None
@@ -209,6 +228,145 @@ def _file_exporter(session: ViewerSession,
          },
         )
     experiment_workbook_exporter(experiment, session.export_root, spectra=with_spectra)
+
+
+# ---- _kept_haems_drawer --------------------------------------------------------------
+def _kept_haems_drawer(session: ViewerSession,
+                       summary: dict,
+                       info: dict,
+                       answers: dict,
+                       kept: dict,
+                       haem_source: Optional[str],
+                       experiment: dict,
+                       axes: list,
+                       plot_config: dict,
+                       ) -> str:
+    """
+    ---- Summary ----
+    Helper function to work one file out again with the kept decomposition (its fit and
+    background, everything else as in use), draw its haem traces dashed over the haems
+    in use in the same colours, widening a panel a kept trace would leave, and say how
+    far apart the two are. Its own warnings are left out, as they repeat those of the
+    decomposition in use.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (files, window, cache).
+    summary : dict
+        File summary (DATA_FORMAT.md).
+    info : dict
+        Per-file information the decomposition in use was worked out with.
+    answers : dict
+        Answers the decomposition in use was worked out with.
+    kept : dict
+        The kept decomposition (DATA_FORMAT.md, kept decomposition).
+    haem_source : Optional[str]
+        Key of HAEM_KEYS the haem panels show.
+    experiment : dict
+        The experiment worked out with the decomposition in use.
+    axes : list
+        Panels of the preview, top to bottom; a haem panel has haem_names.
+    plot_config : dict
+        Plot settings of the preview (HAEM_COLOURS, LINE_WIDTH, HAEM_Y_MIN,
+        HAEM_Y_MAX).
+
+    ---- Globals read ----
+    settings.Config, HAEM_KEYS, KEY_PREFIX, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
+
+    ---- Outputs ----
+    str
+        The notes: a KEY_PREFIX line for the dashed lines and a line with the largest
+        and the average gap of each haem in both; or one sentence saying why the kept
+        decomposition is not shown on this file.
+
+    ---- Globals mutated ----
+    None. Draws on the haem panels; the details of a problem go to the log (side
+    effects).
+
+    ---- Equations ----
+    The gaps: decomposition_gap_calculator. A widened panel reaches from
+    min - pad to max + pad of the kept trace outside the ignored parts, with
+    pad = (max - min) x KEPT_MARGIN, and never shrinks.
+
+    ---- Helpers ----
+    _loaded_experiment_getter
+    decomposition_gap_calculator
+    experiment_data_processor
+    haem_name_plainer
+    name_simplifier
+    problem_teller
+    """
+
+    # ---- 1 Work the file out with the kept decomposition -----------------------------
+    key = HAEM_KEYS.get(haem_source or '')
+    kept_answers = dict(answers, **kept['answers'], decompose=True, averaging=False)
+    name = summary['name']
+    try:
+        with session.window.output_capturer():
+            fresh = _loaded_experiment_getter(session,
+                                              summary,
+                                              kept_answers['decomposition_dataset'],
+                                              )
+            kept_experiment = experiment_data_processor(info,
+                                                        settings.Config(kept_answers),
+                                                        kept['fit'],
+                                                        fresh,
+                                                        )['experiment']
+    except Exception as exc:  # the comparison must never stop the preview
+        return problem_teller(f'The kept decomposition is not shown for {name}', exc)
+    new_table, kept_table = experiment.get(key), kept_experiment.get(key)
+    if new_table is None or kept_table is None:
+        return ('The kept decomposition is not shown on this file: its haems could not '
+                'be worked out.'
+                )
+
+    # ---- 2 Draw its traces dashed over the haems in use ------------------------------
+    colours = {name_simplifier(k): v for k, v in plot_config['HAEM_COLOURS'].items()}
+    kept_columns = {name_simplifier(column): column
+                    for column in measurement_column_finder(kept_table)
+                    }
+    times = time_getter(kept_table)
+    # The panels were scaled to the haems in use, outside the ignored parts; they are
+    # widened the same way where a kept trace would leave them, unless the scale is set.
+    is_scaled = (plot_config['HAEM_Y_MIN'] is None and
+                 plot_config['HAEM_Y_MAX'] is None and
+                 np.isfinite(times).any()
+                 )
+    if is_scaled:
+        is_used = ((times >= np.nanmin(times) + (info['ignore_start'] or 0.0)) &
+                   (times <= np.nanmax(times) - (info['ignore_end'] or 0.0))
+                   )
+    for ax in axes:
+        for haem in getattr(ax, 'haem_names', []):
+            if haem not in kept_columns:
+                continue
+            values = value_getter(kept_table, kept_columns[haem])
+            ax.plot(times,
+                    values,
+                    color=colours.get(haem),
+                    linewidth=plot_config['LINE_WIDTH'],
+                    dashes=KEPT_DASHES,
+                    alpha=KEPT_ALPHA,
+                    zorder=2,
+                    )
+            used = values[is_used & np.isfinite(values)] if is_scaled else values[:0]
+            if used.size:
+                pad = (used.max() - used.min()) * KEPT_MARGIN
+                low, high = ax.get_ylim()
+                ax.set_ylim(min(low, used.min() - pad), max(high, used.max() + pad))
+
+    # ---- 3 Say how far apart they are ------------------------------------------------
+    gaps = decomposition_gap_calculator(new_table, kept_table)
+    if not gaps:
+        return f'{KEY_PREFIX}dashed and paler = kept decomposition (no haem in common)'
+    words = ', '.join(f'{haem_name_plainer(haem)} {largest:.3g} / {average:.3g}'
+                      for haem, (largest, average) in gaps.items()
+                      )
+    return '\n'.join((f'{KEY_PREFIX}dashed and paler = kept decomposition',
+                      f'Gap to the kept decomposition, largest / average, in the units '
+                      f'of the haem panels: {words}',
+                      ),
+                     )
 
 
 # ---- _loaded_experiment_getter -------------------------------------------------------
@@ -700,8 +858,9 @@ def preview_drawer(session: ViewerSession,
     """
     ---- Summary ----
     Main function to show the answers given so far in the window: the window is given
-    the settings and draws every file the user looks at with them. Problems are
-    reported, never raised, so the questions carry on.
+    the settings, with the decomposition kept to compare with (session.kept), and draws
+    every file the user looks at with them. Problems are reported, never raised, so the
+    questions carry on.
 
     ---- Inputs ----
     session : ViewerSession
@@ -747,6 +906,7 @@ def preview_drawer(session: ViewerSession,
                        details=copy.deepcopy(details),
                        show_trim=show_trim,
                        show_ignored=show_ignored,
+                       kept=session.kept,
                        )
 
     # ---- 2 Hand them to the window ---------------------------------------------------
@@ -779,9 +939,10 @@ def preview_figure_builder(session: ViewerSession,
     Tuple[Optional[Figure], str]
         (figure, notes). The figure is None when the preview could not be drawn, and
         the notes then say why in one sentence. Otherwise the notes are the warnings
-        shown while it was drawn (a skipped step, a missing OD), one per line, and may
-        be empty. A line starting with KEY_PREFIX explains the shading and belongs by
-        the controls.
+        shown while it was drawn (a skipped step, a missing OD), and the gaps to the
+        kept decomposition when one is kept, one per line, and may be empty. A line
+        starting with KEY_PREFIX explains the shading or the dashed lines and belongs
+        by the controls.
 
     ---- Globals mutated ----
     None. Sets the matplotlib rcParams of the figure style; the details of a problem
@@ -792,6 +953,7 @@ def preview_figure_builder(session: ViewerSession,
     None.
 
     ---- Helpers ----
+    _kept_haems_drawer
     _loaded_experiment_getter
     _overlay_drawer
     experiment_data_processor
@@ -856,6 +1018,20 @@ def preview_figure_builder(session: ViewerSession,
     except Exception as exc:  # a preview problem must never stop the questions
         return None, problem_teller(f'Preview not drawn for {name}', exc)
     notes = '\n'.join(buffer.warnings)
+
+    # ---- 2.1 Draw the kept decomposition over the haems ------------------------------
+    if spec.kept is not None and haem_panels:
+        kept_notes = _kept_haems_drawer(session,
+                                        summary,
+                                        info,
+                                        preview_answers,
+                                        spec.kept,
+                                        processed['haem_source'],
+                                        experiment,
+                                        axes,
+                                        plot_config,
+                                        )
+        notes = '\n'.join(line for line in (notes, kept_notes) if line)
 
     # ---- 3 Shade the ignored parts ---------------------------------------------------
     # In the trimming step the window shades the whole recording itself, so the shading

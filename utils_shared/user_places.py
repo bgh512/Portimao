@@ -182,9 +182,10 @@ def user_folder_preparer(places: UserPlaces) -> None:
     """
     ---- Summary ----
     Main function to make the Mac app's own folder, with its fits and logs folders, and
-    to copy in each fit that comes with the program and is not there yet. A fit already
-    there is never overwritten, so the user's changes are kept. Run from source,
-    nothing is done: everything stays in the program folder.
+    to copy in each fit that comes with the program and is not there yet, the haem
+    library and the presets in their own folders. A fit already there is never
+    overwritten, so the user's changes are kept. Run from source, nothing is done:
+    everything stays in the program folder.
 
     ---- Inputs ----
     places : UserPlaces
@@ -212,11 +213,13 @@ def user_folder_preparer(places: UserPlaces) -> None:
         return
     places.fits_folder.mkdir(parents=True, exist_ok=True)
     places.logs_folder.mkdir(parents=True, exist_ok=True)
-    for fit in sorted((places.program_folder / FITS_FOLDER_NAME).glob('*.csv')):
-        target = places.fits_folder / fit.name
+    shipped = places.program_folder / FITS_FOLDER_NAME
+    for fit in sorted(shipped.rglob('*.csv')):
+        target = places.fits_folder / fit.relative_to(shipped)
         if target.exists():
             continue
         try:
+            target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(fit, target)
         except OSError:  # that fit is not offered; the others still are
             continue

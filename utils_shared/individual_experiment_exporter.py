@@ -21,16 +21,15 @@ from utils_shared.schema import DELTA_HAEM_SOURCES
 # first three).
 BASIC_SHEETS = ('CcO2', 'CsO2', 'VoO2')
 # Sheets are written in this order; any that are absent from the experiment are skipped.
-# (experiment dictionary key, worksheet name)
+# (experiment dictionary key, worksheet name). The haem amounts (haem_conc, haem_OD) are
+# left out: only cells are measured, and an amount depends on the size of its shape.
 DATA_SHEETS = (('CcO2', 'CcO2'),
                ('CsO2', 'CsO2'),
                ('VoO2', 'VoO2'),
                ('VoO2_OD', 'VoO2_OD'),
                ('VoO2_percent', 'VoO2_percent'),
-               ('haem_conc', 'haem_conc'),
                ('haem_abs', 'haem_abs'),
                ('haem_delta_abs', 'haem_delta_abs'),
-               ('haem_OD', 'haem_OD'),
                ('haem_abs_OD', 'haem_abs_OD'),
                ('haem_delta_abs_OD', 'haem_delta_abs_OD'),
                ('haem_percent', 'haem_percent'),

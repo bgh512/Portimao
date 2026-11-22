@@ -212,6 +212,7 @@ class ViewerGui:
     session_attacher
     spec_publisher
     strip_fits_setter
+    strip_library_setter
     strip_listener_setter
     strip_reader
     strip_setter
@@ -964,6 +965,8 @@ class ViewerGui:
             self._strip.values_setter(event[1])
         elif kind == 'strip_fits':
             self._strip.fits_setter(event[1])
+        elif kind == 'strip_library':
+            self._strip.library_setter(event[1])
         elif kind == 'strip_state':
             self._strip.state_setter(event[1])
         elif kind == 'busy':
@@ -2929,6 +2932,36 @@ class ViewerGui:
         """
 
         self._events.put(('strip_fits', list(names)))
+
+    # ---- strip_library_setter --------------------------------------------------------
+    def strip_library_setter(self, haems: List[Dict[str, str]]) -> None:
+        """
+        ---- Summary ----
+        Method to give the settings strip the library haems it shows a tick box for
+        under Build a fit.
+
+        ---- Inputs ----
+        haems : List[Dict[str, str]]
+            The library, as spectral_decomposer.library_haems_lister gives it.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the list for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('strip_library', [dict(item) for item in haems]))
 
     # ---- strip_listener_setter -------------------------------------------------------
     def strip_listener_setter(self,

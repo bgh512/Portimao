@@ -14,7 +14,11 @@ from utils_shared.user_places import (user_folder_preparer,
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-SHIPPED_FITS = {'standard.csv': 'shipped standard', 'other.csv': 'shipped other'}
+SHIPPED_FITS = {'standard.csv': 'shipped standard',
+                'other.csv': 'shipped other',
+                'haems/bH.csv': 'shipped haem',
+                'presets/standard.csv': 'shipped preset',
+                }
 
 
 # ---- HELPERS -------------------------------------------------------------------------
@@ -51,6 +55,7 @@ def _app_places_maker(tmp_path: Path) -> UserPlaces:
     program_folder = tmp_path / 'inside_the_app'
     (program_folder / 'fits').mkdir(parents=True)
     for name, text in SHIPPED_FITS.items():
+        (program_folder / 'fits' / name).parent.mkdir(parents=True, exist_ok=True)
         (program_folder / 'fits' / name).write_text(text)
     (tmp_path / 'home').mkdir()
     return user_places_finder(is_app=True,
@@ -105,7 +110,8 @@ def test_app_never_overwrites_a_fit(tmp_path: Path) -> None:
     """
     ---- Summary ----
     Main function to check that the app makes its folders, copies in the fit that is
-    missing, and leaves a fit the user changed as it is, also when it starts again.
+    missing (the haem library and the presets in their own folders), and leaves a fit
+    the user changed as it is, also when it starts again.
 
     ---- Inputs ----
     tmp_path : Path
@@ -138,6 +144,10 @@ def test_app_never_overwrites_a_fit(tmp_path: Path) -> None:
         assert (places.fits_folder / 'standard.csv').read_text() == 'changed by the user'
         assert (places.fits_folder / 'other.csv').read_text() == 'shipped other'
         assert (places.fits_folder / 'mine.csv').read_text() == 'the user own fit'
+        assert (places.fits_folder / 'haems' / 'bH.csv').read_text() == 'shipped haem'
+        assert ((places.fits_folder / 'presets' / 'standard.csv').read_text()
+                == 'shipped preset'
+                )
 
 
 # ---- test_source_keeps_things_in_program_folder --------------------------------------

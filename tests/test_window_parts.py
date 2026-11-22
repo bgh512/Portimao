@@ -17,6 +17,7 @@ import pytest
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 import utils_viewer.viewer_preview as viewer_preview
+from utils_shared.spectral_decomposer import OWN_HAEMS_NAME
 from utils_shared.survey import (event_entries_builder,
                                  event_asker,
                                  IGNORE_LABEL,
@@ -27,7 +28,9 @@ from utils_viewer.viewer_preview import (_loaded_experiment_getter,
                                          time_title_chooser,
                                          ViewerSession,
                                          )
-from utils_viewer.viewer_strip import (height_checker,
+from utils_viewer.viewer_strip import (haem_ticks_resolver,
+                                       height_checker,
+                                       kept_decomposition_builder,
                                        NO_JOURNAL,
                                        size_answers_builder,
                                        strip_values_builder,
@@ -388,6 +391,59 @@ def test_height_typed_in_the_strip() -> None:
         assert 'above 0 and up to 1' in reason
 
 
+# ---- test_the_decomposition_kept_to_compare ------------------------------------------
+def test_the_decomposition_kept_to_compare() -> None:
+    """
+    ---- Summary ----
+    Main function to check that keeping a decomposition keeps its fit as it is, the
+    answers it was worked out with (and nothing else), and its name in words, for a
+    fit file and for haems ticked under Build a fit.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    fit = {'haem_list': ['bL']}
+    answers = {'fit_file': 'made_up.csv',
+               'haem_files': [],
+               'haem_background': 'valencia',
+               'decomposition_dataset': 'Spectra',
+               'journal': 'cell',
+               }
+    kept = kept_decomposition_builder(answers, fit)
+    assert kept['fit'] is fit
+    assert kept['answers'] == {'fit_file': 'made_up.csv',
+                               'haem_files': [],
+                               'haem_background': 'valencia',
+                               'decomposition_dataset': 'Spectra',
+                               }
+    assert kept['text'] == 'made_up.csv with the Valencia background'
+    own = dict(answers,
+               fit_file=OWN_HAEMS_NAME,
+               haem_files=['c1_myco.csv', 'bH_bswitch.csv'],
+               haem_background='rowan_scatter',
+               )
+    assert kept_decomposition_builder(own, fit)['text'] == (
+        f'{OWN_HAEMS_NAME}: c1_myco, bH_bswitch with the Rowan scatter background'
+        )
+
+
 # ---- test_answers_shown_in_the_strip -------------------------------------------------
 def test_answers_shown_in_the_strip() -> None:
     """
@@ -419,9 +475,13 @@ def test_answers_shown_in_the_strip() -> None:
 
     # ---- 1 The standard size ---------------------------------------------------------
     standard = dict(settings.DEFAULT_ANSWERS)
-    values = strip_values_builder(standard, True)
+    values = strip_values_builder(standard, True, ['c1_myco.csv', 'bH_bswitch.csv'])
     assert values == {'plot_haems': True,
                       'fit_file': settings.STANDARD_FIT,
+                      'haem_background': 'rowan_scatter',
+                      'haem_files': ['c1_myco.csv', 'bH_bswitch.csv'],
+                      'compare': False,
+                      'kept': '',
                       'journal': NO_JOURNAL,
                       'columns': 1,
                       'height': 0.5,
@@ -440,10 +500,15 @@ def test_answers_shown_in_the_strip() -> None:
                   height=0.75,
                   size_mode='custom',
                   fit_file=None,
+                  haem_background='linear',
                   )
-    values = strip_values_builder(chosen, False)
+    values = strip_values_builder(chosen, False, [], kept='made_up.csv, Valencia')
     assert values == {'plot_haems': False,
                       'fit_file': '',
+                      'haem_background': 'linear',
+                      'haem_files': [],
+                      'compare': True,
+                      'kept': 'made_up.csv, Valencia',
                       'journal': 'cell',
                       'columns': 1.5,
                       'height': 0.75,
@@ -465,8 +530,9 @@ def test_values_meant_for_the_strip() -> None:
     """
     ---- Summary ----
     Main function to check that values the strip can show pass, and that an unknown
-    name, an unknown journal, a width the journal does not allow and a height over a
-    page are each refused.
+    name, an unknown journal, a width the journal does not allow, a height over a page,
+    an unknown background, haems ticked that are not a list of names, a comparing that
+    is not True or False and a kept decomposition not in words are each refused.
 
     ---- Inputs ----
     None.
@@ -496,15 +562,83 @@ def test_values_meant_for_the_strip() -> None:
                           },
                          )
     strip_values_checker({'journal': NO_JOURNAL})
+    strip_values_checker({'haem_background': 'valencia', 'haem_files': ['bL_og.csv']})
     strip_values_checker({})
     for wrong in ({'colour': 'red'},
                   {'journal': 'lancet'},
                   {'journal': 'nature', 'columns': 3},
                   {'height': 1.5},
                   {'height': 'tall'},
+                  {'haem_background': 'wavy'},
+                  {'haem_files': 'bL_og.csv'},
+                  {'haem_files': [3]},
+                  {'compare': 'yes'},
+                  {'kept': None},
                   ):
         with pytest.raises(ValueError):
             strip_values_checker(wrong)
+
+
+# ---- test_haems_ticked_in_the_strip --------------------------------------------------
+def test_haems_ticked_in_the_strip() -> None:
+    """
+    ---- Summary ----
+    Main function to check the tick boxes of Build a fit: a haem ticked is added; a
+    haem with the same name as one ticked takes its place, with a note naming both; a
+    haem unticked is taken away; the last cannot be unticked, with a note; and a box
+    not ticked before changes nothing when unticked.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    names = {'c1_myco.csv': 'Cyt cc',
+             'c1_037v.csv': 'Cyt cc',
+             'c1_og.csv': 'Cyt c1',
+             'bH_og.csv': 'Cyt bH',
+             }
+    assert haem_ticks_resolver(['c1_myco.csv'], 'bH_og.csv', True, names) == (
+        ['c1_myco.csv', 'bH_og.csv'],
+        '',
+        )
+    assert haem_ticks_resolver(['c1_og.csv'], 'c1_myco.csv', True, names) == (
+        ['c1_og.csv', 'c1_myco.csv'],
+        '',
+        )
+    ticked, note = haem_ticks_resolver(['c1_myco.csv', 'bH_og.csv'],
+                                       'c1_037v.csv',
+                                       True,
+                                       names,
+                                       )
+    assert ticked == ['bH_og.csv', 'c1_037v.csv']
+    assert 'c1_037v.csv' in note and 'c1_myco.csv' in note and 'Cyt cc' in note
+    assert haem_ticks_resolver(['c1_myco.csv', 'bH_og.csv'],
+                               'c1_myco.csv',
+                               False,
+                               names,
+                               ) == (['bH_og.csv'], '')
+    ticked, note = haem_ticks_resolver(['bH_og.csv'], 'bH_og.csv', False, names)
+    assert ticked == ['bH_og.csv'] and note
+    assert haem_ticks_resolver(['bH_og.csv'], 'c1_og.csv', False, names) == (
+        ['bH_og.csv'],
+        '',
+        )
 
 
 # ---- test_widths_of_each_journal -----------------------------------------------------

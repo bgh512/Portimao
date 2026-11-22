@@ -26,7 +26,7 @@ from utils_shared.questions import (choice_asker,
                                     text_italiser,
                                     yes_no_asker,
                                     )
-from utils_shared.spectral_decomposer import fit_importer
+from utils_shared.spectral_decomposer import fit_loader, fit_names_lister
 from utils_shared.user_notices import problem_teller
 
 
@@ -768,6 +768,7 @@ def decomposition_asker(summaries: List[dict],
                         forced: bool = False,
                         depth: int = 1,
                         pca_runner: Optional[Callable] = None,
+                        numbers: Optional[Dict[str, str]] = None,
                         ) -> tuple:
     """
     ---- Summary ----
@@ -790,6 +791,9 @@ def decomposition_asker(summaries: List[dict],
         Function (dataset, depth) that finds the components with a principal component
         analysis and returns (fit file name, fit), or (None, None) when the user wants
         a fit file instead. None leaves the option out.
+    numbers : Optional[Dict[str, str]]
+        The questions' own numbers from QUESTION_FLOW.md, by 'decompose', 'fit' and
+        'spectrometer'; None numbers them in the order asked.
 
     ---- Globals read ----
     PCA_CHOICE (module constant).
@@ -807,26 +811,28 @@ def decomposition_asker(summaries: List[dict],
 
     ---- Helpers ----
     choice_asker
-    fit_importer
+    fit_loader
+    fit_names_lister
     info_printer
     problem_teller
     yes_no_asker
     """
 
     # ---- 1 Find the available fits ---------------------------------------------------
+    numbers = numbers or {}
     none_chosen = (False, None, None, defaults['decomposition_dataset'])
-    fits = sorted(fits_folder.glob('*.csv'), key=lambda p: p.name.lower())
-    if not fits and pca_runner is None:
-        info_printer(f'No fit files (.csv) were found in {fits_folder}, so haems '
-                     f'cannot be '
-                     'decomposed this time. Put a fit .csv in that folder and run '
-                     'again.',
+    names = fit_names_lister(fits_folder)
+    if not names and pca_runner is None:
+        info_printer(f'No presets or fit files (.csv) were found in {fits_folder}, so '
+                     'haems cannot be decomposed this time. Put a fit .csv in that '
+                     'folder and run again.',
                      )
         return none_chosen
     if (not forced and
         not yes_no_asker('Do you want to decompose the haems?',
                          defaults['decompose'],
                          depth=depth,
+                         number=numbers.get('decompose'),
                          )
         ):
         return none_chosen
@@ -848,11 +854,11 @@ def decomposition_asker(summaries: List[dict],
                                       [(o, o) for o in options],
                                       options[0],
                                       depth=depth + extra_depth,
+                                      number=numbers.get('spectrometer'),
                                       )
         return chosen
 
     # ---- 2 Choose the fit, and the spectral dataset ----------------------------------
-    names = [p.name for p in fits]
     default_fit = defaults.get('fit_file')
     choices = [(n, n) for n in names]
     if pca_runner is not None:
@@ -867,6 +873,7 @@ def decomposition_asker(summaries: List[dict],
                                 choices,
                                 default_fit if default_fit in names else choices[0][0],
                                 depth=depth + (0 if forced else 1),
+                                number=numbers.get('fit'),
                                 )
         if fit_file == PCA_CHOICE:
             dataset = dataset or dataset_chooser(1)
@@ -877,8 +884,8 @@ def decomposition_asker(summaries: List[dict],
                 continue
             break
         try:
-            fit = fit_importer(fits_folder / fit_file)
-        except Exception as exc:
+            fit = fit_loader(fits_folder, fit_file)
+        except (OSError, ValueError) as exc:
             info_printer(f"{problem_teller('The fit file could not be read', exc)} The "
                          f'haems will not be decomposed.',
                          )
@@ -1293,7 +1300,7 @@ def haem_form_option_builder(include_percent: bool) -> List[Tuple[str, str]]:
 
     ---- Outputs ----
     List[Tuple[str, str]]
-        [(key, label), ...]: abs, delta, conc and optionally percent.
+        [(key, label), ...]: abs, delta and optionally percent.
 
     ---- Globals mutated ----
     None.
@@ -1305,10 +1312,11 @@ def haem_form_option_builder(include_percent: bool) -> List[Tuple[str, str]]:
     text_italiser
     """
 
+    # No concentration: only cells are measured, and a haem amount depends on the size
+    # of its shape, which the absorbance, delta A and % do not.
     delta = f"ΔA (mOD), {text_italiser('the change in absorbance from the start')}"
     options = [('abs', 'Absorbance (mOD)'),
                ('delta', delta),
-               ('conc', 'Concentration'),
                ]
     if include_percent:
         options.append(('percent', '% oxidised (lowest to highest = 0 to 100 %)'))

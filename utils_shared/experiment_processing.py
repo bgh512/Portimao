@@ -137,7 +137,7 @@ def experiment_data_processor(info: dict,
         so the file is not read again). It is processed in place. None reads the file.
 
     ---- Globals read ----
-    settings.HAEM_BACKGROUND, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
+    settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
     settings.BASELINE_MINIMUM_SECONDS; BACKGROUND_LABELS.
 
     ---- Outputs ----
@@ -239,7 +239,7 @@ def experiment_data_processor(info: dict,
                                   fit,
                                   dataset_name=a['decomposition_dataset'],
                                   spectrum_type='attenuation',
-                                  background=settings.HAEM_BACKGROUND,
+                                  background=a['haem_background'],
                                   haemfactor=settings.HAEM_FACTOR,
                                   delta_exclude_first_minutes=ignore_first,
                                   delta_window_points=window_points,
@@ -251,7 +251,7 @@ def experiment_data_processor(info: dict,
                               in reference['window_by_haem'].items()
                               )
             print(f"  Decomposed with {a['fit_file']} and a "
-                  f'{BACKGROUND_LABELS[settings.HAEM_BACKGROUND]} background; delta A '
+                  f"{BACKGROUND_LABELS[a['haem_background']]} background; delta A "
                   f'zero is the median of the highest {window_points} points in a row '
                   f"({reference['window_seconds']:.3g} s) of each haem: {spans}",
                   )

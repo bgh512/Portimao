@@ -17,7 +17,7 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'VoO2'` | pd.DataFrame | (n_ocr_points, 2) | µM/min | Oxygen consumption rate (OCR): `Time (min)` and `VoO2`. Always there: a file without it is refused. It has fewer rows than the oxygen tables, as the time points where the instrument has no OCR value (the start of a recording, and the end when the trace is shorter than the clock) are left out |
 | `'VoO2_OD'` | pd.DataFrame | (n_points, 2) | | Optional. OCR divided by dilution factor x OD x volume |
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
-| `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mM for a 1 cm light path | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem. The fit shapes times `HAEM_FACTOR` are in OD/mM/cm, so the amounts are mM x cm; with components found from data they are in arbitrary units. Fitted beside the chosen background (`HAEM_BACKGROUND` in `config.py`; the choices are `BACKGROUND_LABELS` in `spectral_decomposer.py`). When the change from the first spectrum is fitted, these are the changes from the first spectrum (the first kept, in a trimmed run) |
+| `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mM for a 1 cm light path | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem. The fit shapes times `HAEM_FACTOR` are in OD/mM/cm, so the amounts are mM x cm; with components found from data they are in arbitrary units. Fitted beside the background named by the answer `'haem_background'` (kept with the dataset's answers; the standard, in `config.DEFAULT_ANSWERS`, is `rowan_scatter`; the choices are `BACKGROUND_LABELS` in `spectral_decomposer.py`). When the change from the first spectrum is fitted, these are the changes from the first spectrum (the first kept, in a trimmed run) |
 | `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum; a change from the first spectrum when `haem_conc` is |
 | `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. `haem_abs` shifted so that, for each haem, the median of its highest 50 spectra in a row (outside the ignored start and end; `REFERENCE_WINDOW_POINTS` in `config.py`) is 0 |
 | `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'` | pd.DataFrame | (n_spectra, 2 + n_haems) | | Optional. The matching tables divided by dilution factor x OD x volume |
@@ -49,7 +49,7 @@ What is known about one experiment, stored as `experiment['metadata']`. The firs
 | `'ignored_events'` | List[dict] | | | The additions the user chose to ignore; they are kept only for the workbook. After a start trim their times are counted from the new 0 like those of the other additions, so one made before the cut has a negative time |
 | `'trimmed_before_minutes'`, `'trimmed_after_minutes'` | float | | min | Optional. Where the recording was cut, on the original time |
 | `'ignore_first_minutes'`, `'ignore_last_minutes'` | float | | min | Start and end left out of the averages and references |
-| `'fit_file'` | str or None | | | Fit file of the decomposition; None when the haems were not decomposed |
+| `'fit_file'` | str or None | | | Fit (preset or fit file) of the decomposition, or `Your own haems: <files without .csv>` for haems ticked under Build a fit (`fit_describer`); None when the haems were not decomposed |
 | `'processed'` | str | | | Date and time of the run, `YYYY-MM-DD HH:MM` |
 
 #### `event`
@@ -216,7 +216,7 @@ Added to each experiment of the time response figure by `utils_custom`.
 
 #### `fit`
 
-A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds the components found by the principal component analysis.
+A haem fit, as `fit_importer` reads a fit file, `preset_importer` joins the library files of a preset (`haem_files_combiner`, which `fit_loader` calls for a preset's name) and `fit_table_builder` builds the components found by the principal component analysis.
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
@@ -224,6 +224,7 @@ A haem fit, as `fit_importer` reads a fit file and `fit_table_builder` builds th
 | `'data'` | pd.DataFrame | (n_wavelengths, 2 x n_haems) | nm, OD/mM/cm ÷ 1 000 000 | (wavelength, response) column pairs, one pair per haem. The decomposition uses the response as the basis spectrum; it has the sign of the attenuation, -log10(T), oxidised minus reduced (each haem's α peak is a dip). Each haem's rows are at the top, with wavelengths going upwards and blanks (NaN) below a shorter haem. The responses are on the standard scale, OD/mM/cm divided by a million (the instrument's own scale, which `HAEM_FACTOR` multiplies back): the highest point of the shapes lies between 1e-7 and 1e-3 |
 | `'scale_divisor'` | float | | | What the values of the file were divided by to reach the standard scale: set by the Unit line of a file with heading lines (1 000 000 for OD/mM/cm and relative, 1 000 for OD/µM/cm, 1 for OD/nM/cm); for an older file, 1, or 1 000 000 when it is a million above the standard |
 | `'notes'` | List[str] | | | Sentences for the user: leftover rows left out of a haem, an older fit divided by a million, a fit far from the usual size of its unit or on neither scale |
+| `'haem_files'` | List[str] | (n_haems) | | Only from a preset or `haem_files_combiner`: the library file name of each haem, in the order of `'haem_list'` |
 
 #### `pca_analysis`
 
@@ -320,10 +321,24 @@ What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/vie
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
 | `'plot_haems'` | bool | | | Whether the haems are worked out and shown (the answers `decompose` and `plot_haems` together) |
-| `'fit_file'` | str | | | File name of the fit, normally one of the list given with `ViewerGui.strip_fits_setter`; the description of components found from the data and not saved; `''` when none is named |
+| `'fit_file'` | str | | | File name of the fit: a preset, or a fit file of the fits folder itself (`fit_loader` looks for a preset first), normally one of the list given with `ViewerGui.strip_fits_setter` (`fit_names_lister`); the description of components found from the data and not saved; `'Your own haems'` (`spectral_decomposer.OWN_HAEMS_NAME`) for library haems ticked under Build a fit; `''` when none is named |
+| `'haem_background'` | str | | | The background fitted under the haems, a key of `spectral_decomposer.BACKGROUND_SHORT_NAMES` (the words of the drop-down) |
+| `'haem_files'` | List[str] | (n_haems,) | | The library files ticked under Build a fit: those of the fit in use (a preset's, or your own haems), none for a fit file of the user's own or components from the data. The library itself is given with `ViewerGui.strip_library_setter` (`library_haems_lister`: `[{'file', 'haem', 'type'}]`, in the order a, b, c). The answer of the same name keeps the haems ticked, used when `fit_file` is `'Your own haems'` and saved with the dataset's settings |
+| `'compare'` | bool | | | Whether a decomposition is kept to compare with: the button reads *Stop comparing* when True. The user's click changes it; the program then keeps the decomposition in use (`kept_decomposition`) or drops the kept one |
+| `'kept'` | str | | | The kept decomposition in words (the `'text'` of `kept_decomposition`), shown in a line of the strip; `''` when none is kept. Set by the program only |
 | `'journal'` | str | | | `'none'` (the standard size, on the page of the standard journal) or a key of `config.JOURNAL_SPECS` |
 | `'columns'` | float | | columns | Width, one of the widths the journal allows (`'widths_mm'`) |
 | `'height'` | float | | fraction of a page | Height, above 0 and up to 1 |
+
+#### `kept_decomposition`
+
+The decomposition kept with *Keep to compare* in the strip, built by `kept_decomposition_builder` (`utils_viewer/viewer_strip.py`) and held in `ViewerSession.kept` until *Stop comparing* or the haems are left out. Each preview works the file out a second time with it and draws its haem traces dashed over the ones in use (`_kept_haems_drawer`); the distance between the two is from `decomposition_gap_calculator`. It is not saved with the dataset's settings.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'fit'` | dict | | | The `fit` it was worked out with |
+| `'answers'` | dict | | | The answers that set it: `fit_file`, `haem_files`, `haem_background`, `decomposition_dataset`. Every other answer (trimming, OD, how the haems are shown) is the one in use, so only the decomposition differs |
+| `'text'` | str | | | Its name in words, for example `bswitch_no2_mycobl_b557.csv with the Rowan scatter background` |
 
 #### `od_rows`
 
@@ -401,6 +416,7 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every 
 | `details` | dict | | | | `{file name: {OD, volume, dilution_factor, events}}` |
 | `show_trim` | bool | | | `False` | Draw the whole recording without shading, for the trimming step (the window draws the edges and the shading over it) |
 | `show_ignored` | bool | | | `True` | Shade the ignored start and end (not with `show_trim`) |
+| `kept` | Optional[dict] | | | `None` | The `kept_decomposition` drawn dashed over the haems, or None |
 
 #### `UserPlaces`
 
@@ -410,7 +426,7 @@ Defined in `utils_shared/user_places.py`. Created by `user_places_finder` when `
 |---|---|---|---|---|---|
 | `program_folder` | Path | | | | The program's own files (`fits/`, `assets/`, `QUESTION_FLOW.md`): the folder of `main.py`, or `sys._MEIPASS` inside the app |
 | `own_folder` | Path | | | | The user's own folder; the data folders directly inside it are offered by number at question 1.1. The program folder, or `~/Portimao` in the app |
-| `fits_folder` | Path | | | | `<own_folder>/fits`: the fits offered, and where fits saved from the components go. In the app, each fit of the program that is missing is copied in at every start; one already there is never overwritten |
+| `fits_folder` | Path | | | | `<own_folder>/fits`: the haem library (`haems/`), the presets (`presets/`), the user's own fit files, and where fits saved from the components go. In the app, each file of the program's fits folder that is missing (subfolders included) is copied in at every start; one already there is never overwritten |
 | `last_answers_file` | Path | | | | `<own_folder>/last_answers.json` (`last_answers`) |
 | `logs_folder` | Path | | | | `<own_folder>/logs`: the self-test log and, in the app, the launch log and the update log |
 | `is_app` | bool | | | | True when running as the Mac app |
@@ -440,6 +456,7 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by 
 | `current` | int | | | `0` | Index of the file being looked at |
 | `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the files nearest the one being looked at (`WINDOW_KEPT_FILES` in `config.py`, 3: that file and the one on each side); each preview works on a deep copy |
 | `fit` | Optional[dict] | | | `None` | The `fit` the haems are worked out with: the standard or saved fit at first, then the one chosen in the processing or the strip; `None` when the haems are left out |
+| `kept` | Optional[dict] | | | `None` | The `kept_decomposition` to compare with, set by *Keep to compare* in the strip; `None` when none is kept |
 | `redraw` | Optional[Callable[[], bool]] | | | `None` | Draws the plot of the step being asked again (set by each stage runner), for a change in the strip |
 | `is_figure` | bool | | | `False` | True while the plot is the figure of each file at its saved size (section 5), so a new journal or size in the strip redraws it |
 | `export_choice` | Optional[str] | | | `None` | What the export of the import (3.4) wrote: `'summary'`, `'trimmed'` or `'all'`; `None` before anything is exported. New edges export again with it |
@@ -534,7 +551,7 @@ What the file holds, each item marked **recorded** (taken as true), **calculated
 | Property | Value |
 |---|---|
 | File type | xlsx |
-| Sheets | `CcO2`, `CsO2`, `VoO2` and, for the full export, `VoO2_OD`, `VoO2_percent`, `haem_conc`, `haem_abs`, `haem_delta_abs`, `haem_OD`, `haem_abs_OD`, `haem_delta_abs_OD`, `haem_percent`; plus `Averages`, `Events` and `Metadata` when available |
+| Sheets | `CcO2`, `CsO2`, `VoO2` and, for the full export, `VoO2_OD`, `VoO2_percent`, `haem_abs`, `haem_delta_abs`, `haem_abs_OD`, `haem_delta_abs_OD`, `haem_percent` (no haem amounts: only cells are measured, and an amount depends on the size of its shape); plus `Averages`, `Events` and `Metadata` when available |
 | Location and name | `<results>/<experiment>/<experiment>.xlsx`: the trimmed data (all of it when the file is not trimmed), written by the export at the end of the import and again, with the run's results added, by the run; for a trimmed file the export of the import also writes `<results>/<experiment>/full/<experiment>.xlsx`, the whole recording |
 
 The export of the import writes only `CcO2`, `CsO2`, `VoO2`, `Events` and `Metadata`. In the trimmed workbook the Metadata holds the edges (`trimmed_before_minutes`, `trimmed_after_minutes` when trimmed, `ignore_first_minutes`, `ignore_last_minutes`); the whole recording's holds none, so it does not change when they do.
@@ -554,9 +571,9 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 | File type | CSV |
 | Delimiter | comma |
 | Encoding | UTF-8 with the byte-order mark, so that Excel shows µ and α (line ends CRLF when written by the program); read with or without the mark |
-| Location and name | `fits/<name>.csv`; the program saves the components found by the principal component analysis here |
+| Location and name | `fits/haems/<haem>_<source>.csv`: the haem library, one haem per file, each with the values of its source fit unchanged (`c1_myco.csv`, `bL_037v.csv`; `c1_037v.csv` is drawn for the two haems of the cc, as the presets' haems per protein say); `fits/<name>.csv`: the user's own fits of one haem or several, and the components found by the principal component analysis, which the program saves here |
 
-The file holds one haem or several, written by `fit_file_writer` and read by `fit_importer`. It starts with heading lines, one `name,text` line each, down to the first empty line:
+The file holds one haem or several, written by `fit_file_writer` and read by `fit_importer`. A library file holds one haem, and its `Made from` line names the fit and haem it was taken from (`_USER_REVIEW` keeps a table of all of them). It starts with heading lines, one `name,text` line each, down to the first empty line:
 
 | Line | Read by the program | Description |
 |---|---|---|
@@ -576,24 +593,58 @@ Then the table:
 | Wavelength columns (every second, from the first) | float | nm | Wavelengths of one haem, going upwards |
 | Value columns | float | the unit | The haem's shape at those wavelengths. Shorter haems end in empty cells |
 
-Example (the top of `fits/bswitch_no2_mycobl_b557.csv`, the standard fit):
+Example (the top of `fits/haems/c1_myco.csv`, the cc of the standard fit):
 
 ```text
 Portimao fit file,format 1
-Holds,"The shape of each haem: how much 1 mM of the haem in a 1 cm light path changes the attenuation, -log10(T), at each wavelength between its oxidised and reduced states"
+Holds,"The shape of one haem: how much 1 mM of the haem in a 1 cm light path changes the attenuation, -log10(T), at each wavelength between its oxidised and reduced states"
 Unit,OD/mM/cm
 Way up,"oxidised minus reduced: each haem's α peak is a dip, so the amount found rises as the haem is oxidised and falls as it is reduced"
 Names,"In the figures the haem letters are in italics and a capital letter or number after them is written below the line (Cyt bH, Cyt a605)"
-Made from,The shapes of the instrument's fit 20240913_Myco_b557_nolamda.fit
+Made from,"Cyt cc of bswitch_no2_mycobl_b557.csv, the shape of the instrument's fit 20240913_Myco_b557_nolamda.fit (...)"
 
-Cyt cc,,Cyt bH,,Cyt bL,,Cyt a605,,Cyt b557,
-Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm,Wavelength (nm),OD/mM/cm
-508.1799927,1.89,494.9100037,5.89,519.9821167,4.75,508.6799927,-1.93,486.9100037,5.89
+Cyt cc,
+Wavelength (nm),OD/mM/cm
+508.1799927,1.89
 ```
 
 Rules, checked by `fit_importer`: the columns come in pairs and every wavelength column has a haem name; every cell is a number or empty; a row holds both a wavelength and a response, or neither; each haem has at least two rows. The haems may have different lengths, and empty rows are skipped wherever they are. Within a haem the wavelengths go upwards (a haem written wholly downwards is turned round); where they jump backwards, the rows from the jump on are left out and the user is told. The values are divided by the unit's number (1 000 000 for OD/mM/cm and relative, 1 000 for OD/µM/cm, 1 for OD/nM/cm) to reach the standard scale; a file whose shapes then fall outside 1e-7 to 1e-3 is used with a warning to check its Unit line. Each message names the row as the file has it.
 
 **Older layout** (still read, for fit files made elsewhere): no heading lines, the first row is the haem names (the header over each value column is not used), the names are used as written (plotting codes such as `Cyt $b_H$` included), and the values have no stated unit. The same rules apply, and the scale is guessed: a file whose highest point is between 1e-7 and 1e-3 is used as it is, a file a million above that (0.1 to 1000) is divided by a million, and a file on neither scale is used as it is with a warning.
+
+#### `preset csv`
+
+| Property | Value |
+|---|---|
+| File type | CSV |
+| Delimiter | comma |
+| Encoding | UTF-8 with the byte-order mark; read with or without the mark, and with either line end |
+| Location and name | `fits/presets/<name>.csv`. The six presets keep the names of the fit files they replaced, so a dataset saved with one of those names finds it; the standard fit is `bswitch_no2_mycobl_b557.csv` (`config.STANDARD_FIT`) |
+
+A preset is a set of haems of the library, offered by its name in the fit question and the strip, before the user's own fit files. A fit file of the fits folder with a preset's name is not offered. Read by `preset_importer`:
+
+| Line | Read by the program | Description |
+|---|---|---|
+| `Portimao preset,format 1` | Yes | Always first. A newer format than the program knows is refused |
+| `Holds,<text>` | No | What the preset is, in words |
+| (empty line) | Yes | Ends the heading lines |
+| `Haem file,Haems per protein` | No | Names the columns |
+| `<file>.csv,<number>`, one per line | The file name only | A file of `fits/haems/`, in any order: the haems are put in the order a, b, c. A missing file, a file of more than one haem, and two haems of the same name are refused, each with a message. The number, for the reader only, is how many haems the shape was drawn for in its source fit: 2 for `c1_037v.csv` (the two haems of the cc), 1 for every other. Only cells are measured, so a shape's size never changes the absorbance, ΔA or % |
+
+Example (`fits/presets/temp_fit_037v.csv`):
+
+```text
+Portimao preset,format 1
+Holds,"The haems of temp_fit_037v, the latest fit, each at the size that fit gives it"
+
+Haem file,Haems per protein
+c1_037v.csv,2
+b557_037v.csv,1
+bH_037v.csv,1
+bL_037v.csv,1
+a605_037v.csv,1
+a3_037v.csv,1
+```
 
 #### `spectral csv`
 

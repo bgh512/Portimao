@@ -12,6 +12,10 @@ from typing import Dict, Optional
 # what is known about each run, kept beside its trim and ignore limits
 SAVED_VALUE_KEYS = ('OD', 'volume', 'dilution_factor', 'events')
 SETTINGS_FILE_NAME = 'portimao_settings.json'
+# Only cells are measured, so the haem amounts, which depend on the size of each shape,
+# are no longer shown: a dataset saved showing them opens showing delta A.
+RETIRED_HAEM_MODES = {'conc': 'delta'}
+RETIRED_HAEM_MODE_KEYS = ('haem_mode', 'ho_haem_mode')
 
 
 # ---- HELPERS -------------------------------------------------------------------------
@@ -147,13 +151,14 @@ def dataset_settings_reader(folder: Path) -> dict:
         The dataset folder (the folder of the .paf files).
 
     ---- Globals read ----
-    SETTINGS_FILE_NAME (module constant).
+    SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RETIRED_HAEM_MODE_KEYS (module constants).
 
     ---- Outputs ----
     dict
         {'export_folder': Optional[Path], 'files': dict, 'answers': dict}
         (DATA_FORMAT.md, dataset_settings). An empty dict when the dataset was never
-        saved or its file cannot be read, so the standard settings are used.
+        saved or its file cannot be read, so the standard settings are used. A haem
+        way of showing no longer offered (RETIRED_HAEM_MODES) is given as its successor.
 
     ---- Globals mutated ----
     None. Reads the file (side effect).
@@ -175,12 +180,19 @@ def dataset_settings_reader(folder: Path) -> dict:
 
     # ---- 2 Keep the parts that have the right form -----------------------------------
     files = values.get('files')
-    answers = values.get('answers')
+    answers = dict(values.get('answers')) if isinstance(values.get('answers'),
+                                                        dict,
+                                                        ) else {}
+
+    # ---- 3 Read a way of showing the haems no longer offered as its successor --------
+    for key in RETIRED_HAEM_MODE_KEYS:
+        if answers.get(key) in RETIRED_HAEM_MODES:
+            answers[key] = RETIRED_HAEM_MODES[answers[key]]
     return {'export_folder': _export_folder_resolver(Path(folder),
                                                      values.get('export_folder'),
                                                      ),
             'files': files if isinstance(files, dict) else {},
-            'answers': answers if isinstance(answers, dict) else {},
+            'answers': answers,
             }
 
 

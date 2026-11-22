@@ -16,7 +16,7 @@ from utils_shared.helpers import haem_type_finder, name_simplifier
 # ---- CONSTANTS -----------------------------------------------------------------------
 # The standard settings: a dataset never opened before starts from them, and a dataset
 # opened before from the settings kept in its own folder (utils_shared.dataset_settings).
-# The standard fit is the file in fits/ used for the haems of the standard plot.
+# The standard fit is the preset (fits/presets/) used for the haems of the standard plot.
 STANDARD_FIT = 'bswitch_no2_mycobl_b557.csv'
 # the results folder offered, inside the data folder, for a dataset never run before
 RESULTS_FOLDER_NAME = 'results'
@@ -25,6 +25,14 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ignore_last_minutes': 0.0,
                    'decompose': True,
                    'fit_file': STANDARD_FIT,
+                   # the library haems ticked under Build a fit in the strip, used when
+                   # fit_file is "Your own haems" (spectral_decomposer.OWN_HAEMS_NAME)
+                   'haem_files': [],
+                   # the background fitted under the haems (names and words in
+                   # utils_shared.spectral_decomposer.BACKGROUND_LABELS): the lab's own
+                   # chamber scripts' background, which can bend, as bL needs to fall
+                   # when reduced as the instrument's own trace does
+                   'haem_background': 'rowan_scatter',
                    'decomposition_dataset': 'Cyt',
                    'normalise_od': False,
                    'averaging': False,
@@ -40,7 +48,8 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    # the haems of the fit, when decomposed, in the figure of each file
                    'plot_haems': True,
                    'haems': [],
-                   # "abs", "delta", "conc" or "percent"
+                   # "abs", "delta" or "percent"; no haem amounts, as only cells are
+                   # measured and an amount depends on the size of its shape
                    'haem_mode': 'delta',
                    # divide the haem values (not "percent") by OD x volume x dilution
                    # when OD scaling is on
@@ -96,12 +105,8 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ho_pub_height': 0.75,
                    'ho_size_mode': 'default',
                    }
-# the background fitted under the haems (names and words in
-# utils_shared.spectral_decomposer.BACKGROUND_LABELS); one that can bend is needed for bL
-# to fall when reduced, as the instrument's own trace does
-HAEM_BACKGROUND = 'scatter_2'
-# scatter terms the component finder takes out of the spectra; it does not follow
-# HAEM_BACKGROUND yet
+# scatter terms the component finder takes out of the spectra; it does not follow the
+# 'haem_background' answer yet
 DEGREE_OF_SCATTER = 1
 HAEM_FACTOR = 1_000_000
 # points in a row whose median is a reference level: the 0 of delta A, the 0 % and the
@@ -142,8 +147,7 @@ SPACING = 1.0
 LINE_WIDTH_PT = 0.75
 # Plot source names (see utils_shared.schema): chosen in the terminal as a "kind" and,
 # when OD scaling is on, "per OD".
-HAEM_SOURCE_BY_MODE = {'conc': ('raw', 'od'),
-                       'abs': ('abs', 'abs_od'),
+HAEM_SOURCE_BY_MODE = {'abs': ('abs', 'abs_od'),
                        'delta': ('delta_abs', 'delta_abs_od'),
                        'percent': ('percent', 'percent'),
                        }

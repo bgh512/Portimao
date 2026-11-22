@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.5
+- **Version:** V2.6
 - **Date:** 21/11/2026
 
 ## Contents
@@ -81,6 +81,7 @@
     - [`test_results_folder_is_checked`](#test_results_folder_is_checked)
     - [`test_results_folder_names_and_old_results`](#test_results_folder_names_and_old_results)
     - [`test_results_folder_outside_is_kept_whole`](#test_results_folder_outside_is_kept_whole)
+    - [`test_saved_haem_amounts_open_as_delta_a`](#test_saved_haem_amounts_open_as_delta_a)
     - [`test_settings_are_read_back`](#test_settings_are_read_back)
     - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
 - [`tests/test_file_names.py`](#teststest_file_namespy)
@@ -112,8 +113,11 @@
     - [`test_same_shapes_give_a_plain_error`](#test_same_shapes_give_a_plain_error)
     - [`test_a_failed_decomposition_leaves_nothing`](#test_a_failed_decomposition_leaves_nothing)
     - [`test_delta_a_zero_is_the_median_of_the_highest_points`](#test_delta_a_zero_is_the_median_of_the_highest_points)
+    - [`test_the_gap_between_two_decompositions`](#test_the_gap_between_two_decompositions)
     - [`test_each_background_gives_back_the_amounts`](#test_each_background_gives_back_the_amounts)
     - [`test_an_unknown_background_is_refused`](#test_an_unknown_background_is_refused)
+    - [`test_the_background_answered_is_the_one_used`](#test_the_background_answered_is_the_one_used)
+    - [`test_rowan_scatter_is_the_chamber_scripts_background`](#test_rowan_scatter_is_the_chamber_scripts_background)
     - [`test_some_haems_only_give_back_their_amounts`](#test_some_haems_only_give_back_their_amounts)
     - [`test_the_change_from_the_first_spectrum`](#test_the_change_from_the_first_spectrum)
     - [`test_two_mixed_shapes_give_two_components`](#test_two_mixed_shapes_give_two_components)
@@ -127,6 +131,16 @@
     - [`test_haem_shapes_are_those_of_the_instrument`](#test_haem_shapes_are_those_of_the_instrument)
     - [`test_valencia_background_is_the_instruments`](#test_valencia_background_is_the_instruments)
     - [`test_instrument_traces_fall_when_reduced`](#test_instrument_traces_fall_when_reduced)
+- [`tests/test_haem_library.py`](#teststest_haem_librarypy)
+    - [`_dip_finder`](#_dip_finder)
+    - [`_haem_file_writer`](#_haem_file_writer)
+    - [`_preset_writer`](#_preset_writer)
+    - [`_library_maker`](#_library_maker)
+    - [`test_preset_joins_its_haems_in_order`](#test_preset_joins_its_haems_in_order)
+    - [`test_preset_problems_are_refused`](#test_preset_problems_are_refused)
+    - [`test_root_file_with_a_preset_name_is_not_offered`](#test_root_file_with_a_preset_name_is_not_offered)
+    - [`test_standard_preset_keeps_its_haems`](#test_standard_preset_keeps_its_haems)
+    - [`test_own_haems_are_built_from_the_library`](#test_own_haems_are_built_from_the_library)
 - [`tests/test_haem_types.py`](#teststest_haem_typespy)
     - [`test_a_fit_file_is_read_in_that_order`](#test_a_fit_file_is_read_in_that_order)
     - [`test_haems_are_ordered_a_then_b_then_c`](#test_haems_are_ordered_a_then_b_then_c)
@@ -348,8 +362,10 @@
     - [`test_rows_of_the_od_table`](#test_rows_of_the_od_table)
     - [`test_sentence_when_confirmed_too_early`](#test_sentence_when_confirmed_too_early)
     - [`test_height_typed_in_the_strip`](#test_height_typed_in_the_strip)
+    - [`test_the_decomposition_kept_to_compare`](#test_the_decomposition_kept_to_compare)
     - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
     - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
+    - [`test_haems_ticked_in_the_strip`](#test_haems_ticked_in_the_strip)
     - [`test_widths_of_each_journal`](#test_widths_of_each_journal)
     - [`test_time_title_of_a_preview`](#test_time_title_of_a_preview)
     - [`test_files_drawn_beside_the_one_shown`](#test_files_drawn_beside_the_one_shown)
@@ -742,20 +758,29 @@
     - [`_haem_shape_getter`](#_haem_shape_getter)
     - [`_headed_fit_reader`](#_headed_fit_reader)
     - [`_number_column_reader`](#_number_column_reader)
+    - [`_preset_reader`](#_preset_reader)
     - [`_unit_scaler`](#_unit_scaler)
     - [`_wavelength_masker`](#_wavelength_masker)
+    - [`answers_fit_loader`](#answers_fit_loader)
     - [`background_builder`](#background_builder)
     - [`basis_solver`](#basis_solver)
     - [`data_filterer`](#data_filterer)
+    - [`decomposition_gap_calculator`](#decomposition_gap_calculator)
     - [`delta_abs_calculator`](#delta_abs_calculator)
     - [`experiment_decomposer`](#experiment_decomposer)
+    - [`fit_describer`](#fit_describer)
     - [`fit_file_writer`](#fit_file_writer)
     - [`fit_haem_selector`](#fit_haem_selector)
     - [`fit_importer`](#fit_importer)
+    - [`fit_loader`](#fit_loader)
+    - [`fit_names_lister`](#fit_names_lister)
     - [`fit_range_finder`](#fit_range_finder)
     - [`fit_scale_standardiser`](#fit_scale_standardiser)
+    - [`haem_files_combiner`](#haem_files_combiner)
     - [`haem_name_plainer`](#haem_name_plainer)
     - [`haem_name_typesetter`](#haem_name_typesetter)
+    - [`library_haems_lister`](#library_haems_lister)
+    - [`preset_importer`](#preset_importer)
     - [`s_array_generator`](#s_array_generator)
     - [`scatter_background_builder`](#scatter_background_builder)
     - [`spectrum_decomposer`](#spectrum_decomposer)
@@ -848,6 +873,7 @@
     - [`TimeAxis`](#timeaxis)
     - [`ViewerSession`](#viewersession)
     - [`_file_exporter`](#_file_exporter)
+    - [`_kept_haems_drawer`](#_kept_haems_drawer)
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
     - [`preview_info_builder`](#preview_info_builder)
@@ -878,7 +904,6 @@
     - [`_export_refresher`](#_export_refresher)
     - [`_figure_starter`](#_figure_starter)
     - [`_fit_file_saver`](#_fit_file_saver)
-    - [`_fit_names_lister`](#_fit_names_lister)
     - [`_label_table_filler`](#_label_table_filler)
     - [`_limits_lister`](#_limits_lister)
     - [`_od_lister`](#_od_lister)
@@ -900,7 +925,9 @@
     - [`EdgeRow`](#edgerow)
     - [`SettingsStrip`](#settingsstrip)
     - [`_page_journal_finder`](#_page_journal_finder)
+    - [`haem_ticks_resolver`](#haem_ticks_resolver)
     - [`height_checker`](#height_checker)
+    - [`kept_decomposition_builder`](#kept_decomposition_builder)
     - [`minutes_checker`](#minutes_checker)
     - [`size_answers_builder`](#size_answers_builder)
     - [`strip_values_builder`](#strip_values_builder)
@@ -3224,6 +3251,34 @@ None.
 None.
 ```
 
+#### `test_saved_haem_amounts_open_as_delta_a`
+
+```text
+---- Summary ----
+Main function to check that, with only cells measured, the haem amounts are not
+offered as a way of showing the haems, and that a dataset saved showing them opens
+showing delta A, the other answers unchanged.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+FILES, ANSWERS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_settings_are_read_back`
 
 ```text
@@ -3421,7 +3476,7 @@ None.
 
 ---- Equations ----
 x = wl / 100 nm. scatter_1: 1/x; scatter_2: 1/x and 1/x^2; linear: x - 5.5;
-quadratic: x - 5.5 and (x - 6)^2, a curve with its bottom off the middle;
+rowan_scatter: x - 5.5 and (x - 6)^2, a curve with its bottom off the middle;
 valencia: 1/x^2.
 
 ---- Helpers ----
@@ -3706,16 +3761,18 @@ _series_decomposer
 
 ```text
 ---- Summary ----
-Main function to check that every fit file users can choose is in the layout with
-heading lines, in OD/mM/cm, and is read without an error or a note, with
-wavelengths that go upwards in every haem, on the standard scale. Leftover rows and
-the million scale of the older layout are tested on made-up files.
+Main function to check that every file of the haem library is in the layout with
+heading lines, in OD/mM/cm, holds one haem, and is read without an error or a note,
+with wavelengths that go upwards, on the standard scale; that every fit offered (the
+presets, and any fit file shipped in the fits folder itself) is read the same way;
+and that every library file is in a preset. Leftover rows and the million scale of
+the older layout are tested on made-up files.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-FITS_FOLDER, UNIT_DIVISORS (module constants).
+FITS_FOLDER, UNIT_DIVISORS (module constants); HAEMS_FOLDER_NAME.
 
 ---- Outputs ----
 None.
@@ -4086,6 +4143,37 @@ the zero. A window of nine points does not fit in eight.
 None.
 ```
 
+#### `test_the_gap_between_two_decompositions`
+
+```text
+---- Summary ----
+Main function to check the largest and the average gap between the haem traces of
+two decompositions: the spectra are matched by their index, not their row; a haem
+is matched by its plain name; a haem in only one of them, and a spectrum with no
+value, are left out; a table without the spectrum index is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+bL new 1.0, 2.0, 3.0 and kept 1.0, 1.5, 3.5 (spectra 1 to 3): gaps 0, 0.5, -0.5,
+so the largest is 0.5 and the average (0 + 0.5 + 0.5) / 3 = 1/3. Cyt cc new 4.0,
+4.0, 4.0 and kept 3.0, (no value), 5.0: gaps 1 and -1, so both are 1. The kept
+table lists its spectra in the order 3, 1, 2.
+
+---- Helpers ----
+None.
+```
+
 #### `test_each_background_gives_back_the_amounts`
 
 ```text
@@ -4129,7 +4217,7 @@ config.py is one it knows.
 None.
 
 ---- Globals read ----
-BACKGROUNDS (module constant); settings.HAEM_BACKGROUND.
+BACKGROUNDS (module constant); settings.DEFAULT_ANSWERS.
 
 ---- Outputs ----
 None.
@@ -4142,6 +4230,66 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+#### `test_the_background_answered_is_the_one_used`
+
+```text
+---- Summary ----
+Main function to check that the processing of a file decomposes its haems with the
+background named in the dataset's answers, not the standard one.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the attenuation and the decomposition, so no file is read.
+
+---- Globals read ----
+FIT_FILE (module constant); settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_rowan_scatter_is_the_chamber_scripts_background`
+
+```text
+---- Summary ----
+Main function to check that the background called Rowan scatter is the additive
+background of the lab's own chamber scripts: their lines build the same terms, and
+a spectrum that neither can fit exactly gives the same haem amounts and the same
+leftover with both.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE, EXACT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The scripts' terms over the fitted wavelengths cw, as their lines write them (only
+their basis S is called s_array here): blank = 1; scatter2 = cw, and scatter3 =
+(cw - centre)^2 with centre = (cw[0] + cw[-1]) / 2, each scaled as (f - min f) /
+max(f - min f). Their amounts are the least-squares solution of [haem shapes x
+HAEM_FACTOR, blank, scatter2, scatter3]. The spectrum's background, OFFSET + SLOPE
+/ x^2 (x = wl / 100 nm), is not of that kind, so about 3e-5 OD is left over.
+
+---- Helpers ----
+_haem_spectrum_builder
 ```
 
 #### `test_some_haems_only_give_back_their_amounts`
@@ -4354,7 +4502,7 @@ read the instrument's own haem traces of the same run.
 None.
 
 ---- Globals read ----
-PAF_FILE, FIT_FILE, HAEM_TRACES (module constants).
+PAF_FILE, FITS_FOLDER, HAEM_TRACES (module constants); settings.STANDARD_FIT.
 
 ---- Outputs ----
 dict
@@ -4448,7 +4596,8 @@ name : str
     Name of the haem in our fit file.
 
 ---- Globals read ----
-FIT_FILE, INSTRUMENT_FIT_FILE, HAEM_TRACES, SAME_SHAPE (module constants).
+FITS_FOLDER, INSTRUMENT_FIT_FILE, HAEM_TRACES, SAME_SHAPE (module constants);
+settings.STANDARD_FIT.
 
 ---- Outputs ----
 None.
@@ -4521,6 +4670,279 @@ before the first addition < 0.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_haem_library.py`
+
+Tests of the haem library: the presets, the joining of library files and the fits offered.
+
+### HELPERS
+
+#### `_dip_finder`
+
+```text
+---- Summary ----
+Helper function to find the α dip of one haem of a fit.
+
+---- Inputs ----
+fit : dict
+    Fit dictionary, as fit_loader gives it.
+index : int
+    Number of the haem in the fit, from 0.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[float, float]
+    (lowest value between 540 and 640 nm in OD/mM/cm, its wavelength in nm).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+value in OD/mM/cm = value on the standard scale x 1 000 000.
+
+---- Helpers ----
+None.
+```
+
+#### `_haem_file_writer`
+
+```text
+---- Summary ----
+Helper function to write a made-up fit file in the layout with heading lines.
+
+---- Inputs ----
+path : Path
+    File to write.
+haems : Dict[str, List[Tuple[float, float]]]
+    {plain haem name: (wavelength in nm, value in OD/mM/cm) rows}; one haem for a
+    library file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The file written.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_preset_writer`
+
+```text
+---- Summary ----
+Helper function to write a made-up preset listing library files.
+
+---- Inputs ----
+path : Path
+    File to write.
+files : List[str]
+    Library file names, in the order the preset lists them.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The file written.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_library_maker`
+
+```text
+---- Summary ----
+Helper function to make a made-up library of three haems, one file each.
+
+---- Inputs ----
+fits : Path
+    The made-up fits folder.
+
+---- Globals read ----
+HAEMS (module constant); HAEMS_FOLDER_NAME.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haem_file_writer
+```
+
+### MAIN FUNCTIONS
+
+#### `test_preset_joins_its_haems_in_order`
+
+```text
+---- Summary ----
+Main function to check that a preset gives one fit of its library files, the a
+haems first, then the b, then the c, whatever order it lists them in, each with its
+own rows and values.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+HAEMS (module constant); PRESETS_FOLDER_NAME.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+value on the standard scale = value in OD/mM/cm / 1 000 000.
+
+---- Helpers ----
+_library_maker
+_preset_writer
+```
+
+#### `test_preset_problems_are_refused`
+
+```text
+---- Summary ----
+Main function to check that a preset listing a missing file, a library file of two
+haems, or two haems of the same name is refused with a message naming the problem.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+files : List[str]
+    Library files the preset lists.
+words : str
+    Words the message must hold.
+
+---- Globals read ----
+HAEMS (module constant); HAEMS_FOLDER_NAME, PRESETS_FOLDER_NAME.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haem_file_writer
+_library_maker
+_preset_writer
+```
+
+#### `test_root_file_with_a_preset_name_is_not_offered`
+
+```text
+---- Summary ----
+Main function to check that the fits offered are the presets, then the user's own
+fit files, and that a fit file with a preset's name (an old copy) is neither
+offered nor loaded in place of the preset.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+HAEMS (module constant); PRESETS_FOLDER_NAME.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haem_file_writer
+_library_maker
+_preset_writer
+```
+
+#### `test_standard_preset_keeps_its_haems`
+
+```text
+---- Summary ----
+Main function to check that the standard fit, now a preset of the haem library,
+gives the five haems and α dips of the fit file it replaced, and that the cc of
+temp_fit_037v keeps the 35.2 OD/mM/cm of its old file, its preset giving it 2 haems
+per protein.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FITS_FOLDER, STANDARD_DIPS (module constants); settings.STANDARD_FIT.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_dip_finder
+```
+
+#### `test_own_haems_are_built_from_the_library`
+
+```text
+---- Summary ----
+Main function to check the haems ticked under Build a fit: the library is listed
+for the tick boxes in the order a, b, c with each file's haem name; the haems
+ticked load as one fit, named in words with their files; and no haem ticked, or a
+ticked file that is missing, is refused with a message, while a preset name still
+loads the preset.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+OWN_HAEMS_NAME, PRESETS_FOLDER_NAME.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_library_maker
+_preset_writer
 ```
 
 ## `tests/test_haem_types.py`
@@ -10114,7 +10536,8 @@ _app_places_maker
 ```text
 ---- Summary ----
 Main function to check that the app makes its folders, copies in the fit that is
-missing, and leaves a fit the user changed as it is, also when it starts again.
+missing (the haem library and the presets in their own folders), and leaves a fit
+the user changed as it is, also when it starts again.
 
 ---- Inputs ----
 tmp_path : Path
@@ -10370,6 +10793,34 @@ page is 230 mm: 0.25 of it is 57.5 mm. "None" uses the Nature page.
 None.
 ```
 
+#### `test_the_decomposition_kept_to_compare`
+
+```text
+---- Summary ----
+Main function to check that keeping a decomposition keeps its fit as it is, the
+answers it was worked out with (and nothing else), and its name in words, for a
+fit file and for haems ticked under Build a fit.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_answers_shown_in_the_strip`
 
 ```text
@@ -10404,8 +10855,38 @@ None.
 ```text
 ---- Summary ----
 Main function to check that values the strip can show pass, and that an unknown
-name, an unknown journal, a width the journal does not allow and a height over a
-page are each refused.
+name, an unknown journal, a width the journal does not allow, a height over a page,
+an unknown background, haems ticked that are not a list of names, a comparing that
+is not True or False and a kept decomposition not in words are each refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_haems_ticked_in_the_strip`
+
+```text
+---- Summary ----
+Main function to check the tick boxes of Build a fit: a haem ticked is added; a
+haem with the same name as one ticked takes its place, with a note naming both; a
+haem unticked is taken away; the last cannot be unticked, with a note; and a box
+not ticked before changes nothing when unticked.
 
 ---- Inputs ----
 None.
@@ -10708,7 +11189,7 @@ figures from the answers.
 ---- Inputs ----
 answers : dict
     Terminal answers; uses ho_ocr_mode ('raw', 'od' or 'percent'), ho_haem_mode
-    ('delta', 'abs', 'conc' or 'percent') and ho_per_od.
+    ('delta', 'abs' or 'percent') and ho_per_od.
 od_available : bool
     True when the experiment has OD, volume and dilution factor.
 
@@ -11237,12 +11718,13 @@ experiment : dict
 group : str
     Group the experiment belongs to.
 answers : dict
-    Terminal answers; uses decomposition_dataset and the tr_* windows.
+    Terminal answers; uses decomposition_dataset, haem_background and the tr_*
+    windows.
 fit : dict
     Fit dictionary from import_fit.
 
 ---- Globals read ----
-config.HAEM_BACKGROUND, config.HAEM_FACTOR.
+config.HAEM_FACTOR.
 
 ---- Outputs ----
 dict
@@ -17372,13 +17854,14 @@ folder : Path
     The dataset folder (the folder of the .paf files).
 
 ---- Globals read ----
-SETTINGS_FILE_NAME (module constant).
+SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RETIRED_HAEM_MODE_KEYS (module constants).
 
 ---- Outputs ----
 dict
     {'export_folder': Optional[Path], 'files': dict, 'answers': dict}
     (DATA_FORMAT.md, dataset_settings). An empty dict when the dataset was never
-    saved or its file cannot be read, so the standard settings are used.
+    saved or its file cannot be read, so the standard settings are used. A haem
+    way of showing no longer offered (RETIRED_HAEM_MODES) is given as its successor.
 
 ---- Globals mutated ----
 None. Reads the file (side effect).
@@ -17555,7 +18038,7 @@ experiment : Optional[dict]
     so the file is not read again). It is processed in place. None reads the file.
 
 ---- Globals read ----
-settings.HAEM_BACKGROUND, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
+settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
 settings.BASELINE_MINIMUM_SECONDS; BACKGROUND_LABELS.
 
 ---- Outputs ----
@@ -23555,6 +24038,36 @@ None.
 None.
 ```
 
+#### `_preset_reader`
+
+```text
+---- Summary ----
+Helper function to read the names of the library files a preset lists.
+
+---- Inputs ----
+path : Path
+    Preset file (DATA_FORMAT.md, "preset csv").
+
+---- Globals read ----
+PRESET_FILE_MARK, PRESET_FILE_FORMAT (module constants).
+
+---- Outputs ----
+List[str]
+    The file names, in the order the preset lists them. Raises ValueError, with a
+    message for the user, when the file cannot be read, is not a preset, is of a
+    newer format, or lists no file.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None. The heading lines end at the first empty line; the first line after it is
+the column name, and each line below names one file in its first cell.
+
+---- Helpers ----
+None.
+```
+
 #### `_unit_scaler`
 
 ```text
@@ -23616,6 +24129,43 @@ fit_range_finder
 
 ### MAIN FUNCTIONS
 
+#### `answers_fit_loader`
+
+```text
+---- Summary ----
+Main function to load the fit the answers name: the library haems ticked in the
+strip when the fit is OWN_HAEMS_NAME, otherwise the preset or fit file of that name.
+
+---- Inputs ----
+fits_folder : Path
+    The fits folder, holding the haems and presets folders and the user's own fit
+    files.
+fit_file : str
+    The answer 'fit_file': OWN_HAEMS_NAME, or a name as fit_names_lister gives it.
+haem_files : Sequence[str]
+    The answer 'haem_files': the library file names ticked; used only with
+    OWN_HAEMS_NAME.
+
+---- Globals read ----
+HAEMS_FOLDER_NAME, OWN_HAEMS_NAME (module constants).
+
+---- Outputs ----
+Dict[str, Any]
+    Fit dictionary, as fit_loader or haem_files_combiner gives it. Raises
+    ValueError, with a message for the user, when it cannot be loaded (no haem
+    ticked, a ticked file missing, or the fit unreadable).
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+fit_loader
+haem_files_combiner
+```
+
 #### `background_builder`
 
 ```text
@@ -23643,9 +24193,9 @@ None.
 
 ---- Equations ----
 scatter_1: 1, 1/wl; scatter_2: 1, 1/wl, 1/wl^2 (scatter_background_builder);
-linear: 1, wl; quadratic: 1, wl, (wl - centre)^2 with the centre in the middle of
-the wavelengths; valencia: 1, 1/wl^2. Scaling a shape to run from 0 to 1 changes
-only the size of its amount, not the fit.
+linear: 1, wl; rowan_scatter: 1, wl, (wl - centre)^2 with the centre halfway
+between the shortest and the longest wavelength; valencia: 1, 1/wl^2. Scaling a
+shape to run from 0 to 1 changes only the size of its amount, not the fit.
 
 ---- Helpers ----
 _unit_scaler
@@ -23720,6 +24270,45 @@ None.
 
 ---- Helpers ----
 _wavelength_masker
+```
+
+#### `decomposition_gap_calculator`
+
+```text
+---- Summary ----
+Main function to say how far apart the haem traces of two decompositions of the
+same spectra are: for each haem in both, the largest gap and the average gap. The
+spectra are matched by their index, and a haem is matched by its plain name, so
+"Cyt cc" and "cyt c c" are the same haem.
+
+---- Inputs ----
+new : pd.DataFrame
+    Haem table of the decomposition in use (DATA_FORMAT.md, 'haem_conc' or any
+    table made from it), with SPECTRUM_INDEX_COLUMN.
+kept : pd.DataFrame
+    Haem table of the kept decomposition, of the same kind and units.
+
+---- Globals read ----
+SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+Dict[str, Tuple[float, float]]
+    {haem name as in ``new``: (largest gap, average gap)}, in the units of the
+    tables, in the order of ``new``. A haem with no spectrum where both have a
+    value is left out. Raises KeyError when a table has no spectrum index.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+gap_i = new_i - kept_i at each spectrum i found in both
+largest gap = max |gap_i|
+average gap = mean |gap_i|
+
+---- Helpers ----
+measurement_column_finder
+name_simplifier
+value_getter
 ```
 
 #### `delta_abs_calculator`
@@ -23833,6 +24422,36 @@ _wavelength_masker
 basis_solver
 delta_abs_calculator
 s_array_generator
+```
+
+#### `fit_describer`
+
+```text
+---- Summary ----
+Main function to name the fit in use in words, for the messages and the workbook:
+the preset or fit file as it is, or the library haems ticked under Build a fit.
+
+---- Inputs ----
+fit_file : str
+    The answer 'fit_file'.
+haem_files : Sequence[str]
+    The answer 'haem_files'; used only when fit_file is OWN_HAEMS_NAME.
+
+---- Globals read ----
+OWN_HAEMS_NAME (module constant).
+
+---- Outputs ----
+str
+    fit_file, or 'Your own haems: c1_myco, bH_bswitch' (the files without .csv).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `fit_file_writer`
@@ -23956,6 +24575,72 @@ fit_scale_standardiser
 haem_order_finder
 ```
 
+#### `fit_loader`
+
+```text
+---- Summary ----
+Main function to load a fit by the name the fit list and the answers give it: the
+preset of that name, otherwise the fit file of that name in the fits folder.
+
+---- Inputs ----
+fits_folder : Path
+    The fits folder, holding the haems and presets folders and the user's own fit
+    files.
+name : str
+    File name of the fit, as fit_names_lister gives it ('<name>.csv').
+
+---- Globals read ----
+HAEMS_FOLDER_NAME, PRESETS_FOLDER_NAME (module constants).
+
+---- Outputs ----
+Dict[str, Any]
+    Fit dictionary, as fit_importer gives it (with 'haem_files' for a preset).
+    Raises ValueError, with a message for the user, when there is no such fit or
+    it cannot be read.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+fit_importer
+preset_importer
+```
+
+#### `fit_names_lister`
+
+```text
+---- Summary ----
+Main function to list the fits offered in the fit question and the settings strip:
+the presets, then the user's own fit files.
+
+---- Inputs ----
+fits_folder : Path
+    The fits folder.
+
+---- Globals read ----
+PRESETS_FOLDER_NAME (module constant).
+
+---- Outputs ----
+List[str]
+    File names ('<name>.csv'): the presets, then the .csv files of the fits folder
+    itself, each group sorted without regard to case. A file of the fits folder
+    with a preset's name is left out, as the preset is what that name loads (an
+    old copy of the fit, kept in the Mac app's Portimao folder). Empty when there
+    is nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `fit_range_finder`
 
 ```text
@@ -24021,6 +24706,41 @@ peak = largest |response| in the table. Standard: low <= peak <= high
 None.
 ```
 
+#### `haem_files_combiner`
+
+```text
+---- Summary ----
+Main function to join library files, one haem each, into one fit, so a
+decomposition can use any set of haems of the library.
+
+---- Inputs ----
+paths : Sequence[Path]
+    The library files (fit csv, one haem each), in any order.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Any]
+    Fit dictionary with the keys of fit_importer ('haem_list', 'data',
+    'scale_divisor', 'notes') and 'haem_files': the file name of each haem, in the
+    order of 'haem_list' (the a haems, then the b, then the c). Raises ValueError,
+    with a message for the user, when no file is given, a file is missing, cannot
+    be read or holds more than one haem, two haems have the same name, or the files
+    are on different scales.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None. Each haem keeps its own rows; shorter haems end in blanks.
+
+---- Helpers ----
+fit_importer
+haem_name_plainer
+haem_order_finder
+```
+
 #### `haem_name_plainer`
 
 ```text
@@ -24080,6 +24800,71 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+#### `library_haems_lister`
+
+```text
+---- Summary ----
+Main function to list the haems of the library, for the tick boxes of Build a fit
+in the strip, reading only the top of each file.
+
+---- Inputs ----
+fits_folder : Path
+    The fits folder, holding the haems folder.
+
+---- Globals read ----
+HAEMS_FOLDER_NAME (module constant); helpers.HAEM_TYPE_ORDER.
+
+---- Outputs ----
+List[Dict[str, str]]
+    [{'file': file name, 'haem': plain haem name, 'type': 'a', 'b', 'c' or
+    'other'}], in the order a, b, c, then by file name ignoring case. A file whose
+    top cannot be read is listed under its own name, type 'other', so ticking it
+    says what is wrong. Empty when there is no haems folder.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_fit_heading_reader
+haem_name_plainer
+haem_type_finder
+```
+
+#### `preset_importer`
+
+```text
+---- Summary ----
+Main function to load a preset: the haem library files it lists, joined into one
+fit.
+
+---- Inputs ----
+path : Path
+    Preset file (DATA_FORMAT.md, "preset csv").
+haems_folder : Path
+    The haem library folder the listed files are in.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Any]
+    Fit dictionary, as haem_files_combiner gives it. Raises ValueError, with a
+    message for the user, when the preset or one of its files cannot be used.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_preset_reader
+haem_files_combiner
 ```
 
 #### `s_array_generator`
@@ -24746,6 +25531,9 @@ pca_runner : Optional[Callable]
     Function (dataset, depth) that finds the components with a principal component
     analysis and returns (fit file name, fit), or (None, None) when the user wants
     a fit file instead. None leaves the option out.
+numbers : Optional[Dict[str, str]]
+    The questions' own numbers from QUESTION_FLOW.md, by 'decompose', 'fit' and
+    'spectrometer'; None numbers them in the order asked.
 
 ---- Globals read ----
 PCA_CHOICE (module constant).
@@ -24763,7 +25551,8 @@ None.
 
 ---- Helpers ----
 choice_asker
-fit_importer
+fit_loader
+fit_names_lister
 info_printer
 problem_teller
 yes_no_asker
@@ -25006,7 +25795,7 @@ None.
 
 ---- Outputs ----
 List[Tuple[str, str]]
-    [(key, label), ...]: abs, delta, conc and optionally percent.
+    [(key, label), ...]: abs, delta and optionally percent.
 
 ---- Globals mutated ----
 None.
@@ -26058,9 +26847,10 @@ _launch_log_shortener
 ```text
 ---- Summary ----
 Main function to make the Mac app's own folder, with its fits and logs folders, and
-to copy in each fit that comes with the program and is not there yet. A fit already
-there is never overwritten, so the user's changes are kept. Run from source,
-nothing is done: everything stays in the program folder.
+to copy in each fit that comes with the program and is not there yet, the haem
+library and the presets in their own folders. A fit already there is never
+overwritten, so the user's changes are kept. Run from source, nothing is done:
+everything stays in the program folder.
 
 ---- Inputs ----
 places : UserPlaces
@@ -26983,6 +27773,7 @@ run
 session_attacher
 spec_publisher
 strip_fits_setter
+strip_library_setter
 strip_listener_setter
 strip_reader
 strip_setter
@@ -28626,6 +29417,34 @@ None.
 None.
 ```
 
+##### `strip_library_setter`
+
+```text
+---- Summary ----
+Method to give the settings strip the library haems it shows a tick box for
+under Build a fit.
+
+---- Inputs ----
+haems : List[Dict[str, str]]
+    The library, as spectral_decomposer.library_haems_lister gives it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the list for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `strip_listener_setter`
 
 ```text
@@ -29279,6 +30098,64 @@ experiment_workbook_exporter
 preview_info_builder
 ```
 
+#### `_kept_haems_drawer`
+
+```text
+---- Summary ----
+Helper function to work one file out again with the kept decomposition (its fit and
+background, everything else as in use), draw its haem traces dashed over the haems
+in use in the same colours, widening a panel a kept trace would leave, and say how
+far apart the two are. Its own warnings are left out, as they repeat those of the
+decomposition in use.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache).
+summary : dict
+    File summary (DATA_FORMAT.md).
+info : dict
+    Per-file information the decomposition in use was worked out with.
+answers : dict
+    Answers the decomposition in use was worked out with.
+kept : dict
+    The kept decomposition (DATA_FORMAT.md, kept decomposition).
+haem_source : Optional[str]
+    Key of HAEM_KEYS the haem panels show.
+experiment : dict
+    The experiment worked out with the decomposition in use.
+axes : list
+    Panels of the preview, top to bottom; a haem panel has haem_names.
+plot_config : dict
+    Plot settings of the preview (HAEM_COLOURS, LINE_WIDTH, HAEM_Y_MIN,
+    HAEM_Y_MAX).
+
+---- Globals read ----
+settings.Config, HAEM_KEYS, KEY_PREFIX, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
+
+---- Outputs ----
+str
+    The notes: a KEY_PREFIX line for the dashed lines and a line with the largest
+    and the average gap of each haem in both; or one sentence saying why the kept
+    decomposition is not shown on this file.
+
+---- Globals mutated ----
+None. Draws on the haem panels; the details of a problem go to the log (side
+effects).
+
+---- Equations ----
+The gaps: decomposition_gap_calculator. A widened panel reaches from
+min - pad to max + pad of the kept trace outside the ignored parts, with
+pad = (max - min) x KEPT_MARGIN, and never shrinks.
+
+---- Helpers ----
+_loaded_experiment_getter
+decomposition_gap_calculator
+experiment_data_processor
+haem_name_plainer
+name_simplifier
+problem_teller
+```
+
 #### `_loaded_experiment_getter`
 
 ```text
@@ -29578,8 +30455,9 @@ problem_teller
 ```text
 ---- Summary ----
 Main function to show the answers given so far in the window: the window is given
-the settings and draws every file the user looks at with them. Problems are
-reported, never raised, so the questions carry on.
+the settings, with the decomposition kept to compare with (session.kept), and draws
+every file the user looks at with them. Problems are reported, never raised, so the
+questions carry on.
 
 ---- Inputs ----
 session : ViewerSession
@@ -29640,9 +30518,10 @@ settings.Config, settings.PREVIEW_DPI.
 Tuple[Optional[Figure], str]
     (figure, notes). The figure is None when the preview could not be drawn, and
     the notes then say why in one sentence. Otherwise the notes are the warnings
-    shown while it was drawn (a skipped step, a missing OD), one per line, and may
-    be empty. A line starting with KEY_PREFIX explains the shading and belongs by
-    the controls.
+    shown while it was drawn (a skipped step, a missing OD), and the gaps to the
+    kept decomposition when one is kept, one per line, and may be empty. A line
+    starting with KEY_PREFIX explains the shading or the dashed lines and belongs
+    by the controls.
 
 ---- Globals mutated ----
 None. Sets the matplotlib rcParams of the figure style; the details of a problem
@@ -29653,6 +30532,7 @@ notes go.
 None.
 
 ---- Helpers ----
+_kept_haems_drawer
 _loaded_experiment_getter
 _overlay_drawer
 experiment_data_processor
@@ -30457,7 +31337,7 @@ ocr_kind_lister
 ---- Summary ----
 Helper function to ask whether to keep the components found as a fit file in the
 fits folder, so they can be chosen like any other fit in later runs, and to save
-them.
+them. A preset's name is refused, as the preset is what that name loads.
 
 ---- Inputs ----
 fit : dict
@@ -30472,7 +31352,7 @@ depth : int
     Numbering depth of the questions.
 
 ---- Globals read ----
-None.
+spectral_decomposer.PRESETS_FOLDER_NAME.
 
 ---- Outputs ----
 Optional[str]
@@ -30492,35 +31372,6 @@ info_printer
 problem_teller
 text_asker
 yes_no_asker
-```
-
-#### `_fit_names_lister`
-
-```text
----- Summary ----
-Helper function to list the fit files the settings strip offers, in the order the
-fit question lists them.
-
----- Inputs ----
-fits_folder : Path
-    Folder holding the fit .csv files.
-
----- Globals read ----
-None.
-
----- Outputs ----
-List[str]
-    File names of the .csv files, sorted without regard to case; empty when the
-    folder holds none.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
 ```
 
 #### `_label_table_filler`
@@ -30735,15 +31586,15 @@ text_colourer
 ---- Summary ----
 Helper function to load the fit the standard plot shows the haems with, before any
 question about the haems is asked: the fit last saved for the dataset, or the
-standard fit for a dataset never saved. It also loads a fit picked in the settings
-strip. When the haems cannot be shown, one line says why and the plot keeps to the
-oxygen and the OCR.
+standard fit for a dataset never saved. It also loads a fit picked, or haems
+ticked, in the settings strip. When the haems cannot be shown, one line says why
+and the plot keeps to the oxygen and the OCR.
 
 ---- Inputs ----
 summaries : List[dict]
     File summaries (DATA_FORMAT.md); the spectrometers in common are used.
 defaults : dict
-    Default answers (decompose, fit_file, decomposition_dataset).
+    Default answers (decompose, fit_file, haem_files, decomposition_dataset).
 fits_folder : Path
     Folder holding the fit .csv files.
 is_from_strip : bool
@@ -30766,7 +31617,8 @@ None. Prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
-fit_importer
+answers_fit_loader
+fit_names_lister
 info_printer
 problem_teller
 ```
@@ -30777,9 +31629,12 @@ problem_teller
 ---- Summary ----
 Helper function to make a change in the settings strip what the run uses, and
 redraw the plot of the step being asked. Unticking the haems leaves them out of the
-run; ticking them, or picking a fit, works them out with the fit in the strip. A
-fit that cannot be used is reported and the strip is set back. A new journal, width
-or height redraws only the figure of each file, the one plot drawn at its size.
+run; ticking them, picking a fit or ticking library haems under Build a fit works
+them out with the fit in the strip; a new background works them out again. A fit
+that cannot be used is reported and the strip is set back. Keep to compare keeps
+the fit and background in use, drawn dashed over the haems until Stop comparing or
+the haems are left out. A new journal, width or height redraws only the figure of
+each file, the one plot drawn at its size.
 
 ---- Inputs ----
 session : ViewerSession
@@ -30810,6 +31665,7 @@ None.
 _standard_fit_loader
 _strip_shower
 info_printer
+kept_decomposition_builder
 size_answers_builder
 ```
 
@@ -30818,7 +31674,8 @@ size_answers_builder
 ```text
 ---- Summary ----
 Helper function to show in the settings strip what the run uses now: the haems
-ticked when they are worked out, the fit, the journal and the size.
+ticked when they are worked out, the fit, the decomposition kept to compare with,
+the journal and the size.
 
 ---- Inputs ----
 session : ViewerSession
@@ -31142,10 +31999,10 @@ None.
 _answers_previewer
 _averaging_reviewer
 _decomposition_storer
-_fit_names_lister
 _strip_shower
 accept_asker
 decomposition_asker
+fit_names_lister
 info_printer
 pca_stage_runner
 preview_drawer
@@ -31254,7 +32111,6 @@ None.
 
 ---- Helpers ----
 _export_refresher
-_fit_names_lister
 _standard_fit_loader
 _strip_change_applier
 _strip_shower
@@ -31262,7 +32118,9 @@ active_gui_getter
 browser_stage_runner
 choice_asker
 details_stage_runner
+fit_names_lister
 heading_printer
+library_haems_lister
 info_printer
 numbering_getter
 numbering_setter
@@ -31274,7 +32132,7 @@ trim_stage_runner
 
 ## `utils_viewer/viewer_strip.py`
 
-The settings strip under the plot: the haems, the fit, the journal, the figure size and
+The settings strip under the plot: the haems, the fit, the background, the decomposition
 
 ### CLASSES
 
@@ -31461,30 +32319,38 @@ None.
 ```text
 ---- Summary ----
 The strip under the plot that always shows the current choices: a tick box for the
-haems, a drop-down of the fits, a drop-down of the journal, a drop-down of the
-widths that journal allows and a typing box for the height. It tells the window
-what the user changed and can be set by the program; it changes nothing by itself.
-It starts greyed out, until the program says it is listening. Every method runs on
-the window thread, except values_reader.
+haems, a drop-down of the fits, a drop-down of the backgrounds, a button that folds
+out a tick box for each haem of the library (Build a fit), a button that keeps the
+decomposition in use to compare the next ones with (with a line saying which one is
+kept), a drop-down of the journal, a drop-down of the widths that journal allows and
+a typing box for the height. It tells the window what the user changed and can be
+set by the program; it changes nothing by itself. It starts greyed out, until the
+program says it is listening. Every method runs on the window thread, except
+values_reader.
 
 ---- Attributes ----
 frame : Any
     The Tk frame holding the strip, for the window to place.
 
 ---- Globals read ----
-settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS, JOURNAL_NAMES and the module
-constants.
+settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS, JOURNAL_NAMES,
+BACKGROUND_SHORT_NAMES, OWN_HAEMS_NAME and the module constants.
 
 ---- Methods ----
 __init__
+_background_handler
+_build_toggler
 _change_reporter
+_compare_handler
 _fit_handler
 _haems_handler
 _height_handler
 _journal_handler
 _size_refresher
+_tick_handler
 _width_handler
 fits_setter
+library_setter
 state_setter
 values_reader
 values_setter
@@ -31525,12 +32391,69 @@ None. Creates the widgets (side effect).
 None.
 
 ---- Helpers ----
+_background_handler
+_build_toggler
+_compare_handler
 _fit_handler
 _haems_handler
 _height_handler
 _journal_handler
 _size_refresher
 _width_handler
+```
+
+##### `_background_handler`
+
+```text
+---- Summary ----
+Method to take the background picked in the drop-down.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+```
+
+##### `_build_toggler`
+
+```text
+---- Summary ----
+Method to fold the tick boxes of the library haems out under the first row, or
+away again.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BUILD_CLOSED_TEXT, BUILD_OPEN_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Shows or hides the panel (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_change_reporter`
@@ -31561,6 +32484,35 @@ None.
 None.
 ```
 
+##### `_compare_handler`
+
+```text
+---- Summary ----
+Method to take the button that keeps the decomposition in use to compare with,
+or stops comparing. The program says which one is kept (the value 'kept').
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value, changes the button and reports the change (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+```
+
 ##### `_fit_handler`
 
 ```text
@@ -31586,6 +32538,7 @@ None.
 
 ---- Helpers ----
 _change_reporter
+_size_refresher
 ```
 
 ##### `_haems_handler`
@@ -31681,14 +32634,16 @@ width_choices_lister
 ```text
 ---- Summary ----
 Method to show the kept values in every part of the strip: the widths offered
-follow the journal, the width and the height are greyed for "None", and the
-whole strip is greyed while the program is not listening.
+follow the journal, the width and the height are greyed for "None", the button
+that keeps a decomposition is greyed while no haems are shown, the line saying
+which one is kept shows only while one is, and the whole strip is greyed while
+the program is not listening.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-NO_JOURNAL, NOTE_TEXT.
+KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
 
 ---- Outputs ----
 None
@@ -31703,6 +32658,39 @@ None.
 ---- Helpers ----
 height_checker
 width_choices_lister
+```
+
+##### `_tick_handler`
+
+```text
+---- Summary ----
+Method to take a tick box of Build a fit: the haems ticked become the fit, as
+"Your own haems". Ticking a haem with the same name as one already ticked
+unticks that one, and the last haem ticked cannot be unticked; a note beside
+the height says so.
+
+---- Inputs ----
+name : str
+    File name of the library haem whose box was clicked.
+
+---- Globals read ----
+OWN_HAEMS_NAME, NOTE_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the values, changes the widgets and reports the change (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+haem_ticks_resolver
 ```
 
 ##### `_width_handler`
@@ -31756,7 +32744,38 @@ None. Changes the drop-down (side effect).
 None.
 
 ---- Helpers ----
+_size_refresher
+```
+
+##### `library_setter`
+
+```text
+---- Summary ----
+Method to build the tick boxes of Build a fit: one line for each type of haem
+(a, b, c, then any other), with a box for each library file, named by its file
+without .csv.
+
+---- Inputs ----
+haems : List[Dict[str, str]]
+    The library, as spectral_decomposer.library_haems_lister gives it: [{'file',
+    'haem', 'type'}], in the order to show.
+
+---- Globals read ----
 None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Rebuilds the panel (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_refresher
+_tick_handler
 ```
 
 ##### `state_setter`
@@ -31875,6 +32894,43 @@ None.
 
 ### MAIN FUNCTIONS
 
+#### `haem_ticks_resolver`
+
+```text
+---- Summary ----
+Main function to work out the library haems ticked after a click on one tick box of
+Build a fit. Two haems of the same name could not be told apart in the figures, so
+ticking one unticks the other; and a fit needs a haem, so the last cannot be
+unticked.
+
+---- Inputs ----
+ticked : Sequence[str]
+    File names ticked before the click.
+clicked : str
+    File name of the box clicked.
+is_on : bool
+    True when the box is ticked after the click.
+haems_by_file : Dict[str, str]
+    {file name: plain haem name} of the library.
+
+---- Globals read ----
+LAST_TICK_NOTE (module constant).
+
+---- Outputs ----
+Tuple[List[str], str]
+    (the file names ticked, in the order ticked; a note for the user, '' when
+    there is nothing to say).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `height_checker`
 
 ```text
@@ -31905,6 +32961,38 @@ height in mm = height * page height of the journal in mm.
 ---- Helpers ----
 _page_journal_finder
 typed_number_reader
+```
+
+#### `kept_decomposition_builder`
+
+```text
+---- Summary ----
+Main function to keep the decomposition in use, to compare the next ones with: the
+fit, the answers it was worked out with and its name in words.
+
+---- Inputs ----
+answers : dict
+    The answers in use (fit_file, haem_files, haem_background,
+    decomposition_dataset).
+fit : dict
+    The fit in use (spectral_decomposer.fit_importer); it is kept as it is, as a
+    fit is never changed once read.
+
+---- Globals read ----
+BACKGROUND_SHORT_NAMES.
+
+---- Outputs ----
+Dict[str, Any]
+    The kept decomposition (DATA_FORMAT.md, kept decomposition).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+fit_describer
 ```
 
 #### `minutes_checker`
@@ -31974,10 +33062,16 @@ Main function to give the strip values that show the answers of the run.
 
 ---- Inputs ----
 answers : dict
-    The answers (fit_file, journal, columns, height, size_mode); a fit_file of
-    None shows an empty fit.
+    The answers (fit_file, haem_background, journal, columns, height, size_mode);
+    a fit_file of None shows an empty fit.
 has_haems : bool
     True when the haems are worked out and shown, which ticks the box.
+haem_files : Sequence[str]
+    The library files of the fit in use, ticked under Build a fit (none for a fit
+    file of the user's own or components from the data).
+kept : str
+    The decomposition kept to compare with, in words (its fit and background), or
+    '' when none is kept.
 
 ---- Globals read ----
 NO_JOURNAL.
@@ -32002,7 +33096,8 @@ None.
 ```text
 ---- Summary ----
 Main function to check values meant for the strip before they are shown: the
-names, the journal, a width the journal allows and a height the page allows. The
+names, the background, the haems ticked, whether a decomposition is kept and its
+words, the journal, a width the journal allows and a height the page allows. The
 width and the height are checked against the journal given with them.
 
 ---- Inputs ----
@@ -32010,7 +33105,7 @@ values : Dict[str, Any]
     Some or all of the strip values (DATA_FORMAT.md).
 
 ---- Globals read ----
-VALUE_NAMES, HEIGHT_HELP.
+VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES.
 
 ---- Outputs ----
 None

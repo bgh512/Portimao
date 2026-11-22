@@ -19,6 +19,7 @@ from utils_shared.dataset_settings import (dataset_settings_reader,
 from utils_shared.survey import (data_folder_lister,
                                  data_folder_resolver,
                                  free_folder_finder,
+                                 haem_form_option_builder,
                                  results_counter,
                                  results_folder_checker,
                                  results_folder_resolver,
@@ -468,6 +469,44 @@ def test_results_folder_outside_is_kept_whole(tmp_path: Path) -> None:
     dataset.mkdir()
     assert dataset_settings_saver(dataset, results, FILES, ANSWERS)
     assert dataset_settings_reader(dataset)['export_folder'] == results.resolve()
+
+
+# ---- test_saved_haem_amounts_open_as_delta_a -----------------------------------------
+def test_saved_haem_amounts_open_as_delta_a(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that, with only cells measured, the haem amounts are not
+    offered as a way of showing the haems, and that a dataset saved showing them opens
+    showing delta A, the other answers unchanged.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    FILES, ANSWERS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    for include_percent in (True, False):
+        keys = [key for key, _ in haem_form_option_builder(include_percent)]
+        assert 'conc' not in keys
+        assert keys[:2] == ['abs', 'delta']
+    old = dict(ANSWERS, haem_mode='conc', ho_haem_mode='conc')
+    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, old)
+    answers = dataset_settings_reader(tmp_path)['answers']
+    assert answers == dict(ANSWERS, haem_mode='delta', ho_haem_mode='delta')
 
 
 # ---- test_settings_are_read_back -----------------------------------------------------

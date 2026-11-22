@@ -37,7 +37,14 @@ from utils_shared.questions import (accept_asker,
                                     text_colourer,
                                     yes_no_asker,
                                     )
-from utils_shared.spectral_decomposer import fit_importer
+from utils_shared.spectral_decomposer import (answers_fit_loader,
+                                              BACKGROUND_SHORT_NAMES,
+                                              fit_describer,
+                                              fit_names_lister,
+                                              library_haems_lister,
+                                              OWN_HAEMS_NAME,
+                                              PRESETS_FOLDER_NAME,
+                                              )
 from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
                                  event_asker,
@@ -68,7 +75,10 @@ from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
-from utils_viewer.viewer_strip import size_answers_builder, strip_values_builder
+from utils_viewer.viewer_strip import (kept_decomposition_builder,
+                                       size_answers_builder,
+                                       strip_values_builder,
+                                       )
 from utils_viewer.viewer_table import (label_entries_reader,
                                        label_table_builder,
                                        od_rows_reader,
@@ -93,6 +103,8 @@ TRIM_FIELDS = [('trim_start', 'Trim start'),
                ('ignore_end', 'last'),
                ]
 TRIM_KEY_TEXT = 'grey hatched = trimmed away, amber = ignored in calculations'
+# The numbers of the haem fit questions of the processing, from QUESTION_FLOW.md 4.A.
+PROCESSING_FIT_NUMBERS = {'decompose': '4.1', 'fit': '4.1.1', 'spectrometer': '4.1.2'}
 TRIM_NUDGE = ('Type the times in the strip under the plot, or drag the edges; press '
               'Enter with this box empty when every file looks right.')
 
@@ -321,7 +333,11 @@ def _component_namer(result: dict, types: List[str], depth: int) -> List[str]:
     """
 
     names = [f'PC{i + 1}' for i in range(result['components'].shape[1])]
-    if not yes_no_asker('Do you want to name the components?', False, depth=depth):
+    if not yes_no_asker('Do you want to name the components?',
+                        False,
+                        depth=depth,
+                        number='4.1.1.7',
+                        ):
         return names
     seen: Dict[str, int] = {}
     suggestions = []
@@ -626,7 +642,7 @@ def _fit_file_saver(fit: dict,
     ---- Summary ----
     Helper function to ask whether to keep the components found as a fit file in the
     fits folder, so they can be chosen like any other fit in later runs, and to save
-    them.
+    them. A preset's name is refused, as the preset is what that name loads.
 
     ---- Inputs ----
     fit : dict
@@ -641,7 +657,7 @@ def _fit_file_saver(fit: dict,
         Numbering depth of the questions.
 
     ---- Globals read ----
-    None.
+    spectral_decomposer.PRESETS_FOLDER_NAME.
 
     ---- Outputs ----
     Optional[str]
@@ -667,6 +683,7 @@ def _fit_file_saver(fit: dict,
                         'fits folder?',
                         True,
                         depth=depth,
+                        number='4.1.1.8',
                         ):
         return None
     default = f'pca_{count}_components_{window[0]:g}-{window[1]:g}nm'
@@ -682,9 +699,16 @@ def _fit_file_saver(fit: dict,
                                       default,
                                       depth=depth,
                                       checker=stem_checker,
+                                      number='4.1.1.9',
                                       ),
                            )
         path = fits_folder / f'{stem}.csv'
+        if (fits_folder / PRESETS_FOLDER_NAME / path.name).is_file():
+            info_printer(f'{path.name} is the name of a preset, so the components '
+                         'could not be chosen under it. Type another name.',
+                         depth=depth,
+                         )
+            continue
         if path.exists() and not yes_no_asker(f'{path.name} already exists. Do you '
                                               f'want to replace it?',
                                               False,
@@ -704,38 +728,6 @@ def _fit_file_saver(fit: dict,
                      depth=depth,
                      )
         return path.name
-
-
-# ---- _fit_names_lister ---------------------------------------------------------------
-def _fit_names_lister(fits_folder: Path) -> List[str]:
-    """
-    ---- Summary ----
-    Helper function to list the fit files the settings strip offers, in the order the
-    fit question lists them.
-
-    ---- Inputs ----
-    fits_folder : Path
-        Folder holding the fit .csv files.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    List[str]
-        File names of the .csv files, sorted without regard to case; empty when the
-        folder holds none.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    return sorted((path.name for path in fits_folder.glob('*.csv')), key=str.lower)
 
 
 # ---- _label_table_filler -------------------------------------------------------------
@@ -1056,15 +1048,15 @@ def _standard_fit_loader(summaries: List[dict],
     ---- Summary ----
     Helper function to load the fit the standard plot shows the haems with, before any
     question about the haems is asked: the fit last saved for the dataset, or the
-    standard fit for a dataset never saved. It also loads a fit picked in the settings
-    strip. When the haems cannot be shown, one line says why and the plot keeps to the
-    oxygen and the OCR.
+    standard fit for a dataset never saved. It also loads a fit picked, or haems
+    ticked, in the settings strip. When the haems cannot be shown, one line says why
+    and the plot keeps to the oxygen and the OCR.
 
     ---- Inputs ----
     summaries : List[dict]
         File summaries (DATA_FORMAT.md); the spectrometers in common are used.
     defaults : dict
-        Default answers (decompose, fit_file, decomposition_dataset).
+        Default answers (decompose, fit_file, haem_files, decomposition_dataset).
     fits_folder : Path
         Folder holding the fit .csv files.
     is_from_strip : bool
@@ -1087,7 +1079,8 @@ def _standard_fit_loader(summaries: List[dict],
     None.
 
     ---- Helpers ----
-    fit_importer
+    answers_fit_loader
+    fit_names_lister
     info_printer
     problem_teller
     """
@@ -1102,8 +1095,8 @@ def _standard_fit_loader(summaries: List[dict],
     def advice(text: str) -> str:
         return 'The strip is set back to what is in use.' if is_from_strip else text
     name = defaults.get('fit_file')
-    if not name or not (fits_folder / name).is_file():
-        info_printer(f'{lead}: the fit file {name} is not in {fits_folder}. '
+    if not name or (name != OWN_HAEMS_NAME and name not in fit_names_lister(fits_folder)):
+        info_printer(f'{lead}: the fit {name} is not in {fits_folder}. '
                      f"{advice('You can choose a fit in the processing.')}",
                      )
         return None, None
@@ -1124,9 +1117,12 @@ def _standard_fit_loader(summaries: List[dict],
 
     # ---- 3 Read the fit --------------------------------------------------------------
     try:
-        return fit_importer(fits_folder / name), dataset
+        return answers_fit_loader(fits_folder,
+                                  name,
+                                  defaults.get('haem_files') or [],
+                                  ), dataset
     except (OSError, ValueError) as exc:
-        problem = problem_teller(f'{lead}: the fit file {name} could not be read', exc)
+        problem = problem_teller(f'{lead}: the fit {name} could not be read', exc)
         info_printer(f'{problem} '
                      f"{advice('You can choose another fit in the processing.')}",
                      )
@@ -1143,9 +1139,12 @@ def _strip_change_applier(session: ViewerSession,
     ---- Summary ----
     Helper function to make a change in the settings strip what the run uses, and
     redraw the plot of the step being asked. Unticking the haems leaves them out of the
-    run; ticking them, or picking a fit, works them out with the fit in the strip. A
-    fit that cannot be used is reported and the strip is set back. A new journal, width
-    or height redraws only the figure of each file, the one plot drawn at its size.
+    run; ticking them, picking a fit or ticking library haems under Build a fit works
+    them out with the fit in the strip; a new background works them out again. A fit
+    that cannot be used is reported and the strip is set back. Keep to compare keeps
+    the fit and background in use, drawn dashed over the haems until Stop comparing or
+    the haems are left out. A new journal, width or height redraws only the figure of
+    each file, the one plot drawn at its size.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1176,6 +1175,7 @@ def _strip_change_applier(session: ViewerSession,
     _standard_fit_loader
     _strip_shower
     info_printer
+    kept_decomposition_builder
     size_answers_builder
     """
 
@@ -1184,18 +1184,32 @@ def _strip_change_applier(session: ViewerSession,
     answers.update(sizes)
     is_redrawn = bool(sizes) and session.is_figure
 
-    # ---- 2 The haems and the fit -----------------------------------------------------
+    # ---- 2 The background under the haems --------------------------------------------
+    if 'haem_background' in changes:
+        answers['haem_background'] = changes['haem_background']
+        info_printer('The background under the haems is now '
+                     f"{BACKGROUND_SHORT_NAMES[answers['haem_background']]}.",
+                     )
+        is_redrawn = is_redrawn or session.fit is not None
+
+    # ---- 3 The haems and the fit -----------------------------------------------------
     if changes.get('plot_haems') is False:
         answers.update({'decompose': False, 'plot_haems': False})
         session.fit = None
+        session.kept = None
         info_printer('The haems are left out of the run.')
         is_redrawn = True
-    elif 'fit_file' in changes or changes.get('plot_haems'):
+    elif ('fit_file' in changes or
+          'haem_files' in changes or
+          changes.get('plot_haems')
+          ):
         name = changes.get('fit_file') or answers['fit_file']
+        ticked = list(changes.get('haem_files', answers.get('haem_files', [])))
         fit, dataset = _standard_fit_loader(session.summaries,
                                             dict(answers,
                                                  decompose=True,
                                                  fit_file=name,
+                                                 haem_files=ticked,
                                                  ),
                                             fits_folder,
                                             is_from_strip=True,
@@ -1205,15 +1219,36 @@ def _strip_change_applier(session: ViewerSession,
             answers.update({'decompose': True,
                             'plot_haems': True,
                             'fit_file': name,
+                            'haem_files': ticked if name == OWN_HAEMS_NAME else [],
                             'decomposition_dataset': dataset,
                             'haems': haems or list(fit['haem_list']),
                             },
                            )
             session.fit = fit
-            info_printer(f'The haems are worked out with {name}.')
+            info_printer('The haems are worked out with '
+                         f'{fit_describer(name, ticked)}.',
+                         )
             is_redrawn = True
 
-    # ---- 3 Show what is in use and redraw --------------------------------------------
+    # ---- 4 Keep the decomposition in use to compare with, or stop --------------------
+    if 'compare' in changes and session.fit is not None:
+        kept = (kept_decomposition_builder(answers, session.fit)
+                if changes['compare']
+                else None
+                )
+        session.kept = kept
+        info_printer(f"Kept {kept['text']} to compare: change the haems or the "
+                     'background, and the kept haems show dashed on the plot.'
+                     if kept is not None
+                     else 'The kept decomposition is no longer shown.',
+                     )
+        is_redrawn = True
+    elif changes.get('compare'):
+        info_printer('There are no haems worked out yet to keep: they are worked out '
+                     'in the processing.',
+                     )
+
+    # ---- 5 Show what is in use and redraw --------------------------------------------
     _strip_shower(session, answers)
     if is_redrawn and session.redraw is not None:
         session.redraw()
@@ -1224,7 +1259,8 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     """
     ---- Summary ----
     Helper function to show in the settings strip what the run uses now: the haems
-    ticked when they are worked out, the fit, the journal and the size.
+    ticked when they are worked out, the fit, the decomposition kept to compare with,
+    the journal and the size.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1249,7 +1285,17 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     strip_values_builder
     """
 
-    session.window.strip_setter(strip_values_builder(answers, session.fit is not None))
+    fit = session.fit
+    session.window.strip_setter(strip_values_builder(answers,
+                                                     fit is not None,
+                                                     fit.get('haem_files', [])
+                                                     if fit is not None
+                                                     else [],
+                                                     session.kept['text']
+                                                     if session.kept is not None
+                                                     else '',
+                                                     ),
+                                )
 
 
 # ---- _table_filler -------------------------------------------------------------------
@@ -1556,12 +1602,14 @@ def pca_stage_runner(session: ViewerSession,
                              start,
                              minimum=0,
                              depth=depth,
+                             number='4.1.1.1',
                              )
         end = number_asker('Where should the spectral window end (nm)?',
                            max(end, start + 20.0),
                            minimum=start,
                            exclusive_minimum=True,
                            depth=depth,
+                           number='4.1.1.2',
                            )
         sets, problems = pca_spectra_gatherer(
             session,
@@ -1611,12 +1659,14 @@ def pca_stage_runner(session: ViewerSession,
                                      maximum=available,
                                      depth=depth,
                                      is_whole=True,
+                                     number='4.1.1.3',
                                      ),
                         )
             rotate = yes_no_asker('Do you want to rotate the components so each is as '
                                   'peak-like as possible (varimax)?',
                                   rotate,
                                   depth=depth,
+                                  number='4.1.1.4',
                                   )
             smoothing = number_asker('Over how many nm should the components be '
                                      'smoothed to remove their noise (0 for none)?',
@@ -1624,6 +1674,7 @@ def pca_stage_runner(session: ViewerSession,
                                      minimum=0,
                                      maximum=(end - start) / 4,
                                      depth=depth,
+                                     number='4.1.1.5',
                                      )
 
             # ---- 2.2 Build, describe and draw them -----------------------------------
@@ -1671,6 +1722,7 @@ def pca_stage_runner(session: ViewerSession,
                                    ('fit', 'choose a fit file instead'),
                                    ],
                                   depth=depth,
+                                  number='4.1.1.6',
                                   )
             if choice != 'count':
                 break
@@ -1874,10 +1926,10 @@ def processing_stage_runner(session: ViewerSession,
     _answers_previewer
     _averaging_reviewer
     _decomposition_storer
-    _fit_names_lister
     _strip_shower
     accept_asker
     decomposition_asker
+    fit_names_lister
     info_printer
     pca_stage_runner
     preview_drawer
@@ -1905,7 +1957,7 @@ def processing_stage_runner(session: ViewerSession,
                                     depth,
                                     )
         finally:
-            session.window.strip_fits_setter(_fit_names_lister(fits_folder))
+            session.window.strip_fits_setter(fit_names_lister(fits_folder))
             session.window.strip_state_setter(True)
 
     # ---- 1 The haem fit --------------------------------------------------------------
@@ -1923,11 +1975,15 @@ def processing_stage_runner(session: ViewerSession,
                                                   asked,
                                                   fits_folder,
                                                   pca_runner=pca_finder,
+                                                  numbers=PROCESSING_FIT_NUMBERS,
                                                   ),
                               )
     else:
         answers['decompose'] = True
-        info_printer(f"The haems are worked out with {answers['fit_file']}.")
+        info_printer(
+            'The haems are worked out with '
+            f"{fit_describer(answers['fit_file'], answers.get('haem_files', []))}.",
+            )
 
     # ---- 1.2 Accept the fit or find the components from the data ---------------------
     # The strip picks another fit and leaves the haems out.
@@ -1935,6 +1991,7 @@ def processing_stage_runner(session: ViewerSession,
         redraw()
         if accept_asker('Do you accept this decomposition?',
                         [('pca', 'find the components from the data')],
+                        number='4.2',
                         ) == 'yes':
             break
         name, fit = pca_finder(answers['decomposition_dataset'], 2)
@@ -2129,7 +2186,6 @@ def viewer_asker(summaries: List[dict],
 
     ---- Helpers ----
     _export_refresher
-    _fit_names_lister
     _standard_fit_loader
     _strip_change_applier
     _strip_shower
@@ -2137,7 +2193,9 @@ def viewer_asker(summaries: List[dict],
     browser_stage_runner
     choice_asker
     details_stage_runner
+    fit_names_lister
     heading_printer
+    library_haems_lister
     info_printer
     numbering_getter
     numbering_setter
@@ -2163,7 +2221,8 @@ def viewer_asker(summaries: List[dict],
         answers['decomposition_dataset'] = dataset
 
     # ---- 2 Set up the settings strip -------------------------------------------------
-    window.strip_fits_setter(_fit_names_lister(fits_folder))
+    window.strip_fits_setter(fit_names_lister(fits_folder))
+    window.strip_library_setter(library_haems_lister(fits_folder))
     _strip_shower(session, answers)
     window.strip_listener_setter(lambda changes: _strip_change_applier(session,
                                                                        answers,

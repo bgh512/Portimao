@@ -331,7 +331,7 @@ def source_selector(answers: dict, od_available: bool) -> tuple:
     ---- Inputs ----
     answers : dict
         Terminal answers; uses ho_ocr_mode ('raw', 'od' or 'percent'), ho_haem_mode
-        ('delta', 'abs', 'conc' or 'percent') and ho_per_od.
+        ('delta', 'abs' or 'percent') and ho_per_od.
     od_available : bool
         True when the experiment has OD, volume and dilution factor.
 
@@ -353,8 +353,7 @@ def source_selector(answers: dict, od_available: bool) -> tuple:
     None.
     """
 
-    pairs = {'conc': ('raw', 'od'),
-             'abs': ('abs', 'abs_od'),
+    pairs = {'abs': ('abs', 'abs_od'),
              'delta': ('delta_abs', 'delta_abs_od'),
              'percent': ('percent', 'percent'),
              }

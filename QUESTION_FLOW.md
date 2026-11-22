@@ -1,4 +1,4 @@
-# Portimao question flow (V2.6)
+# Portimao question flow (V2.7)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -41,7 +41,7 @@ Every question in the order it is asked, with where each answer leads. The quest
 |---|---|---|---|
 | 1.2.1 | *(only when the folder already holds results of these files; above it: "results already holds results of 12 of these 12 files.")* Do you want to write over them? `(y/N)` | the standard plot is drawn **(plot)**, then **2.1**; results written later replace those there | **1.2** again, offering a free name beside it (`results_2`), with the line "Type another folder, or a new name: a name without a path is made inside the data folder." |
 
-The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. The haems are worked out with the standard fit (`bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit file is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
+The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. The haems are worked out with the standard fit (the preset `bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
 
 ---
 
@@ -122,7 +122,7 @@ The plot is the standard plot, cut to the limits of section 2, with the event la
 
 ### 4.A Haem fit
 
-The haems on the plot are those of the import, worked out with the standard fit, the fit last saved for the dataset, or the fit you picked in the strip. A message names that fit ("The haems are worked out with *fit*."). The section then starts at **4.2**. 4.1 is asked only when the plot shows no haems yet:
+The haems on the plot are those of the import, worked out with the standard fit, the fit last saved for the dataset, or the fit you picked or built in the strip, with the background in the strip. A message names that fit ("The haems are worked out with *fit*.", or "... with Your own haems: *c1_myco, bH_bswitch, ...*"). The section then starts at **4.2**. 4.1 is asked only when the plot shows no haems yet:
 - the dataset was last saved without them;
 - the fit could not be used (a message in section 1 said why);
 - you unticked Haems in the strip.
@@ -131,14 +131,20 @@ The haems on the plot are those of the import, worked out with the standard fit,
 |---|---|---|---|
 | 4.1 | *(only when no haems are shown)* Do you want to decompose the haems? `(Y/n)`, or `(y/N)` when Haems was unticked in the strip or the dataset was saved without haems | **4.1.1** | **4.4** (no haems, unless you tick Haems in the strip later) |
 
-If the `fits/` folder holds no `.csv` file, 4.1 is still asked, and 4.1.1 then offers only *Find the components from the data*.
+If the `fits/` folder holds no preset and no fit file, 4.1 is still asked, and 4.1.1 then offers only *Find the components from the data*.
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.1.1 | Which fit would you like to use? (a numbered list of the fit files, and *Find the components from the data (principal component analysis)* last; the fit in the strip is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.4**. |
+| 4.1.1 | Which fit would you like to use? (a numbered list of the presets of the haem library, then your own fit files in the `fits/` folder, and *Find the components from the data (principal component analysis)* last; the fit in the strip is the default) | **4.1.2** if the files have more than one spectrometer in common and the default one is not among them, otherwise the decomposition is drawn **(plot)**, then **4.2**; the last choice leads to **4.1.1.1** (after 4.1.2 if that is needed). If the fit file cannot be read, a message says so and the haems are not decomposed: **4.4**. |
 | 4.1.2 | Which spectrometer holds the haem spectra? | the decomposition is drawn **(plot)**, then **4.2** (or **4.1.1.1** when the components are being found) |
 
-To try another fit, pick it in the strip while 4.2 waits: the plot is redrawn with it. To leave the haems out, untick Haems in the strip; answering yes then goes on without haems, to **4.4**.
+While 4.2 waits, the strip under the plot changes the decomposition, and the plot is redrawn after each change:
+- **Fit**: another preset or fit file of your own.
+- **Background**: the background fitted under the haems (Rowan scatter, the standard; Valencia; flat + 1/wavelength; flat + 1/wavelength + 1/wavelength²; straight line).
+- **Build a fit**: folds out a tick box for each haem of the library, one line each for the a, b and c haems; the boxes start with the haems of the preset in use. Ticking or unticking a box works the haems out with the ones ticked, and the Fit drop-down reads *Your own haems*. Ticking a haem with the same name as one already ticked (c1_myco and c1_037v are both Cyt cc) unticks the other, and the last box cannot be unticked; a note beside the height says so. Click the button again to fold the boxes away.
+- **Keep to compare**: keeps the decomposition on the plot (its fit and background), and a line in the strip says which one is kept. Change the fit, the haems ticked or the background, and the kept haems are drawn as dashed, paler lines in the same colours under the new ones, on every file. Under the plot, each haem in both has two numbers, largest / average: the largest and the average distance between its two traces, in the units of the haem panels. The button reads *Stop comparing* while one is kept; click it to take the dashed lines away. Each file takes about twice as long to draw while one is kept.
+
+To leave the haems out, untick Haems in the strip; answering yes then goes on without haems, to **4.4**.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
@@ -164,7 +170,7 @@ Asked when the last choice of 4.1.1, or No at 4.2, is taken. The strip is greyed
 |---|---|---|
 | 4.1.1.7 | Do you want to name the components? `(y/N)` | yes: one question for each component, "What is component *N* (*type*, largest peak at *X* nm) called?", suggesting a name from its type such as *a-like* (a name that is empty, has a comma or is used twice is asked again), then **4.1.1.8**; no (PC1, PC2, ...): **4.1.1.8** |
 | 4.1.1.8 | Do you want to save these components as a fit file in the fits folder? `(Y/n)` | yes: **4.1.1.9**; no: the decomposition is drawn **(plot)**, then **4.2** |
-| 4.1.1.9 | What should the fit file be called (without .csv)? | if a fit file of that name exists, it asks "*name*.csv already exists. Do you want to replace it?" `(y/N)` (no asks for a name again); then the decomposition is drawn **(plot)**, then **4.2** |
+| 4.1.1.9 | What should the fit file be called (without .csv)? | the name of a preset is refused (one line says so and the question waits); if a fit file of that name exists, it asks "*name*.csv already exists. Do you want to replace it?" `(y/N)` (no asks for a name again); then the decomposition is drawn **(plot)**, then **4.2** |
 
 ### 4.B Trim and ignore times again
 
@@ -233,7 +239,7 @@ Whether the haems are plotted at all is the Haems box in the strip; this questio
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.5 | How would you like to plot the haems? Options: absorbance (mOD), ΔA (mOD) the change from the start, concentration, % oxidised | **5.5.1** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise the figure is drawn **(plot)**, then **5.1** |
+| 5.5 | How would you like to plot the haems? Options: absorbance (mOD), ΔA (mOD) the change from the start, % oxidised (no concentration: only cells are measured, and a haem amount depends on the size of its shape; a dataset saved with concentration opens with ΔA) | **5.5.1** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise the figure is drawn **(plot)**, then **5.1** |
 | 5.5.1 | Do you want to scale the haems by OD as well? `(Y/n)` | the figure is drawn **(plot)**, then **5.1** |
 
 ### 5.D Event labels

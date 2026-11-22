@@ -121,12 +121,13 @@ def _time_response_preparer(experiment: dict,
     group : str
         Group the experiment belongs to.
     answers : dict
-        Terminal answers; uses decomposition_dataset and the tr_* windows.
+        Terminal answers; uses decomposition_dataset, haem_background and the tr_*
+        windows.
     fit : dict
         Fit dictionary from import_fit.
 
     ---- Globals read ----
-    config.HAEM_BACKGROUND, config.HAEM_FACTOR.
+    config.HAEM_FACTOR.
 
     ---- Outputs ----
     dict
@@ -163,7 +164,7 @@ def _time_response_preparer(experiment: dict,
     difference_spectrum_calculator(prepared, 'penultimate', 'final')
     difference_spectrum_decomposer(prepared,
                                    fit,
-                                   settings.HAEM_BACKGROUND,
+                                   answers['haem_background'],
                                    settings.HAEM_FACTOR,
                                    'signed',
                                    )

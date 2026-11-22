@@ -42,6 +42,7 @@ from utils_shared.run_logging import (details_place_setter,
                                       logging_stopper,
                                       settings_logger,
                                       )
+from utils_shared.spectral_decomposer import BACKGROUND_SHORT_NAMES, fit_describer
 from utils_shared.survey import (files_asker,
                                  haem_name_formatter,
                                  JOURNAL_NAMES,
@@ -342,8 +343,10 @@ def everything_asker(folder: Path,
                for (start, end), names in ignore_spans.items()
                ]
     print(f"  Ignored:          {'; '.join(ignored) or 'none'}")
+    fit_text = fit_describer(answers['fit_file'], answers['haem_files'])
     print(f'  Decomposition:    '
-          f"{answers['fit_file'] if answers['decompose'] else 'no'}",
+          f"{fit_text if answers['decompose'] else 'no'}, "
+          f"{BACKGROUND_SHORT_NAMES.get(answers['haem_background'], '?')} background",
           )
     print(f"  OD scaling:       {'yes' if answers['normalise_od'] else 'no'}")
     averaging_text = 'no'
@@ -499,7 +502,10 @@ def experiment_processor(info: dict,
     # Workbook.
     metadata.update({'ignore_first_minutes': ignore_first,
                      'ignore_last_minutes': ignore_last,
-                     'fit_file': a['fit_file'] if a['decompose'] else None,
+                     'fit_file': (fit_describer(a['fit_file'], a['haem_files'])
+                                  if a['decompose']
+                                  else None
+                                  ),
                      'processed': datetime.now().strftime('%Y-%m-%d %H:%M'),
                      },
                     )

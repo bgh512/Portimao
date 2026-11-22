@@ -20,14 +20,14 @@ from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.paf_reader import experiment_paf_loader, MARK, PafFile, token_reader
 from utils_shared.spectral_decomposer import (background_builder,
                                               experiment_decomposer,
-                                              fit_importer,
+                                              fit_loader,
                                               )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
 PAF_FILE = ROOT / 'data_instrument_check' / 'example.paf'  # local only, not in git
-FIT_FILE = ROOT / 'fits' / 'bswitch_no2_mycobl_b557.csv'
+FITS_FOLDER = ROOT / 'fits'  # the standard fit is the preset settings.STANDARD_FIT
 # the instrument software's own fit file for the example run (local only)
 INSTRUMENT_FIT_FILE = (ROOT / 'data_instrument_check'
                        / '20240913_Myco_b557_nolamda.fit')
@@ -159,7 +159,7 @@ def _haem_trace_loader() -> dict:
     None.
 
     ---- Globals read ----
-    PAF_FILE, FIT_FILE, HAEM_TRACES (module constants).
+    PAF_FILE, FITS_FOLDER, HAEM_TRACES (module constants); settings.STANDARD_FIT.
 
     ---- Outputs ----
     dict
@@ -181,9 +181,9 @@ def _haem_trace_loader() -> dict:
     # the program's own standard settings, so the amounts are those a user gets
     answers = settings.DEFAULT_ANSWERS
     experiment_decomposer(experiment,
-                          fit_importer(FIT_FILE),
+                          fit_loader(FITS_FOLDER, settings.STANDARD_FIT),
                           dataset_name=answers['decomposition_dataset'],
-                          background=settings.HAEM_BACKGROUND,
+                          background=answers['haem_background'],
                           haemfactor=settings.HAEM_FACTOR,
                           delta_exclude_first_minutes=answers['ignore_first_minutes'],
                           delta_window_points=settings.REFERENCE_WINDOW_POINTS,
@@ -301,7 +301,8 @@ def test_haem_shapes_are_those_of_the_instrument(name: str) -> None:
         Name of the haem in our fit file.
 
     ---- Globals read ----
-    FIT_FILE, INSTRUMENT_FIT_FILE, HAEM_TRACES, SAME_SHAPE (module constants).
+    FITS_FOLDER, INSTRUMENT_FIT_FILE, HAEM_TRACES, SAME_SHAPE (module constants);
+    settings.STANDARD_FIT.
 
     ---- Outputs ----
     None.
@@ -319,7 +320,7 @@ def test_haem_shapes_are_those_of_the_instrument(name: str) -> None:
 
     instrument = _instrument_fit_reader(INSTRUMENT_FIT_FILE)
     theirs = instrument['shapes'][instrument['labels'].index(HAEM_TRACES[name])]
-    fit = fit_importer(FIT_FILE)
+    fit = fit_loader(FITS_FOLDER, settings.STANDARD_FIT)
     column = 2 * list(fit['haem_list']).index(name)
     ours = fit['data'].iloc[:, [column, column + 1]].dropna().to_numpy(dtype=float)
     ours = ours[np.argsort(ours[:, 0], kind='stable')]

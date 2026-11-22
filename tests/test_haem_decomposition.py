@@ -1,7 +1,8 @@
 """
 Tests that the haem decomposition gives back the amounts a spectrum was built from,
-whatever its background, with only some haems or from the first spectrum, and that the
-component finder gives back the shapes its spectra were mixed from.
+whatever its background (the one the dataset's answers name, Rowan scatter exactly as
+the lab's chamber scripts fit it), with only some haems or from the first spectrum, and
+that the component finder gives back the shapes its spectra were mixed from.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -16,6 +17,7 @@ import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+from utils_shared import experiment_processing
 from utils_shared.pca_fitter import (component_builder,
                                      component_count_suggester,
                                      component_finder,
@@ -25,14 +27,18 @@ from utils_shared.pca_fitter import (component_builder,
                                      )
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
 from utils_shared.spectral_decomposer import (background_builder,
+                                              decomposition_gap_calculator,
                                               delta_abs_calculator,
                                               experiment_decomposer,
                                               FIT_FILE_MARK,
                                               fit_file_writer,
                                               fit_haem_selector,
                                               fit_importer,
+                                              fit_loader,
+                                              fit_names_lister,
                                               fit_range_finder,
                                               haem_name_plainer,
+                                              HAEMS_FOLDER_NAME,
                                               haem_name_typesetter,
                                               spectrum_decomposer,
                                               )
@@ -59,7 +65,7 @@ AMOUNTS = np.array([1.0, 2.0, 3.0, 4.0, 5.0]) * 1e-4
 OFFSET = 0.4  # a flat background under the haems (OD)
 SLOPE = 0.05  # size of the scatter background (OD)
 # the backgrounds the program offers, each fitted by a test of its own
-BACKGROUNDS = ('scatter_1', 'scatter_2', 'linear', 'quadratic', 'valencia')
+BACKGROUNDS = ('scatter_1', 'scatter_2', 'linear', 'rowan_scatter', 'valencia')
 SEED = 0  # the one random seed, for the noise and amounts of the mixed spectra
 PEAKS_NM = (550.0, 605.0)  # where the two mixed shapes have their peaks
 WIDTHS_NM = (8.0, 10.0)
@@ -128,7 +134,7 @@ def _background_shape_builder(background: str, wavelengths: np.ndarray) -> list:
 
     ---- Equations ----
     x = wl / 100 nm. scatter_1: 1/x; scatter_2: 1/x and 1/x^2; linear: x - 5.5;
-    quadratic: x - 5.5 and (x - 6)^2, a curve with its bottom off the middle;
+    rowan_scatter: x - 5.5 and (x - 6)^2, a curve with its bottom off the middle;
     valencia: 1/x^2.
 
     ---- Helpers ----
@@ -139,7 +145,7 @@ def _background_shape_builder(background: str, wavelengths: np.ndarray) -> list:
     return {'scatter_1': [1.0 / x],
             'scatter_2': [1.0 / x, 1.0 / x ** 2],
             'linear': [x - 5.5],
-            'quadratic': [x - 5.5, (x - 6.0) ** 2],
+            'rowan_scatter': [x - 5.5, (x - 6.0) ** 2],
             'valencia': [1.0 / x ** 2],
             }[background]
 
@@ -609,16 +615,18 @@ def test_a_million_times_larger_fit_gives_the_same_amounts(tmp_path: Path) -> No
 def test_every_fit_file_is_read() -> None:
     """
     ---- Summary ----
-    Main function to check that every fit file users can choose is in the layout with
-    heading lines, in OD/mM/cm, and is read without an error or a note, with
-    wavelengths that go upwards in every haem, on the standard scale. Leftover rows and
-    the million scale of the older layout are tested on made-up files.
+    Main function to check that every file of the haem library is in the layout with
+    heading lines, in OD/mM/cm, holds one haem, and is read without an error or a note,
+    with wavelengths that go upwards, on the standard scale; that every fit offered (the
+    presets, and any fit file shipped in the fits folder itself) is read the same way;
+    and that every library file is in a preset. Leftover rows and the million scale of
+    the older layout are tested on made-up files.
 
     ---- Inputs ----
     None.
 
     ---- Globals read ----
-    FITS_FOLDER, UNIT_DIVISORS (module constants).
+    FITS_FOLDER, UNIT_DIVISORS (module constants); HAEMS_FOLDER_NAME.
 
     ---- Outputs ----
     None.
@@ -633,13 +641,22 @@ def test_every_fit_file_is_read() -> None:
     None.
     """
 
-    paths = sorted(FITS_FOLDER.glob('*.csv'))
+    # ---- 1 Every library file --------------------------------------------------------
+    paths = sorted((FITS_FOLDER / HAEMS_FOLDER_NAME).glob('*.csv'))
     assert paths
     for path in paths:
         lines = path.read_text(encoding='utf-8-sig').splitlines()
         assert lines[0].startswith(f'{FIT_FILE_MARK},'), path.name
         assert 'Unit,OD/mM/cm' in lines, path.name
-        fit = fit_importer(path)
+        assert len(fit_importer(path)['haem_list']) == 1, path.name
+
+    # ---- 2 Every fit offered ---------------------------------------------------------
+    names = fit_names_lister(FITS_FOLDER)
+    assert names
+    used = set()
+    for name in names:
+        fit = fit_loader(FITS_FOLDER, name)
+        used |= set(fit.get('haem_files', []))
         data = fit['data']
         assert len(fit['haem_list']) == data.shape[1] // 2
         for i in range(len(fit['haem_list'])):
@@ -649,7 +666,8 @@ def test_every_fit_file_is_read() -> None:
         peak = np.nanmax(np.abs(data.iloc[:, 1::2].to_numpy()))
         assert 1e-7 <= peak <= 1e-3
         assert fit['scale_divisor'] == UNIT_DIVISORS['OD/mM/cm']
-        assert fit['notes'] == [], path.name
+        assert fit['notes'] == [], name
+    assert used == {path.name for path in paths}
 
 
 # ---- test_haem_names_go_to_figure_form_and_back --------------------------------------
@@ -1316,6 +1334,59 @@ def test_delta_a_zero_is_the_median_of_the_highest_points() -> None:
         delta_abs_calculator(frame, exclude_first_minutes=0.0, window_points=9)
 
 
+# ---- test_the_gap_between_two_decompositions -----------------------------------------
+def test_the_gap_between_two_decompositions() -> None:
+    """
+    ---- Summary ----
+    Main function to check the largest and the average gap between the haem traces of
+    two decompositions: the spectra are matched by their index, not their row; a haem
+    is matched by its plain name; a haem in only one of them, and a spectrum with no
+    value, are left out; a table without the spectrum index is refused.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    bL new 1.0, 2.0, 3.0 and kept 1.0, 1.5, 3.5 (spectra 1 to 3): gaps 0, 0.5, -0.5,
+    so the largest is 0.5 and the average (0 + 0.5 + 0.5) / 3 = 1/3. Cyt cc new 4.0,
+    4.0, 4.0 and kept 3.0, (no value), 5.0: gaps 1 and -1, so both are 1. The kept
+    table lists its spectra in the order 3, 1, 2.
+
+    ---- Helpers ----
+    None.
+    """
+
+    new = pd.DataFrame({TIME_COLUMN: [0.0, 1.0, 2.0],
+                        SPECTRUM_INDEX_COLUMN: [1, 2, 3],
+                        'bL': [1.0, 2.0, 3.0],
+                        'Cyt cc': [4.0, 4.0, 4.0],
+                        'a605': [7.0, 7.0, 7.0],
+                        },
+                       )
+    kept = pd.DataFrame({TIME_COLUMN: [2.0, 0.0, 1.0],
+                         SPECTRUM_INDEX_COLUMN: [3, 1, 2],
+                         'bL': [3.5, 1.0, 1.5],
+                         'cyt c c': [5.0, 3.0, np.nan],
+                         'bH': [0.0, 0.0, 0.0],
+                         },
+                        )
+    gaps = decomposition_gap_calculator(new, kept)
+    assert list(gaps) == ['bL', 'Cyt cc']
+    assert np.allclose(gaps['bL'], (0.5, 1.0 / 3.0))
+    assert np.allclose(gaps['Cyt cc'], (1.0, 1.0))
+    with pytest.raises(KeyError):
+        decomposition_gap_calculator(new.drop(columns=SPECTRUM_INDEX_COLUMN), kept)
+
+
 # ---- test_each_background_gives_back_the_amounts -------------------------------------
 @pytest.mark.parametrize('background', BACKGROUNDS)
 def test_each_background_gives_back_the_amounts(background: str) -> None:
@@ -1376,7 +1447,7 @@ def test_an_unknown_background_is_refused() -> None:
     None.
 
     ---- Globals read ----
-    BACKGROUNDS (module constant); settings.HAEM_BACKGROUND.
+    BACKGROUNDS (module constant); settings.DEFAULT_ANSWERS.
 
     ---- Outputs ----
     None.
@@ -1394,8 +1465,154 @@ def test_an_unknown_background_is_refused() -> None:
     wavelengths = np.array([500.0, 550.0, 600.0])
     with pytest.raises(ValueError, match='no background called "cubic"'):
         background_builder(wavelengths, 'cubic')
-    assert settings.HAEM_BACKGROUND in BACKGROUNDS
-    assert background_builder(wavelengths, settings.HAEM_BACKGROUND).shape[0] == 3
+    standard = settings.DEFAULT_ANSWERS['haem_background']
+    assert standard in BACKGROUNDS
+    assert background_builder(wavelengths, standard).shape[0] == 3
+
+
+# ---- test_the_background_answered_is_the_one_used ------------------------------------
+def test_the_background_answered_is_the_one_used(monkeypatch: pytest.MonkeyPatch,
+                                                 ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the processing of a file decomposes its haems with the
+    background named in the dataset's answers, not the standard one.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the attenuation and the decomposition, so no file is read.
+
+    ---- Globals read ----
+    FIT_FILE (module constant); settings.DEFAULT_ANSWERS.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- _DecompositionReached -------------------------------------------------------
+    class _DecompositionReached(Exception):
+        """Stops the processing once the decomposition is asked for."""
+
+    used = []
+
+    def _decomposer_stand_in(*args, **kwargs) -> None:
+        used.append(kwargs['background'])
+        raise _DecompositionReached()
+
+    monkeypatch.setattr(experiment_processing,
+                        'experiment_attenuation_adder',
+                        lambda *args, **kwargs: None,
+                        )
+    monkeypatch.setattr(experiment_processing,
+                        'experiment_decomposer',
+                        _decomposer_stand_in,
+                        )
+
+    # ---- 2 Process a made-up file with another background than the standard ----------
+    assert settings.DEFAULT_ANSWERS['haem_background'] != 'linear'
+    answers = dict(settings.DEFAULT_ANSWERS, haem_background='linear')
+    info = {'path': Path('made_up.paf'),
+            'name': 'made_up',
+            'ignore_start': 5.0,
+            'ignore_end': 0.0,
+            }
+    experiment = {'metadata': {'events': []}, 'CcO2': [0.0, 0.0]}
+    with pytest.raises(_DecompositionReached):
+        experiment_processing.experiment_data_processor(info,
+                                                        settings.Config(answers),
+                                                        fit_importer(FIT_FILE),
+                                                        experiment,
+                                                        )
+    assert used == ['linear']
+
+
+# ---- test_rowan_scatter_is_the_chamber_scripts_background ----------------------------
+def test_rowan_scatter_is_the_chamber_scripts_background() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the background called Rowan scatter is the additive
+    background of the lab's own chamber scripts: their lines build the same terms, and
+    a spectrum that neither can fit exactly gives the same haem amounts and the same
+    leftover with both.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    FIT_FILE, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE, EXACT (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The scripts' terms over the fitted wavelengths cw, as their lines write them (only
+    their basis S is called s_array here): blank = 1; scatter2 = cw, and scatter3 =
+    (cw - centre)^2 with centre = (cw[0] + cw[-1]) / 2, each scaled as (f - min f) /
+    max(f - min f). Their amounts are the least-squares solution of [haem shapes x
+    HAEM_FACTOR, blank, scatter2, scatter3]. The spectrum's background, OFFSET + SLOPE
+    / x^2 (x = wl / 100 nm), is not of that kind, so about 3e-5 OD is left over.
+
+    ---- Helpers ----
+    _haem_spectrum_builder
+    """
+
+    # ---- 1 Build a spectrum Rowan scatter cannot fit exactly -------------------------
+    wavelengths, _, shapes = _haem_spectrum_builder()
+    spectrum = ((shapes @ AMOUNTS) * HAEM_FACTOR
+                + OFFSET
+                + SLOPE / (wavelengths / 100.0) ** 2
+                )
+
+    # ---- 2 Fit it with the scripts' own lines ----------------------------------------
+    cw = wavelengths
+    centre = (cw[0] + cw[-1]) / 2
+    blank = np.zeros(len(cw)) + 1.0
+    scatter2_function = cw
+    scatter2 = ((scatter2_function - np.amin(scatter2_function))
+                / np.amax(scatter2_function - np.amin(scatter2_function))
+                )
+    scatter3_function = (cw - centre) ** 2
+    scatter3 = ((scatter3_function - np.amin(scatter3_function))
+                / np.amax(scatter3_function - np.amin(scatter3_function))
+                )
+    s_array = shapes * HAEM_FACTOR
+    s_array = np.column_stack((s_array, blank))
+    s_array = np.column_stack((s_array, scatter2))
+    s_array = np.column_stack((s_array, scatter3))
+    theirs = np.linalg.lstsq(s_array, spectrum, rcond=None)[0]
+    their_leftover = spectrum - s_array @ theirs
+
+    # ---- 3 Fit it with ours and compare ----------------------------------------------
+    assert np.allclose(background_builder(cw, 'rowan_scatter'),
+                       s_array[:, len(AMOUNTS):],
+                       rtol=0.0,
+                       atol=1e-12,
+                       )
+    found, _, _, _, _, _, leftover = spectrum_decomposer(
+        np.column_stack((wavelengths, spectrum)),
+        fit_importer(FIT_FILE)['data'],
+        background='rowan_scatter',
+        haemfactor=HAEM_FACTOR,
+        )
+    assert np.abs(their_leftover).max() > 1e-6
+    assert np.allclose(found[:len(AMOUNTS)],
+                       theirs[:len(AMOUNTS)],
+                       rtol=EXACT,
+                       atol=0.0,
+                       )
+    assert np.allclose(leftover[:, 1], their_leftover, rtol=0.0, atol=1e-12)
 
 
 # ---- test_some_haems_only_give_back_their_amounts ------------------------------------
