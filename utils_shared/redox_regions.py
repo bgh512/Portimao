@@ -14,6 +14,57 @@ import pandas as pd
 from utils_shared.schema import measurement_column_finder, time_getter, value_getter
 
 
+# ---- CONSTANTS -----------------------------------------------------------------------
+# The four edges of the two regions of a file, in the order of the boxes in the strip.
+REGION_KEYS = ('oxidised_start', 'oxidised_end', 'reduced_start', 'reduced_end')
+REGION_NAMES = ('oxidised', 'reduced')
+# The edge that stands for a region not chosen: the one pulled out to open it.
+CLOSED_KEYS = {'oxidised': 'oxidised_end', 'reduced': 'reduced_start'}
+LENGTH_TOLERANCE_MIN = 1e-9  # so a region of exactly the least length counts as open
+
+
+# ---- REGION HELPERS ------------------------------------------------------------------
+
+
+# ---- _region_open_checker ------------------------------------------------------------
+def _region_open_checker(values: Dict[str, float],
+                         region: str,
+                         minimum_min: float,
+                         ) -> bool:
+    """
+    ---- Summary ----
+    Helper function to say whether a region of a file is chosen: at least as long as
+    the least length.
+
+    ---- Inputs ----
+    values : Dict[str, float]
+        {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min).
+    region : str
+        'oxidised' or 'reduced'.
+    minimum_min : float
+        Least length of a region (min).
+
+    ---- Globals read ----
+    LENGTH_TOLERANCE_MIN.
+
+    ---- Outputs ----
+    bool
+        True when the region is open (chosen).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    open when end - start >= least length.
+
+    ---- Helpers ----
+    None.
+    """
+
+    length = values[f'{region}_end'] - values[f'{region}_start']
+    return bool(length >= minimum_min - LENGTH_TOLERANCE_MIN)
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -187,6 +238,243 @@ def percent_oxidised_calculator(haem_table: pd.DataFrame,
     return result
 
 
+# ---- region_edge_copier --------------------------------------------------------------
+def region_edge_copier(time_min: float,
+                       source_additions_min: Sequence[float],
+                       target_additions_min: Sequence[float],
+                       ) -> Optional[float]:
+    """
+    ---- Summary ----
+    Main function to copy an edge set on one file to another file: the same distance
+    from the addition of the same number as the one nearest to it in the first file.
+
+    ---- Inputs ----
+    time_min : float
+        Time of the edge on the file it was set on (min).
+    source_additions_min : Sequence[float]
+        Times of the additions of that file (min), on the same time axis.
+    target_additions_min : Sequence[float]
+        Times of the additions of the file the edge is copied to (min), on that
+        file's time axis.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[float]
+        Time of the edge in the other file (min), not yet kept within its limits, or
+        None when it cannot be copied (the first file has no addition, or the other
+        has fewer additions), so the other file keeps the edge it had.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    time = time of the same addition in the other file + (edge - nearest addition).
+
+    ---- Helpers ----
+    edge_anchor_finder
+    edge_time_finder
+    """
+
+    anchor = edge_anchor_finder(time_min, source_additions_min)
+    if anchor is None:
+        return None
+    return edge_time_finder(anchor, target_additions_min)
+
+
+# ---- region_edge_setter --------------------------------------------------------------
+def region_edge_setter(values: Dict[str, float],
+                       key: str,
+                       value: float,
+                       used_span: Tuple[float, float],
+                       minimum_min: float,
+                       ) -> Dict[str, float]:
+    """
+    ---- Summary ----
+    Main function to set one edge of one region of a file to a time, kept within the
+    limits: an edge stays in the used part of the run; moved past the other edge of its
+    region it pushes that edge along; and the two regions never overlap. An edge moved
+    into the other region stops at that region's nearer side, and when the other region
+    would then lie inside this one, the edge not being set gives way to it.
+
+    ---- Inputs ----
+    values : Dict[str, float]
+        {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min).
+    key : str
+        The edge set: one of REGION_KEYS.
+    value : float
+        Time wanted for it (min).
+    used_span : Tuple[float, float]
+        (first, last) time of the used part of the run (min): not trimmed, not
+        ignored.
+    minimum_min : float
+        Least length of a region (min); a shorter one counts as not chosen, so the
+        other region may cross it.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, float]
+        New values of the file; the dictionary given is not changed.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    t = value kept within the used part. With the other region open from a to b and
+    a < t < b: t = a when t - a <= b - t, otherwise b. Start edge set: end = max(end,
+    t), and end = a when t <= a < end. End edge set: start = min(start, t), and
+    start = b when start < b <= t.
+
+    ---- Helpers ----
+    _region_open_checker
+    """
+
+    region, side = key.split('_')
+    other = 'reduced' if region == 'oxidised' else 'oxidised'
+    first, last = used_span
+    time_min = min(max(float(value), float(first)), float(last))
+    other_start, other_end = values[f'{other}_start'], values[f'{other}_end']
+    is_other_open = _region_open_checker(values, other, minimum_min)
+    if is_other_open and other_start < time_min < other_end:
+        is_nearer_start = time_min - other_start <= other_end - time_min
+        time_min = other_start if is_nearer_start else other_end
+    changed = dict(values)
+    changed[key] = time_min
+    if side == 'start':
+        end = max(values[f'{region}_end'], time_min)
+        if is_other_open and time_min <= other_start < end:
+            end = other_start
+        changed[f'{region}_end'] = end
+    else:
+        start = min(values[f'{region}_start'], time_min)
+        if is_other_open and start < other_end <= time_min:
+            start = other_end
+        changed[f'{region}_start'] = start
+    return changed
+
+
+# ---- region_edges_builder ------------------------------------------------------------
+def region_edges_builder(used_span: Tuple[float, float],
+                         remembered: Optional[Dict[str, float]],
+                         minimum_min: float,
+                         ) -> Dict[str, float]:
+    """
+    ---- Summary ----
+    Main function to give the edges a file starts the regions step with: both regions
+    not chosen, parked at the sides of the used part (oxidised at its start, reduced at
+    its end), or the regions remembered for it, kept within the used part. A
+    remembered region that is no longer long enough is parked again.
+
+    ---- Inputs ----
+    used_span : Tuple[float, float]
+        (first, last) time of the used part of the run (min).
+    remembered : Optional[Dict[str, float]]
+        {oxidised_start, oxidised_end, reduced_start, reduced_end} (min) on the same
+        time axis, or None for a file with nothing remembered.
+    minimum_min : float
+        Least length of a region (min).
+
+    ---- Globals read ----
+    REGION_KEYS, REGION_NAMES.
+
+    ---- Outputs ----
+    Dict[str, float]
+        {oxidised_start, oxidised_end, reduced_start, reduced_end} (min).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Parked: oxidised start = oxidised end = first; reduced start = reduced end = last.
+
+    ---- Helpers ----
+    _region_open_checker
+    """
+
+    first, last = float(used_span[0]), float(used_span[1])
+    parked = {'oxidised_start': first,
+              'oxidised_end': first,
+              'reduced_start': last,
+              'reduced_end': last,
+              }
+    if not remembered:
+        return parked
+    values = {key: min(max(float(remembered.get(key, parked[key])), first), last)
+              for key in REGION_KEYS
+              }
+    for region in REGION_NAMES:
+        if not _region_open_checker(values, region, minimum_min):
+            values[f'{region}_start'] = parked[f'{region}_start']
+            values[f'{region}_end'] = parked[f'{region}_end']
+    return values
+
+
+# ---- region_layout_finder ------------------------------------------------------------
+def region_layout_finder(values: Dict[str, float],
+                         minimum_min: float,
+                         ) -> Tuple[List[Tuple[str, float, str, str]],
+                                    List[Tuple[float, float, str]],
+                                    ]:
+    """
+    ---- Summary ----
+    Main function to say where the edges of the two regions of one file sit on its
+    plot, with the words by each handle, and which parts are shaded. A region not
+    chosen has one handle, reading "not chosen", and no shading.
+
+    ---- Inputs ----
+    values : Dict[str, float]
+        {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min),
+        on the time axis of the plot.
+    minimum_min : float
+        Least length of a region (min); a shorter one is not chosen.
+
+    ---- Globals read ----
+    REGION_NAMES, CLOSED_KEYS.
+
+    ---- Outputs ----
+    Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
+        (edges, parts): edges as [(key, time_min, words, kind)] with kind 'oxidised'
+        or 'reduced'; parts as [(start_min, end_min, kind)]. The words of an open
+        region are by the edge that opened it (the end of the oxidised region, the
+        start of the reduced one), which keeps them clear of its other handle where
+        the regions usually are; the other edge has no words.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _region_open_checker
+    """
+
+    edges: List[Tuple[str, float, str, str]] = []
+    parts: List[Tuple[float, float, str]] = []
+    for region in REGION_NAMES:
+        start, end = values[f'{region}_start'], values[f'{region}_end']
+        if not _region_open_checker(values, region, minimum_min):
+            key = CLOSED_KEYS[region]
+            edges.append((key, values[key], f'{region}: not chosen', region))
+            continue
+        words = f'{region} {round(start, 2):g} to {round(end, 2):g} min'
+        is_worded = {side: f'{region}_{side}' == CLOSED_KEYS[region]
+                     for side in ('start', 'end')
+                     }
+        edges.append((f'{region}_start',
+                      start,
+                      words if is_worded['start'] else '',
+                      region,
+                      ),
+                     )
+        edges.append((f'{region}_end', end, words if is_worded['end'] else '', region))
+        parts.append((start, end, region))
+    return edges, parts
+
+
 # ---- region_level_finder -------------------------------------------------------------
 def region_level_finder(haem_table: pd.DataFrame,
                         start_min: float,
@@ -268,3 +556,76 @@ def region_level_finder(haem_table: pd.DataFrame,
                              )
         levels[str(column)] = float(np.median(values))
     return levels
+
+
+# ---- region_pointer_reader -----------------------------------------------------------
+def region_pointer_reader(time_min: float) -> float:
+    """
+    ---- Summary ----
+    Main function to turn a time pointed at on the plot into the time of the edge put
+    there, in steps of 0.1 min.
+
+    ---- Inputs ----
+    time_min : float
+        The time pointed at, on the time axis of the plot (min).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        The time rounded to 0.1 min; the limits of the edges are applied afterwards
+        (region_edge_setter).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return round(float(time_min), 1)
+
+
+# ---- region_span_reader --------------------------------------------------------------
+def region_span_reader(values: Dict[str, float],
+                       minimum_min: float,
+                       ) -> Dict[str, Optional[Tuple[float, float]]]:
+    """
+    ---- Summary ----
+    Main function to give the two regions of a file as they were chosen: each as its
+    first and last time, or None when it was not chosen.
+
+    ---- Inputs ----
+    values : Dict[str, float]
+        {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min).
+    minimum_min : float
+        Least length of a region (min); a shorter one is not chosen.
+
+    ---- Globals read ----
+    REGION_NAMES.
+
+    ---- Outputs ----
+    Dict[str, Optional[Tuple[float, float]]]
+        {'oxidised': (start_min, end_min) or None, 'reduced': the same}. A file needs
+        both for its haems' levels; one alone counts as none.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _region_open_checker
+    """
+
+    return {region: ((float(values[f'{region}_start']), float(values[f'{region}_end']))
+                     if _region_open_checker(values, region, minimum_min)
+                     else None
+                     )
+            for region in REGION_NAMES
+            }

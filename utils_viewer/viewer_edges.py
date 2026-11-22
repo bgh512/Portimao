@@ -21,12 +21,16 @@ from utils_viewer.viewer_preview import IGNORE_COLOUR, TimeAxis
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 TRIM_COLOUR = '0.45'
+OXIDISED_COLOUR = '#d62728'  # red and blue, as oxidised and reduced blood are drawn
+REDUCED_COLOUR = '#1f77b4'
 PREVIOUS_COLOUR = '#d62728'
 # How each kind of part looks: its colour, how strongly its shading covers the plot (0
 # to 1), whether it is hatched, and the row of its handles above the plot (0 the top).
 # The rows keep two edges that meet apart, so both can still be taken.
 PART_STYLES = {'trim': (TRIM_COLOUR, 0.25, True, 0),
                'ignore': (IGNORE_COLOUR, 0.22, False, 1),
+               'oxidised': (OXIDISED_COLOUR, 0.18, False, 0),
+               'reduced': (REDUCED_COLOUR, 0.18, False, 1),
                }
 HANDLE_ROW_PX = 22
 HANDLE_SIZE_PX = (9, 16)  # (width, height)
@@ -63,6 +67,7 @@ class EdgeChoice:
     key_text: str = ''
     previous: Dict[str, Dict[str, float]] = field(default_factory=dict)
     is_every_file: bool = True
+    value_copier: Optional[Callable[[str, str, str, float], Optional[float]]] = None
 
 
 # ---- EdgeOverlay ---------------------------------------------------------------------
@@ -353,7 +358,8 @@ class EdgeOverlay:
         """
         ---- Summary ----
         Method to set one field of the file shown, or of every file, through the rules
-        of the step, then show the result.
+        of the step, then show the result. When the step has a rule for copying, the
+        other files get the value that rule gives them from the file shown.
 
         ---- Inputs ----
         key : str
@@ -389,6 +395,8 @@ class EdgeOverlay:
                                     key,
                                     value,
                                     self.choice.value_setter,
+                                    shown=self._name,
+                                    copier=self.choice.value_copier,
                                     )
         if changed == self.values:
             self._edges_drawer()
@@ -886,11 +894,18 @@ def every_file_setter(values: Dict[str, Dict[str, float]],
                       setter: Callable[[str, Dict[str, float], str, float],
                                        Dict[str, float],
                                        ],
+                      shown: Optional[str] = None,
+                      copier: Optional[Callable[[str, str, str, float],
+                                                Optional[float],
+                                                ]
+                                       ] = None,
                       ) -> Dict[str, Dict[str, float]]:
     """
     ---- Summary ----
     Main function to set one field to the same value on some files, each kept within
-    its own limits by the rules of the step.
+    its own limits by the rules of the step. With a rule for copying, the file shown is
+    set first, and each other file gets the value the rule gives it from the value the
+    file shown ended with; a file the rule gives nothing keeps its values.
 
     ---- Inputs ----
     values : Dict[str, Dict[str, float]]
@@ -903,6 +918,12 @@ def every_file_setter(values: Dict[str, Dict[str, float]],
         The value wanted, the same for each file.
     setter : Callable[[str, Dict[str, float], str, float], Dict[str, float]]
         The rule of the step: (file name, its values, field, value) -> its new values.
+    shown : Optional[str]
+        The file the value was set on; needed only with ``copier``.
+    copier : Optional[Callable[[str, str, str, float], Optional[float]]]
+        The rule for copying: (file shown, other file, field, value on the file
+        shown) -> value for the other file, or None to leave that file as it is.
+        None (or no file shown): every file gets the same value.
 
     ---- Globals read ----
     None.
@@ -922,8 +943,17 @@ def every_file_setter(values: Dict[str, Dict[str, float]],
     """
 
     changed = dict(values)
+    if copier is None or shown is None or shown not in names:
+        for name in names:
+            changed[name] = setter(name, values[name], key, value)
+        return changed
+    changed[shown] = setter(shown, values[shown], key, value)
     for name in names:
-        changed[name] = setter(name, values[name], key, value)
+        if name == shown:
+            continue
+        copied = copier(shown, name, key, changed[shown][key])
+        if copied is not None:
+            changed[name] = setter(name, values[name], key, copied)
     return changed
 
 

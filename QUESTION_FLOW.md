@@ -1,4 +1,4 @@
-# Portimao question flow (V2.8)
+# Portimao question flow (V2.9)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -24,7 +24,7 @@ Every question in the order it is asked, with where each answer leads. The quest
     - If a fit cannot be used, one line says why and the strip goes back to what it showed.
     - A new journal, width or height redraws the plot only in section 5, the one plot drawn at the figure's size. Before that the change is kept for section 5.
     - The strip is greyed out while you choose the folder, during the questions of 4.A.1, and from section 6 on.
-    - In section 2 the strip has one more row, above the others: the times of the trimmed and ignored edges of the file shown, and **Every file** (see section 2).
+    - In section 2 the strip has one more row, above the others: the times of the trimmed and ignored edges of the file shown, and **Every file** (see section 2). While **4.4** waits, that row holds the times of the oxidised and the reduced region instead (see 4.C).
 - While the program draws a picture of its own (the components found from the data, the figures of sections 6 and 7), a yellow **Drawing ...** sign is on the plot. It goes when the picture is shown or the next question is asked.
 - Sections **1** to **3** are the import: your files, the parts of them that are used, and what is known about each run (the OD values and the labels). The processing starts with section **4**.
 
@@ -129,7 +129,7 @@ The haems on the plot are those of the import, worked out with the standard fit,
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.1 | *(only when no haems are shown)* Do you want to decompose the haems? `(Y/n)`, or `(y/N)` when Haems was unticked in the strip or the dataset was saved without haems | **4.1.1** | **4.4** (no haems, unless you tick Haems in the strip later) |
+| 4.1 | *(only when no haems are shown)* Do you want to decompose the haems? `(Y/n)`, or `(y/N)` when Haems was unticked in the strip or the dataset was saved without haems | **4.1.1** | **4.5** (no haems, unless you tick Haems in the strip later) |
 
 If the `fits/` folder holds no preset and no fit file, 4.1 is still asked, and 4.1.1 then offers only *Find the components from the data*.
 
@@ -144,11 +144,11 @@ While 4.2 waits, the strip under the plot changes the decomposition, and the plo
 - **Build a fit**: folds out a tick box for each haem of the library, one line each for the a, b and c haems; the boxes start with the haems of the preset in use. Ticking or unticking a box works the haems out with the ones ticked, and the Fit drop-down reads *Your own haems*. Ticking a haem with the same name as one already ticked (c1_myco and c1_037v are both Cyt cc) unticks the other, and the last box cannot be unticked; a note beside the height says so. Click the button again to fold the boxes away.
 - **Keep to compare**: keeps the decomposition on the plot (its fit and background), and a line in the strip says which one is kept. Change the fit, the haems ticked or the background, and the kept haems are drawn as dashed, paler lines in the same colours under the new ones, on every file. Under the plot, each haem in both has two numbers, largest / average: the largest and the average distance between its two traces, in the units of the haem panels. The button reads *Stop comparing* while one is kept; click it to take the dashed lines away. Each file takes about twice as long to draw while one is kept.
 
-To leave the haems out, untick Haems in the strip; answering yes then goes on without haems, to **4.4**.
+To leave the haems out, untick Haems in the strip; answering yes then goes on without haems, to **4.5**.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.2 | Do you accept this decomposition? `(Y/n)` (above it: "Type n to find the components from the data.") | **4.3** (**4.4** when Haems was unticked) | **4.1.1.1** (the questions of 4.A.1, then 4.2 again with the components) |
+| 4.2 | Do you accept this decomposition? `(Y/n)` (above it: "Type n to find the components from the data.") | **4.3** (**4.5** when Haems was unticked) | **4.1.1.1** (the questions of 4.A.1, then 4.2 again with the components) |
 
 #### 4.A.1 Components from the data (principal component analysis)
 
@@ -178,26 +178,41 @@ Asked when the last choice of 4.1.1, or No at 4.2, is taken. The strip is greyed
 |---|---|---|---|
 | 4.3 | *(only when the haems are decomposed)* Do you want to change the trim and ignore times now that the haems are shown? `(y/N)` | section 2 (**2.1**) is asked again with its own number, with the edges where you left them, your limits as red dashed lines and the haems of the chosen fit on the plot; if you exported at 3.4, the files whose edges changed are exported again (see section 2); then the plot is redrawn **(plot)** and **4.4** | **4.4** |
 
-### 4.C Averaging around the events
+### 4.C The oxidised and reduced regions
 
-The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Each window ends a set time before the next addition (the last one 0.5 min before the end of the recording), so it moves with that addition in every file and one setting fits the whole dataset. The window and the gap are given in seconds.
+*(only when the haems are decomposed)* The oxidised region is a stretch of the run where the haems are fully oxidised, the reduced region one where they are fully reduced. Each haem's level in the two (its median there) is what its % oxidised is worked out from. The program never places a region: you pull each out on the plot, in red for oxidised and blue for reduced, or leave it as it is.
 
-You can set both with the mouse: while 4.4.1 waits, drag across one window on the plot of any file, just before an addition. A band follows the mouse, with its length above it. When you let go, the length goes into the answer box and the gap is offered in 4.4.2, both rounded to whole 5 s, so you can tidy them (to exactly 30 s, say) before pressing Enter.
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 4.4 | Do you want to average around the events? `(y/N)` | **4.4.1** | **5.1** (no averaging in the run) |
+- Both regions start **not chosen**: one red handle at the left of the used part of the run reading "oxidised: not chosen", one blue handle at the right reading "reduced: not chosen". **Pull** a handle out, by the handle or its line, and the region opens from that side, shaded in its colour; its second edge then has a handle too, and the times of the region are written beside it. The edges move in steps of 0.1 min, and moving one never draws the plot again.
+- **Type** the times in the row of the strip under the plot: **Oxidised from** and **to**, **Reduced from** and **to**, in minutes as on the time axis of the plot. Press Enter or leave the box.
+- An edge stays in the used part of the run (not trimmed, not ignored). Moved past the other edge of its region, it pushes that edge along. The two regions never overlap: an edge moved into the other region stops at that region's nearer side, so moved on past its middle it comes out on the far side.
+- A region shorter than 10 spectra (5 s when a spectrum is taken every 0.5 s) counts as not chosen: its shading goes and its handle reads "not chosen" again.
+- **Every file**, ticked when the step opens: an edge set on the file shown is copied to every file at the same distance from the addition nearest to it, counted in order (1.5 min before the 3rd addition of the file shown is 1.5 min before the 3rd addition of every file), then kept within that file's own limits. A file with fewer additions keeps the edge it had. Unticked, only the file shown changes.
+- If you go back to the processing step later in the run, the regions are where you left them, on the same data even when the trim has changed.
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.4.1 | How long a window (s) should the average be taken over? `[120]` | **4.4.2** |
-| 4.4.2 | How long before the next addition should the averaging window end (s)? `[30]`, or, after a drag in 4.4.1, the time from where you let go to the next addition (no default from a drag after the last addition). A drag here gives the gap alone. | the windows are drawn **(plot)**, then **4.5** |
+| 4.4 | Pull the oxidised and the reduced region out on the plot, or type their times in the strip under it. Press Enter when every file looks right. (above it, in grey: what the regions are, "Red is oxidised, blue is reduced; with "Every file" ticked, an edge is copied to every file at the same distance from its nearest addition." and "Leave both as "not chosen" for no regions.") | Enter with the answer box empty: the regions of every file are listed, then **4.5**. A file with only one of the two regions counts as having none, and a warning names it; a warning also names the files that kept an edge of their own because they have fewer additions. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 4.4 goes on waiting. |
+
+### 4.D Averaging around the events
+
+The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Each window ends a set time before the next addition (the last one 0.5 min before the end of the recording), so it moves with that addition in every file and one setting fits the whole dataset. The window and the gap are given in seconds.
+
+You can set both with the mouse: while 4.5.1 waits, drag across one window on the plot of any file, just before an addition. A band follows the mouse, with its length above it. When you let go, the length goes into the answer box and the gap is offered in 4.5.2, both rounded to whole 5 s, so you can tidy them (to exactly 30 s, say) before pressing Enter.
+
+| # | Question | Yes → | No → |
+|---|---|---|---|
+| 4.5 | Do you want to average around the events? `(y/N)` | **4.5.1** | **5.1** (no averaging in the run) |
+
+| # | Question | Leads to |
+|---|---|---|
+| 4.5.1 | How long a window (s) should the average be taken over? `[120]` | **4.5.2** |
+| 4.5.2 | How long before the next addition should the averaging window end (s)? `[30]`, or, after a drag in 4.5.1, the time from where you let go to the next addition (no default from a drag after the last addition). A drag here gives the gap alone. | the windows are drawn **(plot)**, then **4.6** |
 
 Windows that do not fit are skipped; they are drawn red with a warning sign and listed in red in the terminal first.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.5 | Do you accept these averaging windows? `(Y/n)` (above it: "Type n to change the window and gap.") | **5.1** | **4.4** |
+| 4.6 | Do you accept these averaging windows? `(Y/n)` (above it: "Type n to change the window and gap.") | **5.1** | **4.5** |
 
 ---
 
@@ -306,7 +321,7 @@ File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_the
 
 | # | Question | Leads to |
 |---|---|---|
-| 6.3.1 | Which run number should be shown? | **6.3.2** if you said No to averaging in 4.4, otherwise **6.3.4** |
+| 6.3.1 | Which run number should be shown? | **6.3.2** if you said No to averaging in 4.5, otherwise **6.3.4** |
 | 6.3.2 | *(a message says the figure starts at the baseline averaging window, so the events are averaged as in the processing)* How long a window (s) should the average be taken over? `[120]` (typed; the plot shows figures here, so there is nothing to drag across) | **6.3.3** |
 | 6.3.3 | How long before the next addition should the averaging window end (s)? `[30]` | **6.3.4** |
 | 6.3.4 | Do you want the run name written faintly on each plot? `(Y/n)` | **6.3.5** |

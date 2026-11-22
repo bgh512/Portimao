@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.7
+- **Version:** V2.8
 - **Date:** 22/11/2026
 
 ## Contents
@@ -312,6 +312,17 @@
     - [`test_an_edge_is_copied_by_its_nearest_addition`](#test_an_edge_is_copied_by_its_nearest_addition)
     - [`test_percent_oxidised_runs_between_the_two_levels`](#test_percent_oxidised_runs_between_the_two_levels)
     - [`test_the_least_spectra_of_the_program`](#test_the_least_spectra_of_the_program)
+- [`tests/test_region_edges.py`](#teststest_region_edgespy)
+    - [`_edge_setter`](#_edge_setter)
+    - [`test_copy_to_every_file_or_one_file`](#test_copy_to_every_file_or_one_file)
+    - [`test_edge_copied_by_its_nearest_addition`](#test_edge_copied_by_its_nearest_addition)
+    - [`test_edges_stay_in_the_used_part`](#test_edges_stay_in_the_used_part)
+    - [`test_layout_of_the_regions`](#test_layout_of_the_regions)
+    - [`test_pointer_gives_the_time_in_steps`](#test_pointer_gives_the_time_in_steps)
+    - [`test_regions_a_file_ends_with`](#test_regions_a_file_ends_with)
+    - [`test_regions_never_overlap`](#test_regions_never_overlap)
+    - [`test_shaded_regions`](#test_shaded_regions)
+    - [`test_starting_edges`](#test_starting_edges)
 - [`tests/test_run_logging.py`](#teststest_run_loggingpy)
     - [`_typist_maker`](#_typist_maker)
     - [`_fresh_numbering`](#_fresh_numbering)
@@ -740,10 +751,17 @@
     - [`typed_number_reader`](#typed_number_reader)
     - [`yes_no_asker`](#yes_no_asker)
 - [`utils_shared/redox_regions.py`](#utils_sharedredox_regionspy)
+    - [`_region_open_checker`](#_region_open_checker)
     - [`edge_anchor_finder`](#edge_anchor_finder)
     - [`edge_time_finder`](#edge_time_finder)
     - [`percent_oxidised_calculator`](#percent_oxidised_calculator)
+    - [`region_edge_copier`](#region_edge_copier)
+    - [`region_edge_setter`](#region_edge_setter)
+    - [`region_edges_builder`](#region_edges_builder)
+    - [`region_layout_finder`](#region_layout_finder)
     - [`region_level_finder`](#region_level_finder)
+    - [`region_pointer_reader`](#region_pointer_reader)
+    - [`region_span_reader`](#region_span_reader)
 - [`utils_shared/reference_level.py`](#utils_sharedreference_levelpy)
     - [`_usable_point_keeper`](#_usable_point_keeper)
     - [`reference_level_finder`](#reference_level_finder)
@@ -921,6 +939,9 @@
     - [`_od_lister`](#_od_lister)
     - [`_od_table_filler`](#_od_table_filler)
     - [`_pca_pictures_publisher`](#_pca_pictures_publisher)
+    - [`_region_rules_lister`](#_region_rules_lister)
+    - [`_regions_chooser`](#_regions_chooser)
+    - [`_regions_lister`](#_regions_lister)
     - [`_skipped_lister`](#_skipped_lister)
     - [`_standard_fit_loader`](#_standard_fit_loader)
     - [`_strip_change_applier`](#_strip_change_applier)
@@ -9511,6 +9532,288 @@ None.
 Twenty spectra 0.5 s apart, at 0/120, 1/120, ... 19/120 min, with the values 1 to
 20. From 0 to 9/120 min there are ten, 1 to 10: median (5 + 6) / 2 = 5.5. From 0
 to 8/120 min there are nine.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_region_edges.py`
+
+Tests that the edges of the oxidised and reduced regions start, move, stop, are copied
+
+### TEST HELPERS
+
+#### `_edge_setter`
+
+```text
+Helper function to set one edge with the limits of the made-up run. See
+region_edge_setter.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_copy_to_every_file_or_one_file`
+
+```text
+---- Summary ----
+Main function to check that an edge set on every file is set on the file shown
+first and copied to the others by their additions, that a file with fewer
+additions keeps what it had, and that an edge set on one file leaves the others
+alone.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITIONS, PARKED (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Oxidised end set to 18.5 on 'one': 1.5 min before its 3rd addition (20). 'two':
+22 - 1.5 = 20.5. 'few' has no 3rd addition: it keeps 5. Typed as 70 on 'one': it
+stops at 55, which is 35 min after its 3rd addition; 'two' gets 22 + 35 = 57,
+stopped at 55.
+
+---- Helpers ----
+_edge_setter
+```
+
+#### `test_edge_copied_by_its_nearest_addition`
+
+```text
+---- Summary ----
+Main function to check the time an edge is copied to in another file: the same
+distance from the addition of the same number, from the first addition for an edge
+before it, and not at all to a file with fewer additions or from a file with none.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITIONS (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+18.5 on 'one' is 1.5 before its 3rd addition (20): 22 - 1.5 = 20.5 on 'two'. 7 on
+'one' is 3 before its 1st (10): 11 - 3 = 8 on 'two', 9 - 3 = 6 on 'few'. 12 on
+'one' is 2 after its 1st: 9 + 2 = 11 on 'few'.
+
+---- Helpers ----
+None.
+```
+
+#### `test_edges_stay_in_the_used_part`
+
+```text
+---- Summary ----
+Main function to check that a region is pulled out from its side, that an edge
+stops at the ends of the used part, and that an edge moved past the other edge of
+its region pushes it along.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PARKED (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Used part 5 to 55. Oxidised end to 12: 5 to 12. Reduced start to 40: 40 to 55.
+Oxidised end to 2: stops at 5, so 5 to 5. Reduced end to 70: stops at 55. Oxidised
+start to 20 with the end at 12: the end is pushed to 20. Reduced end to 30 with
+the start at 40: the start is pushed to 30.
+
+---- Helpers ----
+_edge_setter
+```
+
+#### `test_layout_of_the_regions`
+
+```text
+---- Summary ----
+Main function to check the handles, their words and the shading: one handle
+reading "not chosen" and no shading for a region not chosen, two edges and one
+shaded part for a chosen one, and a region shorter than the least length drawn as
+not chosen.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PARKED, MINIMUM_MIN (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Least length 0.5 min: 5 to 12.25 is chosen, 54.6 to 55 (0.4 min) is not, 54.5 to
+55 (0.5 min) is.
+
+---- Helpers ----
+None.
+```
+
+#### `test_pointer_gives_the_time_in_steps`
+
+```text
+---- Summary ----
+Main function to check that a time pointed at gives the edge in steps of 0.1 min.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+12.34 -> 12.3; 12.36 -> 12.4.
+
+---- Helpers ----
+None.
+```
+
+#### `test_regions_a_file_ends_with`
+
+```text
+---- Summary ----
+Main function to check the regions read from the edges: none for a file left as it
+started, one alone (which the program counts as none) and both.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PARKED, MINIMUM_MIN (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_regions_never_overlap`
+
+```text
+---- Summary ----
+Main function to check that an edge moved into the other region stops at its
+nearer side, that past its middle it comes out on the far side with the edge not
+being set giving way, and that a region not chosen is in nobody's way.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PARKED (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Reduced 20 to 30, oxidised not chosen at 5. Oxidised end to 22 (2 from 20, 8 from
+30): stops at 20, so 5 to 20. Oxidised end to 27 (7 from 20, 3 from 30): goes to
+30, and the start gives way to 30, so 30 to 30, not chosen. Oxidised end to 40:
+the reduced region would lie inside 5 to 40, so the start gives way to 30: 30 to
+40. Then the oxidised start to 10: the end gives way to 20: 10 to 20. With the
+reduced region not chosen (55 to 55), the oxidised end goes to 55.
+
+---- Helpers ----
+_edge_setter
+```
+
+#### `test_shaded_regions`
+
+```text
+---- Summary ----
+Main function to check that the oxidised region is shaded see-through red and the
+reduced one see-through blue on a white picture.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+At 18 % (46 of 255) over white, 255 - (255 - channel) * 46 / 255. Red #d62728 =
+(214, 39, 40): (247.6, 216.0, 216.2), so (248, 216, 216). Blue #1f77b4 = (31, 119,
+180): (214.6, 230.5, 241.5), so (215, 230, 241).
+
+---- Helpers ----
+None.
+```
+
+#### `test_starting_edges`
+
+```text
+---- Summary ----
+Main function to check the edges a file starts with: both regions not chosen at
+the sides of the used part, or the regions remembered, kept within the used part,
+one that no longer fits being not chosen again.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+USED_SPAN, MINIMUM_MIN, PARKED (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Remembered oxidised 2 to 12 and reduced 56 to 60, used part 5 to 55: the oxidised
+region becomes 5 to 12; the reduced one becomes 55 to 55, so it is parked at 55.
 
 ---- Helpers ----
 None.
@@ -23394,6 +23697,40 @@ retry_teller
 
 The maths of the oxidised and reduced regions: a haem's level in a region, % oxidised
 
+### REGION HELPERS
+
+#### `_region_open_checker`
+
+```text
+---- Summary ----
+Helper function to say whether a region of a file is chosen: at least as long as
+the least length.
+
+---- Inputs ----
+values : Dict[str, float]
+    {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min).
+region : str
+    'oxidised' or 'reduced'.
+minimum_min : float
+    Least length of a region (min).
+
+---- Globals read ----
+LENGTH_TOLERANCE_MIN.
+
+---- Outputs ----
+bool
+    True when the region is open (chosen).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+open when end - start >= least length.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `edge_anchor_finder`
@@ -23507,6 +23844,157 @@ measurement_column_finder
 value_getter
 ```
 
+#### `region_edge_copier`
+
+```text
+---- Summary ----
+Main function to copy an edge set on one file to another file: the same distance
+from the addition of the same number as the one nearest to it in the first file.
+
+---- Inputs ----
+time_min : float
+    Time of the edge on the file it was set on (min).
+source_additions_min : Sequence[float]
+    Times of the additions of that file (min), on the same time axis.
+target_additions_min : Sequence[float]
+    Times of the additions of the file the edge is copied to (min), on that
+    file's time axis.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    Time of the edge in the other file (min), not yet kept within its limits, or
+    None when it cannot be copied (the first file has no addition, or the other
+    has fewer additions), so the other file keeps the edge it had.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+time = time of the same addition in the other file + (edge - nearest addition).
+
+---- Helpers ----
+edge_anchor_finder
+edge_time_finder
+```
+
+#### `region_edge_setter`
+
+```text
+---- Summary ----
+Main function to set one edge of one region of a file to a time, kept within the
+limits: an edge stays in the used part of the run; moved past the other edge of its
+region it pushes that edge along; and the two regions never overlap. An edge moved
+into the other region stops at that region's nearer side, and when the other region
+would then lie inside this one, the edge not being set gives way to it.
+
+---- Inputs ----
+values : Dict[str, float]
+    {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min).
+key : str
+    The edge set: one of REGION_KEYS.
+value : float
+    Time wanted for it (min).
+used_span : Tuple[float, float]
+    (first, last) time of the used part of the run (min): not trimmed, not
+    ignored.
+minimum_min : float
+    Least length of a region (min); a shorter one counts as not chosen, so the
+    other region may cross it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, float]
+    New values of the file; the dictionary given is not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+t = value kept within the used part. With the other region open from a to b and
+a < t < b: t = a when t - a <= b - t, otherwise b. Start edge set: end = max(end,
+t), and end = a when t <= a < end. End edge set: start = min(start, t), and
+start = b when start < b <= t.
+
+---- Helpers ----
+_region_open_checker
+```
+
+#### `region_edges_builder`
+
+```text
+---- Summary ----
+Main function to give the edges a file starts the regions step with: both regions
+not chosen, parked at the sides of the used part (oxidised at its start, reduced at
+its end), or the regions remembered for it, kept within the used part. A
+remembered region that is no longer long enough is parked again.
+
+---- Inputs ----
+used_span : Tuple[float, float]
+    (first, last) time of the used part of the run (min).
+remembered : Optional[Dict[str, float]]
+    {oxidised_start, oxidised_end, reduced_start, reduced_end} (min) on the same
+    time axis, or None for a file with nothing remembered.
+minimum_min : float
+    Least length of a region (min).
+
+---- Globals read ----
+REGION_KEYS, REGION_NAMES.
+
+---- Outputs ----
+Dict[str, float]
+    {oxidised_start, oxidised_end, reduced_start, reduced_end} (min).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Parked: oxidised start = oxidised end = first; reduced start = reduced end = last.
+
+---- Helpers ----
+_region_open_checker
+```
+
+#### `region_layout_finder`
+
+```text
+---- Summary ----
+Main function to say where the edges of the two regions of one file sit on its
+plot, with the words by each handle, and which parts are shaded. A region not
+chosen has one handle, reading "not chosen", and no shading.
+
+---- Inputs ----
+values : Dict[str, float]
+    {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min),
+    on the time axis of the plot.
+minimum_min : float
+    Least length of a region (min); a shorter one is not chosen.
+
+---- Globals read ----
+REGION_NAMES, CLOSED_KEYS.
+
+---- Outputs ----
+Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
+    (edges, parts): edges as [(key, time_min, words, kind)] with kind 'oxidised'
+    or 'reduced'; parts as [(start_min, end_min, kind)]. The words of an open
+    region are by the edge that opened it (the end of the oxidised region, the
+    start of the reduced one), which keeps them clear of its other handle where
+    the regions usually are; the other edge has no words.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_region_open_checker
+```
+
 #### `region_level_finder`
 
 ```text
@@ -23550,6 +24038,66 @@ with a blank value for a haem is left out for that haem.
 measurement_column_finder
 time_getter
 value_getter
+```
+
+#### `region_pointer_reader`
+
+```text
+---- Summary ----
+Main function to turn a time pointed at on the plot into the time of the edge put
+there, in steps of 0.1 min.
+
+---- Inputs ----
+time_min : float
+    The time pointed at, on the time axis of the plot (min).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    The time rounded to 0.1 min; the limits of the edges are applied afterwards
+    (region_edge_setter).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `region_span_reader`
+
+```text
+---- Summary ----
+Main function to give the two regions of a file as they were chosen: each as its
+first and last time, or None when it was not chosen.
+
+---- Inputs ----
+values : Dict[str, float]
+    {oxidised_start, oxidised_end, reduced_start, reduced_end} of the file (min).
+minimum_min : float
+    Least length of a region (min); a shorter one is not chosen.
+
+---- Globals read ----
+REGION_NAMES.
+
+---- Outputs ----
+Dict[str, Optional[Tuple[float, float]]]
+    {'oxidised': (start_min, end_min) or None, 'reduced': the same}. A file needs
+    both for its haems' levels; one alone counts as none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_region_open_checker
 ```
 
 ## `utils_shared/reference_level.py`
@@ -27498,7 +28046,8 @@ x_minute_finder
 ```text
 ---- Summary ----
 Method to set one field of the file shown, or of every file, through the rules
-of the step, then show the result.
+of the step, then show the result. When the step has a rule for copying, the
+other files get the value that rule gives them from the file shown.
 
 ---- Inputs ----
 key : str
@@ -27892,7 +28441,9 @@ None.
 ```text
 ---- Summary ----
 Main function to set one field to the same value on some files, each kept within
-its own limits by the rules of the step.
+its own limits by the rules of the step. With a rule for copying, the file shown is
+set first, and each other file gets the value the rule gives it from the value the
+file shown ended with; a file the rule gives nothing keeps its values.
 
 ---- Inputs ----
 values : Dict[str, Dict[str, float]]
@@ -27905,6 +28456,12 @@ value : float
     The value wanted, the same for each file.
 setter : Callable[[str, Dict[str, float], str, float], Dict[str, float]]
     The rule of the step: (file name, its values, field, value) -> its new values.
+shown : Optional[str]
+    The file the value was set on; needed only with ``copier``.
+copier : Optional[Callable[[str, str, str, float], Optional[float]]]
+    The rule for copying: (file shown, other file, field, value on the file
+    shown) -> value for the other file, or None to leave that file as it is.
+    None (or no file shown): every file gets the same value.
 
 ---- Globals read ----
 None.
@@ -31947,6 +32504,139 @@ pca_picture_builder
 problem_teller
 ```
 
+#### `_region_rules_lister`
+
+```text
+---- Summary ----
+Helper function to give, for every file, what the edges of its regions are kept
+within on the time axis of the processing plot (which starts at 0 where the trimmed
+data starts): the used part of the run and the least length of a region.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+limits : Dict[str, dict]
+    Trim and ignore limits of every file; the trim times are on the original
+    recording, the ignore times are minutes from the trimmed edges.
+dataset : Optional[str]
+    The spectrometer whose spectra hold the haems; None when it is not known.
+
+---- Globals read ----
+settings.REGION_MINIMUM_POINTS.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {'used_span': (first, last) time of the used part (min on the
+    plot), 'minimum_min': least length of a region (min), 'shift': trim start
+    (min), to add to a time on the plot for the time on the recording}}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+first = ignore start; last = (trim end - trim start) - ignore end, never before
+first. least length = least number of spectra x duration / number of spectra (the
+number of time points when the file does not say how many spectra it holds).
+
+---- Helpers ----
+None.
+```
+
+#### `_regions_chooser`
+
+```text
+---- Summary ----
+Helper function to run the regions step on the plot of every file: the oxidised and
+the reduced region are pulled out on the plot or typed in the strip under it, and
+Enter accepts them. With "Every file" ticked, an edge set on the file shown is
+copied to every file at the same distance from its nearest addition. The regions
+are then listed, with the files that have only one region and the files a copy
+could not reach.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session, with the processing plot drawn.
+answers : dict
+    Answers so far; decomposition_dataset names the spectra the haems come from.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file; an edge is copied by the additions not
+    ignored there.
+remembered : Optional[Dict[str, Dict[str, float]]]
+    {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+    times on the original recording (min), which the edges start at; None, or a
+    file missing, for regions not chosen.
+
+---- Globals read ----
+REGION_FIELDS, REGION_KEY_TEXT, REGION_NUDGE (module constants).
+
+---- Outputs ----
+Dict[str, Dict[str, float]]
+    {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+    times on the original recording (min), so a later change of the trim leaves
+    them on the same data. A region not chosen has its two edges together.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and draws on the plot window (side
+effects).
+
+---- Equations ----
+time on the recording = time on the plot + trim start.
+
+---- Helpers ----
+_addition_time_lister
+_region_rules_lister
+_regions_lister
+enter_waiter
+info_printer
+region_edge_copier
+region_edge_setter
+region_edges_builder
+region_layout_finder
+region_pointer_reader
+EdgeChoice
+```
+
+#### `_regions_lister`
+
+```text
+---- Summary ----
+Helper function to print the two regions of every file in one list, then name the
+files with only one region (which count as having none) and the files that kept an
+edge of their own because they have fewer additions than the file it was copied
+from.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+values : Dict[str, Dict[str, float]]
+    {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} on
+    the time axis of the plot (min).
+rules : Dict[str, dict]
+    The limits of every file (_region_rules_lister).
+unreached : List[str]
+    The files a copied edge could not reach.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+region_span_reader
+warning_shower
+```
+
 #### `_skipped_lister`
 
 ```text
@@ -32360,7 +33050,8 @@ signal_asker
 ---- Summary ----
 Main function to talk the user through the processing, with the plot redrawn after
 each answer: first the haem fit, then, now that the haems are seen, an offer to
-change the trim and ignore times, and last the averaging around the events. The
+change the trim and ignore times, then the oxidised and the reduced region of every
+file (when the haems are shown), and last the averaging around the events. The
 settings strip picks the fit and leaves the haems out, so the decomposition
 question only offers to find the components from the data instead. While those
 questions are asked the strip is greyed out.
@@ -32385,13 +33076,18 @@ details : Dict[str, dict]
 trim_runner : Callable[[], Dict[str, dict]]
     Function that asks the trim and ignore questions again with the haems of the
     session's fit on the plot, and returns the new limits.
+regions : Optional[Dict[str, Dict[str, float]]]
+    The regions the step starts with (_regions_chooser), from the last time it
+    was answered in this run; None for regions not chosen.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-None
-    Nothing. The fit is in session.fit (None when the haems are not decomposed).
+Optional[Dict[str, Dict[str, float]]]
+    The regions of every file as _regions_chooser gives them; those given, when
+    the haems are not decomposed and the step is not asked. The fit is in
+    session.fit (None when the haems are not decomposed).
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers`` and the fit in the session, reads from and
@@ -32404,6 +33100,7 @@ None.
 _answers_previewer
 _averaging_reviewer
 _decomposition_storer
+_regions_chooser
 _strip_shower
 accept_asker
 decomposition_asker
@@ -32472,7 +33169,7 @@ EdgeChoice
 Main function to ask the questions of the experiment browser: the file browser,
 trimming and ignoring, the OD values and the event labels (which end the import),
 the processing (the haem fit, the trim and ignore times again if wanted, the
-averaging) and the individual figures. The standard plot of every file (oxygen, OCR
+oxidised and reduced regions, the averaging) and the individual figures. The standard plot of every file (oxygen, OCR
 and the haems of the dataset's fit) is shown first, with no question asked. The
 plot window is redrawn after each answer, and at the end any step can be gone back
 to. The settings strip can be changed while these questions wait (except those of

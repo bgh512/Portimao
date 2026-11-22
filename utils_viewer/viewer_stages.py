@@ -37,6 +37,14 @@ from utils_shared.questions import (accept_asker,
                                     text_colourer,
                                     yes_no_asker,
                                     )
+from utils_shared.redox_regions import (REGION_KEYS,
+                                        region_edge_copier,
+                                        region_edge_setter,
+                                        region_edges_builder,
+                                        region_layout_finder,
+                                        region_pointer_reader,
+                                        region_span_reader,
+                                        )
 from utils_shared.spectral_decomposer import (answers_fit_loader,
                                               BACKGROUND_SHORT_NAMES,
                                               fit_describer,
@@ -63,7 +71,7 @@ from utils_shared.survey import (averaging_asker,
                                  trim_minutes_setter,
                                  trim_pointer_reader,
                                  )
-from utils_shared.user_notices import problem_teller
+from utils_shared.user_notices import problem_teller, warning_shower
 from utils_viewer.viewer_edges import EdgeChoice
 from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          import_data_exporter,
@@ -107,6 +115,15 @@ TRIM_KEY_TEXT = 'grey hatched = trimmed away, amber = ignored in calculations'
 PROCESSING_FIT_NUMBERS = {'decompose': '4.1', 'fit': '4.1.1', 'spectrometer': '4.1.2'}
 TRIM_NUDGE = ('Type the times in the strip under the plot, or drag the edges; press '
               'Enter with this box empty when every file looks right.')
+# The boxes of the regions step in the strip, in the order of redox_regions.REGION_KEYS.
+REGION_FIELDS = [('oxidised_start', 'Oxidised from'),
+                 ('oxidised_end', 'to'),
+                 ('reduced_start', 'Reduced from'),
+                 ('reduced_end', 'to'),
+                 ]
+REGION_KEY_TEXT = 'red = oxidised region, blue = reduced region'
+REGION_NUDGE = ('Type the times in the strip under the plot, or pull the regions out on '
+                'the plot; press Enter with this box empty when every file looks right.')
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
@@ -976,6 +993,281 @@ def _pca_pictures_publisher(session: ViewerSession,
         info_printer(problem_teller('The PCA pictures could not be drawn', exc),
                      depth=depth,
                      )
+
+
+# ---- _region_rules_lister ------------------------------------------------------------
+def _region_rules_lister(summaries: List[dict],
+                         limits: Dict[str, dict],
+                         dataset: Optional[str],
+                         ) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Helper function to give, for every file, what the edges of its regions are kept
+    within on the time axis of the processing plot (which starts at 0 where the trimmed
+    data starts): the used part of the run and the least length of a region.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file; the trim times are on the original
+        recording, the ignore times are minutes from the trimmed edges.
+    dataset : Optional[str]
+        The spectrometer whose spectra hold the haems; None when it is not known.
+
+    ---- Globals read ----
+    settings.REGION_MINIMUM_POINTS.
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: {'used_span': (first, last) time of the used part (min on the
+        plot), 'minimum_min': least length of a region (min), 'shift': trim start
+        (min), to add to a time on the plot for the time on the recording}}.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    first = ignore start; last = (trim end - trim start) - ignore end, never before
+    first. least length = least number of spectra x duration / number of spectra (the
+    number of time points when the file does not say how many spectra it holds).
+
+    ---- Helpers ----
+    None.
+    """
+
+    rules = {}
+    for summary in summaries:
+        name = summary['name']
+        own = limits.get(name) or {}
+        duration = float(summary['duration_min'])
+        shift = float(own.get('trim_start') or 0.0)
+        kept_end = float(own.get('trim_end') or duration) - shift
+        first = float(own.get('ignore_start') or 0.0)
+        last = max(kept_end - float(own.get('ignore_end') or 0.0), first)
+        shape = (summary.get('spectra_shapes') or {}).get(dataset)
+        count = (shape[0] if shape else 0) or summary.get('frames') or 1
+        rules[name] = {'used_span': (first, last),
+                       'minimum_min': settings.REGION_MINIMUM_POINTS * duration / count,
+                       'shift': shift,
+                       }
+    return rules
+
+
+# ---- _regions_chooser ----------------------------------------------------------------
+def _regions_chooser(session: ViewerSession,
+                     answers: dict,
+                     limits: Dict[str, dict],
+                     details: Dict[str, dict],
+                     remembered: Optional[Dict[str, Dict[str, float]]],
+                     ) -> Dict[str, Dict[str, float]]:
+    """
+    ---- Summary ----
+    Helper function to run the regions step on the plot of every file: the oxidised and
+    the reduced region are pulled out on the plot or typed in the strip under it, and
+    Enter accepts them. With "Every file" ticked, an edge set on the file shown is
+    copied to every file at the same distance from its nearest addition. The regions
+    are then listed, with the files that have only one region and the files a copy
+    could not reach.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session, with the processing plot drawn.
+    answers : dict
+        Answers so far; decomposition_dataset names the spectra the haems come from.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    details : Dict[str, dict]
+        OD values and events of every file; an edge is copied by the additions not
+        ignored there.
+    remembered : Optional[Dict[str, Dict[str, float]]]
+        {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+        times on the original recording (min), which the edges start at; None, or a
+        file missing, for regions not chosen.
+
+    ---- Globals read ----
+    REGION_FIELDS, REGION_KEY_TEXT, REGION_NUDGE (module constants).
+
+    ---- Outputs ----
+    Dict[str, Dict[str, float]]
+        {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+        times on the original recording (min), so a later change of the trim leaves
+        them on the same data. A region not chosen has its two edges together.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal and draws on the plot window (side
+    effects).
+
+    ---- Equations ----
+    time on the recording = time on the plot + trim start.
+
+    ---- Helpers ----
+    _addition_time_lister
+    _region_rules_lister
+    _regions_lister
+    enter_waiter
+    info_printer
+    region_edge_copier
+    region_edge_setter
+    region_edges_builder
+    region_layout_finder
+    region_pointer_reader
+    EdgeChoice
+    """
+
+    # ---- 1 The limits, the additions and the starting edges of every file ------------
+    rules = _region_rules_lister(session.summaries,
+                                 limits,
+                                 answers.get('decomposition_dataset'),
+                                 )
+    additions = _addition_time_lister(session.summaries, limits, details)
+    start = {}
+    for name, rule in rules.items():
+        own = (remembered or {}).get(name)
+        on_plot = ({key: own[key] - rule['shift'] for key in REGION_KEYS}
+                   if own
+                   else None
+                   )
+        start[name] = region_edges_builder(rule['used_span'],
+                                           on_plot,
+                                           rule['minimum_min'],
+                                           )
+
+    # ---- 2 The rules of the edges ----------------------------------------------------
+    # The edges of each file a copy could not reach, until they are set another way.
+    unreached: Dict[str, Set[str]] = {}
+    def setter(name: str,
+               values: Dict[str, float],
+               key: str,
+               value: float,
+               ) -> Dict[str, float]:
+        unreached.get(name, set()).discard(key)
+        return region_edge_setter(values,
+                                  key,
+                                  value,
+                                  rules[name]['used_span'],
+                                  rules[name]['minimum_min'],
+                                  )
+    def copier(shown: str, name: str, key: str, value: float) -> Optional[float]:
+        copied = region_edge_copier(value, additions[shown], additions[name])
+        if copied is None:
+            unreached.setdefault(name, set()).add(key)
+        return copied
+    choice = EdgeChoice(fields=list(REGION_FIELDS),
+                        values=start,
+                        layout_finder=lambda name, values: (
+                            region_layout_finder(values, rules[name]['minimum_min'])),
+                        pointer_reader=lambda name, values, key, time_min: (
+                            region_pointer_reader(time_min)),
+                        value_setter=setter,
+                        key_text=REGION_KEY_TEXT,
+                        value_copier=copier,
+                        )
+
+    # ---- 3 Pull out or type the regions until Enter ----------------------------------
+    info_printer('OXIDISED and REDUCED regions = where the haems are fully oxidised '
+                 "and fully reduced. Each haem's level in them gives its % oxidised.",
+                 )
+    info_printer('Red is oxidised, blue is reduced; with "Every file" ticked, an edge '
+                 'is copied to every file at the same distance from its nearest '
+                 'addition.',
+                 tight=True,
+                 )
+    info_printer('Leave both as "not chosen" for no regions.', tight=True)
+    session.window.edges_shower(choice)
+    try:
+        enter_waiter('Pull the oxidised and the reduced region out on the plot, or '
+                     'type their times in the strip under it. Press Enter when every '
+                     'file looks right.',
+                     REGION_NUDGE,
+                     number='4.4',
+                     )
+        values = session.window.edges_reader()
+    finally:
+        session.window.edges_hider()
+
+    # ---- 4 List the regions ----------------------------------------------------------
+    _regions_lister(session.summaries,
+                    values,
+                    rules,
+                    [name for name in values if unreached.get(name)],
+                    )
+    return {name: {key: own[key] + rules[name]['shift'] for key in REGION_KEYS}
+            for name, own in values.items()
+            }
+
+
+# ---- _regions_lister -----------------------------------------------------------------
+def _regions_lister(summaries: List[dict],
+                    values: Dict[str, Dict[str, float]],
+                    rules: Dict[str, dict],
+                    unreached: List[str],
+                    ) -> None:
+    """
+    ---- Summary ----
+    Helper function to print the two regions of every file in one list, then name the
+    files with only one region (which count as having none) and the files that kept an
+    edge of their own because they have fewer additions than the file it was copied
+    from.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    values : Dict[str, Dict[str, float]]
+        {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} on
+        the time axis of the plot (min).
+    rules : Dict[str, dict]
+        The limits of every file (_region_rules_lister).
+    unreached : List[str]
+        The files a copied edge could not reach.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    region_span_reader
+    warning_shower
+    """
+
+    info_printer('Regions (minutes on the plot):')
+    alone = []
+    for summary in summaries:
+        name = summary['name']
+        spans = region_span_reader(values[name], rules[name]['minimum_min'])
+        texts = [f'{region} not chosen'
+                 if span is None
+                 else f'{region} {round(span[0], 2):g} to {round(span[1], 2):g}'
+                 for region, span in spans.items()
+                 ]
+        info_printer(f"  {name}: {', '.join(texts)}")
+        if sum(span is not None for span in spans.values()) == 1:
+            alone.append(name)
+    if alone:
+        counts = 'it counts' if len(alone) == 1 else 'they count'
+        warning_shower(f"{', '.join(alone)}: only one of the two regions was chosen, "
+                       f'so {counts} as having none. Go back to the processing step '
+                       'to choose the other.',
+                       )
+    if unreached:
+        kept = ('has fewer additions, so it kept the region it had'
+                if len(unreached) == 1
+                else 'have fewer additions, so they kept the regions they had'
+                )
+        warning_shower(f"{', '.join(unreached)}: {kept} when an edge was copied to "
+                       'every file. Go back to the processing step to set it on that '
+                       'file alone, with "Every file" unticked.',
+                       )
 
 
 # ---- _skipped_lister -----------------------------------------------------------------
@@ -1877,12 +2169,14 @@ def processing_stage_runner(session: ViewerSession,
                             fits_folder: Path,
                             details: Dict[str, dict],
                             trim_runner: Callable[[], Dict[str, dict]],
-                            ) -> None:
+                            regions: Optional[Dict[str, Dict[str, float]]] = None,
+                            ) -> Optional[Dict[str, Dict[str, float]]]:
     """
     ---- Summary ----
     Main function to talk the user through the processing, with the plot redrawn after
     each answer: first the haem fit, then, now that the haems are seen, an offer to
-    change the trim and ignore times, and last the averaging around the events. The
+    change the trim and ignore times, then the oxidised and the reduced region of every
+    file (when the haems are shown), and last the averaging around the events. The
     settings strip picks the fit and leaves the haems out, so the decomposition
     question only offers to find the components from the data instead. While those
     questions are asked the strip is greyed out.
@@ -1907,13 +2201,18 @@ def processing_stage_runner(session: ViewerSession,
     trim_runner : Callable[[], Dict[str, dict]]
         Function that asks the trim and ignore questions again with the haems of the
         session's fit on the plot, and returns the new limits.
+    regions : Optional[Dict[str, Dict[str, float]]]
+        The regions the step starts with (_regions_chooser), from the last time it
+        was answered in this run; None for regions not chosen.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    None
-        Nothing. The fit is in session.fit (None when the haems are not decomposed).
+    Optional[Dict[str, Dict[str, float]]]
+        The regions of every file as _regions_chooser gives them; those given, when
+        the haems are not decomposed and the step is not asked. The fit is in
+        session.fit (None when the haems are not decomposed).
 
     ---- Globals mutated ----
     None. Stores the answers in ``answers`` and the fit in the session, reads from and
@@ -1926,6 +2225,7 @@ def processing_stage_runner(session: ViewerSession,
     _answers_previewer
     _averaging_reviewer
     _decomposition_storer
+    _regions_chooser
     _strip_shower
     accept_asker
     decomposition_asker
@@ -2014,8 +2314,13 @@ def processing_stage_runner(session: ViewerSession,
         session.redraw = redraw
         redraw()
 
-    # ---- 3 Averaging around the events -----------------------------------------------
+    # ---- 3 The oxidised and the reduced region ---------------------------------------
+    if answers['decompose']:
+        regions = _regions_chooser(session, answers, limits, details, regions)
+
+    # ---- 4 Averaging around the events -----------------------------------------------
     _averaging_reviewer(session, answers, defaults, limits, details, redraw)
+    return regions
 
 
 # ---- trim_stage_runner ---------------------------------------------------------------
@@ -2142,7 +2447,7 @@ def viewer_asker(summaries: List[dict],
     Main function to ask the questions of the experiment browser: the file browser,
     trimming and ignoring, the OD values and the event labels (which end the import),
     the processing (the haem fit, the trim and ignore times again if wanted, the
-    averaging) and the individual figures. The standard plot of every file (oxygen, OCR
+    oxidised and reduced regions, the averaging) and the individual figures. The standard plot of every file (oxygen, OCR
     and the haems of the dataset's fit) is shown first, with no question asked. The
     plot window is redrawn after each answer, and at the end any step can be gone back
     to. The settings strip can be changed while these questions wait (except those of
@@ -2256,14 +2561,15 @@ def viewer_asker(summaries: List[dict],
                                                 )
     def run_processing() -> None:
         old_defaults = dict(answers) if state.get('fit_asked') else defaults
-        processing_stage_runner(session,
-                                answers,
-                                old_defaults,
-                                state['limits'],
-                                fits_folder,
-                                state['details'],
-                                run_trim,
-                                )
+        state['regions'] = processing_stage_runner(session,
+                                                   answers,
+                                                   old_defaults,
+                                                   state['limits'],
+                                                   fits_folder,
+                                                   state['details'],
+                                                   run_trim,
+                                                   state.get('regions'),
+                                                   )
         state['fit_asked'] = True
     def run_plots() -> None:
         old_defaults = dict(answers) if state.get('plots_asked') else defaults

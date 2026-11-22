@@ -647,7 +647,12 @@ class ViewerGui:
         own_value_lister
         """
 
-        if self._edges.is_on and not self._is_pictures:
+        # edges copied by a rule of the step are meant to differ from file to file
+        is_marking = (self._edges.is_on
+                      and not self._is_pictures
+                      and self._edges.choice.value_copier is None
+                      )
+        if is_marking:
             own = set(own_value_lister(self._edges.values))
             return [f'{name}{OWN_VALUES_MARK}' if name in own else name
                     for name in self._names
