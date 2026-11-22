@@ -12,6 +12,7 @@ import numpy as np
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.averaging import experiment_averages_calculator
+from utils_shared.delta_psi import delta_psi_table_builder
 from utils_shared.normalisation import experiment_normaliser, percent_converter
 from utils_shared.paf_reader import experiment_paf_loader, PafError
 from utils_shared.redox_regions import haem_levels_finder, percent_oxidised_calculator
@@ -126,8 +127,9 @@ def experiment_data_processor(info: dict,
     ---- Summary ----
     Main function to read (or take) one experiment and process its data: trim, decompose
     into haems, find each haem's oxidised and reduced level and its % oxidised (a file
-    with both regions), scale by OD, put the OCR on its % of the range, choose the
-    plotted sources and average around the events. It draws and saves nothing.
+    with both regions), work out delta psi from bH and bL (when switched on), scale by
+    OD, put the OCR on its % of the range, choose the plotted sources and average
+    around the events. It draws and saves nothing.
 
     ---- Inputs ----
     info : dict
@@ -145,7 +147,8 @@ def experiment_data_processor(info: dict,
 
     ---- Globals read ----
     settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
-    settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS;
+    settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS,
+    settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_REDUCED_LIMITS_PERCENT;
     BACKGROUND_LABELS.
 
     ---- Outputs ----
@@ -153,7 +156,8 @@ def experiment_data_processor(info: dict,
         {experiment, od_available, vo2_source, haem_source}. A file with both regions
         has experiment['haem_levels'] and experiment['haem_percent'] (DATA_FORMAT.md);
         when % oxidised is asked for a file without them, its haem source is
-        'delta_abs'. Prints progress and the reason when a step is skipped (side
+        'delta_abs'. With delta psi switched on, a file with % oxidised, one bH and
+        one bL has experiment['delta_psi']. Prints progress and the reason when a step is skipped (side
         effect).
 
     ---- Globals mutated ----
@@ -164,6 +168,7 @@ def experiment_data_processor(info: dict,
 
     ---- Helpers ----
     _skip_reporter
+    delta_psi_table_builder
     event_settings_merger
     experiment_attenuation_adder
     experiment_averages_calculator
@@ -309,7 +314,38 @@ def experiment_data_processor(info: dict,
         except (KeyError, ValueError, TypeError) as exc:
             _skip_reporter('the % oxidised of the haems', exc)
 
-    # ---- 4.4 Normalise by OD ---------------------------------------------------------
+    # ---- 4.4 Work out delta psi from bH and bL ---------------------------------------
+    # Only when switched on, and for a file with % oxidised: it needs both regions.
+    if a['delta_psi'] and 'haem_percent' in experiment:
+        try:
+            midpoints = {key: a[answer]
+                         for key, answer in settings.DELTA_PSI_MIDPOINT_ANSWERS.items()
+                         }
+            table = delta_psi_table_builder(experiment['haem_percent'],
+                                            midpoints,
+                                            a['psi_share'],
+                                            a['temperature_c'],
+                                            settings.DELTA_PSI_REDUCED_LIMITS_PERCENT,
+                                            )
+            if table is None:
+                warning_shower('  Warning: Δψ needs one bH and one bL among the '
+                               'haems, and this fit does not have them, so this file '
+                               'has no Δψ. Choose a fit with both.',
+                               )
+            else:
+                experiment['delta_psi'] = table
+                used = table.attrs['delta_psi']
+                lowest, highest = used['limits_percent']
+                print(f"  Δψ worked out from {used['bH']} and {used['bL']} at "
+                      f"{used['temperature_c']:g} °C: "
+                      f"{used['spectra_with_value']} of {len(table)} spectra have a "
+                      f'value (both haems between {lowest:g} and {highest:g} % '
+                      f'reduced)',
+                      )
+        except (KeyError, ValueError, TypeError) as exc:
+            _skip_reporter('Δψ', exc)
+
+    # ---- 4.5 Normalise by OD ---------------------------------------------------------
     if od_available:
         try:
             experiment_normaliser(experiment)
@@ -320,7 +356,7 @@ def experiment_data_processor(info: dict,
             od_available = False
             _skip_reporter('the scaling by OD', exc)
 
-    # ---- 4.5 Put the OCR on its % of the range ---------------------------------------
+    # ---- 4.6 Put the OCR on its % of the range ---------------------------------------
     if cfg.percent_need_checker() and 'VoO2' in experiment:
         try:
             percent_converter(experiment,

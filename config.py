@@ -55,6 +55,21 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    # divide the haem values (not "percent") by OD x volume x dilution
                    # when OD scaling is on
                    'haem_per_od': True,
+                   # Delta psi, the membrane potential, from how reduced bH and bL are
+                   # (utils_shared.delta_psi, MATHS.md): worked out for the files with
+                   # both regions only when switched on. Its numbers start from those of
+                   # Kim, Ripple and Springett (Biophys J 2012, 102:1194), measured on
+                   # mitochondria, and are kept with the dataset so they can be changed:
+                   # the temperature of the sample, each haem's midpoint potential with
+                   # the other haem oxidised (first) and reduced (second), and the share
+                   # of the membrane potential that lies between the two haems
+                   'delta_psi': False,
+                   'temperature_c': 37.0,
+                   'psi_bH_first_mV': 40.0,
+                   'psi_bL_first_mV': -20.0,
+                   'psi_bH_second_mV': -30.0,
+                   'psi_bL_second_mV': -90.0,
+                   'psi_share': 0.5,
                    # Figure sizes. Each figure has its own journal, width (columns) and
                    # height (fraction of a page).
                    # The *_size_mode answer is "default" (the journal question was
@@ -118,6 +133,16 @@ REFERENCE_WINDOW_POINTS = 50
 # least number of spectra an oxidised or a reduced region must hold for a haem's level
 # in it (its median there); a shorter region counts as not chosen (10 spectra are 5 s)
 REGION_MINIMUM_POINTS = 10
+# delta psi is given only where bH and bL are both between these % reduced: outside
+# them a small error in the % gives a large error in delta psi (the method's own rule)
+DELTA_PSI_REDUCED_LIMITS_PERCENT = (10.0, 90.0)
+# the answer that holds each midpoint potential of the delta psi maths
+# (utils_shared.delta_psi.MIDPOINT_KEYS)
+DELTA_PSI_MIDPOINT_ANSWERS = {'bH_first': 'psi_bH_first_mV',
+                              'bL_first': 'psi_bL_first_mV',
+                              'bH_second': 'psi_bH_second_mV',
+                              'bL_second': 'psi_bL_second_mV',
+                              }
 # least data the baseline average (before the first addition) must span
 BASELINE_MINIMUM_SECONDS = 10
 # an averaging window dragged across the plot is rounded to whole steps of this

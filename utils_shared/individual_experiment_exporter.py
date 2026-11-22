@@ -33,6 +33,7 @@ DATA_SHEETS = (('CcO2', 'CcO2'),
                ('haem_abs_OD', 'haem_abs_OD'),
                ('haem_delta_abs_OD', 'haem_delta_abs_OD'),
                ('haem_percent', 'haem_percent'),
+               ('delta_psi', 'delta_psi'),
                )
 # Spectral arrays exported to CSV (they are far too large for worksheets).
 SPECTRAL_CSV_TYPES = (('transmission', 'transmiss'),

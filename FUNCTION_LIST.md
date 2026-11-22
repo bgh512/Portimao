@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.10
+- **Version:** V2.11
 - **Date:** 22/11/2026
 
 ## Contents
@@ -85,6 +85,15 @@
     - [`test_saved_haem_amounts_open_as_delta_d`](#test_saved_haem_amounts_open_as_delta_d)
     - [`test_settings_are_read_back`](#test_settings_are_read_back)
     - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
+- [`tests/test_delta_psi.py`](#teststest_delta_psipy)
+    - [`_calculator`](#_calculator)
+    - [`test_delta_psi_is_empty_outside_the_limits`](#test_delta_psi_is_empty_outside_the_limits)
+    - [`test_equal_haems_at_their_midpoints_give_120_mV`](#test_equal_haems_at_their_midpoints_give_120_mv)
+    - [`test_numbers_that_cannot_be_used_are_refused`](#test_numbers_that_cannot_be_used_are_refused)
+    - [`test_the_b_haems_are_found_by_name`](#test_the_b_haems_are_found_by_name)
+    - [`test_the_numbers_the_program_starts_with`](#test_the_numbers_the_program_starts_with)
+    - [`test_the_processing_keeps_delta_psi_when_switched_on`](#test_the_processing_keeps_delta_psi_when_switched_on)
+    - [`test_unequal_haems_give_173_mV`](#test_unequal_haems_give_173_mv)
 - [`tests/test_file_names.py`](#teststest_file_namespy)
     - [`test_dots_and_spaces_at_the_ends_go`](#test_dots_and_spaces_at_the_ends_go)
     - [`test_forbidden_characters_become_underscores`](#test_forbidden_characters_become_underscores)
@@ -608,6 +617,13 @@
     - [`dataset_settings_reader`](#dataset_settings_reader)
     - [`dataset_settings_saver`](#dataset_settings_saver)
     - [`file_settings_merger`](#file_settings_merger)
+- [`utils_shared/delta_psi.py`](#utils_shareddelta_psipy)
+    - [`_settings_validator`](#_settings_validator)
+    - [`b_haem_column_finder`](#b_haem_column_finder)
+    - [`delta_psi_calculator`](#delta_psi_calculator)
+    - [`delta_psi_table_builder`](#delta_psi_table_builder)
+    - [`state_fractions_solver`](#state_fractions_solver)
+    - [`thermal_voltage_finder`](#thermal_voltage_finder)
 - [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
     - [`_skip_reporter`](#_skip_reporter)
     - [`event_settings_merger`](#event_settings_merger)
@@ -3405,6 +3421,258 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_delta_psi.py`
+
+Tests that delta psi from the b haems comes out as worked out by hand on made-up data.
+
+### DELTA PSI TEST HELPERS
+
+#### `_calculator`
+
+```text
+---- Summary ----
+Helper function to work out delta psi with the numbers of the method, any of them
+changed by name.
+
+---- Inputs ----
+percent_bH : list
+    % oxidised of bH.
+percent_bL : list
+    % oxidised of bL.
+**changes : object
+    midpoints_mV, share, temperature_c or limits_percent, in place of the
+    standard ones.
+
+---- Globals read ----
+MIDPOINTS_MV, SHARE, TEMPERATURE_C, LIMITS_PERCENT.
+
+---- Outputs ----
+dict
+    What delta_psi_calculator gives.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_delta_psi_is_empty_outside_the_limits`
+
+```text
+---- Summary ----
+Main function to check that delta psi is given only where bH and bL are both
+between 10 and 90 % reduced, the limits themselves counted, and is left empty for
+a blank value.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+EQUAL_PERCENT.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+90 % oxidised is 10 % reduced and 10 % oxidised is 90 % reduced: both kept. 90.5
+and 9.5 % oxidised are 9.5 and 90.5 % reduced: left out, whichever haem it is.
+105 % oxidised (above the oxidised level) is -5 % reduced: left out.
+
+---- Helpers ----
+_calculator
+```
+
+#### `test_equal_haems_at_their_midpoints_give_120_mV`
+
+```text
+---- Summary ----
+Main function to check the first example of MATHS.md: bH and bL both 65.0858 %
+oxidised at 37 °C sit at their midpoints, +40 and -20 mV, which is 120 mV of
+membrane potential.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+EQUAL_PERCENT, FACTOR.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+R_H = R_L = 1 - 0.650858 = 0.349142. With k = 0.072868: n = h = l = 1 / (3 + k)
+= 0.325429 and b = k / (3 + k) = 0.023713 (h + b = 0.349142). E_H = 40 - s x
+ln(h / n) = 40 - 0 = 40 mV; E_L = -20 - 0 = -20 mV; delta psi = 60 / 0.5 = 120 mV.
+With a share of 1 it is 60 mV.
+
+---- Helpers ----
+_calculator
+```
+
+#### `test_numbers_that_cannot_be_used_are_refused`
+
+```text
+---- Summary ----
+Main function to check that numbers of the method that would give a wrong delta
+psi are refused with a sentence saying which: midpoints whose two drops differ, a
+missing midpoint, a share of 0, a temperature below absolute zero, and limits in
+the wrong order.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MIDPOINTS_MV.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+With bL's second midpoint at -80 mV its drop is -20 + 80 = 60 mV, and bH's is
+40 + 30 = 70 mV.
+
+---- Helpers ----
+_calculator
+```
+
+#### `test_the_b_haems_are_found_by_name`
+
+```text
+---- Summary ----
+Main function to check that the delta psi table is built from the bH and the bL
+column however they are written, with b557 and the other haems left alone, and
+that a file without one of the two has no table.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+EQUAL_PERCENT, UNEQUAL_PERCENT_BH, UNEQUAL_PERCENT_BL, UNEQUAL_DELTA_PSI_MV,
+MIDPOINTS_MV, SHARE, TEMPERATURE_C, LIMITS_PERCENT.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Three spectra: the first example (120 mV), the second (173.453 mV), and one with
+bH 100 % oxidised (0 % reduced, below the limit: empty).
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_numbers_the_program_starts_with`
+
+```text
+---- Summary ----
+Main function to check that the program starts with the numbers of the method
+written in MATHS.md, with delta psi switched off, and that the voltage that goes
+with a temperature is the one worked out by hand.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MIDPOINTS_MV, SHARE, TEMPERATURE_C, LIMITS_PERCENT, THERMAL_MV, FACTOR;
+config.DEFAULT_ANSWERS, config.DELTA_PSI_MIDPOINT_ANSWERS,
+config.DELTA_PSI_REDUCED_LIMITS_PERCENT.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+s = 8.314462618 x (37 + 273.15) / 96485.33212 x 1000 = 26.72666 mV; at 25 °C,
+8.314462618 x 298.15 / 96485.33212 x 1000 = 25.69258 mV. k = exp(-70 / 26.72666)
+= exp(-2.619108) = 0.072868.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_processing_keeps_delta_psi_when_switched_on`
+
+```text
+---- Summary ----
+Main function to check that the processing of a file works out delta psi from its
+% oxidised when delta psi is switched on, and nothing when it is off or when the
+file has no regions.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the decomposition.
+
+---- Globals read ----
+EQUAL_PERCENT; TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Sixty spectra, one every 0.5 min. bH is 12 mOD before 10 min and 4 mOD from 20
+min; bL is 20 and 10 mOD. Regions: oxidised 0 to 6 min, reduced 22 to 28 min, so
+D_ox = 12 and D_red = 4 for bH, 20 and 10 for bL. From 10 to 20 min both are
+65.0858 % oxidised: bH = 4 + 8 x 0.650858 = 9.206864 mOD, bL = 10 + 10 x 0.650858
+= 16.50858 mOD, which is 120 mV. Before 10 min both are 100 % oxidised and after
+20 min 0 %: outside the limits, so empty.
+
+---- Helpers ----
+None.
+```
+
+#### `test_unequal_haems_give_173_mV`
+
+```text
+---- Summary ----
+Main function to check the second example of MATHS.md: bH 75.6308 % and bL
+40.6805 % oxidised at 37 °C give 173.453 mV, and a warmer sample a little more.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+UNEQUAL_PERCENT_BH, UNEQUAL_PERCENT_BL, UNEQUAL_DELTA_PSI_MV, FACTOR, THERMAL_MV.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+R_H = 0.243692, R_L = 0.593195. Out of 2 + e + e x k = 2 + 2.718282 + 0.198075 =
+4.916357: n = h = 0.203403, l = 2.718282 / 4.916357 = 0.552906, b = 0.198075 /
+4.916357 = 0.040289 (h + b = 0.243692, l + b = 0.593195, b x n / (h x l) =
+0.072868). E_H = 40 - s x ln(1) = 40 mV; E_L = -20 - s x ln(e) = -20 - 26.727 =
+-46.727 mV; delta psi = 86.727 / 0.5 = 173.453 mV.
+
+---- Helpers ----
+_calculator
 ```
 
 ## `tests/test_file_names.py`
@@ -18599,6 +18867,239 @@ None.
 _event_plainer
 ```
 
+## `utils_shared/delta_psi.py`
+
+The maths of delta psi, the membrane potential, from how reduced the two b haems (bH
+
+### DELTA PSI HELPERS
+
+#### `_settings_validator`
+
+```text
+---- Summary ----
+Helper function to refuse numbers of the method that would give a wrong delta psi,
+each with a plain sentence saying what to change.
+
+---- Inputs ----
+midpoints_mV : Dict[str, float]
+    {bH_first, bL_first, bH_second, bL_second}: the midpoint potentials (mV).
+share : float
+    Share of the membrane potential between the two haems (0.5 is half).
+temperature_c : float
+    Temperature of the sample (°C).
+limits_percent : Sequence[float]
+    (lowest, highest) % reduced at which delta psi is still given.
+
+---- Globals read ----
+MIDPOINT_KEYS, MIDPOINT_TOLERANCE_MV, ZERO_CELSIUS_K.
+
+---- Outputs ----
+None
+    Nothing. Raises ValueError for a missing or blank midpoint, two drops that
+    differ, a share not above 0, a temperature at or below absolute zero, and
+    limits that are not 0 < lowest < highest < 100.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+bH_first - bH_second must equal bL_first - bL_second: both are the push of one
+electron on the other, so the two orders of filling the haems cost the same.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `b_haem_column_finder`
+
+```text
+---- Summary ----
+Main function to find the bH and the bL column of a haem table by their names,
+however they are written ("Cyt $b_H$", "cyt bH", "bH").
+
+---- Inputs ----
+haem_table : pd.DataFrame
+    Haem table (time, spectrum index and one column per haem).
+
+---- Globals read ----
+BH_NAME, BL_NAME; HAEM_NAME_PREFIXES.
+
+---- Outputs ----
+Optional[Tuple[str, str]]
+    (bH column, bL column), or None when the table does not have exactly one of
+    each, so delta psi cannot be worked out from it.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+measurement_column_finder
+name_simplifier
+```
+
+#### `delta_psi_calculator`
+
+```text
+---- Summary ----
+Main function to work out delta psi, and the redox potential at each of the two
+b haems, from their % oxidised in every spectrum.
+
+---- Inputs ----
+percent_bH : Sequence[float]
+    % oxidised of bH, shape (n_spectra,).
+percent_bL : Sequence[float]
+    % oxidised of bL, shape (n_spectra,).
+midpoints_mV : Dict[str, float]
+    {bH_first, bL_first, bH_second, bL_second}: the midpoint potential of each
+    haem with the other oxidised (first) and with the other reduced (second), mV.
+share : float
+    Share of the membrane potential that lies between the two haems (0.5 is half).
+temperature_c : float
+    Temperature of the sample (°C).
+limits_percent : Sequence[float]
+    (lowest, highest) % reduced of a haem at which delta psi is still given.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, np.ndarray]
+    {'delta_psi', 'potential_bH', 'potential_bL'}: mV, each of shape (n_spectra,),
+    float64. All three are NaN in a spectrum where bH or bL is blank, or less
+    reduced than the lowest limit, or more reduced than the highest. Raises
+    ValueError for numbers of the method that cannot be used (_settings_validator)
+    and for two haems of different lengths.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+R_H = 1 - P_H / 100; R_L = 1 - P_L / 100 (fractions reduced).
+s = R x T / F (mV); k = exp(-(bH_first - bH_second) / s).
+n, h, l, b: state_fractions_solver.
+E_H = bH_first - s x ln(h / n); E_L = bL_first - s x ln(l / n).
+delta psi = (E_H - E_L) / share.
+
+---- Helpers ----
+_settings_validator
+state_fractions_solver
+thermal_voltage_finder
+```
+
+#### `delta_psi_table_builder`
+
+```text
+---- Summary ----
+Main function to build the delta psi table of a file from its % oxidised table.
+
+---- Inputs ----
+haem_percent : pd.DataFrame
+    % oxidised table of the file (time, spectrum index and one column per haem).
+midpoints_mV : Dict[str, float]
+    The four midpoint potentials (mV); see delta_psi_calculator.
+share : float
+    Share of the membrane potential between the two haems.
+temperature_c : float
+    Temperature of the sample (°C).
+limits_percent : Sequence[float]
+    (lowest, highest) % reduced at which delta psi is still given.
+
+---- Globals read ----
+DELTA_PSI_COLUMN, BH_POTENTIAL_COLUMN, BL_POTENTIAL_COLUMN; TIME_COLUMN,
+SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+Optional[pd.DataFrame]
+    The time and spectrum index of the % table, then delta psi and the potential
+    at bH and at bL (mV), one row per spectrum; or None when the table does not
+    have one bH and one bL. table.attrs['delta_psi'] holds the numbers used:
+    {'midpoints_mV', 'share', 'temperature_c', 'limits_percent', 'bH', 'bL' (the
+    two columns), 'spectra_with_value'}. Raises ValueError as
+    delta_psi_calculator does.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+delta_psi_calculator.
+
+---- Helpers ----
+b_haem_column_finder
+delta_psi_calculator
+value_getter
+```
+
+#### `state_fractions_solver`
+
+```text
+---- Summary ----
+Main function to split the pair of b haems into its four states (neither reduced,
+only bH, only bL, both) from how reduced each haem is.
+
+---- Inputs ----
+reduced_bH : Sequence[float]
+    Fraction of bH that is reduced, above 0 and below 1, shape (n,).
+reduced_bL : Sequence[float]
+    Fraction of bL that is reduced, above 0 and below 1, shape (n,).
+factor : float
+    k, how much rarer "both reduced" is made by the push of one electron on the
+    other (1 for no push), above 0.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    (n, h, l, b): the fractions of the pairs with neither haem reduced, only bH,
+    only bL and both, each of shape (n,), adding up to 1.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+R_H = h + b; R_L = l + b; n + h + l + b = 1; (b x n) / (h x l) = k. Together:
+(1 - k) b^2 + B b - k R_H R_L = 0 with B = 1 - (1 - k)(R_H + R_L), whose one
+answer between 0 and the smaller of R_H and R_L is
+b = 2 k R_H R_L / (B + sqrt(B^2 + 4 (1 - k) k R_H R_L)).
+Then h = R_H - b, l = R_L - b, n = 1 - R_H - R_L + b.
+
+---- Helpers ----
+None.
+```
+
+#### `thermal_voltage_finder`
+
+```text
+---- Summary ----
+Main function to give s = R x T / F, the voltage that goes with a temperature, in
+mV (26.7 mV at 37 °C).
+
+---- Inputs ----
+temperature_c : float
+    Temperature (°C), above absolute zero.
+
+---- Globals read ----
+GAS_CONSTANT_J_PER_MOL_K, FARADAY_C_PER_MOL, ZERO_CELSIUS_K.
+
+---- Outputs ----
+float
+    s (mV).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+s = R x (temperature + 273.15) / F x 1000.
+
+---- Helpers ----
+None.
+```
+
 ## `utils_shared/experiment_processing.py`
 
 Reading and processing of one experiment (everything before the figure and the export).
@@ -18675,8 +19176,9 @@ None.
 ---- Summary ----
 Main function to read (or take) one experiment and process its data: trim, decompose
 into haems, find each haem's oxidised and reduced level and its % oxidised (a file
-with both regions), scale by OD, put the OCR on its % of the range, choose the
-plotted sources and average around the events. It draws and saves nothing.
+with both regions), work out delta psi from bH and bL (when switched on), scale by
+OD, put the OCR on its % of the range, choose the plotted sources and average
+around the events. It draws and saves nothing.
 
 ---- Inputs ----
 info : dict
@@ -18694,7 +19196,8 @@ experiment : Optional[dict]
 
 ---- Globals read ----
 settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
-settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS;
+settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS,
+settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_REDUCED_LIMITS_PERCENT;
 BACKGROUND_LABELS.
 
 ---- Outputs ----
@@ -18702,7 +19205,8 @@ dict
     {experiment, od_available, vo2_source, haem_source}. A file with both regions
     has experiment['haem_levels'] and experiment['haem_percent'] (DATA_FORMAT.md);
     when % oxidised is asked for a file without them, its haem source is
-    'delta_abs'. Prints progress and the reason when a step is skipped (side
+    'delta_abs'. With delta psi switched on, a file with % oxidised, one bH and
+    one bL has experiment['delta_psi']. Prints progress and the reason when a step is skipped (side
     effect).
 
 ---- Globals mutated ----
@@ -18713,6 +19217,7 @@ None.
 
 ---- Helpers ----
 _skip_reporter
+delta_psi_table_builder
 event_settings_merger
 experiment_attenuation_adder
 experiment_averages_calculator

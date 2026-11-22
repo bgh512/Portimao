@@ -238,3 +238,86 @@ Notes:
 Example: one file has its additions at 5, 12, 20 and 30 min, another at 6, 13, 22 and 31 min. An edge at t = 18.5 min in the first file is 13.5, 6.5, 1.5 and 11.5 min from its four additions, so the third is nearest: a = 20 and d = 18.5 − 20 = −1.5 min. In the other file the third addition is at a_new = 22 min, so t_new = 22 − 1.5 = 20.5 min. A file with only two additions is not given this edge.
 
 Checked by: `test_an_edge_is_copied_by_its_nearest_addition` in `tests/test_redox_regions.py`.
+
+---
+
+## 6. Δψ, the membrane potential, from bH and bL
+
+The two b haems sit at different depths in the membrane, so the membrane potential pushes electrons from one to the other: the higher Δψ, the more reduced bL is next to bH. Δψ is worked out from how reduced the two are in each spectrum. The method is that of Kim, Ripple and Springett, "Measurement of the mitochondrial membrane potential and pH gradient from the redox poise of the hemes of the bc1 complex", Biophysical Journal 2012, 102:1194 to 1203 (doi 10.1016/j.bpj.2012.02.003), section "Equilibrium measurement of membrane potential".
+
+Step 1, how reduced each haem is, as a fraction:
+
+```text
+R_H = 1 − P_H ÷ 100
+R_L = 1 − P_L ÷ 100
+```
+
+Step 2, the four states of the pair of haems. A pair has neither haem reduced, only bH, only bL, or both:
+
+```text
+R_H = h + b
+R_L = l + b
+n + h + l + b = 1
+```
+
+Step 3, an electron on one haem pushes a second one away, which makes "both reduced" rarer by a fixed factor:
+
+```text
+(b × n) ÷ (h × l) = k
+k = e^(−(M_H1 − M_H2) ÷ s)
+s = R × T ÷ F
+```
+
+Steps 2 and 3 together give b (below), and then h = R_H − b, l = R_L − b and n = 1 − R_H − R_L + b.
+
+Step 4, the redox potential at each haem:
+
+```text
+E_H = M_H1 − s × ln(h ÷ n)
+E_L = M_L1 − s × ln(l ÷ n)
+```
+
+Step 5, the membrane potential:
+
+```text
+Δψ = (E_H − E_L) ÷ β
+```
+
+- P_H, P_L: how oxidised bH and bL are in this spectrum (%), from 4
+- R_H, R_L: the fraction of bH and of bL that is reduced (0 to 1)
+- n, h, l, b: the fractions of the pairs with neither haem reduced, only bH reduced, only bL reduced, and both reduced (0 to 1)
+- M_H1, M_L1: the midpoint potential of bH and of bL while the other haem is oxidised (mV); +40 and −20
+- M_H2, M_L2: the midpoint potential of bH and of bL while the other haem is reduced (mV); −30 and −90
+- k: how much rarer "both reduced" is made by the push (no unit); 0.0729 at 37 °C, as M_H1 − M_H2 = 70 mV
+- s: the voltage that goes with the temperature (mV); 26.727 at 37 °C
+- R: the gas constant, 8.314462618 J/mol/K
+- T: the temperature of the sample (K), its temperature in °C + 273.15; 37 °C unless changed
+- F: the Faraday constant, 96485.33212 C/mol
+- E_H, E_L: the redox potential at bH and at bL (mV)
+- β: the share of the membrane potential that lies between the two haems (no unit); 0.5, half
+- Δψ: the membrane potential (mV)
+
+How b is found: putting step 2 into step 3 leaves one equation with b alone,
+
+```text
+(1 − k) × b² + B × b − k × R_H × R_L = 0
+B = 1 − (1 − k) × (R_H + R_L)
+b = 2 × k × R_H × R_L ÷ (B + √(B² + 4 × (1 − k) × k × R_H × R_L))
+```
+
+which has only this one answer between 0 and the smaller of R_H and R_L.
+
+Notes:
+
+- The midpoint potentials, β and the temperature above are the paper's, measured on the bc1 complex of mitochondria. They are the numbers the program starts with; each is kept with the dataset so that it can be changed for another organism.
+- M_H1 − M_H2 must equal M_L1 − M_L2 (70 mV for both here): each is the push of one electron on the other. Numbers that break this are refused.
+- Δψ is left empty in a spectrum where bH or bL is less than 10 % or more than 90 % reduced (the paper's rule): outside these limits a small error in the % gives a large error in Δψ. A haem exactly at a limit is kept.
+- The paper finds E_H and β × Δψ by fitting a model to R_H and R_L. With two measured values and two unknowns nothing is left over to fit, so the equations above give the same two numbers directly.
+- Only a file with both regions has P, so only such a file has Δψ; its fit must have one bH and one bL.
+- The program keeps E_H and E_L beside Δψ for every spectrum.
+
+Example 1: bH and bL are both 65.0858 % oxidised at 37 °C, so R_H = R_L = 0.349142. Then b = 0.023713, h = l = 0.349142 − 0.023713 = 0.325429 and n = 1 − 0.698284 + 0.023713 = 0.325429 (check: b × n ÷ (h × l) = 0.023713 ÷ 0.325429 = 0.0729 = k). E_H = 40 − 26.727 × ln(1) = 40 mV and E_L = −20 − 26.727 × ln(1) = −20 mV, so Δψ = (40 + 20) ÷ 0.5 = 120 mV.
+
+Example 2: bH is 75.6308 % and bL 40.6805 % oxidised at 37 °C, so R_H = 0.243692 and R_L = 0.593195. Then b = 0.040289, h = 0.203403, l = 0.552906 and n = 0.203403. E_H = 40 − 26.727 × ln(0.203403 ÷ 0.203403) = 40 mV and E_L = −20 − 26.727 × ln(0.552906 ÷ 0.203403) = −20 − 26.727 × 1 = −46.727 mV, so Δψ = (40 + 46.727) ÷ 0.5 = 173.453 mV.
+
+Checked by: `test_equal_haems_at_their_midpoints_give_120_mV`, `test_unequal_haems_give_173_mV`, `test_delta_psi_is_empty_outside_the_limits`, `test_numbers_that_cannot_be_used_are_refused` and `test_the_numbers_the_program_starts_with` in `tests/test_delta_psi.py`.
