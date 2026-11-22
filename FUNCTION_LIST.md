@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.12
+- **Version:** V2.13
 - **Date:** 22/11/2026
 
 ## Contents
@@ -92,6 +92,8 @@
     - [`test_numbers_that_cannot_be_used_are_refused`](#test_numbers_that_cannot_be_used_are_refused)
     - [`test_the_b_haems_are_found_by_name`](#test_the_b_haems_are_found_by_name)
     - [`test_the_numbers_the_program_starts_with`](#test_the_numbers_the_program_starts_with)
+    - [`test_the_kept_delta_psi_is_drawn_dashed`](#test_the_kept_delta_psi_is_drawn_dashed)
+    - [`test_the_kept_regions_and_numbers_work_the_file_out`](#test_the_kept_regions_and_numbers_work_the_file_out)
     - [`test_the_panel_is_drawn_only_for_a_file_with_delta_psi`](#test_the_panel_is_drawn_only_for_a_file_with_delta_psi)
     - [`test_the_processing_keeps_delta_psi_when_switched_on`](#test_the_processing_keeps_delta_psi_when_switched_on)
     - [`test_the_question_is_asked_only_when_delta_psi_can_be_worked_out`](#test_the_question_is_asked_only_when_delta_psi_can_be_worked_out)
@@ -393,8 +395,11 @@
     - [`test_sentence_when_confirmed_too_early`](#test_sentence_when_confirmed_too_early)
     - [`test_height_typed_in_the_strip`](#test_height_typed_in_the_strip)
     - [`test_the_decomposition_kept_to_compare`](#test_the_decomposition_kept_to_compare)
+    - [`test_keep_to_compare_keeps_the_regions_in_use`](#test_keep_to_compare_keeps_the_regions_in_use)
+    - [`test_go_back_to_kept_puts_the_kept_one_back`](#test_go_back_to_kept_puts_the_kept_one_back)
     - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
     - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
+    - [`test_numbers_of_the_delta_psi_row`](#test_numbers_of_the_delta_psi_row)
     - [`test_haems_and_ocr_shown_from_the_strip`](#test_haems_and_ocr_shown_from_the_strip)
     - [`test_plots_follow_the_strip`](#test_plots_follow_the_strip)
     - [`test_haems_ticked_in_the_strip`](#test_haems_ticked_in_the_strip)
@@ -930,6 +935,7 @@
     - [`ViewerSession`](#viewersession)
     - [`_file_exporter`](#_file_exporter)
     - [`_kept_haems_drawer`](#_kept_haems_drawer)
+    - [`_kept_psi_drawer`](#_kept_psi_drawer)
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
     - [`preview_info_builder`](#preview_info_builder)
@@ -960,6 +966,7 @@
     - [`_export_refresher`](#_export_refresher)
     - [`_figure_starter`](#_figure_starter)
     - [`_fit_file_saver`](#_fit_file_saver)
+    - [`_kept_restorer`](#_kept_restorer)
     - [`_label_table_filler`](#_label_table_filler)
     - [`_limits_lister`](#_limits_lister)
     - [`_od_lister`](#_od_lister)
@@ -991,6 +998,12 @@
     - [`height_checker`](#height_checker)
     - [`kept_decomposition_builder`](#kept_decomposition_builder)
     - [`minutes_checker`](#minutes_checker)
+    - [`psi_answers_builder`](#psi_answers_builder)
+    - [`psi_change_describer`](#psi_change_describer)
+    - [`psi_number_checker`](#psi_number_checker)
+    - [`psi_seconds_filler`](#psi_seconds_filler)
+    - [`psi_summary_writer`](#psi_summary_writer)
+    - [`psi_values_builder`](#psi_values_builder)
     - [`size_answers_builder`](#size_answers_builder)
     - [`strip_values_builder`](#strip_values_builder)
     - [`strip_values_checker`](#strip_values_checker)
@@ -3603,7 +3616,7 @@ None.
 ---- Globals read ----
 MIDPOINTS_MV, SHARE, TEMPERATURE_C, LIMITS_PERCENT, THERMAL_MV, FACTOR;
 config.DEFAULT_ANSWERS, config.DELTA_PSI_MIDPOINT_ANSWERS,
-config.DELTA_PSI_REDUCED_LIMITS_PERCENT.
+config.DELTA_PSI_LIMIT_ANSWERS.
 
 ---- Outputs ----
 None.
@@ -3615,6 +3628,67 @@ None.
 s = 8.314462618 x (37 + 273.15) / 96485.33212 x 1000 = 26.72666 mV; at 25 °C,
 8.314462618 x 298.15 / 96485.33212 x 1000 = 25.69258 mV. k = exp(-70 / 26.72666)
 = exp(-2.619108) = 0.072868.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_kept_delta_psi_is_drawn_dashed`
+
+```text
+---- Summary ----
+Main function to check the Δψ kept to compare with on the plot of one file: a
+second line in the Δψ panel, dashed and paler, the panel widened to hold it outside
+the ignored parts, and the gap between the two worked out by hand; and one
+sentence in place of the line for a file with no kept Δψ.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+DELTA_PSI_COLUMN, SPECTRUM_INDEX_COLUMN, TIME_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Six spectra, one a minute. In use: empty, 100, 110, 120, 130, empty (mV). Kept:
+empty, empty, 115, 110, 150, 140. Both have a value in the 3rd, 4th and 5th: the
+gaps are 5, 10 and 20 mV, so the largest is 20 and the average 35 / 3 = 11.7 mV.
+The kept line runs from 110 to 150 mV: with 5 % of that range (2 mV) left free,
+the panel reaches up to 152 mV. With the last 1.5 min ignored only 115 and 110 mV
+count, which the panel already holds, so it stays as it was.
+
+---- Helpers ----
+experiment_drawer
+```
+
+#### `test_the_kept_regions_and_numbers_work_the_file_out`
+
+```text
+---- Summary ----
+Main function to check that a file is worked out again for the comparison with
+the kept regions and the kept numbers of Δψ, not the ones in use, and with
+everything else as in use. The reading and the processing are stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the reading and the processing.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. The stand-ins are undone after the test.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
@@ -3653,7 +3727,8 @@ experiment_drawer
 ---- Summary ----
 Main function to check that the processing of a file works out delta psi from its
 % oxidised when delta psi is switched on, and nothing when it is off or when the
-file has no regions.
+file has no regions, and that a share and a limit typed in place of the paper's
+are the ones used.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -3674,7 +3749,10 @@ min; bL is 20 and 10 mOD. Regions: oxidised 0 to 6 min, reduced 22 to 28 min, so
 D_ox = 12 and D_red = 4 for bH, 20 and 10 for bL. From 10 to 20 min both are
 65.0858 % oxidised: bH = 4 + 8 x 0.650858 = 9.206864 mOD, bL = 10 + 10 x 0.650858
 = 16.50858 mOD, which is 120 mV. Before 10 min both are 100 % oxidised and after
-20 min 0 %: outside the limits, so empty.
+20 min 0 %: outside the limits, so empty. With a share of 0.4 typed, the same 60 mV
+between the haems is 60 / 0.4 = 150 mV. With a lowest limit of 40 % reduced typed,
+both haems (34.9142 % reduced from 10 to 20 min) are under it, so every spectrum
+is empty.
 
 ---- Helpers ----
 None.
@@ -11708,8 +11786,10 @@ None.
 ```text
 ---- Summary ----
 Main function to check that keeping a decomposition keeps its fit as it is, the
-answers it was worked out with (and nothing else), and its name in words, for a
-fit file and for haems ticked under Build a fit.
+answers it was worked out with (the fit, the background, the spectrometer and the
+numbers of delta psi, and nothing else), a copy of the regions that later changes
+leave alone, and its name in words, for a fit file and for haems ticked under
+Build a fit, with delta psi on and off and without regions.
 
 ---- Inputs ----
 None.
@@ -11723,6 +11803,68 @@ None
 
 ---- Globals mutated ----
 None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_keep_to_compare_keeps_the_regions_in_use`
+
+```text
+---- Summary ----
+Main function to check that a click on Keep to compare keeps the fit, the regions
+and the numbers of delta psi in use at that moment and redraws the plot, and that
+Keep this one drops them. The showing of the strip is stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the showing of the strip.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The stand-in is undone after the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_go_back_to_kept_puts_the_kept_one_back`
+
+```text
+---- Summary ----
+Main function to check the two ways of choosing after Keep to compare. Go back to
+kept puts the kept fit, background, number of delta psi and regions back in use,
+drops the kept one and redraws the plot; while the regions are being chosen on the
+plot it leaves the regions as they are; with nothing kept it does nothing. Keep
+this one leaves what is in use as it is and drops the kept one. The strip tells
+the click on Go back to kept only while one is kept. The showing of the strip is
+stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the showing of the strip.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The stand-in is undone after the test.
 
 ---- Equations ----
 None.
@@ -11787,6 +11929,40 @@ None.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_numbers_of_the_delta_psi_row`
+
+```text
+---- Summary ----
+Main function to check the Δψ row of the strip: the midpoints filled in from the
+ones typed and the fall, the answers a change gives, the sentence that says it,
+the row shown only with the haems and Δψ switched on, the numbers refused with a
+reason, the values the strip cannot show, and what the row keeps and tells when a
+number is typed, refused, or the paper's values are put back (not the
+temperature).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+second = first - fall. The paper's: 40 - 70 = -30 and -20 - 70 = -90. A fall of 60
+typed: 40 - 60 = -20 and -20 - 60 = -80. bH typed as 50 with the fall of 70 kept:
+50 - 70 = -20, and bL stays at -20 and -90. From answers of 50 and -20 the fall
+shown is 50 - (-20) = 70.
 
 ---- Helpers ----
 None.
@@ -19261,7 +19437,7 @@ experiment : Optional[dict]
 ---- Globals read ----
 settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
 settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS,
-settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_REDUCED_LIMITS_PERCENT;
+settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_LIMIT_ANSWERS;
 BACKGROUND_LABELS.
 
 ---- Outputs ----
@@ -31990,11 +32166,12 @@ preview_info_builder
 
 ```text
 ---- Summary ----
-Helper function to work one file out again with the kept decomposition (its fit and
-background, everything else as in use), draw its haem traces dashed over the haems
-in use in the same colours, widening a panel a kept trace would leave, and say how
-far apart the two are. Its own warnings are left out, as they repeat those of the
-decomposition in use.
+Helper function to work one file out again with the kept decomposition (its fit,
+background, regions and numbers of delta psi, everything else as in use), draw its
+haem traces dashed over the haems in use in the same colours, widening a panel a
+kept trace would leave, and say how far apart the two are; its delta psi is drawn
+the same way over the delta psi in use. Its own warnings are left out, as they
+repeat those of the decomposition in use.
 
 ---- Inputs ----
 session : ViewerSession
@@ -32022,9 +32199,10 @@ settings.Config, HAEM_KEYS, KEY_PREFIX, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
 
 ---- Outputs ----
 str
-    The notes: a KEY_PREFIX line for the dashed lines and a line with the largest
-    and the average gap of each haem in both; or one sentence saying why the kept
-    decomposition is not shown on this file.
+    The notes: a KEY_PREFIX line for the dashed lines, a line with the largest
+    and the average gap of each haem in both, and the note of the kept delta psi
+    (_kept_psi_drawer) when delta psi is shown; or one sentence saying why the
+    kept decomposition is not shown on this file.
 
 ---- Globals mutated ----
 None. Draws on the haem panels; the details of a problem go to the log (side
@@ -32036,12 +32214,60 @@ min - pad to max + pad of the kept trace outside the ignored parts, with
 pad = (max - min) x KEPT_MARGIN, and never shrinks.
 
 ---- Helpers ----
+_kept_psi_drawer
 _loaded_experiment_getter
 decomposition_gap_calculator
 experiment_data_processor
 haem_name_plainer
 name_simplifier
 problem_teller
+```
+
+#### `_kept_psi_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the delta psi of the kept decomposition dashed and paler
+over the delta psi in use, widening the panel where the kept line would leave it,
+and say how far apart the two are.
+
+---- Inputs ----
+experiment : dict
+    The experiment worked out with what is in use.
+kept_experiment : dict
+    The same file worked out with the kept fit, background, regions and numbers
+    of delta psi; it has no 'delta_psi' when the file had no regions then, or the
+    kept fit has no bH and bL.
+axes : list
+    Panels of the preview, top to bottom; the delta psi panel has is_delta_psi.
+plot_config : dict
+    Plot settings of the preview (DELTA_PSI_COLOUR, LINE_WIDTH).
+ignore_start_min : float
+    Minutes ignored at the start, left out when the panel is widened.
+ignore_end_min : float
+    Minutes ignored at the end, left out when the panel is widened.
+
+---- Globals read ----
+DELTA_PSI_COLUMN, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
+
+---- Outputs ----
+str
+    The note: the largest and the average gap between the two in mV, or one
+    sentence saying why no kept delta psi is shown on this file; '' when the
+    preview has no delta psi panel.
+
+---- Globals mutated ----
+None. Draws on the delta psi panel (side effect).
+
+---- Equations ----
+The gaps: decomposition_gap_calculator, over the spectra where both have a value.
+The widened panel reaches from min - pad to max + pad of the kept line outside
+the ignored parts, with pad = (max - min) x KEPT_MARGIN, and never shrinks.
+
+---- Helpers ----
+decomposition_gap_calculator
+time_getter
+value_getter
 ```
 
 #### `_loaded_experiment_getter`
@@ -33273,6 +33499,41 @@ text_asker
 yes_no_asker
 ```
 
+#### `_kept_restorer`
+
+```text
+---- Summary ----
+Helper function to go back to the decomposition kept to compare with: its fit, its
+haems ticked, its background, its spectrometer, its numbers of delta psi and the
+regions of every file are in use again, and nothing is kept any more. While the
+regions are being chosen on the plot they are left as they are, and one sentence
+says so.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its kept decomposition (not None) becomes its fit and its
+    regions, and is dropped.
+answers : dict
+    Answers dictionary the kept answers are put back in.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes ``answers`` and the session and prints to the terminal (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+```
+
 #### `_label_table_filler`
 
 ```text
@@ -33669,9 +33930,12 @@ redraw the plot of the step being asked. Unticking the haems leaves them out of 
 run; ticking them, picking a fit or ticking library haems under Build a fit works
 them out with the fit in the strip; a new background works them out again, and so
 does another spectrometer. A new way of showing the haems, or a per OD box, redraws
-the plot with it. A fit
+the plot with it. A number typed in the Δψ row is kept in the answers (the two
+filled-in midpoints with it), said in the terminal and Δψ worked out again. A fit
 that cannot be used is reported and the strip is set back. Keep to compare keeps
-the fit and background in use, drawn dashed over the haems until Stop comparing or
+the fit, the background, the regions and the numbers of Δψ in use, drawn dashed
+over the haems and over Δψ until one of the two is chosen (Keep this one carries
+on with what is on the plot, Go back to kept puts the kept one back in use) or
 the haems are left out. A new journal, width or height redraws only the figure of
 each file, the one plot drawn at its size.
 
@@ -33701,11 +33965,14 @@ and redraws the plot (side effects).
 None.
 
 ---- Helpers ----
+_kept_restorer
 _standard_fit_loader
 _strip_shower
 form_answers_builder
 info_printer
 kept_decomposition_builder
+psi_answers_builder
+psi_change_describer
 size_answers_builder
 ```
 
@@ -34041,7 +34308,7 @@ regions : Optional[Dict[str, Dict[str, float]]]
     was answered in this run; None for regions not chosen.
 
 ---- Globals read ----
-settings.DELTA_PSI_REDUCED_LIMITS_PERCENT.
+settings.DELTA_PSI_LIMIT_ANSWERS.
 
 ---- Outputs ----
 Optional[Dict[str, Dict[str, float]]]
@@ -34428,10 +34695,14 @@ The strip under the plot that always shows the current choices: a tick box for t
 haems, a drop-down of the fits, a drop-down of the backgrounds, a button that folds
 out a tick box for each haem of the library (Build a fit), a button that keeps the
 decomposition in use to compare the next ones with (with a line saying which one is
-kept), a drop-down of the spectrometer whose spectra hold the haems (shown when the
+kept; while one is kept it reads "Keep this one", and a second button goes back to
+the kept one), a drop-down of the spectrometer whose spectra hold the haems (shown when the
 files share more than one), a drop-down of how the haems are shown with a "per OD"
 box, an "OCR per OD" box (both boxes shown only when OD values were entered), a
-drop-down of the journal, a drop-down of the widths that journal allows and a typing
+row of the numbers of Δψ (shown only while Δψ is worked out: the midpoint of bH
+and of bL and the fall typed, each midpoint with the other haem reduced filled in,
+a button for the paper's values, and the share, the temperature and the limits as
+text, or as boxes when "More" is ticked), a drop-down of the journal, a drop-down of the widths that journal allows and a typing
 box for the height. It tells the window what the user changed and can be
 set by the program; it changes nothing by itself. It starts greyed out, until the
 program says it is listening. Every method runs on the window thread, except
@@ -34447,6 +34718,7 @@ BACKGROUND_SHORT_NAMES, OWN_HAEMS_NAME and the module constants.
 
 ---- Methods ----
 __init__
+_back_handler
 _background_handler
 _build_toggler
 _change_reporter
@@ -34456,7 +34728,10 @@ _form_handler
 _haems_handler
 _height_handler
 _journal_handler
+_more_toggler
+_paper_handler
 _per_od_handler
+_psi_handler
 _size_refresher
 _spectra_handler
 _tick_handler
@@ -34504,6 +34779,7 @@ None. Creates the widgets (side effect).
 None.
 
 ---- Helpers ----
+_back_handler
 _background_handler
 _build_toggler
 _compare_handler
@@ -34512,10 +34788,14 @@ _form_handler
 _haems_handler
 _height_handler
 _journal_handler
+_more_toggler
+_paper_handler
 _per_od_handler
+_psi_handler
 _size_refresher
 _spectra_handler
 _width_handler
+psi_values_builder
 ```
 
 ##### `_background_handler`
@@ -34543,6 +34823,34 @@ None.
 
 ---- Helpers ----
 _change_reporter
+```
+
+##### `_back_handler`
+
+```text
+---- Summary ----
+Method to take the button that goes back to the kept decomposition. The strip
+keeps nothing: the click is told as {BACK_CHANGE: True}, and the program sets
+the strip to the kept values.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BACK_CHANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the function given as on_change (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_build_toggler`
@@ -34605,7 +34913,7 @@ None.
 ```text
 ---- Summary ----
 Method to take the button that keeps the decomposition in use to compare with,
-or stops comparing. The program says which one is kept (the value 'kept').
+or, while one is kept, carries on with the one on the plot. The program says which one is kept (the value 'kept').
 
 ---- Inputs ----
 None.
@@ -34773,6 +35081,63 @@ _size_refresher
 width_choices_lister
 ```
 
+##### `_more_toggler`
+
+```text
+---- Summary ----
+Method to take the "More" box of the Δψ row: ticked, the share, the temperature
+and the limits are boxes to type in; unticked, they are one line of text.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_refresher
+```
+
+##### `_paper_handler`
+
+```text
+---- Summary ----
+Method to take the button that puts the numbers of the paper back in the Δψ
+row: the midpoints, the fall, the share and the limits. The temperature stays,
+as it is that of the runs.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS, PSI_FIELDS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the values and reports the changes (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+psi_values_builder
+```
+
 ##### `_per_od_handler`
 
 ```text
@@ -34800,23 +35165,59 @@ None.
 _change_reporter
 ```
 
+##### `_psi_handler`
+
+```text
+---- Summary ----
+Method to take the number typed in one box of the Δψ row, when Enter is pressed
+or the box is left; a box left as it was shown passes nothing on. A number that
+cannot be used turns the box red, with the reason under the row, and the value
+in use stays.
+
+---- Inputs ----
+name : str
+    The value of the box, one of PSI_FIELDS.
+
+---- Globals read ----
+ERROR_BACKGROUND.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+psi_number_checker
+typed_number_reader
+```
+
 ##### `_size_refresher`
 
 ```text
 ---- Summary ----
 Method to show the kept values in every part of the strip: the widths offered
 follow the journal, the width and the height are greyed for "None", the button
-that keeps a decomposition is greyed while no haems are shown, the line saying
-which one is kept shows only while one is, the spectrometer shows only when
+that keeps a decomposition is greyed while no haems are shown, the button that
+goes back to the kept one and the line saying which one is kept show only
+while one is, the spectrometer shows only when
 there is a choice, the per OD boxes only when OD values were entered (the one
-of the haems greyed for % oxidised, which has no per OD), and the whole strip
-is greyed while the program is not listening.
+of the haems greyed for % oxidised, which has no per OD), the Δψ row only
+while Δψ is worked out (its filled-in midpoints following the typed ones and
+the fall), and the whole strip is greyed while the program is not listening.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
 HAEM_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
+(BACK_TEXT is set on its button once, when it is built.)
 
 ---- Outputs ----
 None
@@ -34831,6 +35232,8 @@ None.
 ---- Helpers ----
 haem_form_choices_lister
 height_checker
+psi_seconds_filler
+psi_summary_writer
 width_choices_lister
 ```
 
@@ -35262,18 +35665,24 @@ typed_number_reader
 ```text
 ---- Summary ----
 Main function to keep the decomposition in use, to compare the next ones with: the
-fit, the answers it was worked out with and its name in words.
+fit, the answers it was worked out with (the fit, the background, the spectrometer
+and the numbers of delta psi), the oxidised and reduced regions of every file, and
+its name in words.
 
 ---- Inputs ----
 answers : dict
     The answers in use (fit_file, haem_files, haem_background,
-    decomposition_dataset).
+    decomposition_dataset, delta_psi and the numbers of delta psi).
 fit : dict
     The fit in use (spectral_decomposer.fit_importer); it is kept as it is, as a
     fit is never changed once read.
+regions : Dict[str, Dict[str, float]]
+    {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+    times on the original recording (min); may be empty. A copy is kept, so the
+    regions changed later leave it as it was.
 
 ---- Globals read ----
-BACKGROUND_SHORT_NAMES.
+BACKGROUND_SHORT_NAMES, PSI_KEPT_ANSWERS.
 
 ---- Outputs ----
 Dict[str, Any]
@@ -35314,6 +35723,199 @@ None.
 
 ---- Helpers ----
 typed_number_reader
+```
+
+#### `psi_answers_builder`
+
+```text
+---- Summary ----
+Main function to turn the numbers changed in the Δψ row into the answers of the
+run: the four midpoint potentials from the two typed and the fall, and the share,
+the temperature and the limits as given.
+
+---- Inputs ----
+changes : Dict[str, Any]
+    {name: new value} of the strip values that changed (DATA_FORMAT.md).
+answers : dict
+    The answers in use; the midpoints not changed are read from them.
+
+---- Globals read ----
+PSI_MIDPOINT_FIELDS, PSI_MORE_ANSWERS.
+
+---- Outputs ----
+Dict[str, float]
+    The answers to update: all four midpoints (mV) when a midpoint or the fall
+    changed, and psi_share, temperature_c (°C), psi_reduced_lowest_percent and
+    psi_reduced_highest_percent when they did. Empty when no number of the row
+    changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+psi_seconds_filler.
+
+---- Helpers ----
+psi_seconds_filler
+psi_values_builder
+```
+
+#### `psi_change_describer`
+
+```text
+---- Summary ----
+Main function to say in plain sentences what the numbers of Δψ are after a change
+in the Δψ row: what was typed and what was filled in from it.
+
+---- Inputs ----
+changes : Dict[str, Any]
+    {name: new value} of the strip values that changed (DATA_FORMAT.md).
+answers : dict
+    The answers in use, already holding the change (psi_answers_builder).
+
+---- Globals read ----
+PSI_MIDPOINT_FIELDS.
+
+---- Outputs ----
+List[str]
+    One sentence for the midpoints and the fall, one for the share, one for the
+    temperature and one for the limits, each only when it changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+psi_values_builder
+```
+
+#### `psi_number_checker`
+
+```text
+---- Summary ----
+Main function to check a number typed in one box of the Δψ row.
+
+---- Inputs ----
+name : str
+    The value of the box, one of PSI_FIELDS.
+text : str
+    What was typed, e.g. '40', '-20' or '0,5'.
+values : Dict[str, Any]
+    The strip values in use; a limit is checked against the other limit.
+
+---- Globals read ----
+TEMPERATURE_LIMITS_C.
+
+---- Outputs ----
+Tuple[Optional[float], str]
+    (number, '') for a number that can be used, or (None, what to type instead).
+    A midpoint or the fall is any number (mV); the share is above 0; the
+    temperature is one the temperature question takes; the lowest limit is above
+    0 and below the highest, the highest above the lowest and below 100.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+typed_number_reader
+```
+
+#### `psi_seconds_filler`
+
+```text
+---- Summary ----
+Main function to fill in the midpoint potential of each b haem with the other
+haem reduced, from its midpoint with the other oxidised and the fall.
+
+---- Inputs ----
+bH_mV : float
+    Midpoint potential of bH with bL oxidised (mV).
+bL_mV : float
+    Midpoint potential of bL with bH oxidised (mV).
+fall_mV : float
+    How far each midpoint falls when the other haem is reduced (mV).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[float, float]
+    (midpoint of bH with bL reduced, midpoint of bL with bH reduced), in mV.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+second = first - fall, for each haem: 40 and -20 with a fall of 70 give -30 and
+-90. The fall is the same for both, as the maths of delta psi needs.
+
+---- Helpers ----
+None.
+```
+
+#### `psi_summary_writer`
+
+```text
+---- Summary ----
+Main function to write the share, the temperature and the limits of Δψ as the one
+line of text shown in the Δψ row while "More" is not ticked.
+
+---- Inputs ----
+values : Dict[str, Any]
+    The strip values (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'share 0.5 · 37 °C · given between 10 and 90 % reduced'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `psi_values_builder`
+
+```text
+---- Summary ----
+Main function to give the strip values of the Δψ row that show the answers of the
+run.
+
+---- Inputs ----
+answers : dict
+    The answers (the four midpoints, psi_share, temperature_c and the two limits).
+is_on : bool
+    True when Δψ is worked out, which shows the row.
+
+---- Globals read ----
+PSI_MORE_ANSWERS.
+
+---- Outputs ----
+Dict[str, Any]
+    {'delta_psi', 'psi_bH_mV', 'psi_bL_mV', 'psi_fall_mV', 'psi_share',
+    'temperature_c', 'psi_lowest_percent', 'psi_highest_percent'}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+fall = midpoint of bH with bL oxidised - midpoint of bH with bL reduced, rounded
+to a millionth of a mV: 40 - (-30) = 70 mV.
+
+---- Helpers ----
+None.
 ```
 
 #### `size_answers_builder`
@@ -35357,8 +35959,8 @@ Main function to give the strip values that show the answers of the run.
 ---- Inputs ----
 answers : dict
     The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
-    haem_per_od, ocr_mode, journal, columns, height, size_mode); a fit_file of None
-    shows an empty fit.
+    haem_per_od, ocr_mode, delta_psi and the numbers of Δψ, journal, columns,
+    height, size_mode); a fit_file of None shows an empty fit.
 has_haems : bool
     True when the haems are worked out and shown, which ticks the box.
 haem_files : Sequence[str]
@@ -35376,7 +35978,7 @@ Dict[str, Any]
     All the strip values (DATA_FORMAT.md). A figure of the standard size
     (size_mode other than 'custom') shows the journal as "None"; the OCR per OD
     box is ticked for the OCR per OD, unticked for the plain OCR and its % of the
-    range.
+    range; the Δψ row shows when the haems are worked out and Δψ is switched on.
 
 ---- Globals mutated ----
 None.
@@ -35385,7 +35987,7 @@ None.
 None.
 
 ---- Helpers ----
-None.
+psi_values_builder
 ```
 
 #### `strip_values_checker`
@@ -35395,15 +35997,17 @@ None.
 Main function to check values meant for the strip before they are shown: the
 names, the background, the haems ticked, whether a decomposition is kept and its
 words, the spectrometer, the way of showing the haems, the per OD boxes, the
-journal, a width the journal allows and a height the page allows. The
-width and the height are checked against the journal given with them.
+numbers of the Δψ row (numbers, a share above 0, limits above 0 and below 100
+with the lowest first), the journal, a width the journal allows and a height the
+page allows. The width and the height are checked against the journal given with
+them.
 
 ---- Inputs ----
 values : Dict[str, Any]
     Some or all of the strip values (DATA_FORMAT.md).
 
 ---- Globals read ----
-VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS.
+VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS, PSI_FIELDS.
 
 ---- Outputs ----
 None

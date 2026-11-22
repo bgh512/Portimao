@@ -148,7 +148,7 @@ def experiment_data_processor(info: dict,
     ---- Globals read ----
     settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
     settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS,
-    settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_REDUCED_LIMITS_PERCENT;
+    settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_LIMIT_ANSWERS;
     BACKGROUND_LABELS.
 
     ---- Outputs ----
@@ -325,7 +325,10 @@ def experiment_data_processor(info: dict,
                                             midpoints,
                                             a['psi_share'],
                                             a['temperature_c'],
-                                            settings.DELTA_PSI_REDUCED_LIMITS_PERCENT,
+                                            tuple(a[answer]
+                                                  for answer
+                                                  in settings.DELTA_PSI_LIMIT_ANSWERS
+                                                  ),
                                             )
             if table is None:
                 warning_shower('  Warning: Δψ needs one bH and one bL among the '

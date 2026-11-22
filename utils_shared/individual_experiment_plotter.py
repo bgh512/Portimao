@@ -883,6 +883,7 @@ def experiment_drawer(fig: Figure,
                           labelpad=config['Y_LABEL_PAD'],
                           multialignment='center',
                           )
+            ax.is_delta_psi = True  # so a kept delta psi can be drawn over it
             ignore_last = config.get('Y_SCALE_IGNORE_LAST_MINUTES', 0.0)
             limits = _ylim_calculator(t,
                                       [y],

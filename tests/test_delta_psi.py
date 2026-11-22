@@ -2,6 +2,10 @@
 Tests that delta psi from the b haems comes out as worked out by hand on made-up data.
 """
 
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
+from contextlib import nullcontext
+from types import SimpleNamespace
+
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
 import pandas as pd
@@ -10,6 +14,7 @@ from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+import utils_viewer.viewer_preview as viewer_preview
 from utils_shared import experiment_processing, survey
 from utils_shared.delta_psi import (b_haem_column_finder,
                                     BH_POTENTIAL_COLUMN,
@@ -23,6 +28,8 @@ from utils_shared.delta_psi import (b_haem_column_finder,
 from utils_shared.individual_experiment_plotter import experiment_drawer
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
 from utils_shared.survey import delta_psi_offer_checker
+from utils_viewer.viewer_preview import _kept_psi_drawer, KEPT_ALPHA
+from utils_viewer.viewer_strip import kept_decomposition_builder
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -341,7 +348,7 @@ def test_the_numbers_the_program_starts_with() -> None:
     ---- Globals read ----
     MIDPOINTS_MV, SHARE, TEMPERATURE_C, LIMITS_PERCENT, THERMAL_MV, FACTOR;
     config.DEFAULT_ANSWERS, config.DELTA_PSI_MIDPOINT_ANSWERS,
-    config.DELTA_PSI_REDUCED_LIMITS_PERCENT.
+    config.DELTA_PSI_LIMIT_ANSWERS.
 
     ---- Outputs ----
     None.
@@ -365,12 +372,205 @@ def test_the_numbers_the_program_starts_with() -> None:
     assert {key: answers[answer]
             for key, answer in settings.DELTA_PSI_MIDPOINT_ANSWERS.items()
             } == MIDPOINTS_MV
-    assert settings.DELTA_PSI_REDUCED_LIMITS_PERCENT == LIMITS_PERCENT
+    assert tuple(answers[answer]
+                 for answer in settings.DELTA_PSI_LIMIT_ANSWERS
+                 ) == LIMITS_PERCENT
     assert thermal_voltage_finder(37.0) == pytest.approx(THERMAL_MV, abs=1e-4)
     assert thermal_voltage_finder(25.0) == pytest.approx(25.69258, abs=1e-4)
     assert np.exp(-70.0 / thermal_voltage_finder(37.0)) == pytest.approx(FACTOR,
                                                                          abs=2e-6,
                                                                          )
+
+
+# ---- test_the_kept_delta_psi_is_drawn_dashed -----------------------------------------
+def test_the_kept_delta_psi_is_drawn_dashed() -> None:
+    """
+    ---- Summary ----
+    Main function to check the Δψ kept to compare with on the plot of one file: a
+    second line in the Δψ panel, dashed and paler, the panel widened to hold it outside
+    the ignored parts, and the gap between the two worked out by hand; and one
+    sentence in place of the line for a file with no kept Δψ.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    DELTA_PSI_COLUMN, SPECTRUM_INDEX_COLUMN, TIME_COLUMN.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Six spectra, one a minute. In use: empty, 100, 110, 120, 130, empty (mV). Kept:
+    empty, empty, 115, 110, 150, 140. Both have a value in the 3rd, 4th and 5th: the
+    gaps are 5, 10 and 20 mV, so the largest is 20 and the average 35 / 3 = 11.7 mV.
+    The kept line runs from 110 to 150 mV: with 5 % of that range (2 mV) left free,
+    the panel reaches up to 152 mV. With the last 1.5 min ignored only 115 and 110 mV
+    count, which the panel already holds, so it stays as it was.
+
+    ---- Helpers ----
+    experiment_drawer
+    """
+
+    # ---- 1 A made-up file, in use and kept -------------------------------------------
+    times = np.arange(6, dtype=float)
+
+    def experiment_maker(delta_psi_mV: list) -> dict:
+        return {'experiment_name': 'made_up',
+                'CcO2': pd.DataFrame({TIME_COLUMN: times, 'Measured O2': 50.0}),
+                'VoO2': pd.DataFrame({TIME_COLUMN: times, 'VoO2': 1.0}),
+                'metadata': {'events': []},
+                'delta_psi': pd.DataFrame({TIME_COLUMN: times,
+                                           SPECTRUM_INDEX_COLUMN: np.arange(1, 7),
+                                           DELTA_PSI_COLUMN: delta_psi_mV,
+                                           },
+                                          ),
+                }
+
+    in_use = experiment_maker([np.nan, 100.0, 110.0, 120.0, 130.0, np.nan])
+    kept = experiment_maker([np.nan, np.nan, 115.0, 110.0, 150.0, 140.0])
+    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS))
+    config = cfg.plot_config_builder('raw', None, 0.0, 0.0, delta_psi=True)
+
+    def drawer(shown: dict) -> list:
+        fig = Figure()
+        axes, _ = experiment_drawer(fig, fig.add_gridspec(1, 1)[0, 0], shown, config)
+        return list(axes)
+
+    # ---- 2 The kept line is dashed and paler, and the gap is as worked out -----------
+    axes = drawer(in_use)
+    low_before, high_before = axes[-1].get_ylim()
+    assert high_before < 150.0
+    note = _kept_psi_drawer(in_use, kept, axes, config, 0.0, 0.0)
+    assert note == 'Gap to the kept Δψ, largest / average (mV): 20 / 11.7'
+    solid, dashed = axes[-1].get_lines()
+    assert not solid.is_dashed()
+    assert dashed.is_dashed()
+    assert dashed.get_alpha() == KEPT_ALPHA
+    assert dashed.get_color() == solid.get_color()
+    assert dashed.get_ydata()[2:].tolist() == [115.0, 110.0, 150.0, 140.0]
+    low, high = axes[-1].get_ylim()
+    assert low == low_before
+    assert high == pytest.approx(152.0)
+
+    # ---- 3 The ignored end does not widen the panel ----------------------------------
+    axes = drawer(in_use)
+    _kept_psi_drawer(in_use, kept, axes, config, 0.0, 1.5)
+    assert axes[-1].get_ylim() == (low_before, high_before)
+
+    # ---- 4 No kept delta psi: one sentence and no second line ------------------------
+    axes = drawer(in_use)
+    without = {key: value for key, value in kept.items() if key != 'delta_psi'}
+    note = _kept_psi_drawer(in_use, without, axes, config, 0.0, 0.0)
+    assert note.startswith('The kept Δψ is not shown on this file')
+    assert len(axes[-1].get_lines()) == 1
+
+    # ---- 5 No spectrum where both have a value: no gap -------------------------------
+    axes = drawer(in_use)
+    apart = experiment_maker([90.0, np.nan, np.nan, np.nan, np.nan, 95.0])
+    note = _kept_psi_drawer(in_use, apart, axes, config, 0.0, 0.0)
+    assert note.startswith('No gap to the kept Δψ is given')
+
+    # ---- 6 No delta psi panel: nothing drawn, nothing said ---------------------------
+    plain = {key: value for key, value in in_use.items() if key != 'delta_psi'}
+    assert _kept_psi_drawer(plain, kept, drawer(plain), config, 0.0, 0.0) == ''
+
+
+# ---- test_the_kept_regions_and_numbers_work_the_file_out -----------------------------
+def test_the_kept_regions_and_numbers_work_the_file_out(monkeypatch: pytest.MonkeyPatch,
+                                                        ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a file is worked out again for the comparison with
+    the kept regions and the kept numbers of Δψ, not the ones in use, and with
+    everything else as in use. The reading and the processing are stood in for.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Pytest's tool for standing in for the reading and the processing.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. The stand-ins are undone after the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 What is in use, and what was kept -----------------------------------------
+    kept_regions = {'oxidised_start': 0.0,
+                    'oxidised_end': 6.0,
+                    'reduced_start': 22.0,
+                    'reduced_end': 28.0,
+                    }
+    kept_answers = dict(settings.DEFAULT_ANSWERS,
+                        fit_file='kept.csv',
+                        haem_files=[],
+                        decomposition_dataset='Spectra',
+                        delta_psi=True,
+                        psi_bH_first_mV=45.0,
+                        psi_share=0.4,
+                        )
+    kept = kept_decomposition_builder(kept_answers,
+                                      {'haem_list': []},
+                                      {'made_up': kept_regions, 'other': {}},
+                                      )
+    answers = dict(kept_answers,
+                   fit_file='new.csv',
+                   psi_bH_first_mV=60.0,
+                   psi_share=0.5,
+                   )
+    info = {'name': 'made_up',
+            'ignore_start': 2.0,
+            'ignore_end': 0.0,
+            'regions': dict(kept_regions, oxidised_end=4.0),
+            }
+
+    # ---- 2 The processing stood in for, noting what it is given ----------------------
+    given = {}
+
+    def processor(info: dict, cfg: settings.Config, fit: dict, fresh: dict) -> dict:
+        given.update({'info': info, 'answers': cfg.answers, 'fit': fit})
+        return {'experiment': {}}
+
+    monkeypatch.setattr(viewer_preview, 'experiment_data_processor', processor)
+    monkeypatch.setattr(viewer_preview,
+                        '_loaded_experiment_getter',
+                        lambda session, summary, dataset: {},
+                        )
+    session = SimpleNamespace(window=SimpleNamespace(output_capturer=nullcontext))
+    note = viewer_preview._kept_haems_drawer(session,
+                                             {'name': 'made_up'},
+                                             info,
+                                             answers,
+                                             kept,
+                                             None,
+                                             {},
+                                             [],
+                                             {},
+                                             )
+
+    # ---- 3 The kept regions and numbers, everything else as in use -------------------
+    assert given['info']['regions'] == kept_regions
+    assert given['info']['ignore_start'] == 2.0
+    assert given['answers']['psi_bH_first_mV'] == 45.0
+    assert given['answers']['psi_share'] == 0.4
+    assert given['answers']['fit_file'] == 'kept.csv'
+    assert given['answers']['delta_psi'] is True
+    assert given['fit'] is kept['fit']
+    assert info['regions']['oxidised_end'] == 4.0  # the ones in use are left alone
+    assert note.startswith('The kept decomposition is not shown on this file')
 
 
 # ---- test_the_panel_is_drawn_only_for_a_file_with_delta_psi --------------------------
@@ -447,7 +647,8 @@ def test_the_processing_keeps_delta_psi_when_switched_on(
     ---- Summary ----
     Main function to check that the processing of a file works out delta psi from its
     % oxidised when delta psi is switched on, and nothing when it is off or when the
-    file has no regions.
+    file has no regions, and that a share and a limit typed in place of the paper's
+    are the ones used.
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
@@ -468,7 +669,10 @@ def test_the_processing_keeps_delta_psi_when_switched_on(
     D_ox = 12 and D_red = 4 for bH, 20 and 10 for bL. From 10 to 20 min both are
     65.0858 % oxidised: bH = 4 + 8 x 0.650858 = 9.206864 mOD, bL = 10 + 10 x 0.650858
     = 16.50858 mOD, which is 120 mV. Before 10 min both are 100 % oxidised and after
-    20 min 0 %: outside the limits, so empty.
+    20 min 0 %: outside the limits, so empty. With a share of 0.4 typed, the same 60 mV
+    between the haems is 60 / 0.4 = 150 mV. With a lowest limit of 40 % reduced typed,
+    both haems (34.9142 % reduced from 10 to 20 min) are under it, so every spectrum
+    is empty.
 
     ---- Helpers ----
     None.
@@ -509,7 +713,7 @@ def test_the_processing_keeps_delta_psi_when_switched_on(
                         lambda data: (500.0, 630.0),
                         )
 
-    def processor(is_on: bool, regions: object) -> dict:
+    def processor(is_on: bool, regions: object, **typed: float) -> dict:
         experiment = {'experiment_name': 'made_up',
                       'CcO2': pd.DataFrame({TIME_COLUMN: times, 'Measured O2': 0.0}),
                       'VoO2': pd.DataFrame({TIME_COLUMN: times, 'VoO2': 1.0}),
@@ -529,6 +733,7 @@ def test_the_processing_keeps_delta_psi_when_switched_on(
                        plot_haems=True,
                        haem_per_od=False,
                        delta_psi=is_on,
+                       **typed,
                        )
         fit = {'haem_list': ['Cyt $b_H$', 'Cyt $b_L$'], 'data': None}
         processed = experiment_processing.experiment_data_processor(info,
@@ -556,6 +761,15 @@ def test_the_processing_keeps_delta_psi_when_switched_on(
     # ---- 3 Switched off, or without regions: no delta psi ----------------------------
     assert 'delta_psi' not in processor(False, regions)
     assert 'delta_psi' not in processor(True, None)
+
+    # ---- 4 With numbers typed in place of the paper's --------------------------------
+    table = processor(True, regions, psi_share=0.4)['delta_psi']
+    values = table[DELTA_PSI_COLUMN].to_numpy(dtype=float)
+    assert np.allclose(values[middle], 150.0, atol=0.01)
+    table = processor(True, regions, psi_reduced_lowest_percent=40.0)['delta_psi']
+    assert np.isnan(table[DELTA_PSI_COLUMN].to_numpy(dtype=float)).all()
+    assert table.attrs['delta_psi']['spectra_with_value'] == 0
+    assert table.attrs['delta_psi']['limits_percent'] == (40.0, 90.0)
 
 
 # ---- test_the_question_is_asked_only_when_delta_psi_can_be_worked_out ----------------

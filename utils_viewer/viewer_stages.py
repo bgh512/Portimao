@@ -3,6 +3,7 @@ The steps of the experiment browser: ask, redraw the plot window, then accept or
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import copy
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
@@ -84,9 +85,12 @@ from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
-from utils_viewer.viewer_strip import (form_answers_builder,
+from utils_viewer.viewer_strip import (BACK_CHANGE,
+                                       form_answers_builder,
                                        HAEM_FORM_TEXTS,
                                        kept_decomposition_builder,
+                                       psi_answers_builder,
+                                       psi_change_describer,
                                        size_answers_builder,
                                        strip_values_builder,
                                        )
@@ -762,6 +766,64 @@ def _fit_file_saver(fit: dict,
         return path.name
 
 
+# ---- _kept_restorer ------------------------------------------------------------------
+def _kept_restorer(session: ViewerSession, answers: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to go back to the decomposition kept to compare with: its fit, its
+    haems ticked, its background, its spectrometer, its numbers of delta psi and the
+    regions of every file are in use again, and nothing is kept any more. While the
+    regions are being chosen on the plot they are left as they are, and one sentence
+    says so.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session; its kept decomposition (not None) becomes its fit and its
+        regions, and is dropped.
+    answers : dict
+        Answers dictionary the kept answers are put back in.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Changes ``answers`` and the session and prints to the terminal (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    """
+
+    kept = session.kept
+    fit = kept['fit']
+    haems = [haem for haem in answers['haems'] if haem in fit['haem_list']]
+    answers.update(kept['answers'])
+    answers.update({'decompose': True,
+                    'plot_haems': True,
+                    'haems': haems or list(fit['haem_list']),
+                    },
+                   )
+    session.fit = fit
+    session.kept = None
+    info_printer(f"Back to {kept['text']}. The one kept to compare is no longer "
+                 'shown.',
+                 )
+    if session.is_choosing_regions:
+        info_printer('The regions stay as they are on the plot while you are '
+                     'choosing them.',
+                     tight=True,
+                     )
+    else:
+        session.regions = copy.deepcopy(kept['regions'])
+
+
 # ---- _label_table_filler -------------------------------------------------------------
 def _label_table_filler(session: ViewerSession,
                         entries: Dict[str, List[dict]],
@@ -1199,6 +1261,9 @@ def _regions_chooser(session: ViewerSession,
                  tight=True,
                  )
     session.window.edges_shower(choice)
+    # While the edges are on the plot they are the regions being chosen, so a click on
+    # Go back to kept leaves the regions alone.
+    session.is_choosing_regions = True
     try:
         while True:
             enter_waiter('Pull the oxidised and the reduced region out on the plot, '
@@ -1236,6 +1301,7 @@ def _regions_chooser(session: ViewerSession,
                             ):
                 break
     finally:
+        session.is_choosing_regions = False
         session.window.edges_hider()
 
     # ---- 4 List the regions ----------------------------------------------------------
@@ -1476,9 +1542,12 @@ def _strip_change_applier(session: ViewerSession,
     run; ticking them, picking a fit or ticking library haems under Build a fit works
     them out with the fit in the strip; a new background works them out again, and so
     does another spectrometer. A new way of showing the haems, or a per OD box, redraws
-    the plot with it. A fit
+    the plot with it. A number typed in the Δψ row is kept in the answers (the two
+    filled-in midpoints with it), said in the terminal and Δψ worked out again. A fit
     that cannot be used is reported and the strip is set back. Keep to compare keeps
-    the fit and background in use, drawn dashed over the haems until Stop comparing or
+    the fit, the background, the regions and the numbers of Δψ in use, drawn dashed
+    over the haems and over Δψ until one of the two is chosen (Keep this one carries
+    on with what is on the plot, Go back to kept puts the kept one back in use) or
     the haems are left out. A new journal, width or height redraws only the figure of
     each file, the one plot drawn at its size.
 
@@ -1508,11 +1577,14 @@ def _strip_change_applier(session: ViewerSession,
     None.
 
     ---- Helpers ----
+    _kept_restorer
     _standard_fit_loader
     _strip_shower
     form_answers_builder
     info_printer
     kept_decomposition_builder
+    psi_answers_builder
+    psi_change_describer
     size_answers_builder
     """
 
@@ -1546,6 +1618,14 @@ def _strip_change_applier(session: ViewerSession,
                          'per OD.',
                          )
     is_redrawn = is_redrawn or bool(forms)
+
+    # ---- 2.2 The numbers of delta psi ------------------------------------------------
+    psi_answers = psi_answers_builder(changes, answers)
+    if psi_answers:
+        answers.update(psi_answers)
+        for line in psi_change_describer(changes, answers):
+            info_printer(line)
+        is_redrawn = True
 
     # ---- 3 The haems and the fit -----------------------------------------------------
     if changes.get('plot_haems') is False:
@@ -1585,17 +1665,20 @@ def _strip_change_applier(session: ViewerSession,
                          )
             is_redrawn = True
 
-    # ---- 4 Keep the decomposition in use to compare with, or stop --------------------
-    if 'compare' in changes and session.fit is not None:
-        kept = (kept_decomposition_builder(answers, session.fit)
-                if changes['compare']
-                else None
-                )
-        session.kept = kept
-        info_printer(f"Kept {kept['text']} to compare: change the haems or the "
-                     'background, and the kept haems show dashed on the plot.'
-                     if kept is not None
-                     else 'The kept decomposition is no longer shown.',
+    # ---- 4 Keep the decomposition in use to compare with, or choose one of the two ---
+    if changes.get(BACK_CHANGE) and session.kept is not None:
+        _kept_restorer(session, answers)
+        is_redrawn = True
+    elif 'compare' in changes and session.fit is not None:
+        in_use = kept_decomposition_builder(answers, session.fit, session.regions)
+        session.kept = in_use if changes['compare'] else None
+        info_printer(f"Kept {in_use['text']} to compare: change the haems, the "
+                     'background, the regions or the Δψ numbers, and the kept lines '
+                     'show dashed on the plot. Then click Keep this one or Go back '
+                     'to kept.'
+                     if changes['compare']
+                     else f"Carrying on with {in_use['text']}. The one kept to "
+                          'compare is no longer shown.',
                      )
         is_redrawn = True
     elif changes.get('compare'):
@@ -1883,7 +1966,10 @@ def details_stage_runner(session: ViewerSession,
 
     # ---- 2.1 The temperature of the runs ---------------------------------------------
     # One value for the dataset, asked of everyone: delta psi is worked out with it.
-    temperature_asker(answers, defaults)
+    # The delta psi row of the strip holds the same value, so the one in use (the
+    # strip may have changed it) is offered, and the strip shows the answer.
+    temperature_asker(answers, dict(defaults, temperature_c=answers['temperature_c']))
+    _strip_shower(session, answers)
 
     # ---- 3 Event labels --------------------------------------------------------------
     # The table opens again with the labels as last typed until they are accepted.
@@ -2321,7 +2407,7 @@ def processing_stage_runner(session: ViewerSession,
         was answered in this run; None for regions not chosen.
 
     ---- Globals read ----
-    settings.DELTA_PSI_REDUCED_LIMITS_PERCENT.
+    settings.DELTA_PSI_LIMIT_ANSWERS.
 
     ---- Outputs ----
     Optional[Dict[str, Dict[str, float]]]
@@ -2475,21 +2561,34 @@ def processing_stage_runner(session: ViewerSession,
                                                                 ),
                                                     ),
                                 )
+        _strip_shower(session, answers)  # the delta psi row comes or goes with it
         if is_on != was_on:
             redraw()
         if is_on:
-            lowest, highest = settings.DELTA_PSI_REDUCED_LIMITS_PERCENT
+            lowest, highest = (answers[answer]
+                               for answer in settings.DELTA_PSI_LIMIT_ANSWERS
+                               )
             info_printer('Δψ (mV) is the lowest panel of the plot, for the files with '
                          'both regions; it has gaps where bH or bL is less than '
-                         f'{lowest:g} % or more than {highest:g} % reduced.',
+                         f'{lowest:g} % or more than {highest:g} % reduced. Change '
+                         'the numbers of the method in the Δψ row of the strip under '
+                         'the plot.',
+                         )
+            info_printer('To compare fits, click Keep to compare, change the fit or '
+                         'the background, then click Keep this one or Go back to '
+                         'kept.',
+                         tight=True,
                          )
     else:
         # without haems there is no delta psi, whatever the dataset was saved with
         answers['delta_psi'] = False
+        _strip_shower(session, answers)
 
     # ---- 5 Averaging around the events -----------------------------------------------
     _averaging_reviewer(session, answers, defaults, limits, details, redraw)
-    return regions
+    # Read now: Go back to kept may have put the kept regions back since they were
+    # chosen.
+    return session.regions if answers['decompose'] else regions
 
 
 # ---- region_files_lister -------------------------------------------------------------
@@ -2824,7 +2923,7 @@ def viewer_asker(summaries: List[dict],
                                                    fits_folder,
                                                    state['details'],
                                                    run_trim,
-                                                   state.get('regions'),
+                                                   session.regions,
                                                    ) or {}
         session.regions = state['regions']
         state['fit_asked'] = True
@@ -2885,6 +2984,7 @@ def viewer_asker(summaries: List[dict],
         session.window.window_closer()
 
     # ---- 5 Return the answers --------------------------------------------------------
-    # Read now: the strip may have changed the haems after the figure was accepted.
+    # Read now: the strip may have changed the haems, or gone back to the kept regions,
+    # after the figure was accepted.
     plotted = bool(answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems'])
-    return state['limits'], session.fit, state['details'], plotted, state['regions']
+    return state['limits'], session.fit, state['details'], plotted, session.regions

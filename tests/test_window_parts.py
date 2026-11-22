@@ -11,6 +11,7 @@ redraws.
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import pytest
@@ -18,6 +19,7 @@ import pytest
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 import utils_viewer.viewer_preview as viewer_preview
+import utils_viewer.viewer_stages as viewer_stages
 from utils_shared.spectral_decomposer import OWN_HAEMS_NAME
 from utils_shared.survey import (event_entries_builder,
                                  event_asker,
@@ -30,12 +32,20 @@ from utils_viewer.viewer_preview import (_loaded_experiment_getter,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_stages import _answers_previewer
-from utils_viewer.viewer_strip import (form_answers_builder,
+from utils_viewer.viewer_strip import (BACK_CHANGE,
+                                       form_answers_builder,
                                        haem_form_choices_lister,
                                        haem_ticks_resolver,
                                        height_checker,
                                        kept_decomposition_builder,
                                        NO_JOURNAL,
+                                       psi_answers_builder,
+                                       psi_change_describer,
+                                       psi_number_checker,
+                                       psi_seconds_filler,
+                                       psi_summary_writer,
+                                       psi_values_builder,
+                                       SettingsStrip,
                                        size_answers_builder,
                                        strip_values_builder,
                                        strip_values_checker,
@@ -400,8 +410,10 @@ def test_the_decomposition_kept_to_compare() -> None:
     """
     ---- Summary ----
     Main function to check that keeping a decomposition keeps its fit as it is, the
-    answers it was worked out with (and nothing else), and its name in words, for a
-    fit file and for haems ticked under Build a fit.
+    answers it was worked out with (the fit, the background, the spectrometer and the
+    numbers of delta psi, and nothing else), a copy of the regions that later changes
+    leave alone, and its name in words, for a fit file and for haems ticked under
+    Build a fit, with delta psi on and off and without regions.
 
     ---- Inputs ----
     None.
@@ -423,29 +435,259 @@ def test_the_decomposition_kept_to_compare() -> None:
     None.
     """
 
+    # ---- 1 Delta psi on: the fit, the answers and a copy of the regions --------------
     fit = {'haem_list': ['bL']}
+    psi_numbers = {'psi_bH_first_mV': 45.0,
+                   'psi_bL_first_mV': -25.0,
+                   'psi_bH_second_mV': -15.0,
+                   'psi_bL_second_mV': -85.0,
+                   'psi_share': 0.4,
+                   'temperature_c': 30.0,
+                   'psi_reduced_lowest_percent': 5.0,
+                   'psi_reduced_highest_percent': 95.0,
+                   }
     answers = {'fit_file': 'made_up.csv',
                'haem_files': [],
                'haem_background': 'valencia',
                'decomposition_dataset': 'Spectra',
                'journal': 'cell',
+               'delta_psi': True,
+               **psi_numbers,
                }
-    kept = kept_decomposition_builder(answers, fit)
+    regions = {'run1': {'oxidised_start': 1.0,
+                        'oxidised_end': 3.0,
+                        'reduced_start': 20.0,
+                        'reduced_end': 22.0,
+                        },
+               }
+    kept = kept_decomposition_builder(answers, fit, regions)
     assert kept['fit'] is fit
     assert kept['answers'] == {'fit_file': 'made_up.csv',
                                'haem_files': [],
                                'haem_background': 'valencia',
                                'decomposition_dataset': 'Spectra',
+                               **psi_numbers,
                                }
-    assert kept['text'] == 'made_up.csv with the Valencia background'
-    own = dict(answers,
+    assert kept['text'] == ('made_up.csv with the Valencia background, its regions '
+                            'and Δψ numbers'
+                            )
+
+    # ---- 2 The regions and the numbers changed later leave the kept ones alone -------
+    regions['run1']['oxidised_end'] = 5.0
+    answers['psi_bH_first_mV'] = 60.0
+    assert kept['regions']['run1']['oxidised_end'] == 3.0
+    assert kept['answers']['psi_bH_first_mV'] == 45.0
+
+    # ---- 3 The words with delta psi off, with and without regions --------------------
+    off = dict(answers, delta_psi=False)
+    assert kept_decomposition_builder(off, fit, regions)['text'] == (
+        'made_up.csv with the Valencia background and its regions'
+        )
+    assert kept_decomposition_builder(off, fit, {})['text'] == (
+        'made_up.csv with the Valencia background'
+        )
+    assert kept_decomposition_builder(off, fit, {})['regions'] == {}
+    own = dict(off,
                fit_file=OWN_HAEMS_NAME,
                haem_files=['c1_myco.csv', 'bH_bswitch.csv'],
                haem_background='rowan_scatter',
                )
-    assert kept_decomposition_builder(own, fit)['text'] == (
+    assert kept_decomposition_builder(own, fit, {})['text'] == (
         f'{OWN_HAEMS_NAME}: c1_myco, bH_bswitch with the Rowan scatter background'
         )
+
+
+# ---- test_keep_to_compare_keeps_the_regions_in_use -----------------------------------
+def test_keep_to_compare_keeps_the_regions_in_use(monkeypatch: pytest.MonkeyPatch,
+                                                  ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a click on Keep to compare keeps the fit, the regions
+    and the numbers of delta psi in use at that moment and redraws the plot, and that
+    Keep this one drops them. The showing of the strip is stood in for.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the showing of the strip.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. The stand-in is undone after the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 A session with a fit and regions ------------------------------------------
+    monkeypatch.setattr(viewer_stages, '_strip_shower', lambda session, answers: None)
+    redraws = []
+    session = ViewerSession(summaries=[], export_root=Path('.'), window=None)
+    session.fit = {'haem_list': ['bH', 'bL']}
+    session.regions = {'run1': {'oxidised_start': 1.0,
+                                'oxidised_end': 3.0,
+                                'reduced_start': 20.0,
+                                'reduced_end': 22.0,
+                                },
+                       }
+    session.redraw = lambda: redraws.append(True) or True
+    answers = dict(settings.DEFAULT_ANSWERS,
+                   decompose=True,
+                   decomposition_dataset='Spectra',
+                   delta_psi=True,
+                   psi_share=0.4,
+                   )
+
+    # ---- 2 Keep to compare -----------------------------------------------------------
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': True})
+    assert session.kept['fit'] is session.fit
+    assert session.kept['regions'] == session.regions
+    assert session.kept['regions'] is not session.regions
+    assert session.kept['answers']['psi_share'] == 0.4
+    assert redraws == [True]
+
+    # ---- 3 Keep this one -------------------------------------------------------------
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': False})
+    assert session.kept is None
+    assert redraws == [True, True]
+
+
+# ---- test_go_back_to_kept_puts_the_kept_one_back -------------------------------------
+def test_go_back_to_kept_puts_the_kept_one_back(monkeypatch: pytest.MonkeyPatch,
+                                                ) -> None:
+    """
+    ---- Summary ----
+    Main function to check the two ways of choosing after Keep to compare. Go back to
+    kept puts the kept fit, background, number of delta psi and regions back in use,
+    drops the kept one and redraws the plot; while the regions are being chosen on the
+    plot it leaves the regions as they are; with nothing kept it does nothing. Keep
+    this one leaves what is in use as it is and drops the kept one. The strip tells
+    the click on Go back to kept only while one is kept. The showing of the strip is
+    stood in for.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the showing of the strip.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. The stand-in is undone after the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 A session with a fit and regions, kept to compare -------------------------
+    monkeypatch.setattr(viewer_stages, '_strip_shower', lambda session, answers: None)
+    redraws = []
+    first_fit = {'haem_list': ['bH', 'bL']}
+    first_regions = {'run1': {'oxidised_start': 1.0,
+                              'oxidised_end': 3.0,
+                              'reduced_start': 20.0,
+                              'reduced_end': 22.0,
+                              },
+                     }
+    session = ViewerSession(summaries=[], export_root=Path('.'), window=None)
+    session.fit = first_fit
+    session.regions = {name: dict(own) for name, own in first_regions.items()}
+    session.redraw = lambda: redraws.append(True) or True
+    answers = dict(settings.DEFAULT_ANSWERS,
+                   decompose=True,
+                   decomposition_dataset='Spectra',
+                   delta_psi=True,
+                   haems=['bH', 'bL'],
+                   haem_background='rowan_scatter',
+                   psi_share=0.4,
+                   )
+    first_name = answers['fit_file']
+    def changer() -> None:
+        # another fit, background, number of delta psi and oxidised region
+        session.fit = {'haem_list': ['bH', 'bL', 'c1']}
+        session.regions['run1']['oxidised_end'] = 5.0
+        answers.update({'fit_file': 'made_up.csv',
+                        'haem_background': 'valencia',
+                        'psi_share': 0.6,
+                        },
+                       )
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': True})
+    changer()
+
+    # ---- 2 Go back to kept -----------------------------------------------------------
+    viewer_stages._strip_change_applier(session,
+                                        answers,
+                                        Path('.'),
+                                        {BACK_CHANGE: True},
+                                        )
+    assert session.fit is first_fit
+    assert session.regions == first_regions
+    assert answers['fit_file'] == first_name
+    assert answers['haem_background'] == 'rowan_scatter'
+    assert answers['psi_share'] == 0.4
+    assert answers['haems'] == ['bH', 'bL']
+    assert session.kept is None
+    assert redraws == [True, True]
+
+    # ---- 3 While the regions are being chosen, they stay -----------------------------
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': True})
+    changer()
+    session.is_choosing_regions = True
+    viewer_stages._strip_change_applier(session,
+                                        answers,
+                                        Path('.'),
+                                        {BACK_CHANGE: True},
+                                        )
+    assert session.fit is first_fit
+    assert answers['psi_share'] == 0.4
+    assert session.regions['run1']['oxidised_end'] == 5.0
+    assert session.kept is None
+    session.is_choosing_regions = False
+
+    # ---- 4 Nothing kept: nothing happens ---------------------------------------------
+    drawn = len(redraws)
+    viewer_stages._strip_change_applier(session,
+                                        answers,
+                                        Path('.'),
+                                        {BACK_CHANGE: True},
+                                        )
+    assert session.fit is first_fit
+    assert len(redraws) == drawn
+
+    # ---- 5 Keep this one: what is in use stays, the kept one goes --------------------
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': True})
+    changer()
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': False})
+    assert session.fit == {'haem_list': ['bH', 'bL', 'c1']}
+    assert answers['haem_background'] == 'valencia'
+    assert answers['psi_share'] == 0.6
+    assert session.kept is None
+
+    # ---- 6 The strip tells the click only while one is kept --------------------------
+    # Every widget is the same stand-in, so only what the strip tells is checked.
+    told: list = []
+    strip = SettingsStrip(MagicMock(), MagicMock(), MagicMock(), 'white', told.append)
+    strip.state_setter(True)
+    strip._back_handler()
+    assert told == []
+    strip.values_setter({'plot_haems': True, 'compare': True, 'kept': 'made_up.csv'})
+    strip._back_handler()
+    assert told == [{BACK_CHANGE: True}]
 
 
 # ---- test_answers_shown_in_the_strip -------------------------------------------------
@@ -491,6 +733,14 @@ def test_answers_shown_in_the_strip() -> None:
                       'haem_mode': 'delta',
                       'haem_per_od': True,
                       'ocr_per_od': True,
+                      'delta_psi': False,
+                      'psi_bH_mV': 40.0,
+                      'psi_bL_mV': -20.0,
+                      'psi_fall_mV': 70.0,
+                      'psi_share': 0.5,
+                      'temperature_c': 37.0,
+                      'psi_lowest_percent': 10.0,
+                      'psi_highest_percent': 90.0,
                       'journal': NO_JOURNAL,
                       'columns': 1,
                       'height': 0.5,
@@ -526,6 +776,14 @@ def test_answers_shown_in_the_strip() -> None:
                       'haem_mode': 'percent',
                       'haem_per_od': False,
                       'ocr_per_od': False,
+                      'delta_psi': False,
+                      'psi_bH_mV': 40.0,
+                      'psi_bL_mV': -20.0,
+                      'psi_fall_mV': 70.0,
+                      'psi_share': 0.5,
+                      'temperature_c': 37.0,
+                      'psi_lowest_percent': 10.0,
+                      'psi_highest_percent': 90.0,
                       'journal': 'cell',
                       'columns': 1.5,
                       'height': 0.75,
@@ -606,6 +864,173 @@ def test_values_meant_for_the_strip() -> None:
                   ):
         with pytest.raises(ValueError):
             strip_values_checker(wrong)
+
+
+# ---- test_numbers_of_the_delta_psi_row -----------------------------------------------
+def test_numbers_of_the_delta_psi_row() -> None:
+    """
+    ---- Summary ----
+    Main function to check the Δψ row of the strip: the midpoints filled in from the
+    ones typed and the fall, the answers a change gives, the sentence that says it,
+    the row shown only with the haems and Δψ switched on, the numbers refused with a
+    reason, the values the strip cannot show, and what the row keeps and tells when a
+    number is typed, refused, or the paper's values are put back (not the
+    temperature).
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    settings.DEFAULT_ANSWERS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    second = first - fall. The paper's: 40 - 70 = -30 and -20 - 70 = -90. A fall of 60
+    typed: 40 - 60 = -20 and -20 - 60 = -80. bH typed as 50 with the fall of 70 kept:
+    50 - 70 = -20, and bL stays at -20 and -90. From answers of 50 and -20 the fall
+    shown is 50 - (-20) = 70.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The midpoints filled in ---------------------------------------------------
+    assert psi_seconds_filler(40.0, -20.0, 70.0) == (-30.0, -90.0)
+    assert psi_seconds_filler(40.0, -20.0, 60.0) == (-20.0, -80.0)
+    assert psi_seconds_filler(50.0, -20.0, 70.0) == (-20.0, -90.0)
+
+    # ---- 2 The answers a change gives ------------------------------------------------
+    standard = dict(settings.DEFAULT_ANSWERS)
+    assert psi_answers_builder({'psi_fall_mV': 60.0}, standard) == {
+        'psi_bH_first_mV': 40.0,
+        'psi_bL_first_mV': -20.0,
+        'psi_bH_second_mV': -20.0,
+        'psi_bL_second_mV': -80.0,
+        }
+    typed = psi_answers_builder({'psi_bH_mV': 50.0}, standard)
+    assert typed == {'psi_bH_first_mV': 50.0,
+                     'psi_bL_first_mV': -20.0,
+                     'psi_bH_second_mV': -20.0,
+                     'psi_bL_second_mV': -90.0,
+                     }
+    assert psi_answers_builder({'psi_share': 0.4,
+                                'temperature_c': 30,
+                                'psi_lowest_percent': 20.0,
+                                'psi_highest_percent': 80.0,
+                                },
+                               standard,
+                               ) == {'psi_share': 0.4,
+                                     'temperature_c': 30.0,
+                                     'psi_reduced_lowest_percent': 20.0,
+                                     'psi_reduced_highest_percent': 80.0,
+                                     }
+    assert psi_answers_builder({'haem_mode': 'abs', 'height': 0.3}, standard) == {}
+
+    # ---- 3 The sentences that say it -------------------------------------------------
+    changed = dict(standard, **typed)
+    assert psi_change_describer({'psi_bH_mV': 50.0}, changed) == [
+        'Δψ is now worked out with bH at 50 mV (-20 mV with bL reduced) and bL at '
+        '-20 mV (-90 mV with bH reduced): a fall of 70 mV.',
+        ]
+    assert psi_change_describer({'psi_share': 0.4,
+                                 'temperature_c': 30.0,
+                                 'psi_lowest_percent': 20.0,
+                                 },
+                                dict(standard,
+                                     psi_share=0.4,
+                                     temperature_c=30.0,
+                                     psi_reduced_lowest_percent=20.0,
+                                     ),
+                                ) == [
+                                    'The share of the membrane potential between bH and bL is now 0.4.',
+                                    'The temperature of the runs is now 30 °C.',
+                                    'Δψ is now given where bH and bL are between 20 and 90 % reduced.',
+                                    ]
+    assert psi_change_describer({'height': 0.3}, standard) == []
+
+    # ---- 4 What the row shows --------------------------------------------------------
+    assert psi_values_builder(changed, True) == {'delta_psi': True,
+                                                 'psi_bH_mV': 50.0,
+                                                 'psi_bL_mV': -20.0,
+                                                 'psi_fall_mV': 70.0,
+                                                 'psi_share': 0.5,
+                                                 'temperature_c': 37.0,
+                                                 'psi_lowest_percent': 10.0,
+                                                 'psi_highest_percent': 90.0,
+                                                 }
+    assert psi_summary_writer(psi_values_builder(standard, True)) == (
+        'share 0.5 · 37 °C · given between 10 and 90 % reduced'
+        )
+    switched_on = dict(standard, delta_psi=True)
+    assert strip_values_builder(switched_on, True, [])['delta_psi'] is True
+    assert strip_values_builder(switched_on, False, [])['delta_psi'] is False
+    assert strip_values_builder(standard, True, [])['delta_psi'] is False
+
+    # ---- 5 The numbers typed ---------------------------------------------------------
+    values = psi_values_builder(standard, True)
+    assert psi_number_checker('psi_bH_mV', ' 45,5 ', values) == (45.5, '')
+    assert psi_number_checker('psi_bL_mV', '-25', values) == (-25.0, '')
+    assert psi_number_checker('psi_fall_mV', '0', values) == (0.0, '')
+    assert psi_number_checker('psi_share', '0.4', values) == (0.4, '')
+    assert psi_number_checker('temperature_c', '30', values) == (30.0, '')
+    assert psi_number_checker('psi_lowest_percent', '20', values) == (20.0, '')
+    assert psi_number_checker('psi_highest_percent', '80', values) == (80.0, '')
+    for name, wrong, words in (('psi_bH_mV', 'high', 'a number of mV'),
+                               ('psi_fall_mV', '', 'a number of mV'),
+                               ('psi_share', '0', 'a share above 0'),
+                               ('psi_share', '-0.5', 'a share above 0'),
+                               ('temperature_c', '-300', 'from 0 to 100 °C'),
+                               ('temperature_c', 'warm', 'from 0 to 100 °C'),
+                               ('psi_lowest_percent', '0', 'above 0 and below 90'),
+                               ('psi_lowest_percent', '90', 'above 0 and below 90'),
+                               ('psi_highest_percent', '100', 'above 10 and below 100'),
+                               ('psi_highest_percent', '5', 'above 10 and below 100'),
+                               ):
+        number, reason = psi_number_checker(name, wrong, values)
+        assert number is None
+        assert words in reason
+
+    # ---- 6 The values the strip can show ---------------------------------------------
+    strip_values_checker(values)
+    strip_values_checker({'psi_lowest_percent': 20.0})
+    for wrong in ({'delta_psi': 'yes'},
+                  {'psi_bH_mV': '40'},
+                  {'psi_fall_mV': True},
+                  {'psi_bL_mV': float('nan')},
+                  {'psi_share': 0},
+                  {'psi_lowest_percent': 0.0},
+                  {'psi_highest_percent': 100.0},
+                  {'psi_lowest_percent': 90.0, 'psi_highest_percent': 10.0},
+                  {'psi_lowest_percent': 50.0, 'psi_highest_percent': 50.0},
+                  ):
+        with pytest.raises(ValueError):
+            strip_values_checker(wrong)
+
+    # ---- 7 The row itself, its widgets stood in for ----------------------------------
+    # Every widget is the same stand-in, so only what the strip keeps and tells is
+    # checked: a number typed, a number refused, and the paper's values put back.
+    tk = MagicMock()
+    told: list = []
+    strip = SettingsStrip(tk, MagicMock(), MagicMock(), 'white', told.append)
+    strip.state_setter(True)
+    strip.values_setter({'delta_psi': True, 'psi_share': 0.4, 'temperature_c': 30.0})
+    box = tk.Entry.return_value
+    box.cget.return_value = 'normal'
+    box.get.return_value = '60'
+    strip._psi_handler('psi_fall_mV')
+    box.get.return_value = 'far'
+    strip._psi_handler('psi_bH_mV')
+    assert told == [{'psi_fall_mV': 60.0}]
+    assert strip.values_reader()['psi_bH_mV'] == 40.0
+    strip._paper_handler()
+    assert told[1:] == [{'psi_fall_mV': 70.0, 'psi_share': 0.5}]
+    assert strip.values_reader()['temperature_c'] == 30.0
 
 
 # ---- test_haems_and_ocr_shown_from_the_strip -----------------------------------------

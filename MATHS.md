@@ -309,9 +309,9 @@ which has only this one answer between 0 and the smaller of R_H and R_L.
 
 Notes:
 
-- The midpoint potentials, β and the temperature above are the paper's, measured on the bc1 complex of mitochondria. They are the numbers the program starts with; each is kept with the dataset so that it can be changed for another organism.
-- M_H1 − M_H2 must equal M_L1 − M_L2 (70 mV for both here): each is the push of one electron on the other. Numbers that break this are refused.
-- Δψ is left empty in a spectrum where bH or bL is less than 10 % or more than 90 % reduced (the paper's rule): outside these limits a small error in the % gives a large error in Δψ. A haem exactly at a limit is kept.
+- The midpoint potentials, β and the temperature above are the paper's, measured on the bc1 complex of mitochondria. They are the numbers the program starts with; each is kept with the dataset so that it can be changed for another organism, in the Δψ row of the strip under the plot.
+- M_H1 − M_H2 must equal M_L1 − M_L2 (70 mV for both here): each is the push of one electron on the other. So the program has M_H1, M_L1 and this fall typed, and fills in M_H2 = M_H1 − fall and M_L2 = M_L1 − fall itself (40 and −20 with a fall of 70 give −30 and −90; with a fall of 60, −20 and −80). Numbers that break the rule cannot be typed, and are refused if they reach the maths another way.
+- Δψ is left empty in a spectrum where bH or bL is less than 10 % or more than 90 % reduced (the paper's rule): outside these limits a small error in the % gives a large error in Δψ. A haem exactly at a limit is kept. The two limits can be changed in the same row.
 - The paper finds E_H and β × Δψ by fitting a model to R_H and R_L. With two measured values and two unknowns nothing is left over to fit, so the equations above give the same two numbers directly.
 - Only a file with both regions has P, so only such a file has Δψ; its fit must have one bH and one bL.
 - The program keeps E_H and E_L beside Δψ for every spectrum.
@@ -320,4 +320,4 @@ Example 1: bH and bL are both 65.0858 % oxidised at 37 °C, so R_H = R_L = 0.349
 
 Example 2: bH is 75.6308 % and bL 40.6805 % oxidised at 37 °C, so R_H = 0.243692 and R_L = 0.593195. Then b = 0.040289, h = 0.203403, l = 0.552906 and n = 0.203403. E_H = 40 − 26.727 × ln(0.203403 ÷ 0.203403) = 40 mV and E_L = −20 − 26.727 × ln(0.552906 ÷ 0.203403) = −20 − 26.727 × 1 = −46.727 mV, so Δψ = (40 + 46.727) ÷ 0.5 = 173.453 mV.
 
-Checked by: `test_equal_haems_at_their_midpoints_give_120_mV`, `test_unequal_haems_give_173_mV`, `test_delta_psi_is_empty_outside_the_limits`, `test_numbers_that_cannot_be_used_are_refused` and `test_the_numbers_the_program_starts_with` in `tests/test_delta_psi.py`.
+Checked by: `test_equal_haems_at_their_midpoints_give_120_mV`, `test_unequal_haems_give_173_mV`, `test_delta_psi_is_empty_outside_the_limits`, `test_numbers_that_cannot_be_used_are_refused` and `test_the_numbers_the_program_starts_with` in `tests/test_delta_psi.py`; the filled-in midpoints by `test_numbers_of_the_delta_psi_row` in `tests/test_window_parts.py`.

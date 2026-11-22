@@ -1,10 +1,12 @@
 """
 The settings strip under the plot: the haems, the fit, the background, the decomposition
-kept to compare with, the spectrometer, how the haems and the OCR are shown, the journal,
-the figure size and the times of the edges dragged on the plot.
+kept to compare with, the spectrometer, how the haems and the OCR are shown, the numbers
+of Δψ, the journal, the figure size and the times of the edges dragged on the plot.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import copy
+import math
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
@@ -14,10 +16,31 @@ from utils_shared.spectral_decomposer import (BACKGROUND_SHORT_NAMES,
                                               fit_describer,
                                               OWN_HAEMS_NAME,
                                               )
-from utils_shared.survey import JOURNAL_NAMES
+from utils_shared.survey import JOURNAL_NAMES, TEMPERATURE_LIMITS_C
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+# The numbers of the Δψ row: each haem's midpoint potential with the other haem
+# oxidised and how far it falls when the other is reduced (mV), which the user types,
+# then the numbers opened by "More".
+PSI_MIDPOINT_FIELDS = ('psi_bH_mV', 'psi_bL_mV', 'psi_fall_mV')
+PSI_MORE_FIELDS = ('psi_share',
+                   'temperature_c',
+                   'psi_lowest_percent',
+                   'psi_highest_percent',
+                   )
+PSI_FIELDS = PSI_MIDPOINT_FIELDS + PSI_MORE_FIELDS
+# The answer each number of the "More" line is kept in.
+PSI_MORE_ANSWERS = {'psi_share': 'psi_share',
+                    'temperature_c': 'temperature_c',
+                    'psi_lowest_percent': 'psi_reduced_lowest_percent',
+                    'psi_highest_percent': 'psi_reduced_highest_percent',
+                    }
+# The answers that hold the numbers of Δψ, kept with a decomposition to compare with.
+PSI_KEPT_ANSWERS = (tuple(settings.DELTA_PSI_MIDPOINT_ANSWERS.values()) +
+                    tuple(PSI_MORE_ANSWERS.values())
+                    )
+PAPER_TEXT = "Paper's values"
 # The journal shown as "None": the standard size, on the page of the standard journal.
 NO_JOURNAL = 'none'
 NO_JOURNAL_TEXT = 'None (standard size)'
@@ -31,10 +54,11 @@ VALUE_NAMES = ('plot_haems',
                'haem_mode',
                'haem_per_od',
                'ocr_per_od',
-               'journal',
-               'columns',
-               'height',
-               )
+               'delta_psi',
+               ) + PSI_FIELDS + ('journal',
+                                 'columns',
+                                 'height',
+                                 )
 # The ways of showing the haems, in the order of the "Haems as" drop-down, with its words.
 HAEM_FORM_TEXTS = {'delta': 'ΔD (mOD)',
                    'percent': '% oxidised',
@@ -43,10 +67,14 @@ HAEM_FORM_TEXTS = {'delta': 'ΔD (mOD)',
 # The button that folds the tick boxes of the library haems out and away.
 BUILD_CLOSED_TEXT = 'Build a fit ▸'
 BUILD_OPEN_TEXT = 'Build a fit ▾'
-# The button that keeps the decomposition in use to compare the next ones with, and the
-# line under the first row that says which one is kept.
+# The button that keeps the decomposition in use to compare the next ones with, the two
+# that choose between it and the one on the plot, and the line under the first row that
+# says which one is kept.
 KEEP_TEXT = 'Keep to compare'
-STOP_TEXT = 'Stop comparing'
+STOP_TEXT = 'Keep this one'
+BACK_TEXT = 'Go back to kept'
+# What a click on BACK_TEXT is told as: a click, not a value the strip keeps.
+BACK_CHANGE = 'go_back'
 KEPT_PREFIX = 'Kept to compare (dashed on the plot): '
 LAST_TICK_NOTE = 'One haem at least stays ticked: tick another first, or choose a preset.'
 HEIGHT_HELP = 'a share of a page: a number above 0 and up to 1, such as 0.5'
@@ -334,10 +362,14 @@ class SettingsStrip:
     haems, a drop-down of the fits, a drop-down of the backgrounds, a button that folds
     out a tick box for each haem of the library (Build a fit), a button that keeps the
     decomposition in use to compare the next ones with (with a line saying which one is
-    kept), a drop-down of the spectrometer whose spectra hold the haems (shown when the
+    kept; while one is kept it reads "Keep this one", and a second button goes back to
+    the kept one), a drop-down of the spectrometer whose spectra hold the haems (shown when the
     files share more than one), a drop-down of how the haems are shown with a "per OD"
     box, an "OCR per OD" box (both boxes shown only when OD values were entered), a
-    drop-down of the journal, a drop-down of the widths that journal allows and a typing
+    row of the numbers of Δψ (shown only while Δψ is worked out: the midpoint of bH
+    and of bL and the fall typed, each midpoint with the other haem reduced filled in,
+    a button for the paper's values, and the share, the temperature and the limits as
+    text, or as boxes when "More" is ticked), a drop-down of the journal, a drop-down of the widths that journal allows and a typing
     box for the height. It tells the window what the user changed and can be
     set by the program; it changes nothing by itself. It starts greyed out, until the
     program says it is listening. Every method runs on the window thread, except
@@ -353,6 +385,7 @@ class SettingsStrip:
 
     ---- Methods ----
     __init__
+    _back_handler
     _background_handler
     _build_toggler
     _change_reporter
@@ -362,7 +395,10 @@ class SettingsStrip:
     _haems_handler
     _height_handler
     _journal_handler
+    _more_toggler
+    _paper_handler
     _per_od_handler
+    _psi_handler
     _size_refresher
     _spectra_handler
     _tick_handler
@@ -416,6 +452,7 @@ class SettingsStrip:
         None.
 
         ---- Helpers ----
+        _back_handler
         _background_handler
         _build_toggler
         _compare_handler
@@ -424,10 +461,14 @@ class SettingsStrip:
         _haems_handler
         _height_handler
         _journal_handler
+        _more_toggler
+        _paper_handler
         _per_od_handler
+        _psi_handler
         _size_refresher
         _spectra_handler
         _width_handler
+        psi_values_builder
         """
 
         # ---- 1 The values, starting from the standard settings -----------------------
@@ -448,7 +489,9 @@ class SettingsStrip:
                                         'journal': NO_JOURNAL,
                                         'columns': standard['columns'],
                                         'height': standard['height'],
+                                        **psi_values_builder(standard, False),
                                         }
+        self._is_more_open = False
         self._journals = [NO_JOURNAL] + list(JOURNAL_NAMES)
         self._backgrounds = list(BACKGROUND_SHORT_NAMES)
         self._width_columns: List[float] = []
@@ -506,6 +549,11 @@ class SettingsStrip:
                                          command=self._compare_handler,
                                          )
         self._compare_button.pack(side='left', padx=(0, 4))
+        # _size_refresher places it only while a decomposition is kept.
+        self._back_button = tk.Button(upper,
+                                      text=BACK_TEXT,
+                                      command=self._back_handler,
+                                      )
         self._upper = upper
 
         # ---- 2.1 The tick boxes of the library haems, folded away at first -----------
@@ -549,6 +597,85 @@ class SettingsStrip:
             activebackground=background,
             highlightthickness=0,
             )
+
+        # ---- 3.1 The Δψ row, placed only while Δψ is worked out ----------------------
+        # First line: each haem's midpoint, typed, then (after the arrow) its midpoint
+        # with the other haem reduced, filled in and not typed in; the fall; the
+        # button of the paper's values; the box that opens the second line. Second
+        # line: the other numbers as text, or as boxes when "More" is ticked.
+        self._psi_row = tk.Frame(self.frame, bg=background)
+        first = tk.Frame(self._psi_row, bg=background)
+        first.pack()
+        self._psi_boxes: Dict[str, Any] = {}
+        self._psi_seconds: Dict[str, Any] = {}
+
+        def box_maker(parent_line: Any, name: str, gap: Tuple[int, int]) -> None:
+            box = tk.Entry(parent_line,
+                           width=6,
+                           justify='right',
+                           bg='white',
+                           disabledbackground=background,
+                           relief='solid',
+                           borderwidth=1,
+                           )
+            box.pack(side='left', padx=gap)
+            box.bind('<Return>', lambda event, chosen=name: self._psi_handler(chosen))
+            box.bind('<FocusOut>', lambda event, chosen=name: self._psi_handler(chosen))
+            self._psi_boxes[name] = box
+
+        tk.Label(first, text='Δψ', bg=background).pack(side='left', padx=(4, 8))
+        for haem, name in (('bH', 'psi_bH_mV'), ('bL', 'psi_bL_mV')):
+            tk.Label(first, text=haem, bg=background).pack(side='left', padx=(0, 4))
+            box_maker(first, name, (0, 2))
+            tk.Label(first, text='→', bg=background).pack(side='left', padx=(0, 2))
+            second = tk.Entry(first,
+                              width=6,
+                              justify='right',
+                              readonlybackground=background,
+                              fg=NOTE_TEXT,
+                              relief='flat',
+                              state='readonly',
+                              takefocus=0,
+                              )
+            second.pack(side='left', padx=(0, 12))
+            self._psi_seconds[name] = second
+        tk.Label(first, text='fall', bg=background).pack(side='left', padx=(0, 4))
+        box_maker(first, 'psi_fall_mV', (0, 2))
+        tk.Label(first, text='mV', bg=background).pack(side='left', padx=(0, 12))
+        self._paper_button = tk.Button(first,
+                                       text=PAPER_TEXT,
+                                       command=self._paper_handler,
+                                       )
+        self._paper_button.pack(side='left', padx=(0, 8))
+        self._more = tk.BooleanVar(master=parent, value=False)
+        self._more_box = tk.Checkbutton(first,
+                                        text='More',
+                                        variable=self._more,
+                                        command=self._more_toggler,
+                                        bg=background,
+                                        activebackground=background,
+                                        highlightthickness=0,
+                                        )
+        self._more_box.pack(side='left', padx=(0, 4))
+        self._psi_summary = tk.Label(self._psi_row,
+                                     text='',
+                                     bg=background,
+                                     fg=NOTE_TEXT,
+                                     )
+        self._psi_more = tk.Frame(self._psi_row, bg=background)
+        for words, name, after in (('Share', 'psi_share', ''),
+                                   ('Temperature', 'temperature_c', '°C'),
+                                   ('Given between', 'psi_lowest_percent', ''),
+                                   ('and', 'psi_highest_percent', '% reduced'),
+                                   ):
+            tk.Label(self._psi_more, text=words, bg=background).pack(side='left',
+                                                                     padx=(4, 4),
+                                                                     )
+            box_maker(self._psi_more, name, (0, 2))
+            tk.Label(self._psi_more, text=after, bg=background).pack(side='left',
+                                                                     padx=(0, 8),
+                                                                     )
+        self._psi_note = tk.Label(self._psi_row, text='', bg=background, fg=ERROR_TEXT)
 
         # ---- 4 Third row: the journal, the width and the height ----------------------
         lower = tk.Frame(self.frame, bg=background)
@@ -625,6 +752,37 @@ class SettingsStrip:
         self._background_combo.selection_clear()
         self._change_reporter(before)
 
+    # ---- _back_handler ---------------------------------------------------------------
+    def _back_handler(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the button that goes back to the kept decomposition. The strip
+        keeps nothing: the click is told as {BACK_CHANGE: True}, and the program sets
+        the strip to the kept values.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        BACK_CHANGE.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the function given as on_change (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self._values['compare']:
+            self._on_change({BACK_CHANGE: True})
+
     # ---- _build_toggler --------------------------------------------------------------
     def _build_toggler(self) -> None:
         """
@@ -700,7 +858,7 @@ class SettingsStrip:
         """
         ---- Summary ----
         Method to take the button that keeps the decomposition in use to compare with,
-        or stops comparing. The program says which one is kept (the value 'kept').
+        or, while one is kept, carries on with the one on the plot. The program says which one is kept (the value 'kept').
 
         ---- Inputs ----
         None.
@@ -918,6 +1076,76 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _more_toggler ---------------------------------------------------------------
+    def _more_toggler(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the "More" box of the Δψ row: ticked, the share, the temperature
+        and the limits are boxes to type in; unticked, they are one line of text.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _size_refresher
+        """
+
+        self._is_more_open = bool(self._more.get())
+        self._size_refresher()
+
+    # ---- _paper_handler --------------------------------------------------------------
+    def _paper_handler(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the button that puts the numbers of the paper back in the Δψ
+        row: the midpoints, the fall, the share and the limits. The temperature stays,
+        as it is that of the runs.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        settings.DEFAULT_ANSWERS, PSI_FIELDS.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the values and reports the changes (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        psi_values_builder
+        """
+
+        before = dict(self._values)
+        paper = psi_values_builder(settings.DEFAULT_ANSWERS, True)
+        self._values.update({name: paper[name]
+                             for name in PSI_FIELDS
+                             if name != 'temperature_c'
+                             },
+                            )
+        self._size_refresher()
+        self._change_reporter(before)
+
     # ---- _per_od_handler -------------------------------------------------------------
     def _per_od_handler(self, name: str) -> None:
         """
@@ -950,23 +1178,77 @@ class SettingsStrip:
         self._values[name] = bool(box.get())
         self._change_reporter(before)
 
+    # ---- _psi_handler ----------------------------------------------------------------
+    def _psi_handler(self, name: str) -> None:
+        """
+        ---- Summary ----
+        Method to take the number typed in one box of the Δψ row, when Enter is pressed
+        or the box is left; a box left as it was shown passes nothing on. A number that
+        cannot be used turns the box red, with the reason under the row, and the value
+        in use stays.
+
+        ---- Inputs ----
+        name : str
+            The value of the box, one of PSI_FIELDS.
+
+        ---- Globals read ----
+        ERROR_BACKGROUND.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        psi_number_checker
+        typed_number_reader
+        """
+
+        box = self._psi_boxes[name]
+        if str(box.cget('state')) == 'disabled':
+            return
+        text = box.get()
+        if typed_number_reader(text) == self._values[name]:
+            self._size_refresher()
+            return
+        value, note = psi_number_checker(name, text, self._values)
+        if value is None:
+            box.configure(bg=ERROR_BACKGROUND)
+            self._psi_note.configure(text=note)
+            self._psi_note.pack()
+            return
+        before = dict(self._values)
+        self._values[name] = value
+        self._size_refresher()
+        self._change_reporter(before)
+
     # ---- _size_refresher -------------------------------------------------------------
     def _size_refresher(self) -> None:
         """
         ---- Summary ----
         Method to show the kept values in every part of the strip: the widths offered
         follow the journal, the width and the height are greyed for "None", the button
-        that keeps a decomposition is greyed while no haems are shown, the line saying
-        which one is kept shows only while one is, the spectrometer shows only when
+        that keeps a decomposition is greyed while no haems are shown, the button that
+        goes back to the kept one and the line saying which one is kept show only
+        while one is, the spectrometer shows only when
         there is a choice, the per OD boxes only when OD values were entered (the one
-        of the haems greyed for % oxidised, which has no per OD), and the whole strip
-        is greyed while the program is not listening.
+        of the haems greyed for % oxidised, which has no per OD), the Δψ row only
+        while Δψ is worked out (its filled-in midpoints following the typed ones and
+        the fall), and the whole strip is greyed while the program is not listening.
 
         ---- Inputs ----
         None.
 
         ---- Globals read ----
         HAEM_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
+        (BACK_TEXT is set on its button once, when it is built.)
 
         ---- Outputs ----
         None
@@ -981,6 +1263,8 @@ class SettingsStrip:
         ---- Helpers ----
         haem_form_choices_lister
         height_checker
+        psi_seconds_filler
+        psi_summary_writer
         width_choices_lister
         """
 
@@ -1030,6 +1314,11 @@ class SettingsStrip:
             text=STOP_TEXT if values['compare'] else KEEP_TEXT,
             state='normal' if can_compare else 'disabled',
             )
+        if values['compare']:
+            self._back_button.configure(state='normal' if can_compare else 'disabled')
+            self._back_button.pack(side='left', padx=(0, 4))
+        else:
+            self._back_button.pack_forget()
         if values['kept']:
             self._kept_label.configure(text=KEPT_PREFIX + values['kept'])
             self._kept_label.pack(before=self._lower, pady=(0, 3), fill='x')
@@ -1068,6 +1357,33 @@ class SettingsStrip:
         for part, is_shown, gap in parts:
             if is_shown:
                 part.pack(side='left', padx=gap)
+        # The Δψ row: shown only while Δψ is worked out, its boxes holding the values
+        # in use (a number typed and refused is taken away with its reason).
+        seconds = psi_seconds_filler(values['psi_bH_mV'],
+                                     values['psi_bL_mV'],
+                                     values['psi_fall_mV'],
+                                     )
+        for second, filled in zip(self._psi_seconds.values(), seconds):
+            second.configure(state='normal')
+            second.delete(0, 'end')
+            second.insert(0, f'{filled:g}')
+            second.configure(state='readonly')
+        for name, box in self._psi_boxes.items():
+            box.configure(state='normal', bg='white')
+            box.delete(0, 'end')
+            box.insert(0, f'{values[name]:g}')
+            box.configure(state=button_state)
+        self._paper_button.configure(state=button_state)
+        self._more.set(self._is_more_open)
+        self._psi_summary.configure(text=psi_summary_writer(values))
+        self._psi_note.pack_forget()
+        self._psi_summary.pack_forget()
+        self._psi_more.pack_forget()
+        (self._psi_more if self._is_more_open else self._psi_summary).pack()
+        if values['delta_psi']:
+            self._psi_row.pack(before=self._lower, pady=(0, 3))
+        else:
+            self._psi_row.pack_forget()
         self._journal_combo.configure(state=choice_state)
         if is_standard or not self._is_enabled:
             self._width_combo.configure(state='disabled')
@@ -1637,22 +1953,31 @@ def height_checker(text: str, journal: str) -> Tuple[Optional[float], str]:
 
 
 # ---- kept_decomposition_builder ------------------------------------------------------
-def kept_decomposition_builder(answers: dict, fit: dict) -> Dict[str, Any]:
+def kept_decomposition_builder(answers: dict,
+                               fit: dict,
+                               regions: Dict[str, Dict[str, float]],
+                               ) -> Dict[str, Any]:
     """
     ---- Summary ----
     Main function to keep the decomposition in use, to compare the next ones with: the
-    fit, the answers it was worked out with and its name in words.
+    fit, the answers it was worked out with (the fit, the background, the spectrometer
+    and the numbers of delta psi), the oxidised and reduced regions of every file, and
+    its name in words.
 
     ---- Inputs ----
     answers : dict
         The answers in use (fit_file, haem_files, haem_background,
-        decomposition_dataset).
+        decomposition_dataset, delta_psi and the numbers of delta psi).
     fit : dict
         The fit in use (spectral_decomposer.fit_importer); it is kept as it is, as a
         fit is never changed once read.
+    regions : Dict[str, Dict[str, float]]
+        {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+        times on the original recording (min); may be empty. A copy is kept, so the
+        regions changed later leave it as it was.
 
     ---- Globals read ----
-    BACKGROUND_SHORT_NAMES.
+    BACKGROUND_SHORT_NAMES, PSI_KEPT_ANSWERS.
 
     ---- Outputs ----
     Dict[str, Any]
@@ -1672,6 +1997,7 @@ def kept_decomposition_builder(answers: dict, fit: dict) -> Dict[str, Any]:
                     'haem_files': list(answers.get('haem_files', [])),
                     'haem_background': answers['haem_background'],
                     'decomposition_dataset': answers['decomposition_dataset'],
+                    **{name: answers[name] for name in PSI_KEPT_ANSWERS},
                     }
     background = BACKGROUND_SHORT_NAMES.get(answers['haem_background'],
                                             answers['haem_background'],
@@ -1679,7 +2005,15 @@ def kept_decomposition_builder(answers: dict, fit: dict) -> Dict[str, Any]:
     text = (f"{fit_describer(answers['fit_file'], kept_answers['haem_files'])} with "
             f'the {background} background'
             )
-    return {'fit': fit, 'answers': kept_answers, 'text': text}
+    if answers.get('delta_psi'):
+        text += ', its regions and Δψ numbers'
+    elif regions:
+        text += ' and its regions'
+    return {'fit': fit,
+            'answers': kept_answers,
+            'regions': copy.deepcopy(regions),
+            'text': text,
+            }
 
 
 # ---- minutes_checker -----------------------------------------------------------------
@@ -1713,6 +2047,297 @@ def minutes_checker(text: str) -> Tuple[Optional[float], str]:
     if minutes is None or minutes < 0:
         return None, MINUTES_HELP
     return minutes + 0.0, ''
+
+
+# ---- psi_answers_builder -------------------------------------------------------------
+def psi_answers_builder(changes: Dict[str, Any], answers: dict) -> Dict[str, float]:
+    """
+    ---- Summary ----
+    Main function to turn the numbers changed in the Δψ row into the answers of the
+    run: the four midpoint potentials from the two typed and the fall, and the share,
+    the temperature and the limits as given.
+
+    ---- Inputs ----
+    changes : Dict[str, Any]
+        {name: new value} of the strip values that changed (DATA_FORMAT.md).
+    answers : dict
+        The answers in use; the midpoints not changed are read from them.
+
+    ---- Globals read ----
+    PSI_MIDPOINT_FIELDS, PSI_MORE_ANSWERS.
+
+    ---- Outputs ----
+    Dict[str, float]
+        The answers to update: all four midpoints (mV) when a midpoint or the fall
+        changed, and psi_share, temperature_c (°C), psi_reduced_lowest_percent and
+        psi_reduced_highest_percent when they did. Empty when no number of the row
+        changed.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    psi_seconds_filler.
+
+    ---- Helpers ----
+    psi_seconds_filler
+    psi_values_builder
+    """
+
+    result: Dict[str, float] = {}
+    if any(name in changes for name in PSI_MIDPOINT_FIELDS):
+        current = psi_values_builder(answers, True)
+        bH, bL, fall = (float(changes.get(name, current[name]))
+                        for name in PSI_MIDPOINT_FIELDS
+                        )
+        second_bH, second_bL = psi_seconds_filler(bH, bL, fall)
+        result.update({'psi_bH_first_mV': bH,
+                       'psi_bL_first_mV': bL,
+                       'psi_bH_second_mV': second_bH,
+                       'psi_bL_second_mV': second_bL,
+                       },
+                      )
+    for name, answer in PSI_MORE_ANSWERS.items():
+        if name in changes:
+            result[answer] = float(changes[name])
+    return result
+
+
+# ---- psi_change_describer ------------------------------------------------------------
+def psi_change_describer(changes: Dict[str, Any], answers: dict) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to say in plain sentences what the numbers of Δψ are after a change
+    in the Δψ row: what was typed and what was filled in from it.
+
+    ---- Inputs ----
+    changes : Dict[str, Any]
+        {name: new value} of the strip values that changed (DATA_FORMAT.md).
+    answers : dict
+        The answers in use, already holding the change (psi_answers_builder).
+
+    ---- Globals read ----
+    PSI_MIDPOINT_FIELDS.
+
+    ---- Outputs ----
+    List[str]
+        One sentence for the midpoints and the fall, one for the share, one for the
+        temperature and one for the limits, each only when it changed.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    psi_values_builder
+    """
+
+    lines = []
+    values = psi_values_builder(answers, True)
+    if any(name in changes for name in PSI_MIDPOINT_FIELDS):
+        lines.append(f"Δψ is now worked out with bH at {values['psi_bH_mV']:g} mV "
+                     f"({answers['psi_bH_second_mV']:g} mV with bL reduced) and bL at "
+                     f"{values['psi_bL_mV']:g} mV ({answers['psi_bL_second_mV']:g} mV "
+                     f"with bH reduced): a fall of {values['psi_fall_mV']:g} mV.",
+                     )
+    if 'psi_share' in changes:
+        lines.append('The share of the membrane potential between bH and bL is now '
+                     f"{values['psi_share']:g}.",
+                     )
+    if 'temperature_c' in changes:
+        lines.append(f"The temperature of the runs is now {values['temperature_c']:g} "
+                     '°C.',
+                     )
+    if 'psi_lowest_percent' in changes or 'psi_highest_percent' in changes:
+        lines.append('Δψ is now given where bH and bL are between '
+                     f"{values['psi_lowest_percent']:g} and "
+                     f"{values['psi_highest_percent']:g} % reduced.",
+                     )
+    return lines
+
+
+# ---- psi_number_checker --------------------------------------------------------------
+def psi_number_checker(name: str,
+                       text: str,
+                       values: Dict[str, Any],
+                       ) -> Tuple[Optional[float], str]:
+    """
+    ---- Summary ----
+    Main function to check a number typed in one box of the Δψ row.
+
+    ---- Inputs ----
+    name : str
+        The value of the box, one of PSI_FIELDS.
+    text : str
+        What was typed, e.g. '40', '-20' or '0,5'.
+    values : Dict[str, Any]
+        The strip values in use; a limit is checked against the other limit.
+
+    ---- Globals read ----
+    TEMPERATURE_LIMITS_C.
+
+    ---- Outputs ----
+    Tuple[Optional[float], str]
+        (number, '') for a number that can be used, or (None, what to type instead).
+        A midpoint or the fall is any number (mV); the share is above 0; the
+        temperature is one the temperature question takes; the lowest limit is above
+        0 and below the highest, the highest above the lowest and below 100.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    typed_number_reader
+    """
+
+    number = typed_number_reader(text)
+    if name == 'psi_share':
+        if number is None or number <= 0:
+            return None, 'Type a share above 0, such as 0.5 for half.'
+    elif name == 'temperature_c':
+        coldest, hottest = TEMPERATURE_LIMITS_C
+        if number is None or not coldest <= number <= hottest:
+            return None, (f'Type a temperature from {coldest:g} to {hottest:g} °C, '
+                          'such as 37.'
+                          )
+    elif name == 'psi_lowest_percent':
+        highest = values['psi_highest_percent']
+        if number is None or not 0 < number < highest:
+            return None, (f'Type a lowest % reduced above 0 and below {highest:g}, '
+                          'such as 10.'
+                          )
+    elif name == 'psi_highest_percent':
+        lowest = values['psi_lowest_percent']
+        if number is None or not lowest < number < 100:
+            return None, (f'Type a highest % reduced above {lowest:g} and below 100, '
+                          'such as 90.'
+                          )
+    elif number is None:
+        return None, 'Type a number of mV, such as 40 or -20.'
+    return number + 0.0, ''
+
+
+# ---- psi_seconds_filler --------------------------------------------------------------
+def psi_seconds_filler(bH_mV: float,
+                       bL_mV: float,
+                       fall_mV: float,
+                       ) -> Tuple[float, float]:
+    """
+    ---- Summary ----
+    Main function to fill in the midpoint potential of each b haem with the other
+    haem reduced, from its midpoint with the other oxidised and the fall.
+
+    ---- Inputs ----
+    bH_mV : float
+        Midpoint potential of bH with bL oxidised (mV).
+    bL_mV : float
+        Midpoint potential of bL with bH oxidised (mV).
+    fall_mV : float
+        How far each midpoint falls when the other haem is reduced (mV).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[float, float]
+        (midpoint of bH with bL reduced, midpoint of bL with bH reduced), in mV.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    second = first - fall, for each haem: 40 and -20 with a fall of 70 give -30 and
+    -90. The fall is the same for both, as the maths of delta psi needs.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return float(bH_mV) - float(fall_mV), float(bL_mV) - float(fall_mV)
+
+
+# ---- psi_summary_writer --------------------------------------------------------------
+def psi_summary_writer(values: Dict[str, Any]) -> str:
+    """
+    ---- Summary ----
+    Main function to write the share, the temperature and the limits of Δψ as the one
+    line of text shown in the Δψ row while "More" is not ticked.
+
+    ---- Inputs ----
+    values : Dict[str, Any]
+        The strip values (DATA_FORMAT.md).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        'share 0.5 · 37 °C · given between 10 and 90 % reduced'.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return (f"share {values['psi_share']:g} · {values['temperature_c']:g} °C · given "
+            f"between {values['psi_lowest_percent']:g} and "
+            f"{values['psi_highest_percent']:g} % reduced"
+            )
+
+
+# ---- psi_values_builder --------------------------------------------------------------
+def psi_values_builder(answers: dict, is_on: bool) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to give the strip values of the Δψ row that show the answers of the
+    run.
+
+    ---- Inputs ----
+    answers : dict
+        The answers (the four midpoints, psi_share, temperature_c and the two limits).
+    is_on : bool
+        True when Δψ is worked out, which shows the row.
+
+    ---- Globals read ----
+    PSI_MORE_ANSWERS.
+
+    ---- Outputs ----
+    Dict[str, Any]
+        {'delta_psi', 'psi_bH_mV', 'psi_bL_mV', 'psi_fall_mV', 'psi_share',
+        'temperature_c', 'psi_lowest_percent', 'psi_highest_percent'}.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    fall = midpoint of bH with bL oxidised - midpoint of bH with bL reduced, rounded
+    to a millionth of a mV: 40 - (-30) = 70 mV.
+
+    ---- Helpers ----
+    None.
+    """
+
+    values: Dict[str, Any] = {'delta_psi': bool(is_on),
+                              'psi_bH_mV': float(answers['psi_bH_first_mV']),
+                              'psi_bL_mV': float(answers['psi_bL_first_mV']),
+                              'psi_fall_mV': round(float(answers['psi_bH_first_mV']) -
+                                                   float(answers['psi_bH_second_mV']),
+                                                   6,
+                                                   ),
+                              }
+    for name, answer in PSI_MORE_ANSWERS.items():
+        values[name] = float(answers[answer])
+    return values
 
 
 # ---- size_answers_builder ------------------------------------------------------------
@@ -1775,8 +2400,8 @@ def strip_values_builder(answers: dict,
     ---- Inputs ----
     answers : dict
         The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
-        haem_per_od, ocr_mode, journal, columns, height, size_mode); a fit_file of None
-        shows an empty fit.
+        haem_per_od, ocr_mode, delta_psi and the numbers of Δψ, journal, columns,
+        height, size_mode); a fit_file of None shows an empty fit.
     has_haems : bool
         True when the haems are worked out and shown, which ticks the box.
     haem_files : Sequence[str]
@@ -1794,7 +2419,7 @@ def strip_values_builder(answers: dict,
         All the strip values (DATA_FORMAT.md). A figure of the standard size
         (size_mode other than 'custom') shows the journal as "None"; the OCR per OD
         box is ticked for the OCR per OD, unticked for the plain OCR and its % of the
-        range.
+        range; the Δψ row shows when the haems are worked out and Δψ is switched on.
 
     ---- Globals mutated ----
     None.
@@ -1803,7 +2428,7 @@ def strip_values_builder(answers: dict,
     None.
 
     ---- Helpers ----
-    None.
+    psi_values_builder
     """
 
     is_custom = answers['size_mode'] == 'custom'
@@ -1817,6 +2442,7 @@ def strip_values_builder(answers: dict,
             'haem_mode': answers['haem_mode'],
             'haem_per_od': bool(answers['haem_per_od']),
             'ocr_per_od': answers['ocr_mode'] == 'od',
+            **psi_values_builder(answers, has_haems and answers['delta_psi']),
             'journal': answers['journal'] if is_custom else NO_JOURNAL,
             'columns': answers['columns'],
             'height': answers['height'],
@@ -1830,15 +2456,17 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
     Main function to check values meant for the strip before they are shown: the
     names, the background, the haems ticked, whether a decomposition is kept and its
     words, the spectrometer, the way of showing the haems, the per OD boxes, the
-    journal, a width the journal allows and a height the page allows. The
-    width and the height are checked against the journal given with them.
+    numbers of the Δψ row (numbers, a share above 0, limits above 0 and below 100
+    with the lowest first), the journal, a width the journal allows and a height the
+    page allows. The width and the height are checked against the journal given with
+    them.
 
     ---- Inputs ----
     values : Dict[str, Any]
         Some or all of the strip values (DATA_FORMAT.md).
 
     ---- Globals read ----
-    VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS.
+    VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS, PSI_FIELDS.
 
     ---- Outputs ----
     None
@@ -1896,6 +2524,32 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
             raise ValueError('A per OD box of the strip is True or False; '
                              f'{values[name]!r} is not.',
                              )
+    if 'delta_psi' in values and not isinstance(values['delta_psi'], bool):
+        raise ValueError('Whether the strip shows the Δψ row is True or False; '
+                         f"{values['delta_psi']!r} is not.",
+                         )
+    for name in PSI_FIELDS:
+        if name in values and (isinstance(values[name], bool) or
+                               not isinstance(values[name], (int, float)) or
+                               not math.isfinite(values[name])
+                               ):
+            raise ValueError(f"The number '{name}' of the Δψ row is a number; "
+                             f'{values[name]!r} is not.',
+                             )
+    if 'psi_share' in values and values['psi_share'] <= 0:
+        raise ValueError('The share of the Δψ row is above 0; '
+                         f"{values['psi_share']:g} is not.",
+                         )
+    limits = [values[name]
+              for name in ('psi_lowest_percent', 'psi_highest_percent')
+              if name in values
+              ]
+    if not all(0 < limit < 100 for limit in limits) or limits != sorted(set(limits)):
+        raise ValueError('The limits of the Δψ row are above 0 and below 100, the '
+                         'lowest first; '
+                         f"{' and '.join(f'{limit:g}' for limit in limits)} "
+                         f"{'are' if len(limits) > 1 else 'is'} not.",
+                         )
     if 'journal' in values:
         _page_journal_finder(values['journal'])
         if 'columns' in values and values['journal'] != NO_JOURNAL:

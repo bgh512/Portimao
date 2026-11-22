@@ -19,6 +19,7 @@ from matplotlib.figure import Figure
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
+from utils_shared.delta_psi import DELTA_PSI_COLUMN
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_exporter import (experiment_workbook_exporter,
@@ -126,6 +127,7 @@ class ViewerSession:
     has_od: bool = False
     redraw: Optional[Callable[[], bool]] = None
     is_figure: bool = False
+    is_choosing_regions: bool = False
     export_choice: Optional[str] = None
     export_limits: Dict[str, dict] = field(default_factory=dict)
     full_exports: Dict[str, List[Path]] = field(default_factory=dict)
@@ -247,11 +249,12 @@ def _kept_haems_drawer(session: ViewerSession,
                        ) -> str:
     """
     ---- Summary ----
-    Helper function to work one file out again with the kept decomposition (its fit and
-    background, everything else as in use), draw its haem traces dashed over the haems
-    in use in the same colours, widening a panel a kept trace would leave, and say how
-    far apart the two are. Its own warnings are left out, as they repeat those of the
-    decomposition in use.
+    Helper function to work one file out again with the kept decomposition (its fit,
+    background, regions and numbers of delta psi, everything else as in use), draw its
+    haem traces dashed over the haems in use in the same colours, widening a panel a
+    kept trace would leave, and say how far apart the two are; its delta psi is drawn
+    the same way over the delta psi in use. Its own warnings are left out, as they
+    repeat those of the decomposition in use.
 
     ---- Inputs ----
     session : ViewerSession
@@ -279,9 +282,10 @@ def _kept_haems_drawer(session: ViewerSession,
 
     ---- Outputs ----
     str
-        The notes: a KEY_PREFIX line for the dashed lines and a line with the largest
-        and the average gap of each haem in both; or one sentence saying why the kept
-        decomposition is not shown on this file.
+        The notes: a KEY_PREFIX line for the dashed lines, a line with the largest
+        and the average gap of each haem in both, and the note of the kept delta psi
+        (_kept_psi_drawer) when delta psi is shown; or one sentence saying why the
+        kept decomposition is not shown on this file.
 
     ---- Globals mutated ----
     None. Draws on the haem panels; the details of a problem go to the log (side
@@ -293,6 +297,7 @@ def _kept_haems_drawer(session: ViewerSession,
     pad = (max - min) x KEPT_MARGIN, and never shrinks.
 
     ---- Helpers ----
+    _kept_psi_drawer
     _loaded_experiment_getter
     decomposition_gap_calculator
     experiment_data_processor
@@ -305,13 +310,14 @@ def _kept_haems_drawer(session: ViewerSession,
     key = HAEM_KEYS.get(haem_source or '')
     kept_answers = dict(answers, **kept['answers'], decompose=True, averaging=False)
     name = summary['name']
+    kept_info = dict(info, regions=kept['regions'].get(name))
     try:
         with session.window.output_capturer():
             fresh = _loaded_experiment_getter(session,
                                               summary,
                                               kept_answers['decomposition_dataset'],
                                               )
-            kept_experiment = experiment_data_processor(info,
+            kept_experiment = experiment_data_processor(kept_info,
                                                         settings.Config(kept_answers),
                                                         kept['fit'],
                                                         fresh,
@@ -359,18 +365,126 @@ def _kept_haems_drawer(session: ViewerSession,
                 low, high = ax.get_ylim()
                 ax.set_ylim(min(low, used.min() - pad), max(high, used.max() + pad))
 
-    # ---- 3 Say how far apart they are ------------------------------------------------
+    # ---- 3 Draw its delta psi dashed over the one in use -----------------------------
+    psi_note = _kept_psi_drawer(experiment,
+                                kept_experiment,
+                                axes,
+                                plot_config,
+                                info['ignore_start'] or 0.0,
+                                info['ignore_end'] or 0.0,
+                                )
+
+    # ---- 4 Say how far apart they are ------------------------------------------------
     gaps = decomposition_gap_calculator(new_table, kept_table)
-    if not gaps:
-        return f'{KEY_PREFIX}dashed and paler = kept decomposition (no haem in common)'
-    words = ', '.join(f'{haem_name_plainer(haem)} {largest:.3g} / {average:.3g}'
-                      for haem, (largest, average) in gaps.items()
-                      )
-    return '\n'.join((f'{KEY_PREFIX}dashed and paler = kept decomposition',
-                      f'Gap to the kept decomposition, largest / average, in the units '
-                      f'of the haem panels: {words}',
-                      ),
-                     )
+    if gaps:
+        words = ', '.join(f'{haem_name_plainer(haem)} {largest:.3g} / {average:.3g}'
+                          for haem, (largest, average) in gaps.items()
+                          )
+        lines = [f'{KEY_PREFIX}dashed and paler = kept decomposition',
+                 f'Gap to the kept decomposition, largest / average, in the units of '
+                 f'the haem panels: {words}',
+                 ]
+    else:
+        lines = [f'{KEY_PREFIX}dashed and paler = kept decomposition (no haem in '
+                 'common)',
+                 ]
+    return '\n'.join(line for line in (*lines, psi_note) if line)
+
+
+# ---- _kept_psi_drawer ----------------------------------------------------------------
+def _kept_psi_drawer(experiment: dict,
+                     kept_experiment: dict,
+                     axes: list,
+                     plot_config: dict,
+                     ignore_start_min: float,
+                     ignore_end_min: float,
+                     ) -> str:
+    """
+    ---- Summary ----
+    Helper function to draw the delta psi of the kept decomposition dashed and paler
+    over the delta psi in use, widening the panel where the kept line would leave it,
+    and say how far apart the two are.
+
+    ---- Inputs ----
+    experiment : dict
+        The experiment worked out with what is in use.
+    kept_experiment : dict
+        The same file worked out with the kept fit, background, regions and numbers
+        of delta psi; it has no 'delta_psi' when the file had no regions then, or the
+        kept fit has no bH and bL.
+    axes : list
+        Panels of the preview, top to bottom; the delta psi panel has is_delta_psi.
+    plot_config : dict
+        Plot settings of the preview (DELTA_PSI_COLOUR, LINE_WIDTH).
+    ignore_start_min : float
+        Minutes ignored at the start, left out when the panel is widened.
+    ignore_end_min : float
+        Minutes ignored at the end, left out when the panel is widened.
+
+    ---- Globals read ----
+    DELTA_PSI_COLUMN, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
+
+    ---- Outputs ----
+    str
+        The note: the largest and the average gap between the two in mV, or one
+        sentence saying why no kept delta psi is shown on this file; '' when the
+        preview has no delta psi panel.
+
+    ---- Globals mutated ----
+    None. Draws on the delta psi panel (side effect).
+
+    ---- Equations ----
+    The gaps: decomposition_gap_calculator, over the spectra where both have a value.
+    The widened panel reaches from min - pad to max + pad of the kept line outside
+    the ignored parts, with pad = (max - min) x KEPT_MARGIN, and never shrinks.
+
+    ---- Helpers ----
+    decomposition_gap_calculator
+    time_getter
+    value_getter
+    """
+
+    # ---- 1 Find the panel and the kept delta psi -------------------------------------
+    ax = next((ax for ax in axes if getattr(ax, 'is_delta_psi', False)), None)
+    if ax is None:
+        return ''
+    kept_table = kept_experiment.get('delta_psi')
+    if kept_table is None:
+        return ('The kept Δψ is not shown on this file: with what was kept it has no '
+                'Δψ (it had no regions then, or the kept fit has no bH and bL).'
+                )
+
+    # ---- 2 Draw it dashed, and widen the panel to hold it ----------------------------
+    times = time_getter(kept_table)
+    values = np.asarray(value_getter(kept_table, DELTA_PSI_COLUMN), dtype=float)
+    ax.plot(times,
+            values,
+            color=plot_config['DELTA_PSI_COLOUR'],
+            linewidth=plot_config['LINE_WIDTH'],
+            dashes=KEPT_DASHES,
+            alpha=KEPT_ALPHA,
+            zorder=2,
+            )
+    if np.isfinite(times).any():
+        is_used = ((times >= np.nanmin(times) + ignore_start_min) &
+                   (times <= np.nanmax(times) - ignore_end_min) &
+                   np.isfinite(values)
+                   )
+        used = values[is_used]
+        if used.size:
+            pad = (used.max() - used.min()) * KEPT_MARGIN
+            low, high = ax.get_ylim()
+            ax.set_ylim(min(low, used.min() - pad), max(high, used.max() + pad))
+
+    # ---- 3 Say how far apart they are ------------------------------------------------
+    gap = decomposition_gap_calculator(experiment['delta_psi'],
+                                       kept_table,
+                                       ).get(DELTA_PSI_COLUMN)
+    if gap is None:
+        return ('No gap to the kept Δψ is given: there is no spectrum where both '
+                'have a value.'
+                )
+    return f'Gap to the kept Δψ, largest / average (mV): {gap[0]:.3g} / {gap[1]:.3g}'
 
 
 # ---- _loaded_experiment_getter -------------------------------------------------------
