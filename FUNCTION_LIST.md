@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.15
-- **Date:** 22/11/2026
+- **Version:** V2.16
+- **Date:** 23/11/2026
 
 ## Contents
 
@@ -41,8 +41,11 @@
 - [`launchers/make_icons.py`](#launchersmake_iconspy)
     - [`main`](#main)
 - [`main.py`](#mainpy)
+    - [`cancel_sentence_builder`](#cancel_sentence_builder)
     - [`comparison_maker`](#comparison_maker)
     - [`everything_asker`](#everything_asker)
+    - [`experiment_plot_saver`](#experiment_plot_saver)
+    - [`experiment_plots_saver`](#experiment_plots_saver)
     - [`experiment_processor`](#experiment_processor)
     - [`last_answers_loader`](#last_answers_loader)
     - [`last_answers_saver`](#last_answers_saver)
@@ -72,6 +75,7 @@
     - [`test_update_from_made_up_zip`](#test_update_from_made_up_zip)
 - [`tests/test_averaging_windows.py`](#teststest_averaging_windowspy)
     - [`_response_experiment_builder`](#_response_experiment_builder)
+    - [`_views_experiment_builder`](#_views_experiment_builder)
     - [`test_a_figure_asks_which_windows_only_with_both_kinds`](#test_a_figure_asks_which_windows_only_with_both_kinds)
     - [`test_a_figure_without_windows_offers_the_window_step`](#test_a_figure_without_windows_offers_the_window_step)
     - [`test_a_window_can_be_switched_off_and_set`](#test_a_window_can_be_switched_off_and_set)
@@ -81,6 +85,11 @@
     - [`test_the_plot_shows_the_windows`](#test_the_plot_shows_the_windows)
     - [`test_the_quick_windows_fall_after_the_additions`](#test_the_quick_windows_fall_after_the_additions)
     - [`test_both_kinds_are_averaged_from_one_baseline`](#test_both_kinds_are_averaged_from_one_baseline)
+    - [`test_the_ocr_is_put_on_its_percent_of_baseline`](#test_the_ocr_is_put_on_its_percent_of_baseline)
+    - [`test_a_file_without_a_baseline_keeps_its_usual_ocr`](#test_a_file_without_a_baseline_keeps_its_usual_ocr)
+    - [`test_the_ocr_question_offers_the_window_step`](#test_the_ocr_question_offers_the_window_step)
+    - [`test_every_haem_view_and_delta_psi_are_averaged`](#test_every_haem_view_and_delta_psi_are_averaged)
+    - [`test_the_averages_sheet_holds_every_view`](#test_the_averages_sheet_holds_every_view)
     - [`test_the_windows_fall_before_the_additions`](#test_the_windows_fall_before_the_additions)
 - [`tests/test_dataset_settings.py`](#teststest_dataset_settingspy)
     - [`_program_folder_maker`](#_program_folder_maker)
@@ -110,6 +119,46 @@
     - [`test_the_processing_keeps_delta_psi_when_switched_on`](#test_the_processing_keeps_delta_psi_when_switched_on)
     - [`test_the_question_is_asked_only_when_delta_psi_can_be_worked_out`](#test_the_question_is_asked_only_when_delta_psi_can_be_worked_out)
     - [`test_unequal_haems_give_173_mV`](#test_unequal_haems_give_173_mv)
+- [`tests/test_early_plots.py`](#teststest_early_plotspy)
+    - [`FakeWindow`](#fakewindow)
+    - [`_context_builder`](#_context_builder)
+    - [`_questions_stander`](#_questions_stander)
+    - [`_quiet_details`](#_quiet_details)
+    - [`_summaries_builder`](#_summaries_builder)
+    - [`test_a_failed_file_does_not_stop_the_others`](#test_a_failed_file_does_not_stop_the_others)
+    - [`test_a_file_with_nothing_to_plot_is_not_saved`](#test_a_file_with_nothing_to_plot_is_not_saved)
+    - [`test_a_saved_plot_is_not_drawn_again`](#test_a_saved_plot_is_not_drawn_again)
+    - [`test_every_file_is_saved_once_and_shown`](#test_every_file_is_saved_once_and_shown)
+    - [`test_the_cancel_sentence`](#test_the_cancel_sentence)
+    - [`test_the_plots_are_saved_after_the_file_questions`](#test_the_plots_are_saved_after_the_file_questions)
+- [`tests/test_event_concentrations.py`](#teststest_event_concentrationspy)
+    - [`test_one_addition`](#test_one_addition)
+    - [`test_the_same_thing_added_again_adds_up`](#test_the_same_thing_added_again_adds_up)
+    - [`test_a_concentration_typed`](#test_a_concentration_typed)
+    - [`test_a_stock_typed_with_its_unit`](#test_a_stock_typed_with_its_unit)
+    - [`test_the_text_of_the_labels`](#test_the_text_of_the_labels)
+    - [`test_the_table_fills_in_the_chamber`](#test_the_table_fills_in_the_chamber)
+- [`tests/test_experiment_run.py`](#teststest_experiment_runpy)
+    - [`_quiet_details`](#_quiet_details)
+    - [`test_a_workbook_open_in_excel_keeps_the_file`](#test_a_workbook_open_in_excel_keeps_the_file)
+- [`tests/test_experiment_workbook.py`](#teststest_experiment_workbookpy)
+    - [`_haem_table_maker`](#_haem_table_maker)
+    - [`_imported_experiment_maker`](#_imported_experiment_maker)
+    - [`_processed_experiment_maker`](#_processed_experiment_maker)
+    - [`test_imported_file_has_only_its_own_sheets`](#test_imported_file_has_only_its_own_sheets)
+    - [`test_processed_file_has_every_table`](#test_processed_file_has_every_table)
+    - [`test_how_it_was_worked_out`](#test_how_it_was_worked_out)
+    - [`test_ocr_percent_of_baseline_has_its_sheet`](#test_ocr_percent_of_baseline_has_its_sheet)
+    - [`test_workbook_keeps_its_list_of_spectra`](#test_workbook_keeps_its_list_of_spectra)
+    - [`test_every_spectrum_has_its_own_time_heading`](#test_every_spectrum_has_its_own_time_heading)
+- [`tests/test_figure_layout.py`](#teststest_figure_layoutpy)
+    - [`test_science_figure_sizes`](#test_science_figure_sizes)
+    - [`test_figure_never_taller_than_the_journal_takes`](#test_figure_never_taller_than_the_journal_takes)
+    - [`test_text_size_sentences`](#test_text_size_sentences)
+    - [`test_standard_text_fits_the_standard_journal`](#test_standard_text_fits_the_standard_journal)
+    - [`test_text_fitted_to_the_journal`](#test_text_fitted_to_the_journal)
+    - [`test_journal_with_no_largest_text`](#test_journal_with_no_largest_text)
+    - [`test_lines_kept_to_what_the_journal_takes`](#test_lines_kept_to_what_the_journal_takes)
 - [`tests/test_file_names.py`](#teststest_file_namespy)
     - [`test_dots_and_spaces_at_the_ends_go`](#test_dots_and_spaces_at_the_ends_go)
     - [`test_forbidden_characters_become_underscores`](#test_forbidden_characters_become_underscores)
@@ -178,14 +227,24 @@
     - [`_session_maker`](#_session_maker)
     - [`test_size_in_words`](#test_size_in_words)
     - [`test_spectra_size_by_hand`](#test_spectra_size_by_hand)
+    - [`test_workbook_size_by_hand`](#test_workbook_size_by_hand)
+    - [`test_each_choice_writes_its_files`](#test_each_choice_writes_its_files)
+    - [`test_spectra_asked_once`](#test_spectra_asked_once)
     - [`test_trimmed_and_whole_go_to_their_folders`](#test_trimmed_and_whole_go_to_their_folders)
     - [`test_new_edges_export_again`](#test_new_edges_export_again)
+- [`tests/test_journal_files.py`](#teststest_journal_filespy)
+    - [`_journal_writer`](#_journal_writer)
+    - [`test_shipped_journal_files_are_read`](#test_shipped_journal_files_are_read)
+    - [`test_journal_file_that_cannot_be_used_is_left_out`](#test_journal_file_that_cannot_be_used_is_left_out)
+    - [`test_journal_added_by_the_user`](#test_journal_added_by_the_user)
+    - [`test_saved_answers_are_fitted_to_the_journals`](#test_saved_answers_are_fitted_to_the_journals)
 - [`tests/test_label_tidier.py`](#teststest_label_tidierpy)
     - [`test_exponent_after_a_caret_is_raised`](#test_exponent_after_a_caret_is_raised)
     - [`test_exponent_after_a_unit_is_raised`](#test_exponent_after_a_unit_is_raised)
     - [`test_micro_is_written_with_its_sign`](#test_micro_is_written_with_its_sign)
     - [`test_names_and_formulas_are_left_alone`](#test_names_and_formulas_are_left_alone)
     - [`test_number_and_unit_get_a_space`](#test_number_and_unit_get_a_space)
+    - [`test_symbols_are_drawn_by_the_figure_settings`](#test_symbols_are_drawn_by_the_figure_settings)
     - [`test_symbols_can_be_drawn_in_the_figures`](#test_symbols_can_be_drawn_in_the_figures)
     - [`test_tidy_label_stays_as_it_is`](#test_tidy_label_stays_as_it_is)
 - [`tests/test_launcher.py`](#teststest_launcherpy)
@@ -235,6 +294,13 @@
     - [`test_report_in_downloads_names_it`](#test_report_in_downloads_names_it)
     - [`test_report_in_home_folder_is_not_guarded`](#test_report_in_home_folder_is_not_guarded)
     - [`test_report_inside_app_describes_it`](#test_report_inside_app_describes_it)
+- [`tests/test_master_page.py`](#teststest_master_pagepy)
+    - [`_quiet_details`](#_quiet_details)
+    - [`test_page_of_a_one_column_figure`](#test_page_of_a_one_column_figure)
+    - [`test_page_of_a_journal_with_three_columns`](#test_page_of_a_journal_with_three_columns)
+    - [`test_lines_of_the_placeholder_text`](#test_lines_of_the_placeholder_text)
+    - [`test_master_page_is_saved_at_the_page_size`](#test_master_page_is_saved_at_the_page_size)
+    - [`test_master_page_open_elsewhere_is_one_sentence`](#test_master_page_open_elsewhere_is_one_sentence)
 - [`tests/test_no_windows.py`](#teststest_no_windowspy)
     - [`test_no_tk_window_can_open`](#test_no_tk_window_can_open)
     - [`test_plots_are_drawn_off_screen`](#test_plots_are_drawn_off_screen)
@@ -284,6 +350,15 @@
     - [`test_ocr_settings_fit_the_rate_traces`](#test_ocr_settings_fit_the_rate_traces)
     - [`test_example_ocr_agrees`](#test_example_ocr_agrees)
     - [`test_our_ocr_stays_fixed`](#test_our_ocr_stays_fixed)
+- [`tests/test_panel_order.py`](#teststest_panel_orderpy)
+    - [`_figure_drawer`](#_figure_drawer)
+    - [`test_a_click_on_an_arrow_changes_the_order_kept_and_redraws`](#test_a_click_on_an_arrow_changes_the_order_kept_and_redraws)
+    - [`test_a_move_on_one_file_keeps_the_place_of_a_panel_it_does_not_have`](#test_a_move_on_one_file_keeps_the_place_of_a_panel_it_does_not_have)
+    - [`test_a_panel_moves_one_place_and_stops_at_the_ends`](#test_a_panel_moves_one_place_and_stops_at_the_ends)
+    - [`test_a_panel_new_to_the_order_takes_its_standard_place`](#test_a_panel_new_to_the_order_takes_its_standard_place)
+    - [`test_the_arrows_sit_left_of_each_panel`](#test_the_arrows_sit_left_of_each_panel)
+    - [`test_the_order_is_saved_with_the_dataset`](#test_the_order_is_saved_with_the_dataset)
+    - [`test_the_plot_is_drawn_in_the_order_given`](#test_the_plot_is_drawn_in_the_order_given)
 - [`tests/test_processing_maths.py`](#teststest_processing_mathspy)
     - [`_plateau_experiment_builder`](#_plateau_experiment_builder)
     - [`_ramp_experiment_builder`](#_ramp_experiment_builder)
@@ -358,6 +433,14 @@
     - [`test_closed_window_keeps_the_log`](#test_closed_window_keeps_the_log)
     - [`test_launch_log_keeps_the_starts_before`](#test_launch_log_keeps_the_starts_before)
     - [`test_launch_log_is_cut_past_its_limit`](#test_launch_log_is_cut_past_its_limit)
+- [`tests/test_standard_plot.py`](#teststest_standard_plotpy)
+    - [`_plot_drawer`](#_plot_drawer)
+    - [`test_a_plot_that_cannot_show_its_haems_says_so_plainly`](#test_a_plot_that_cannot_show_its_haems_says_so_plainly)
+    - [`test_the_baseline_has_its_colour_and_name_and_the_OCR_its_percent`](#test_the_baseline_has_its_colour_and_name_and_the_ocr_its_percent)
+    - [`test_the_lines_take_the_colours_of_the_settings`](#test_the_lines_take_the_colours_of_the_settings)
+    - [`test_the_panels_are_oxygen_then_OCR_then_the_haems_a_b_c`](#test_the_panels_are_oxygen_then_ocr_then_the_haems_a_b_c)
+    - [`test_the_shared_legend_leaves_the_OCR_out`](#test_the_shared_legend_leaves_the_ocr_out)
+    - [`test_the_time_axis_covers_every_panel`](#test_the_time_axis_covers_every_panel)
 - [`tests/test_summary_maths.py`](#teststest_summary_mathspy)
     - [`_run_builder`](#_run_builder)
     - [`_spectra_experiment_builder`](#_spectra_experiment_builder)
@@ -397,6 +480,7 @@
     - [`_app_places_maker`](#_app_places_maker)
     - [`test_app_keeps_things_in_home_folder`](#test_app_keeps_things_in_home_folder)
     - [`test_app_never_overwrites_a_fit`](#test_app_never_overwrites_a_fit)
+    - [`test_app_never_overwrites_a_journal_file`](#test_app_never_overwrites_a_journal_file)
     - [`test_source_keeps_things_in_program_folder`](#test_source_keeps_things_in_program_folder)
     - [`test_source_program_folder_is_found`](#test_source_program_folder_is_found)
 - [`tests/test_window_parts.py`](#teststest_window_partspy)
@@ -621,6 +705,8 @@
     - [`experiment_attenuation_adder`](#experiment_attenuation_adder)
 - [`utils_shared/averaging.py`](#utils_sharedaveragingpy)
     - [`_baseline_change_adder`](#_baseline_change_adder)
+    - [`_delta_psi_statistics_calculator`](#_delta_psi_statistics_calculator)
+    - [`baseline_percent_adder`](#baseline_percent_adder)
     - [`experiment_averages_calculator`](#experiment_averages_calculator)
     - [`kind_span_lister`](#kind_span_lister)
     - [`quick_span_lister`](#quick_span_lister)
@@ -648,6 +734,13 @@
     - [`delta_psi_table_builder`](#delta_psi_table_builder)
     - [`state_fractions_solver`](#state_fractions_solver)
     - [`thermal_voltage_finder`](#thermal_voltage_finder)
+- [`utils_shared/event_concentrations.py`](#utils_sharedevent_concentrationspy)
+    - [`_label_key_maker`](#_label_key_maker)
+    - [`addition_calculator`](#addition_calculator)
+    - [`concentration_reader`](#concentration_reader)
+    - [`event_amount_writer`](#event_amount_writer)
+    - [`event_concentration_filler`](#event_concentration_filler)
+    - [`event_text_writer`](#event_text_writer)
 - [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
     - [`_skip_reporter`](#_skip_reporter)
     - [`event_settings_merger`](#event_settings_merger)
@@ -656,10 +749,13 @@
     - [`_renderer_getter`](#_renderer_getter)
     - [`figure_canvas_fitter`](#figure_canvas_fitter)
     - [`figure_finisher`](#figure_finisher)
+    - [`figure_lines_fitter`](#figure_lines_fitter)
     - [`figure_size_calculator`](#figure_size_calculator)
     - [`figure_style_builder`](#figure_style_builder)
     - [`figure_style_checker`](#figure_style_checker)
+    - [`font_family_lister`](#font_family_lister)
     - [`gap_space_calculator`](#gap_space_calculator)
+    - [`line_width_fitter`](#line_width_fitter)
     - [`panel_letter_adder`](#panel_letter_adder)
     - [`stack_legend_drawer`](#stack_legend_drawer)
     - [`text_extent_calculator`](#text_extent_calculator)
@@ -672,19 +768,26 @@
     - [`haem_order_finder`](#haem_order_finder)
     - [`haem_type_finder`](#haem_type_finder)
     - [`name_simplifier`](#name_simplifier)
+    - [`panel_name_teller`](#panel_name_teller)
+    - [`panel_order_merger`](#panel_order_merger)
+    - [`panel_order_mover`](#panel_order_mover)
+    - [`panel_order_placer`](#panel_order_placer)
     - [`program_title_builder`](#program_title_builder)
     - [`program_version_reader`](#program_version_reader)
     - [`update_note_finder`](#update_note_finder)
 - [`utils_shared/individual_experiment_exporter.py`](#utils_sharedindividual_experiment_exporterpy)
     - [`_frame_writer`](#_frame_writer)
+    - [`_kept_fraction_finder`](#_kept_fraction_finder)
     - [`_name_lister`](#_name_lister)
+    - [`_processing_table_builder`](#_processing_table_builder)
+    - [`_sheet_table_builder`](#_sheet_table_builder)
     - [`_spectral_csv_exporter`](#_spectral_csv_exporter)
+    - [`_spectral_list_reader`](#_spectral_list_reader)
     - [`averages_table_builder`](#averages_table_builder)
     - [`experiment_workbook_exporter`](#experiment_workbook_exporter)
-    - [`saved_settings_reader`](#saved_settings_reader)
     - [`size_describer`](#size_describer)
     - [`spectra_size_estimator`](#spectra_size_estimator)
-    - [`workbook_path_builder`](#workbook_path_builder)
+    - [`workbook_size_estimator`](#workbook_size_estimator)
 - [`utils_shared/individual_experiment_plotter.py`](#utils_sharedindividual_experiment_plotterpy)
     - [`_HideTopTickLabels`](#_hidetopticklabels)
     - [`_axes_legend_drawer`](#_axes_legend_drawer)
@@ -696,12 +799,24 @@
     - [`_vo2_ymax_calculator`](#_vo2_ymax_calculator)
     - [`_skipped_window_drawer`](#_skipped_window_drawer)
     - [`_window_drawer`](#_window_drawer)
-    - [`_window_label_builder`](#_window_label_builder)
     - [`_ylim_calculator`](#_ylim_calculator)
     - [`experiment_drawer`](#experiment_drawer)
     - [`experiment_plotter`](#experiment_plotter)
     - [`experiment_title_builder`](#experiment_title_builder)
     - [`watermark_style_builder`](#watermark_style_builder)
+- [`utils_shared/journal_files.py`](#utils_sharedjournal_filespy)
+    - [`_number_checker`](#_number_checker)
+    - [`_widths_reader`](#_widths_reader)
+    - [`journal_answers_fitter`](#journal_answers_fitter)
+    - [`journal_file_reader`](#journal_file_reader)
+    - [`journal_specs_loader`](#journal_specs_loader)
+    - [`journals_folder_lister`](#journals_folder_lister)
+- [`utils_shared/master_page_exporter.py`](#utils_sharedmaster_page_exporterpy)
+    - [`master_file_namer`](#master_file_namer)
+    - [`master_page_drawer`](#master_page_drawer)
+    - [`master_page_exporter`](#master_page_exporter)
+    - [`master_page_layout_builder`](#master_page_layout_builder)
+    - [`master_text_lines_lister`](#master_text_lines_lister)
 - [`utils_shared/normalisation.py`](#utils_sharednormalisationpy)
     - [`_frame_normaliser`](#_frame_normaliser)
     - [`_number_reader`](#_number_reader)
@@ -899,6 +1014,7 @@
     - [`saved_values_reader`](#saved_values_reader)
     - [`signal_asker`](#signal_asker)
     - [`size_asker`](#size_asker)
+    - [`spectra_export_asker`](#spectra_export_asker)
     - [`temperature_asker`](#temperature_asker)
     - [`tidy_labels_finder`](#tidy_labels_finder)
     - [`trim_layout_finder`](#trim_layout_finder)
@@ -941,6 +1057,8 @@
     - [`active_gui_getter`](#active_gui_getter)
     - [`gui_runner`](#gui_runner)
     - [`pointed_time_finder`](#pointed_time_finder)
+    - [`panel_arrow_finder`](#panel_arrow_finder)
+    - [`panel_arrow_placer`](#panel_arrow_placer)
     - [`window_opener`](#window_opener)
 - [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
     - [`_kept_builder`](#_kept_builder)
@@ -984,6 +1102,7 @@
     - [`_kept_restorer`](#_kept_restorer)
     - [`_label_table_filler`](#_label_table_filler)
     - [`_limits_lister`](#_limits_lister)
+    - [`_master_page_saver`](#_master_page_saver)
     - [`_od_lister`](#_od_lister)
     - [`_od_table_filler`](#_od_table_filler)
     - [`_pca_pictures_publisher`](#_pca_pictures_publisher)
@@ -1014,6 +1133,7 @@
     - [`haem_ticks_resolver`](#haem_ticks_resolver)
     - [`height_checker`](#height_checker)
     - [`kept_decomposition_builder`](#kept_decomposition_builder)
+    - [`ocr_form_choices_lister`](#ocr_form_choices_lister)
     - [`minutes_checker`](#minutes_checker)
     - [`psi_answers_builder`](#psi_answers_builder)
     - [`psi_change_describer`](#psi_change_describer)
@@ -1028,10 +1148,12 @@
 - [`utils_viewer/viewer_table.py`](#utils_viewerviewer_tablepy)
     - [`AnswerTable`](#answertable)
     - [`_cell_name_joiner`](#_cell_name_joiner)
+    - [`_concentration_writer`](#_concentration_writer)
     - [`_number_writer`](#_number_writer)
     - [`cell_reader`](#cell_reader)
     - [`label_entries_reader`](#label_entries_reader)
     - [`label_table_builder`](#label_table_builder)
+    - [`label_worked_writer`](#label_worked_writer)
     - [`od_rows_reader`](#od_rows_reader)
     - [`od_table_builder`](#od_table_builder)
     - [`table_problem_teller`](#table_problem_teller)
@@ -1080,6 +1202,7 @@ BASE_FONT_PT, DEFAULT_ANSWERS, JOURNAL_SPECS, LINE_WIDTH_PT, SPACING.
 
 ---- Methods ----
 __init__
+haem_view_lister
 percent_need_checker
 plot_config_builder
 source_chooser
@@ -1115,6 +1238,38 @@ None.
 figure_size_calculator
 figure_style_builder
 figure_style_checker
+font_family_lister
+```
+
+##### `haem_view_lister`
+
+```text
+---- Summary ----
+Method to list every way the haems can be shown with the source of each, so the
+averages cover every view and not only the one on the plot.
+
+---- Inputs ----
+od_available : bool
+    True when the experiment has OD, volume and dilution factor.
+
+---- Globals read ----
+HAEM_SOURCE_BY_MODE (module constant).
+
+---- Outputs ----
+Dict[str, str]
+    {view: haem source} in the order of HAEM_SOURCE_BY_MODE, for example
+    {'abs': 'abs_od', 'delta': 'delta_abs_od', 'percent': 'percent'}; per OD
+    exactly when source_chooser gives the plot a per OD source. Empty when
+    nothing is decomposed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `percent_need_checker`
@@ -1165,8 +1320,8 @@ delta_psi : bool
     figures of several files leave it out.
 
 ---- Globals read ----
-haem_colours (module function); the style, font and size attributes of the
-instance.
+SKIPPED_WINDOW_COLOUR, TRACE_COLOURS (module constants); the style, font and
+size attributes of the instance.
 
 ---- Outputs ----
 dict
@@ -1200,7 +1355,8 @@ FALLBACK_WITHOUT_OD, HAEM_SOURCE_BY_MODE (module constants).
 Tuple[str, Optional[str]]
     (OCR source, haem source), for example ("od", "delta_abs_od"). The haem
     source is None when nothing is decomposed; OD sources fall back to raw ones
-    without OD.
+    without OD. The OCR source 'baseline' (% of baseline) is what was asked
+    for: the processing gives a file without a baseline its usual OCR.
 
 ---- Globals mutated ----
 None.
@@ -2152,6 +2308,39 @@ Main program: read .paf files, process them and export figures and workbooks.
 
 ### MAIN FUNCTIONS
 
+#### `cancel_sentence_builder`
+
+```text
+---- Summary ----
+Main function to say what a run cancelled during the questions left in the results
+folder: the data exported at the end of the import, the plots of the files saved
+once their questions were accepted, both, or nothing.
+
+---- Inputs ----
+exported : List[Path]
+    The results folder, once the export of the import wrote into it; else empty.
+saved_plots : List[str]
+    Names of the files whose plot was saved; empty when none was.
+export_root : Path
+    Results folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The sentence, without its full stop.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `comparison_maker`
 
 ```text
@@ -2196,7 +2385,8 @@ warning_shower
 ---- Summary ----
 Main function to ask every question of the run after the files, in numbered
 sections (trimming and ignoring, analysis, plots, summary figures, export), and to
-build the per-file information.
+build the per-file information. The plot of every file is saved as soon as the
+questions about each file are accepted, so the later sections show it.
 
 ---- Inputs ----
 folder : Path
@@ -2211,6 +2401,9 @@ saved : dict
 exported : Optional[List[Path]]
     List the results folder is added to once the export of the import (3.4) writes
     into it; None when not needed.
+saved_plots : Optional[List[str]]
+    List that holds the names of the files whose plot is saved in the results
+    folder before the run starts; None when not needed.
 
 ---- Globals read ----
 PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
@@ -2224,40 +2417,44 @@ Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
 ---- Globals mutated ----
 None. Reads from and prints to the terminal; writes last_answers.json through
 last_answers_saver, the settings file of the dataset through
-dataset_settings_saver, and the export of the import when one is chosen, adding to
-``exported`` (side effects).
+dataset_settings_saver, the export of the import when one is chosen, adding to
+``exported``, and the plot of every file, filling ``saved_plots`` (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+active_gui_getter
 comparison_maker
 dataset_settings_saver
+experiment_plots_saver
 file_settings_merger
 haem_name_formatter
+journal_answers_fitter
 last_answers_saver
 multi_experiment_asker
 multi_figure_checker_builder
 region_files_lister
 section_starter
 special_figures_maker
+spectra_export_asker
 summary_figure_asker
 viewer_asker
 windows_stage_runner
 yes_no_asker
 ```
 
-#### `experiment_processor`
+#### `experiment_plot_saver`
 
 ```text
 ---- Summary ----
-Main function to read, process, plot and export one .paf file. Each step reports its
-own problem so the next step still runs.
+Main function to read and process one .paf file and save its plot as the run does,
+handing back a picture of it for the window.
 
 ---- Inputs ----
 info : dict
-    Per-file information from everything_asker: path, name, trim and ignore times,
-    OD values, events, custom and keep flags.
+    Per-file information: path, name, trim and ignore times, OD values, events and
+    regions (preview_info_builder).
 cfg : settings.Config
     Figure style and settings derived from the answers (config.py).
 fit : Optional[dict]
@@ -2265,6 +2462,89 @@ fit : Optional[dict]
     not decomposed.
 export_root : Path
     Results folder.
+
+---- Globals read ----
+settings.PREVIEW_DPI.
+
+---- Outputs ----
+Optional[bytes]
+    PNG picture of the saved plot, or None when the file has nothing to plot (no
+    oxygen, no OCR and no haems), so nothing was saved.
+
+---- Globals mutated ----
+None. Writes the figure files and prints what the processing says (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_data_processor
+experiment_plotter
+```
+
+#### `experiment_plots_saver`
+
+```text
+---- Summary ----
+Main function to save the plot of every file with the answers so far, once the
+questions about each file are accepted, and to show each saved plot in the window.
+A file whose plot cannot be saved says so in one sentence and the others carry on;
+its plot is tried again in the run.
+
+---- Inputs ----
+context : dict
+    {answers, fit, summaries, limits, details, regions, export_root} of the run so
+    far (everything_asker).
+saved_plots : List[str]
+    List emptied, then filled with the name of each file whose plot was saved.
+window : Any
+    The browser window, which is given each saved plot; None shows nothing.
+
+---- Globals read ----
+plt (matplotlib.pyplot).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the matplotlib rcParams of the figure style, writes the figure files,
+prints its progress and fills ``saved_plots`` (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_plot_saver
+info_printer
+output_capturer
+preview_info_builder
+problem_shower
+```
+
+#### `experiment_processor`
+
+```text
+---- Summary ----
+Main function to read, process, plot and export one .paf file. Each step reports its
+own problem so the next step still runs: a figure or a workbook that could not be
+saved does not take the file out of the later figures.
+
+---- Inputs ----
+info : dict
+    Per-file information from everything_asker: path, name, trim and ignore times,
+    OD values, events, custom and keep flags, and is_plot_saved (True when the
+    plot was saved once its questions were accepted, so it is not drawn again).
+cfg : settings.Config
+    Figure style and settings derived from the answers (config.py).
+fit : Optional[dict]
+    Fit dictionary from import_fit ({haem_list, data}), or None when the haems are
+    not decomposed.
+export_root : Path
+    Results folder.
+unsaved : Optional[List[str]]
+    List the file's name is added to when its workbook could not be saved (open
+    in Excel, a full disk); None keeps no list.
 
 ---- Globals read ----
 plt (matplotlib.pyplot).
@@ -2275,7 +2555,8 @@ Optional[dict]
     again for the comparison or special figures (info["keep"]), otherwise None.
 
 ---- Globals mutated ----
-None. Writes the figure and the workbook files and prints progress (side effects).
+None. Writes the figure and the workbook files, prints progress and adds to
+``unsaved`` (side effects).
 
 ---- Equations ----
 None.
@@ -2406,7 +2687,8 @@ PLACES, PROGRAM_TITLE (written to the log), UPDATE_NOTE (module constants).
 
 ---- Outputs ----
 int
-    0 when every file finished, 1 when the run was cancelled or a file failed.
+    0 when every file finished, 1 when the run was cancelled, a file failed or a
+    workbook could not be saved.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal, sets the matplotlib rcParams, writes
@@ -2417,6 +2699,7 @@ effects).
 None.
 
 ---- Helpers ----
+cancel_sentence_builder
 comparison_maker
 everything_asker
 experiment_processor
@@ -3100,6 +3383,39 @@ None.
 None.
 ```
 
+#### `_views_experiment_builder`
+
+```text
+---- Summary ----
+Helper function to build the experiment of _response_experiment_builder with one
+haem, bH, in its three views, and a delta psi that has no value for part of the
+run.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+DELTA_PSI_COLUMN, TIME_COLUMN (imported).
+
+---- Outputs ----
+dict
+    The experiment with a spectrum every 0.25 min from 0 to 30 min. Before 10 min,
+    from 10 to 20 min and after 20 min bH is 0.5, -2.0 and -3.5 as ΔD
+    ('haem_delta_abs'), 12.5, 10.0 and 8.5 as absorbance ('haem_abs') and 80, 50
+    and 20 as % oxidised ('haem_percent'). Δψ ('delta_psi') is 130 mV before
+    10 min, then empty but for 116 at 18.5 and 18.75 min, 118 at 19 min and 120 at
+    19.25 and 19.5 min.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_response_experiment_builder
+```
+
 ### MAIN FUNCTIONS
 
 #### `test_a_figure_asks_which_windows_only_with_both_kinds`
@@ -3290,8 +3606,9 @@ None.
 ---- Summary ----
 Main function to check what the window step draws for a file: the start of every
 window and the end of all but the last as edges, the first of each kind with its
-words, the windows as blue parts and those that do not fit as red ones, and
-nothing when the windows are unticked or the file has no additions.
+words, the baseline as a part of its own kind that says "baseline", the windows
+as blue parts and those that do not fit as red ones, and nothing when the windows
+are unticked or the file has no additions.
 
 ---- Inputs ----
 None.
@@ -3381,6 +3698,169 @@ give (3, 1) and (7, 4).
 
 ---- Helpers ----
 _response_experiment_builder
+```
+
+#### `test_the_ocr_is_put_on_its_percent_of_baseline`
+
+```text
+---- Summary ----
+Main function to check the OCR as % of baseline at every time of a run, the
+numbers kept with it, and that a file without a baseline, or with a baseline of
+0, gets none.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant); TIME_COLUMN.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The trace is 10 before 10 min, 4 until 12, 6 until 20, 1 until 22 and 2 after.
+Baseline 7.5 to 9.5: b = 10. y = x / 10 x 100: 100, 40, 60, 10 and 20 %. With
+additions at 0.1 and 20 min the baseline would end before the run starts, so the
+file has none. A trace of 0 before 10 min has b = 0, which nothing can be
+divided by.
+
+---- Helpers ----
+_response_experiment_builder
+```
+
+#### `test_a_file_without_a_baseline_keeps_its_usual_ocr`
+
+```text
+---- Summary ----
+Main function to check what the processing of a made-up file gives when the OCR
+is asked for as % of baseline: that view for a file with a baseline, its averages
+still in µM min⁻¹; the usual OCR and one line saying so for a file without one;
+the usual OCR and no line while no windows are set up; and the % of baseline kept
+for the workbook whichever way the OCR is plotted.
+
+---- Inputs ----
+capsys : pytest.CaptureFixture
+    Reads what the processing printed.
+
+---- Globals read ----
+VO2_COLUMN (module constant); settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The trace of _response_experiment_builder: 10 in the baseline (7.5 to 9.5 min)
+and 6 in the settled window 17.5 to 19.5 min, so 100 and 60 % of baseline.
+
+---- Helpers ----
+_response_experiment_builder
+```
+
+#### `test_the_ocr_question_offers_the_window_step`
+
+```text
+---- Summary ----
+Main function to check the question of which OCR is plotted: % of baseline is its
+last choice; picked with the windows set up nothing more is asked; with none, one
+question offers the window step, and without windows after it the OCR goes back
+to what it was. The questions and the window step are stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Puts the stand-ins for the questions in place, and takes them away afterwards.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_every_haem_view_and_delta_psi_are_averaged`
+
+```text
+---- Summary ----
+Main function to check that every view of the haems and delta psi are averaged in
+the windows with their difference from the one baseline and no percentage of it,
+that delta psi is averaged over the spectra that have a value and says how many
+that was, and that a view the file does not have is left out.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+DELTA_PSI_COLUMN (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Windows of 2 min ending 0.5 min before the next addition: the baseline 7.5 to 9.5,
+then 17.5 to 19.5 and 27.5 to 29.5 min, nine spectra each. bH as ΔD is 0.5, -2.0
+and -3.5 mOD in them: differences 0, -2.0 - 0.5 = -2.5 and -3.5 - 0.5 = -4.0. As
+absorbance 12.5, 10.0 and 8.5: 0, -2.5 and -4.0. As % oxidised 80, 50 and 20: 0,
+-30 and -60. Δψ is 130 mV in the baseline; in the second window it has a value for
+the last five spectra only, 116, 116, 118, 120 and 120: mean 590 / 5 = 118, SD =
+sqrt((4 + 4 + 0 + 4 + 4) / 4) = 2, difference 118 - 130 = -12, 5 of 9 spectra; in
+the third window it has no value: 0 of 9.
+
+---- Helpers ----
+_views_experiment_builder
+```
+
+#### `test_the_averages_sheet_holds_every_view`
+
+```text
+---- Summary ----
+Main function to check the columns of the Averages sheet: the OCR with its
+difference from and its percentage of the baseline, each haem in every view with
+its difference only, delta psi with the spectra it used, the one averaged view
+when the windows hold no views, and the unit that ends every heading.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The experiment of test_every_haem_view_and_delta_psi_are_averaged, whose OCR is 10
+in the baseline and 6 in the second window (17.5 to 19.5 min): difference 6 - 10
+= -4, 6 / 10 x 100 = 60 % of the baseline. bH there: ΔD -2.0 (difference -2.5),
+% oxidised 50 (difference -30), Δψ 118 mV (difference -12, 5 of 9 spectra).
+Per OD, at an OD of 0.5: absorbance 10.0 / 0.5 = 20 mOD per OD.
+
+---- Helpers ----
+_views_experiment_builder
 ```
 
 #### `test_the_windows_fall_before_the_additions`
@@ -4184,6 +4664,1134 @@ R_H = 0.243692, R_L = 0.593195. Out of 2 + e + e x k = 2 + 2.718282 + 0.198075 =
 
 ---- Helpers ----
 _calculator
+```
+
+## `tests/test_early_plots.py`
+
+Tests of the plots saved once the questions about each file are accepted: every file saved once and shown in the window, a failed file, the run not drawing a saved plot again, and the sentence when the run is cancelled.
+
+### CLASSES
+
+#### `FakeWindow`
+
+```text
+---- Summary ----
+Stand-in for the browser window that only notes the saved plots it is given.
+
+---- Attributes ----
+shown : List[Tuple[str, bytes]]
+    (file name, picture) of each saved plot, in the order given.
+
+---- Globals read ----
+None.
+
+---- Methods ----
+__init__
+saved_plot_publisher
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to start with no plot shown.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attribute on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `saved_plot_publisher`
+
+```text
+---- Summary ----
+Method to note a saved plot, as the window's own method of this name shows it.
+
+---- Inputs ----
+name : str
+    Name of the file.
+png : bytes
+    Picture of the saved plot.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds to ``shown``.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### TEST HELPERS
+
+#### `_context_builder`
+
+```text
+---- Summary ----
+Helper function to build the answers so far of a made-up dataset of three files,
+as everything_asker hands them to experiment_plots_saver.
+
+---- Inputs ----
+export_root : Path
+    Results folder.
+
+---- Globals read ----
+NAMES (module constant); settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+dict
+    {answers, fit, summaries, limits, details, regions, export_root}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_summaries_builder
+```
+
+#### `_questions_stander`
+
+```text
+---- Summary ----
+Helper function to stand in for every question of everything_asker, the window and
+the saving of the plots, so only its own steps run: the questions about each file
+give the three made-up files and one fit, and the plots saver names every file as
+saved.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for the stand-ins.
+later_fit : Optional[dict]
+    Fit the summary figure questions change to; None keeps the fit of the plots.
+adds_windows : bool
+    True when a multi-experiment figure asks for the averaging windows, which are
+    then set up.
+starts : bool
+    The answer to "Do you want to start?".
+
+---- Globals read ----
+NAMES (module constant).
+
+---- Outputs ----
+List[int]
+    A list that gets one entry each time the plots of the files are saved.
+
+---- Globals mutated ----
+None. Replaces names of main.py for the test (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_quiet_details`
+
+```text
+---- Summary ----
+Helper function (a pytest fixture) to send the details of a problem to a made-up
+log while a test runs, and to send them nowhere afterwards.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The made-up log, named "the test log" for the user.
+
+---- Globals mutated ----
+None. Sets the place for the details, and clears it after the test (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+details_place_setter
+```
+
+#### `_summaries_builder`
+
+```text
+---- Summary ----
+Helper function to build the summaries of the three made-up files.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+NAMES (module constant).
+
+---- Outputs ----
+List[dict]
+    [{name, path, duration_min}], one per file.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_a_failed_file_does_not_stop_the_others`
+
+```text
+---- Summary ----
+Main function to check a file whose plot cannot be saved: the files after it are
+still saved and shown, it is left out of the saved plots, and the user is told in
+one sentence, with Python's own words in the log only. The saving of one plot is
+stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the saving of one plot.
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed.
+_quiet_details : io.StringIO
+    The made-up log.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_context_builder
+```
+
+#### `test_a_file_with_nothing_to_plot_is_not_saved`
+
+```text
+---- Summary ----
+Main function to check the saving of one file's plot: with a panel to plot, the
+plot is drawn once into the results folder and a PNG picture of it is handed back;
+with no oxygen, no OCR and no haems, nothing is drawn and None is handed back. The
+reading and the plot are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the reading and the plot.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_saved_plot_is_not_drawn_again`
+
+```text
+---- Summary ----
+Main function to check the run of one file: a file whose plot was saved once its
+questions were accepted is not drawn a second time, and says so; a file whose plot
+was not is drawn. The reading, the plot and the workbook are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the reading, the plot and the workbook.
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_every_file_is_saved_once_and_shown`
+
+```text
+---- Summary ----
+Main function to check the saving of the plots of a dataset of three files: each
+file is saved once, in order, into the results folder; the window is given the
+picture of each; the list of saved plots is emptied first and then names every
+file; a file with nothing to plot is left out; and the terminal counts the files.
+The saving of one plot is stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the saving of one plot.
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed.
+
+---- Globals read ----
+NAMES (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_context_builder
+```
+
+#### `test_the_cancel_sentence`
+
+```text
+---- Summary ----
+Main function to check what a cancelled run says it left in the results folder:
+nothing, the exported data, the saved plots, or both.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_plots_are_saved_after_the_file_questions`
+
+```text
+---- Summary ----
+Main function to check when the questions save the plots and when the run draws
+them again: saved once after the questions about each file, and not drawn again in
+the run; saved a second time when a later figure adds the averaging windows, and
+still not drawn again; drawn again in the run when a later figure changes the fit;
+and named as saved when the run is cancelled at its last question. Every question,
+the window and the saving are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Data and results folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for the stand-ins.
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed, which is not checked.
+
+---- Globals read ----
+NAMES (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_questions_stander
+_summaries_builder
+```
+
+## `tests/test_event_concentrations.py`
+
+Tests of the concentration of each addition, worked out by hand: the stock with its unit, the concentration in the chamber adding up, a concentration typed, an ignored event and the text of the labels.
+
+### MAIN FUNCTIONS
+
+#### `test_one_addition`
+
+```text
+---- Summary ----
+Main function to check the concentration one addition gives, the example of
+MATHS.md: 10 µL of a 200 mM stock in the 5 mL chamber gives
+200 000 µM × 10 µL ÷ 5000 µL = 400 µM, and 5 µL of 10 mM gives 10 µM.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CHAMBER_ML.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_same_thing_added_again_adds_up`
+
+```text
+---- Summary ----
+Main function to check the concentrations in the chamber of a run: BD 10 µM; KCN
+400, then 800 (400 + 400), then 1200 µM (800 + 400), "kcn " counting as KCN and
+the event left out between them holding nothing and changing nothing.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CHAMBER_ML, RUN.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_concentration_typed`
+
+```text
+---- Summary ----
+Main function to check a concentration in the chamber typed by hand: BD typed as
+10 µM; then 5 µL of 10 mM BD gives 10 + 10 = 20 µM; then BD typed as 50 µM adds
+50 − 20 = 30 µM. A stock without a volume is dropped, and the event then has no
+concentration.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CHAMBER_ML.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_stock_typed_with_its_unit`
+
+```text
+---- Summary ----
+Main function to check a concentration typed with or without its unit: '200 mM',
+'200' (mM when none is typed) and '0,2 M' are 200 000 µM; '500 uM' is 500 µM;
+'10 nM' is 0.01 µM; a word is wrong; 0 is wrong for a stock but not in the chamber;
+nothing typed is "not filled in".
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_text_of_the_labels`
+
+```text
+---- Summary ----
+Main function to check the labels on the plot: in the chamber '1.2 mM KCN' (from
+1200 µM, in its most readable unit); what was added '10 µL of 200 mM KCN'; an
+event with only a typed concentration shows it either way; an event with no
+concentration shows its label alone. Concentrations below 1 µM are written in nM.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CHAMBER_ML, RUN.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_table_fills_in_the_chamber`
+
+```text
+---- Summary ----
+Main function to check what the labels table fills in as it is typed: the rows
+with a stock and a volume get their concentration in the chamber (10 µM, 400 µM,
+800 µM, the second KCN adding up); a row left out and a row typed by hand are not
+filled in; each file adds up on its own.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CHAMBER_ML.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_experiment_run.py`
+
+Tests of the run of one file: a workbook that cannot be saved does not take the file out of the later figures.
+
+### TEST HELPERS
+
+#### `_quiet_details`
+
+```text
+---- Summary ----
+Helper function (a pytest fixture) to send the details of a problem to a made-up
+log while a test runs, and to send them nowhere afterwards.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The made-up log, named "the test log" for the user.
+
+---- Globals mutated ----
+None. Sets the place for the details, and clears it after the test (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+details_place_setter
+```
+
+### MAIN FUNCTIONS
+
+#### `test_a_workbook_open_in_excel_keeps_the_file`
+
+```text
+---- Summary ----
+Main function to check the run of a file whose workbook is open in Excel: the file
+is still handed on to the later figures, its name is noted as not saved, and the
+user is told in one sentence to close the workbook, with Python's own words in the
+log only. The reading, the plot and the workbook are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the reading, the plot and the workbook.
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed.
+_quiet_details : io.StringIO
+    The made-up log.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_experiment_workbook.py`
+
+Tests of the workbook of one experiment: its sheets, their headings and the sheet that says how the numbers were worked out.
+
+### HELPERS
+
+#### `_haem_table_maker`
+
+```text
+---- Summary ----
+Helper function to make a haem table of the made-up experiment: the time, the
+spectrum index and one column per haem.
+
+---- Inputs ----
+values : dict
+    {haem: its four values}.
+
+---- Globals read ----
+TIMES_MIN (module constant); TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+pd.DataFrame
+    The table, four rows.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_imported_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to make an experiment as the import leaves it: the oxygen and the
+OCR (twice the time), no events, and nothing worked out.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+TIMES_MIN (module constant); TIME_COLUMN.
+
+---- Outputs ----
+dict
+    Experiment dictionary (DATA_FORMAT.md) called run1.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_processed_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to make an experiment as the processing leaves it: the imported
+one with the OCR per OD, two haems in ΔD, absorbance and % oxidised, their levels
+in the two regions, and delta psi, each with the numbers it was worked out with.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ABSORBANCE_MOD, TIMES_MIN (module constants).
+
+---- Outputs ----
+dict
+    Experiment dictionary (DATA_FORMAT.md) called run1.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+ΔD = absorbance - its start (bH 12, bL 6 mOD); % oxidised = (absorbance - reduced
+level) / (oxidised level - reduced level) x 100 (bH: 12 and 4 mOD; bL: 6 and 2).
+
+---- Helpers ----
+_haem_table_maker
+_imported_experiment_maker
+```
+
+### MAIN FUNCTIONS
+
+#### `test_imported_file_has_only_its_own_sheets`
+
+```text
+---- Summary ----
+Main function to check that a file with nothing worked out gets the oxygen, the
+OCR, the events and the metadata, and no sheet for what it does not have.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes a workbook in tmp_path (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_imported_experiment_maker
+```
+
+#### `test_processed_file_has_every_table`
+
+```text
+---- Summary ----
+Main function to check that a processed file always gets every table it has, each
+under its plain name with the unit in the headings and its values unchanged, and
+the plain names of the metadata.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+
+---- Globals read ----
+ABSORBANCE_MOD (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes a workbook in tmp_path (side effect).
+
+---- Equations ----
+bH ΔD = 12 - 12 = 0 then 4 - 12 = -8 mOD; bL % oxidised = (6 - 2) / 4 x 100 = 100
+then 0.
+
+---- Helpers ----
+_processed_experiment_maker
+```
+
+#### `test_how_it_was_worked_out`
+
+```text
+---- Summary ----
+Main function to check every line of the sheet that says how the numbers were
+worked out against the made-up experiment, and that a file only imported has no
+lines.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_imported_experiment_maker
+_processed_experiment_maker
+```
+
+#### `test_ocr_percent_of_baseline_has_its_sheet`
+
+```text
+---- Summary ----
+Main function to check that a file with the OCR as % of baseline gets its sheet
+after the other OCR sheets, with the unit in its heading, and the lines saying
+which baseline it was worked out from.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+
+---- Globals read ----
+TIMES_MIN (module constant); TIME_COLUMN.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes a workbook in tmp_path (side effect).
+
+---- Equations ----
+The OCR is twice the time: 0, 2, 4 and 6. With a baseline of 0 to 1 min its
+average there is (0 + 2) / 2 = 1, so the % of baseline is 0, 200, 400 and 600.
+
+---- Helpers ----
+_imported_experiment_maker
+```
+
+#### `test_workbook_keeps_its_list_of_spectra`
+
+```text
+---- Summary ----
+Main function to check a workbook written again after its spectra were written as
+csv files: asked to keep its list, it lists the files still beside it without
+writing them again; not asked, or with the files gone, it has no list.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+
+---- Globals read ----
+TIMES_MIN (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes workbooks and a csv file in tmp_path (side effect).
+
+---- Equations ----
+Four spectra of three wavelengths: one csv file, Cyt_transmiss.csv.
+
+---- Helpers ----
+_imported_experiment_maker
+```
+
+#### `test_every_spectrum_has_its_own_time_heading`
+
+```text
+---- Summary ----
+Main function to check the headings of a spectra csv file: each spectrum's time in
+minutes to 6 decimals with the trailing zeros dropped, so two spectra late in a
+very long run keep their own heading (to 6 figures both would read 1000.01 min),
+and a spectrum without a time is headed by its number.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes a workbook and a csv file in tmp_path (side effect).
+
+---- Equations ----
+Five spectra at 0, 0.5 s (0.008333... min, so 0.008333), 1000.008 and 1000.012
+min, and one with no time, numbered 7.
+
+---- Helpers ----
+_imported_experiment_maker
+```
+
+## `tests/test_figure_layout.py`
+
+Tests of the journal sizes of the figures: the size of a figure from the journal's
+
+### MAIN FUNCTIONS
+
+#### `test_science_figure_sizes`
+
+```text
+---- Summary ----
+Main function to check the Science widths and height against its figure guide, the
+size of a figure worked out from them, and the height Cell recommends.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Science prints in three columns: 1 column is 5.7 cm, 2 columns are 12.1 cm and 3
+columns 18.4 cm; the tallest figure is 199 mm. A 3 column figure of half the
+height is 184 / 25.4 = 7.244 in wide and 199 x 0.5 / 25.4 = 3.917 in tall. Cell
+recommends figures of at most 16.5 x 20 cm, so its tallest figure is 200 mm.
+
+---- Helpers ----
+None.
+```
+
+#### `test_figure_never_taller_than_the_journal_takes`
+
+```text
+---- Summary ----
+Main function to check that the tallest figure of every journal is the journal's
+own tallest, and that a taller one is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The whole height (1) of a Nature figure is 170 / 25.4 = 6.693 in.
+
+---- Helpers ----
+None.
+```
+
+#### `test_text_size_sentences`
+
+```text
+---- Summary ----
+Main function to check the sentences about text sizes a journal does not take: one
+plain sentence for each kind of text, with its size, the journal's limit and the
+journal's name, and none when every size fits.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A made-up journal takes 6 to 7 pt. Text of 5, 6 and 7 pt: only the 5 pt is too
+small. Text of 6.5, 7.5 and 8.5 pt: the 7.5 and the 8.5 pt are too large.
+
+---- Helpers ----
+None.
+```
+
+#### `test_standard_text_fits_the_standard_journal`
+
+```text
+---- Summary ----
+Main function to check that the standard text sizes give no sentence with the
+standard journal, Nature.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.BASE_FONT_PT, settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The standard text is 5, 6 and 7 pt; Nature takes 5 to 7 pt.
+
+---- Helpers ----
+None.
+```
+
+#### `test_text_fitted_to_the_journal`
+
+```text
+---- Summary ----
+Main function to check that the text sizes and the paddings are moved to fit the
+journal chosen, so that no journal of the settings gives a sentence.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.BASE_FONT_PT, settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Axis titles of 6 pt wanted. A journal taking 5 to 7 pt keeps 5, 6 and 7 pt, with a
+padding unit of 6 pt. One taking 6 to 8 pt gets 6, 7 and 8 pt, with a unit of 7 pt.
+One taking 4 to 5.5 pt gets 3.5, 4.5 and 5.5 pt: the largest text is brought down
+to its 5.5 pt, but then the smallest would be under 4 pt, so the smallest is kept
+at 4 pt: 4, 5 and 6 pt.
+
+---- Helpers ----
+None.
+```
+
+#### `test_journal_with_no_largest_text`
+
+```text
+---- Summary ----
+Main function to check a journal that gives a smallest text and no largest: text
+that is too small is lifted, nothing is brought down, and no text is named as too
+large.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Axis titles of 6 pt wanted. A journal taking 4.5 pt and up keeps 5, 6 and 7 pt
+(5 pt is above 4.5 pt). One taking 8 pt and up gets 8, 9 and 10 pt, with a padding
+unit of 9 pt.
+
+---- Helpers ----
+None.
+```
+
+#### `test_lines_kept_to_what_the_journal_takes`
+
+```text
+---- Summary ----
+Main function to check that every line of a figure is kept between the thinnest
+and the thickest line the journal takes: the line widths of the figure style, and
+the lines, tick marks, edges and groups of lines of a made-up figure drawn with
+widths of their own. A width of 0 (no line) and a journal with no limits change
+nothing.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Data lines of 0.75 pt give axis lines of 0.65 x 0.75 = 0.488 pt and thin lines of
+0.5 x 0.75 = 0.375 pt. With a thinnest line of 0.5 pt they become 0.75, 0.5 and
+0.5 pt; with a thickest line of 0.6 pt, 0.6, 0.488 and 0.375 pt. In the made-up
+figure, between 0.5 and 1.5 pt: 0.2 pt becomes 0.5 pt, 3 pt becomes 1.5 pt and
+1 pt stays.
+
+---- Helpers ----
+None.
 ```
 
 ## `tests/test_file_names.py`
@@ -5923,7 +7531,7 @@ None.
 
 ## `tests/test_import_export.py`
 
-Tests of the export at the end of the import: the size of the spectra and where each file goes.
+Tests of the export at the end of the import: the size of each choice, what each writes and where, and when the run asks for the spectra again.
 
 ### HELPERS
 
@@ -5932,8 +7540,8 @@ Tests of the export at the end of the import: the size of the spectra and where 
 ```text
 ---- Summary ----
 Helper function to stand in for the reading of a file: a made-up recording of 0 to
-10 min, one point a minute, with the OD values and events it is given, as the
-processing hands them back.
+10 min, one point and one spectrum of three wavelengths a minute, with the OD
+values and events it is given, as the processing hands them back.
 
 ---- Inputs ----
 info : dict
@@ -5949,7 +7557,7 @@ EVENTS, OD_KEYS (module constants).
 ---- Outputs ----
 dict
     {'experiment': experiment} (DATA_FORMAT.md), the oxygen and OCR tables equal to
-    twice the time.
+    twice the time, and the transmission spectra of one spectrometer, Cyt, all 1.
 
 ---- Globals mutated ----
 None.
@@ -6078,13 +7686,106 @@ the whole 300 x 10 x 5 = 15 000.
 None.
 ```
 
+#### `test_workbook_size_by_hand`
+
+```text
+---- Summary ----
+Main function to check the size of the workbooks against sums worked out by hand:
+a file trimmed at both ends, one not trimmed, and one whose number of data points
+is not known.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+At 10 bytes a data point:
+run1: 60 min kept from 10 to 40, so half of 600 points x 10 = 3 000 trimmed; the
+whole 600 x 10 = 6 000.
+run2: not trimmed, 200 x 10 = 2 000 trimmed and nothing whole.
+run3: no number of points, so nothing.
+Together 5 000 trimmed and 6 000 whole.
+
+---- Helpers ----
+None.
+```
+
+#### `test_each_choice_writes_its_files`
+
+```text
+---- Summary ----
+Main function to check what each of the four choices of the export writes for a
+trimmed file and for one not trimmed: the whole recording only with the "full"
+choices, the spectra csv files only with the "raw CSVs" choices, beside each
+workbook written and cut as its workbook is.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Used to stand in for the reading of the files.
+
+---- Globals read ----
+EVENTS (module constant); EXPORT_PARTS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A spectrum a minute from 0 to 10 min: 11 spectra in the whole recording, 7 kept
+from 2 to 8 min; a csv file has one column more, the wavelengths.
+
+---- Helpers ----
+_session_maker
+```
+
+#### `test_spectra_asked_once`
+
+```text
+---- Summary ----
+Main function to check that the run asks for the spectra csv files only when the
+export of the import did not write them: asked, it gives the answer; not asked, it
+says why in one line and the run writes none.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Used to stand in for the question and the message.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_trimmed_and_whole_go_to_their_folders`
 
 ```text
 ---- Summary ----
-Main function to check where the export of the import writes: a trimmed file's
-trimmed data in its own folder, with the edges, OD values and labels, and its whole
-recording in full/ without the edges; a file not trimmed has no full/.
+Main function to check where the export of the import writes with the whole
+recordings chosen: a trimmed file's trimmed data in its own folder, with the edges,
+OD values and labels, and its whole recording in full/ without the edges; a file
+not trimmed has no full/.
 
 ---- Inputs ----
 tmp_path : Path
@@ -6138,6 +7839,165 @@ None.
 ---- Helpers ----
 _metadata_reader
 _session_maker
+```
+
+## `tests/test_journal_files.py`
+
+Tests of the journal files: the ones that come with the program, a file with a missing
+
+### TEST HELPERS
+
+#### `_journal_writer`
+
+```text
+---- Summary ----
+Helper function to write a made-up journal file, with some of its values changed
+or taken away.
+
+---- Inputs ----
+folder : Path
+    The journals folder; it is made when missing.
+stem : str
+    The file name without its ending.
+**changes : Any
+    Values to change; a value of ... takes the entry away.
+
+---- Globals read ----
+MADE_UP.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_shipped_journal_files_are_read`
+
+```text
+---- Summary ----
+Main function to check that every journal file that comes with the program is read
+with no file left out, in the order they are offered, with the numbers of the
+journals' guides.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ROOT.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Science prints in three columns of 57, 121 and 184 mm on a page of 8 1/4 x 10 1/2
+in (209.6 x 266.7 mm); ACS allows 240 points (84.7 mm) and 504 points (177.8 mm)
+and gives no largest text.
+
+---- Helpers ----
+journal_specs_loader
+journals_folder_lister
+user_places_finder
+```
+
+#### `test_journal_file_that_cannot_be_used_is_left_out`
+
+```text
+---- Summary ----
+Main function to check that a journal file with a missing number, an impossible
+number, a page smaller than its figures or broken punctuation is left out and
+named in one plain sentence, that the good file beside it is still read, and that
+the standard journal is there even with no file of its own.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_journal_writer
+journal_specs_loader
+```
+
+#### `test_journal_added_by_the_user`
+
+```text
+---- Summary ----
+Main function to check that a file added to the journals folder is a journal like
+any other, offered after the first four by its name, and that the user's own copy
+of a file is the one read when the program's folder has one of the same name.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_journal_writer
+journal_specs_loader
+```
+
+#### `test_saved_answers_are_fitted_to_the_journals`
+
+```text
+---- Summary ----
+Main function to check that a width saved with a dataset that its journal does not
+take becomes the widest it takes that is no wider (the narrowest when there is
+none), that a journal no longer in the folder becomes the standard one, each with
+its sentence, and that answers that fit are left as they are.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Science takes 1, 2 and 3 columns: 1.5 columns saved become 1 column (57 mm). A
+journal taking 2 and 3 columns only: 1 column saved becomes 2 columns (100 mm).
+
+---- Helpers ----
+journal_answers_fitter
 ```
 
 ## `tests/test_label_tidier.py`
@@ -6260,6 +8120,34 @@ None.
 
 ---- Globals read ----
 None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_symbols_are_drawn_by_the_figure_settings`
+
+```text
+---- Summary ----
+Main function to check that a figure drawn with the program's own settings draws
+every symbol: a character the journal's font lacks (Arial has no subscripts and no
+raised minus) is taken from the next font, not drawn as an empty box.
+
+---- Inputs ----
+journal : str
+    Key of the journal whose figure settings are used.
+
+---- Globals read ----
+SYMBOLS, SUPERSCRIPT_TABLE (imported); settings.DEFAULT_ANSWERS.
 
 ---- Outputs ----
 None.
@@ -7593,6 +9481,202 @@ _report_runner
 _snapshot_taker
 ```
 
+## `tests/test_master_page.py`
+
+Tests of the master page: where the figure, its legend and the text sit on the page of
+
+### TEST HELPERS
+
+#### `_quiet_details`
+
+```text
+---- Summary ----
+Helper function (a pytest fixture) to send the details of a problem to a made-up
+log while a test runs, and to send them nowhere afterwards.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The made-up log, named "the test log" for the user.
+
+---- Globals mutated ----
+None. Sets the place for the details, and clears it after the test (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+details_place_setter
+```
+
+### MAIN FUNCTIONS
+
+#### `test_page_of_a_one_column_figure`
+
+```text
+---- Summary ----
+Main function to check where everything sits for a 1 column Nature figure, on the
+A4 page that stands in while the journal's page size is not given: the text runs
+from the top in the column beside the figure, and from under the legend in the
+column the figure covers.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+NATURE.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A4 is 210 x 297 mm and the widest Nature figure 183 mm, so the margin is
+(210 - 183) / 2 = 13.5 mm and each of the 2 columns (183 - 5) / 2 = 89 mm wide,
+the second starting at 13.5 + 89 + 5 = 107.5 mm. A figure of 89 x 85 mm ends at
+13.5 + 85 = 98.5 mm; its legend starts 3 mm lower, at 101.5 mm, and is 18 mm tall;
+the text under it starts 4 mm lower, at 101.5 + 18 + 4 = 123.5 mm. Every column
+ends at 297 - 13.5 = 283.5 mm.
+
+---- Helpers ----
+master_page_layout_builder
+```
+
+#### `test_page_of_a_journal_with_three_columns`
+
+```text
+---- Summary ----
+Main function to check the page of Science, whose page size is given and which
+prints in three columns, for a 2 column figure, and that a figure as wide as the
+page leaves no column beside it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+SCIENCE.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The page is 209.6 x 266.7 mm and the widest figure 184 mm: the margin is
+(209.6 - 184) / 2 = 12.8 mm and each of the 3 columns (184 - 2 x 5) / 3 = 58 mm,
+starting at 12.8, 75.8 and 138.8 mm. A figure of 121 x 100 mm ends at 133.8 mm
+across, so only the third column is beside it; the text under it starts at
+12.8 + 100 + 3 + 18 + 4 = 137.8 mm, and every column ends at 266.7 - 12.8 =
+253.9 mm.
+
+---- Helpers ----
+master_page_layout_builder
+```
+
+#### `test_lines_of_the_placeholder_text`
+
+```text
+---- Summary ----
+Main function to check the grey lines that stand for the text: one every 4.2 mm
+while it fits in its column, the ninth of each paragraph shorter.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A column from 20 to 30 mm: lines at 20, 24.2 and 28.4 mm (the third ends at
+28.4 + 1.3 = 29.7 mm; a fourth at 32.6 mm would not fit). A column from 0 to
+40 mm holds lines at 0, 4.2, ... 37.8 mm, ten of them (37.8 + 1.3 = 39.1 mm), and
+its ninth is 0.55 x 50 = 27.5 mm long.
+
+---- Helpers ----
+master_text_lines_lister
+```
+
+#### `test_master_page_is_saved_at_the_page_size`
+
+```text
+---- Summary ----
+Main function to check the PDF saved for a made-up figure: its name, its folder
+(made when missing), and that its one page has the size of the journal's page, or
+of A4 when the journal gives none.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+NATURE, SCIENCE.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A PDF measures its page in points of 1/72 in: A4 is 210 / 25.4 x 72 = 595.3 by
+297 / 25.4 x 72 = 841.9 points, and the Science page 209.6 / 25.4 x 72 = 594.1 by
+266.7 / 25.4 x 72 = 756.0 points.
+
+---- Helpers ----
+master_file_namer
+master_page_exporter
+```
+
+#### `test_master_page_open_elsewhere_is_one_sentence`
+
+```text
+---- Summary ----
+Main function to check what the Export master button does: before the figure of
+each file is on the plot it only says when the page can be exported; with it on
+the plot it saves the page of the file shown, for the journal of the answers; and
+a PDF that is open in another program gives one plain sentence, with Python's own
+words in the log only. The drawing of the figure and the saving are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the drawing and the saving.
+capsys : pytest.CaptureFixture
+    What is shown on screen.
+_quiet_details : io.StringIO
+    The made-up log the details go to.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `tests/test_no_windows.py`
 
 Tests that the tests themselves open no windows on the screen (set in conftest.py).
@@ -8852,6 +10936,266 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_panel_order.py`
+
+Tests of the order of the panels of the standard plot, worked out by hand: a panel
+
+### TEST HELPERS
+
+#### `_figure_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the standard plot of a made-up file with oxygen, OCR and
+the haems Cyt a605, Cyt bH and Cyt cc, of which ``haems`` are shown.
+
+---- Inputs ----
+haems : list
+    Names of the haems the plot shows.
+panel_order : list
+    Keys of the panels in the order the user gave them; empty for the standard.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS; TIME_COLUMN.
+
+---- Outputs ----
+Figure
+    The drawn figure.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_drawer
+```
+
+### MAIN FUNCTIONS
+
+#### `test_a_click_on_an_arrow_changes_the_order_kept_and_redraws`
+
+```text
+---- Summary ----
+Main function to check what the program does with a panel moved in the window: the
+new order of the panels of the file shown is kept in the order of the dataset,
+said in one line and the plot drawn again; the Standard order button empties the
+order kept. The showing of the strip is stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the showing of the strip.
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS; PANEL_ORDER_CHANGE.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. The stand-in is undone after the test.
+
+---- Equations ----
+Kept [oxygen, vo2, delta_psi, haem:Cyt bH]; the file shown has no Δψ, and its
+panels after the move are [haem:Cyt bH, oxygen, vo2]. They take the places 1, 2
+and 4 of the kept order: [haem:Cyt bH, oxygen, delta_psi, vo2].
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_move_on_one_file_keeps_the_place_of_a_panel_it_does_not_have`
+
+```text
+---- Summary ----
+Main function to check how the order of the panels of one file is kept in the
+order of the dataset: the panels on the plot take the places they had, in their
+new order, a panel the file does not have stays where it was, and a panel new to
+the kept order is added to it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Kept [oxygen, vo2, delta_psi, haem:a] and shown [haem:a, oxygen, vo2]: places 1,
+2 and 4 are filled in that order, [haem:a, oxygen, delta_psi, vo2]. Nothing kept
+and shown [vo2, oxygen]: [vo2, oxygen]. Kept [vo2, oxygen] and shown [oxygen,
+haem:a, vo2]: haem:a is added at the end, then places 1, 2 and 3 are filled,
+[oxygen, haem:a, vo2].
+
+---- Helpers ----
+panel_order_merger
+```
+
+#### `test_a_panel_moves_one_place_and_stops_at_the_ends`
+
+```text
+---- Summary ----
+Main function to check a panel moved with its arrows: it swaps with the panel
+above or under it, the top panel does not go up nor the bottom one down, and the
+order given is left as it was.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+[oxygen, vo2, haem:a]: vo2 up gives [vo2, oxygen, haem:a]; vo2 down gives
+[oxygen, haem:a, vo2].
+
+---- Helpers ----
+panel_name_teller
+panel_order_mover
+```
+
+#### `test_a_panel_new_to_the_order_takes_its_standard_place`
+
+```text
+---- Summary ----
+Main function to check where the panels are drawn: in the order given, a panel
+the order does not know just above the panel that follows it in the standard
+order (at the bottom when none does), and a key of the order that is not on the
+plot passed over. With no order, the standard one.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Standard [oxygen, vo2, haem:a, haem:b, delta_psi], places 0 to 4. Order [vo2,
+oxygen, haem:b]: delta_psi, which nothing follows, goes to the bottom and haem:a
+just above haem:b, so [vo2, oxygen, haem:a, haem:b, delta_psi] = places 1, 0, 2,
+3, 4. Order [haem:b, haem:c, oxygen]: haem:c is not on the plot; delta_psi goes
+to the bottom, haem:a just above haem:b, vo2 just above haem:a, so [vo2, haem:a,
+haem:b, oxygen, delta_psi] = places 1, 2, 3, 0, 4.
+
+---- Helpers ----
+panel_order_placer
+```
+
+#### `test_the_arrows_sit_left_of_each_panel`
+
+```text
+---- Summary ----
+Main function to check where the arrows of the panels are put and which one a
+click finds: an up and a down arrow in the room left of the picture, at the middle
+of each panel, smaller beside a low panel; the up arrow of the top panel and the
+down arrow of the bottom one cannot be used.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The picture is 400 x 300 px with its left at 30 px and its top at 10 px, and 26 px
+are kept for the arrows, so the squares are centred on x = 30 - 13 = 17 px. The
+oxygen panel lies from 0.6 to 0.9 of the height: its middle is at 10 + (1 - 0.75)
+x 300 = 85 px and it is 90 px tall, so the squares are 18 px: from 8 to 26 px
+across, the up one from 66 to 84 px and the down one from 86 to 104 px. The OCR
+panel lies from 0.2 to 0.5: middle 10 + 0.65 x 300 = 205 px, up from 186 to 204
+px, down from 206 to 224 px. A panel from 0 to 0.1 is 30 px tall: squares of
+30 / 2 - 1 = 14 px.
+
+---- Helpers ----
+panel_arrow_finder
+panel_arrow_placer
+```
+
+#### `test_the_order_is_saved_with_the_dataset`
+
+```text
+---- Summary ----
+Main function to check that the order of the panels is written in the settings
+file of the dataset and read back from it.
+
+---- Inputs ----
+tmp_path : Path
+    Pytest's temporary folder, used as the dataset folder.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Writes the settings file in the temporary folder (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+dataset_settings_reader
+dataset_settings_saver
+```
+
+#### `test_the_plot_is_drawn_in_the_order_given`
+
+```text
+---- Summary ----
+Main function to check the plot of a made-up file: with no order it is oxygen,
+OCR, then the haems a, b, c; with an order its panels are drawn in it, a haem new
+to the order in its standard place; and the window is told the key, the bottom
+and the top of each panel, top first.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The order [haem:Cyt cc, vo2, oxygen] with Cyt bH and Cyt cc shown: Cyt bH, which
+the order does not know, goes just above Cyt cc, the panel that follows it in the
+standard order, so [haem:Cyt bH, haem:Cyt cc, vo2, oxygen].
+
+---- Helpers ----
+_figure_drawer
+time_axis_finder
 ```
 
 ## `tests/test_processing_maths.py`
@@ -10900,6 +13244,215 @@ None.
 launch_log_opener
 ```
 
+## `tests/test_standard_plot.py`
+
+Tests of the standard plot of one experiment on a made-up file, drawn off screen: its
+
+### TEST HELPERS
+
+#### `_plot_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the standard plot of a made-up file: oxygen and OCR from 0
+to 30 min, four haems from 5 to 25 min only, listed in the order c, b, b, a.
+
+---- Inputs ----
+asked : Optional[List[str]]
+    The haems the plot is asked to show; None asks for the four of the file.
+has_haems : bool
+    False makes a file whose haems were not worked out.
+**changed : object
+    Answers that differ from the standard ones (plot_o2=False).
+
+---- Globals read ----
+HAEMS_GIVEN, TIME_COLUMN.
+
+---- Outputs ----
+list
+    (panel specification, axes) of each panel, top first.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_drawer
+```
+
+### MAIN FUNCTIONS
+
+#### `test_a_plot_that_cannot_show_its_haems_says_so_plainly`
+
+```text
+---- Summary ----
+Main function to check what the plot says when it cannot show the haems, in words
+the user knows: a haem asked for that the file does not have is named and the
+others are drawn; a file whose haems were not worked out is drawn without them;
+and a file left with nothing to plot is refused in one sentence.
+
+---- Inputs ----
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_plot_drawer
+```
+
+#### `test_the_baseline_has_its_colour_and_name_and_the_OCR_its_percent`
+
+```text
+---- Summary ----
+Main function to check the plot of a made-up file with averaging windows: the
+baseline window is shaded in its own colour on every panel, with "Baseline"
+written above the top panel, the settled window stays blue, and the OCR asked for
+as % of baseline is drawn in % with its axis saying so.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.BASELINE_WINDOW_COLOURS, settings.DEFAULT_ANSWERS; TIME_COLUMN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A point a minute from 0 to 30 min, one addition at 10 min, windows 2 min long
+ending 0.5 min before: the baseline 7.5 to 9.5 min, the settled window 27.5 to
+29.5 min. The OCR is 10 before 10 min and 6 after, so b = 10 and the OCR in % of
+baseline is 100 then 60.
+
+---- Helpers ----
+baseline_percent_adder
+experiment_averages_calculator
+experiment_drawer
+```
+
+#### `test_the_lines_take_the_colours_of_the_settings`
+
+```text
+---- Summary ----
+Main function to check that the set oxygen, the measured oxygen and the OCR lines
+are drawn in the colours of the settings, not the plotting library's own.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.TRACE_COLOURS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_plot_drawer
+```
+
+#### `test_the_panels_are_oxygen_then_OCR_then_the_haems_a_b_c`
+
+```text
+---- Summary ----
+Main function to check the panels of the standard plot: the set and measured
+oxygen, then the OCR, then one panel per haem with every a haem first, then every
+b, then every c, though the haems were listed c, b, b, a.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+HAEMS_DRAWN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_plot_drawer
+```
+
+#### `test_the_shared_legend_leaves_the_OCR_out`
+
+```text
+---- Summary ----
+Main function to check that the one legend of a stack of panels holds the set and
+measured oxygen and each haem, and not the OCR, whatever the OCR axis is titled.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+HAEMS_DRAWN.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_plot_drawer
+stack_legend_drawer
+```
+
+#### `test_the_time_axis_covers_every_panel`
+
+```text
+---- Summary ----
+Main function to check that the time axis runs over the longest panel: the oxygen
+and OCR last from 0 to 30 min and the haems, in the lowest panels, only from 5 to
+25 min, so every panel must show 0 to 30 min.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_plot_drawer
+```
+
 ## `tests/test_summary_maths.py`
 
 Tests that the averaged spectra, their difference and the averages over repeated runs
@@ -11916,6 +14469,35 @@ _app_places_maker
 user_folder_preparer
 ```
 
+#### `test_app_never_overwrites_a_journal_file`
+
+```text
+---- Summary ----
+Main function to check that the app makes its journals folder, copies in the
+journal file that is missing and leaves one the user changed as it is, also when
+it starts again.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_app_places_maker
+user_folder_preparer
+```
+
 #### `test_source_keeps_things_in_program_folder`
 
 ```text
@@ -11980,8 +14562,9 @@ Tests of the parts of the window that need no window: the widths a journal allow
 
 ```text
 ---- Summary ----
-Main function to check the three kinds of cell: a number above 0 (with a point or
-a comma), a number of 0 or more, and a label without its outer spaces; an empty
+Main function to check the kinds of cell: a number above 0 (with a point or a
+comma), a number of 0 or more, a label without its outer spaces, a volume added,
+a stock and a concentration in the chamber with or without their unit; an empty
 cell is "not filled in" and never wrong; words, numbers below the limit and
 numbers that are not finite are wrong.
 
@@ -12143,7 +14726,7 @@ None.
 
 ---- Equations ----
 A Nature page is 170 mm: 0.5 of it is 85 mm and the whole is 170 mm. A Science
-page is 230 mm: 0.25 of it is 57.5 mm. "None" uses the Nature page.
+page is 199 mm: 0.5 of it is 99.5 mm. "None" uses the Nature page.
 
 ---- Helpers ----
 None.
@@ -12247,8 +14830,8 @@ None.
 ---- Summary ----
 Main function to check that the answers of a run are shown in the strip as they
 are meant (the standard size as the journal "None", a chosen journal by its name,
-the box ticked only when the haems are worked out, the OCR per OD box ticked only
-for the OCR per OD), that the strip can show them, and that its journal, width and
+the box ticked only when the haems are worked out, the OCR as the answers have
+it), that the strip can show them, and that its journal, width and
 height give the same answers back.
 
 ---- Inputs ----
@@ -12279,8 +14862,8 @@ Main function to check that values the strip can show pass, and that an unknown
 name, an unknown journal, a width the journal does not allow, a height over a page,
 an unknown background, haems ticked that are not a list of names, a comparing that
 is not True or False, a kept decomposition not in words, a spectrometer not given
-by its name, a way of showing the haems the strip does not have and a per OD box
-that is not True or False are each refused.
+by its name, a way of showing the haems or the OCR the strip does not have and a
+per OD box that is not True or False are each refused.
 
 ---- Inputs ----
 None.
@@ -12340,10 +14923,11 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check the "Haems as" drop-down and the per OD boxes: % oxidised is
-in the list only when a file has both regions, and the spectrometer, the way of
-showing the haems and the two boxes give the answers of the run (the OCR per OD
-box ticked is the OCR per OD, unticked the plain OCR), only for what changed.
+Main function to check the "Haems as" and the "OCR as" drop-downs and the per OD
+box: % oxidised is in the list only when a file has both regions, the OCR per OD
+only when OD values were entered and its % of baseline only when the averaging
+windows are set up; and the spectrometer, the ways of showing the haems and the
+OCR and the box give the answers of the run, only for what changed.
 
 ---- Inputs ----
 None.
@@ -12671,8 +15255,9 @@ Main function to build the settings of the OCR and haem response figure.
 cfg : Config
     Figure style derived from the answers (config.py).
 answers : dict
-    Terminal answers; uses ho_haems, ho_metric, ho_pub_columns and ho_pub_height,
-    and ho_blocks (the blocks drawn so far while the figure is being built).
+    Terminal answers; uses ho_haems, ho_metric, ho_pub_columns, ho_pub_height and
+    label_mode, and ho_blocks (the blocks drawn so far while the figure is being
+    built).
 haem_names : list
     Haem names of the fit, in fit order.
 
@@ -15023,13 +17608,16 @@ experiment : Optional[dict]
     Reference experiment whose events label the windows, or None.
 window_names : list
     Averaging window names, for example ['average0', 'average1'].
+mode : str
+    What the labels show (Labels as in the strip): 'chamber' or 'added'.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 list
-    One label per window; additions are written as label and concentration.
+    One label per window; additions are written as label, then the concentration
+    in the chamber or the volume and stock added.
 
 ---- Globals mutated ----
 None.
@@ -15038,7 +17626,7 @@ None.
 None.
 
 ---- Helpers ----
-concentration_formatter
+event_amount_writer
 finite_float_converter
 ```
 
@@ -16348,13 +18936,16 @@ experiment : Optional[dict]
     Reference experiment whose events label the windows, or None.
 window_names : list
     Averaging window names, for example ['average0', 'average1'].
+mode : str
+    What the labels show (Labels as in the strip): 'chamber' or 'added'.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 list
-    One label per window; additions are written as label and concentration.
+    One label per window; additions are written as label, then the concentration
+    in the chamber or the volume and stock added.
 
 ---- Globals mutated ----
 None.
@@ -16363,7 +18954,7 @@ None.
 None.
 
 ---- Helpers ----
-concentration_formatter
+event_amount_writer
 finite_float_converter
 ```
 
@@ -17178,7 +19769,7 @@ None.
 None.
 
 ---- Helpers ----
-concentration_formatter
+event_text_writer
 text_extent_calculator
 ```
 
@@ -19009,7 +21600,83 @@ percent_of_baseline is False, the baseline is 0 or a value is not finite).
 None.
 ```
 
+#### `_delta_psi_statistics_calculator`
+
+```text
+---- Summary ----
+Helper function to average delta psi inside a time window over the spectra that
+have a value, and to count them, as delta psi is empty wherever bH or bL is
+outside its limits.
+
+---- Inputs ----
+table : pd.DataFrame
+    experiment['delta_psi'] (DATA_FORMAT.md): a time column and DELTA_PSI_COLUMN
+    in mV, NaN where it could not be worked out.
+start_time : float
+    Window start, in minutes.
+end_time : float
+    Window end, in minutes.
+
+---- Globals read ----
+DELTA_PSI_COLUMN (imported).
+
+---- Outputs ----
+Dict[str, float]
+    {'mean', 'sd'} in mV as window_statistics_calculator gives them, with
+    'spectra_used' (spectra of the window with a value) and 'spectra_in_window'
+    (all its spectra).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+mean and SD over the spectra with start_time <= t <= end_time and a finite value.
+
+---- Helpers ----
+time_getter
+value_getter
+window_statistics_calculator
+```
+
 ### MAIN FUNCTIONS
+
+#### `baseline_percent_adder`
+
+```text
+---- Summary ----
+Main function to put the OCR of an experiment on its % of baseline and store it:
+every value divided by the average of the OCR in the baseline window (the window
+before the first addition, average0 of the averages). An experiment without a
+baseline gets no such table.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md, with its averages worked
+    out (experiment_averages_calculator) and its OCR in experiment['VoO2'].
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the table was added. False when the experiment has no baseline
+    window, no OCR, or an average in the baseline that is 0 or not a number; a
+    table left by an earlier run is then taken away.
+
+---- Globals mutated ----
+experiment: adds experiment['VoO2_baseline'], a copy of experiment['VoO2'] in % of
+baseline; its attrs['baseline_percent'] holds {'start_time', 'end_time': the
+baseline window (min), 'baseline_mean': {column: the average in it, µM min⁻¹}}.
+
+---- Equations ----
+OCR (% of baseline) = OCR / mean(OCR in average0) x 100. The OCR per OD gives the
+same numbers, as the OD divides both.
+
+---- Helpers ----
+measurement_column_finder
+value_getter
+window_statistics_calculator
+```
 
 #### `experiment_averages_calculator`
 
@@ -19018,6 +21685,8 @@ None.
 Main function to calculate event-window statistics for VoO2 and haem data and store
 them in the experiment: the baseline, the settled windows (ending before the next
 addition) and, when asked for, the quick windows (starting after each addition).
+Every view of the haems asked for, and delta psi when the experiment has it, are
+averaged in the same windows.
 
 ---- Inputs ----
 experiment : dict
@@ -19042,9 +21711,13 @@ delay_minutes : float
     How long after its addition each quick window starts, in minutes (>= 0).
 is_settled : bool
     False leaves the settled windows out (the baseline stays).
+haem_views : Optional[Dict[str, str]]
+    {view: haem source} of every way the haems can be shown
+    (Config.haem_view_lister); a view whose table the experiment does not have is
+    left out. None averages no views.
 
 ---- Globals read ----
-schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES.
+schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES; DELTA_PSI_COLUMN.
 
 ---- Outputs ----
 dict
@@ -19068,10 +21741,12 @@ and is skipped when that is before its own event. quickN starts delay_minutes
 after event N and ends quick_minutes later; it is skipped when that is after event
 N+1 (the end of the recording for the last event). change = mean /
 mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0),
-for the settled and the quick windows alike.
+for the settled and the quick windows alike. The haem views and delta psi have a
+delta only (their change is NaN).
 
 ---- Helpers ----
 _baseline_change_adder
+_delta_psi_statistics_calculator
 quick_span_lister
 source_resolver
 time_getter
@@ -19228,12 +21903,13 @@ None.
 Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
     ([(field, time in min, words, kind)], [(start, end, kind)]). The baseline and
     the settled windows first: the start of each is an edge of the field
-    'window_s' (kind 'average'), the end of each but the last settled window an
-    edge of 'gap_s' (kind 'average_end'; the last window ends a fixed time before
-    the end of the recording). Then the quick windows: the start of each is an
-    edge of 'delay_s' (kind 'quick'), its end an edge of 'quick_s' (kind
-    'quick_end'). A part has the kind 'average', 'quick', or 'average_unfit' for a
-    window that does not fit. Both lists are empty when both kinds are switched off
+    'window_s' (kind 'baseline' for the baseline, with the words "baseline" and
+    its length, 'average' for a settled window), the end of each but the last
+    settled window an edge of 'gap_s' (kind 'baseline_end' or 'average_end'; the
+    last window ends a fixed time before the end of the recording). Then the
+    quick windows: the start of each is an edge of 'delay_s' (kind 'quick'), its
+    end an edge of 'quick_s' (kind 'quick_end'). A part has the kind 'baseline',
+    'average', 'quick', or 'average_unfit' for a window that does not fit. Both lists are empty when both kinds are switched off
     or the file has no additions.
 
 ---- Globals mutated ----
@@ -19497,19 +22173,22 @@ first : dict
 second : dict
     Experiment drawn on the right (panel b).
 config : dict
-    Individual-experiment plot settings (config.py); uses LAYOUT_PAD_PT, FIGURE_DPI,
-    TITLE_GAP_PT and TIGHT_BBOX.
+    Individual-experiment plot settings (config.py); uses LAYOUT_PAD_PT and
+    FIGURE_DPI.
 export_root : Path
     Results folder.
 figure_size : Tuple[float, float]
     (width, height) of the whole figure in inches.
 spec : dict
     Journal specification (config.JOURNAL_SPECS entry).
+gap_extra_pads : float
+    White space between the two plots beyond what their labels need, in multiples
+    of LAYOUT_PAD_PT (config.COMPARISON_GAP_PADS).
 share_time_axis : bool
     True gives both plots the same time range.
 
 ---- Globals read ----
-GAP_EXTRA_PT_PER_PAD (module constant).
+None.
 
 ---- Outputs ----
 str
@@ -19543,13 +22222,15 @@ The settings kept with a dataset: read from and written to a file in its folder.
 
 ```text
 ---- Summary ----
-Helper function to keep an event's label, concentration and whether it is ignored
-as plain numbers and text, so it can be written to the settings file.
+Helper function to keep an event's label, stock, volume added, concentrations and
+whether it is ignored as plain numbers and text, so it can be written to the
+settings file.
 
 ---- Inputs ----
 event : dict
-    {'datapoint', 'label', 'concentration_uM', 'ignored'} as the event questions
-    give it.
+    {'datapoint', 'label', 'stock_uM', 'added_uL', 'addition_uM',
+    'concentration_uM', 'ignored'} as the event questions give it; the numbers
+    may be None or missing (a dataset saved before they were asked).
 
 ---- Globals read ----
 None.
@@ -19976,6 +22657,214 @@ s = R x (temperature + 273.15) / F x 1000.
 None.
 ```
 
+## `utils_shared/event_concentrations.py`
+
+The concentration of each addition: the stock typed with its unit, the concentration in the chamber, adding up for the same thing added again, and the text of its label.
+
+### HELPERS
+
+#### `_label_key_maker`
+
+```text
+---- Summary ----
+Helper function to give the key by which two additions are taken to be of the same
+thing: their labels alike once capitals, spaces and punctuation are left out, so
+"KCN" and "kcn " add up.
+
+---- Inputs ----
+label : str
+    Label of the event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The key.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+name_simplifier
+```
+
+### MAIN FUNCTIONS
+
+#### `addition_calculator`
+
+```text
+---- Summary ----
+Main function to work out how much one addition raises the concentration in the
+chamber. The volume added is not counted in the chamber's volume.
+
+---- Inputs ----
+stock_um : float
+    Concentration of the stock (µM), above 0.
+added_ul : float
+    Volume of the stock added (µL), above 0.
+chamber_ml : float
+    Volume of the chamber (mL), above 0.
+
+---- Globals read ----
+UL_PER_ML.
+
+---- Outputs ----
+float
+    The rise of the concentration in the chamber (µM).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+addition = stock × added ÷ chamber, the chamber in µL (× 1000): 10 µL of a
+200 mM (200 000 µM) stock in 5 mL gives 200 000 × 10 ÷ 5000 = 400 µM.
+
+---- Helpers ----
+None.
+```
+
+#### `concentration_reader`
+
+```text
+---- Summary ----
+Main function to read a concentration typed with or without its unit (nM, µM, mM
+or M, in any capitals, the micro sign typed as u if need be).
+
+---- Inputs ----
+text : str
+    What was typed, such as '200 mM', '0,5M' or '200'.
+default_unit : str
+    The unit of a number typed alone: a key of UNIT_FACTORS_UM, such as 'mm'.
+is_zero_allowed : bool
+    True when 0 can be used (a concentration in the chamber); False for a stock.
+
+---- Globals read ----
+TYPED_CONCENTRATION_PATTERN, UNIT_FACTORS_UM.
+
+---- Outputs ----
+Tuple[Optional[float], bool]
+    (concentration in µM, True) when it can be used; (None, True) for nothing
+    typed; (None, False) for anything else.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+µM = number × UNIT_FACTORS_UM[unit]: '200 mM' gives 200 × 1000 = 200 000 µM.
+
+---- Helpers ----
+typed_number_reader
+```
+
+#### `event_amount_writer`
+
+```text
+---- Summary ----
+Main function to write how much of a thing an event holds, as the labels show it:
+the concentration in the chamber after it, or the volume and the stock added (an
+event with no stock shows its concentration either way).
+
+---- Inputs ----
+event : dict
+    An event with concentration_uM (in the chamber), and stock_uM and added_uL
+    when they were typed; each may be None or missing.
+mode : str
+    A key of LABEL_MODES: 'chamber' or 'added'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    For example '400 µM', '1.2 mM' or '10 µL of 200 mM'; '' when the event has no
+    concentration.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+concentration_formatter
+```
+
+#### `event_concentration_filler`
+
+```text
+---- Summary ----
+Main function to work out, for the events of one file in order, the concentration
+each addition adds and the concentration in the chamber after it. An event with a
+stock and a volume adds stock × volume ÷ chamber to what is already in the chamber
+of the same thing (the same label); an event without them keeps the concentration
+in the chamber that was typed, and adds the difference. Ignored events hold
+nothing and change nothing.
+
+---- Inputs ----
+events : List[dict]
+    The events of one file, in order: {'label', 'stock_uM', 'added_uL',
+    'concentration_uM', 'ignored', ...}; a value may be None or missing.
+chamber_ml : float
+    Volume of the chamber (mL), above 0.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[dict]
+    A copy of each event with stock_uM, added_uL, addition_uM (what it adds, µM)
+    and concentration_uM (in the chamber after it, µM), each None where unknown;
+    a stock without a volume, or a volume without a stock, is dropped.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+With a stock and a volume: addition = stock × added ÷ chamber (addition_calculator)
+and in the chamber = before + addition, where before is the concentration in the
+chamber after the last event of the same label (0 for the first). Typed:
+addition = in the chamber − before. Three additions of 10 µL of 200 mM KCN in
+5 mL give 400, 800 and 1200 µM in the chamber.
+
+---- Helpers ----
+_label_key_maker
+addition_calculator
+```
+
+#### `event_text_writer`
+
+```text
+---- Summary ----
+Main function to write the label of an event on a plot: how much of it there is,
+then its label. See event_amount_writer.
+
+---- Inputs ----
+event : dict
+    An event with its label (see event_amount_writer).
+mode : str
+    A key of LABEL_MODES: 'chamber' or 'added'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    For example '400 µM KCN', '10 µL of 200 mM KCN' or 'KCN'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+event_amount_writer
+```
+
 ## `utils_shared/experiment_processing.py`
 
 Reading and processing of one experiment (everything before the figure and the export).
@@ -20019,14 +22908,16 @@ problem_shower
 
 ```text
 ---- Summary ----
-Main function to copy the label, concentration and ignored flag entered for each
-event onto the experiment, and to move ignored events out of the working event list.
+Main function to copy the label, stock, volume added, concentrations and ignored
+flag entered for each event onto the experiment, and to move ignored events out of
+the working event list.
 
 ---- Inputs ----
 experiment : dict
     Experiment dictionary, as defined in DATA_FORMAT.md.
 events : List[dict]
-    Entered events: {datapoint, label, concentration_uM, ignored}.
+    Entered events: {datapoint, label, stock_uM, added_uL, addition_uM,
+    concentration_uM, ignored}; the numbers may be missing.
 
 ---- Globals read ----
 None.
@@ -20053,8 +22944,9 @@ None.
 Main function to read (or take) one experiment and process its data: trim, decompose
 into haems, find each haem's oxidised and reduced level and its % oxidised (a file
 with both regions), work out delta psi from bH and bL (when switched on), scale by
-OD, put the OCR on its % of the range, choose the plotted sources and average
-around the events. It draws and saves nothing.
+OD, put the OCR on its % of the range, choose the plotted sources, average
+around the events and put the OCR on its % of baseline (a file with a baseline).
+It draws and saves nothing.
 
 ---- Inputs ----
 info : dict
@@ -20074,14 +22966,19 @@ experiment : Optional[dict]
 settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
 settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS,
 settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_LIMIT_ANSWERS;
-BACKGROUND_LABELS.
+BACKGROUND_LABELS, OCR_UNIT_TEXTS.
 
 ---- Outputs ----
 dict
-    {experiment, od_available, vo2_source, haem_source}. A file with both regions
+    {experiment, od_available, vo2_source, haem_source, plotted_haem_source}.
+    plotted_haem_source is the haem source when this file's haems are drawn (the
+    haems are plotted and the file was decomposed), otherwise None: every plot of
+    the file takes it from here. A file with both regions
     has experiment['haem_levels'] and experiment['haem_percent'] (DATA_FORMAT.md);
     when % oxidised is asked for a file without them, its haem source is
-    'delta_abs'. With delta psi switched on, a file with % oxidised, one bH and
+    'delta_abs'. A file with a baseline window has experiment['VoO2_baseline'];
+    when the OCR is asked for as % of baseline for a file without one, its OCR
+    source is 'od' (with OD values) or 'raw'. With delta psi switched on, a file with % oxidised, one bH and
     one bL has experiment['delta_psi']. Prints progress and the reason when a step is skipped (side
     effect).
 
@@ -20093,6 +22990,7 @@ None.
 
 ---- Helpers ----
 _skip_reporter
+baseline_percent_adder
 delta_psi_table_builder
 event_settings_merger
 experiment_attenuation_adder
@@ -20152,7 +23050,8 @@ None.
 ---- Summary ----
 Main function to set the figure margins so that everything drawn sits a fixed
 padding inside the figure edge, whatever the figure size, font size or label
-lengths.
+lengths. Every figure is fitted here before it is shown or saved, so this is also
+where its lines are kept to the widths the journal takes.
 
 ---- Inputs ----
 fig : Figure
@@ -20168,6 +23067,9 @@ iterations : int
     Maximum number of fitting passes.
 tolerance_pt : float
     Stop when no margin moves by more than this many points.
+line_limits_pt : Optional[Tuple[Optional[float], Optional[float]]]
+    (thinnest, thickest) line the journal takes in points, as in
+    figure_style_builder()['line_limits']; None to leave the lines as drawn.
 
 ---- Globals read ----
 None.
@@ -20178,8 +23080,8 @@ None
     contents leave no room for the axes.
 
 ---- Globals mutated ----
-None. Changes the subplot margins of ``fig`` and the layout flag and position of
-``suptitle`` (side effect).
+None. Changes the line widths and the subplot margins of ``fig`` and the layout
+flag and position of ``suptitle`` (side effect).
 
 ---- Equations ----
 Each margin = (pad + width of the decoration outside the axes) / figure size,
@@ -20187,6 +23089,7 @@ repeated until the largest change is below tolerance_pt.
 
 ---- Helpers ----
 _renderer_getter
+figure_lines_fitter
 ```
 
 #### `figure_finisher`
@@ -20222,6 +23125,40 @@ None.
 ---- Helpers ----
 figure_canvas_fitter
 panel_letter_adder
+```
+
+#### `figure_lines_fitter`
+
+```text
+---- Summary ----
+Main function to keep every line drawn in a figure between the thinnest and the
+thickest line a journal takes, whatever width it was drawn with: the data lines,
+the axes and their ticks, the edges of markers, boxes, shadings and legends. A
+width of 0 (no line) is left alone.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure, with everything drawn in it.
+thinnest_pt : Optional[float]
+    Thinnest line the journal takes in points; None when it gives none.
+thickest_pt : Optional[float]
+    Thickest line the journal takes in points; None when it gives none.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    How many widths were changed.
+
+---- Globals mutated ----
+None. Changes the line widths of ``fig`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+line_width_fitter
 ```
 
 #### `figure_size_calculator`
@@ -20269,7 +23206,10 @@ the journal specification and three master settings.
 spec : dict
     Journal specification (config.JOURNAL_SPECS entry).
 base_font_pt : float
-    Axis-label size in points; tick labels are 1 pt smaller and titles 1 pt larger.
+    Axis-label size wanted, in points; tick labels are 1 pt smaller and titles 1 pt
+    larger. It is moved to fit the journal: at least spec['font_min_pt'] + 1 and,
+    where that leaves room, at most spec['font_max_pt'] - 1 (no upper limit for a
+    journal whose font_max_pt is None).
 spacing : float
     Tightness of all paddings and gaps: 1.0 is the default, 1.2 is 20 % looser, 0.8
     is 20 % tighter.
@@ -20284,45 +23224,78 @@ None.
 dict
     Style dictionary with 'fonts' {tick, label, title, panel_letter} and the points
     values unit, tick_length, tick_pad, label_pad, title_pad, edge_pad, title_gap,
-    event_label_offset, line_width, axes_line_width and thin_line_width.
+    event_label_offset, line_width, axes_line_width and thin_line_width, and
+    'line_limits' (thinnest, thickest), the line widths the journal takes in
+    points, None where it gives none.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
+base_font_pt = max(min(base_font_pt, font_max_pt - 1), font_min_pt + 1) (6 pt
+stays 6 for 5 to 7 pt and becomes 7 for 6 to 8 pt);
 unit = base_font_pt x spacing; every padding is a multiple of unit (for example
 title_pad = 0.8 x unit); axes_line_width = 0.65 x line_width_pt; thin_line_width =
-0.5 x line_width_pt.
+0.5 x line_width_pt; each line width is then kept between the journal's thinnest
+and thickest line (0.75, 0.49 and 0.38 pt become 0.75, 0.5 and 0.5 pt for a
+journal whose thinnest line is 0.5 pt).
 
 ---- Helpers ----
-None.
+line_width_fitter
 ```
 
 #### `figure_style_checker`
 
 ```text
 ---- Summary ----
-Main function to list warnings for fonts outside the journal range or a figure
-taller than the journal allows.
+Main function to list, one plain sentence each, the kinds of text of the figures
+that are smaller or larger than the journal asks for. The height of a figure needs
+no check: it is chosen as a part of the tallest figure the journal takes.
 
 ---- Inputs ----
-journal : str
-    Journal name, used in the warning text.
 spec : dict
-    Journal specification (config.JOURNAL_SPECS entry).
+    Journal specification (config.JOURNAL_SPECS entry); its 'name', 'font_min_pt'
+    and 'font_max_pt' are used (a font_max_pt of None: no text is too large).
 fonts : dict
-    Font sizes in points keyed by role, as in make_style()['fonts'].
-size_inches : Tuple[float, float]
-    (width, height) of the figure in inches.
-label : str
-    Text put in front of each warning.
+    Font sizes in points keyed by role, as in figure_style_builder()['fonts'].
 
 ---- Globals read ----
-MM_PER_INCH (module constant).
+TEXT_NAMES (module constant).
 
 ---- Outputs ----
 List[str]
-    Warning messages; empty when the style fits the journal.
+    Warning sentences, in the order of TEXT_NAMES; empty when the text fits the
+    journal.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `font_family_lister`
+
+```text
+---- Summary ----
+Main function to list the fonts of a figure that are on this computer, in the
+order given, so a character the first font cannot draw (a subscript, a raised
+minus) is drawn in the next one that can.
+
+---- Inputs ----
+families : List[str]
+    Font names, the wanted one first and the fallbacks after it.
+
+---- Globals read ----
+None. Reads the list of installed fonts (side effect).
+
+---- Outputs ----
+List[str]
+    The names that are installed, in the same order; a name given twice is kept
+    once. ['sans-serif'] when none is, which is the plotting library's own font.
 
 ---- Globals mutated ----
 None.
@@ -20362,6 +23335,41 @@ None.
 
 ---- Equations ----
 room = extent_pt - gap_pt x (n - 1); space = gap_pt x n / room.
+
+---- Helpers ----
+None.
+```
+
+#### `line_width_fitter`
+
+```text
+---- Summary ----
+Main function to keep a line width between the thinnest and the thickest line a
+journal takes.
+
+---- Inputs ----
+width_pt : float
+    Line width in points; 0 means no line and stays 0.
+thinnest_pt : Optional[float]
+    Thinnest line the journal takes in points; None when it gives none.
+thickest_pt : Optional[float]
+    Thickest line the journal takes in points; None when it gives none.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    The width, lifted to thinnest_pt or lowered to thickest_pt where it was
+    outside them.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+width = min(max(width_pt, thinnest_pt), thickest_pt) for a width above 0 (0.375 pt
+becomes 0.5 pt with a thinnest line of 0.5 pt; 2.6 pt becomes 1.5 pt with a
+thickest line of 1.5 pt).
 
 ---- Helpers ----
 None.
@@ -20421,8 +23429,8 @@ of the stack (set and measured O2, then each haem) except the OCR trace.
 axes : List[Axes]
     Axes of the stack, top first.
 config : dict
-    Settings; uses LEGEND_FONT_SIZE, LEGEND_FRAME, LEGEND_FRAME_LINE_WIDTH
-    (optional) and VO2_LABEL (optional).
+    Settings; uses LEGEND_FONT_SIZE, LEGEND_FRAME and LEGEND_FRAME_LINE_WIDTH
+    (optional).
 bottom : Optional[Axes]
     Lowest axes of the span to centre on (for example the bottom row of a grid of
     stacks), or None for the stack itself.
@@ -20494,28 +23502,33 @@ Small, generic utilities shared by several modules.
 ```text
 ---- Summary ----
 Main function to write a concentration given in micromolar with the most readable
-unit: M from 1 000 000 µM, mM from 1000 µM and µM below that. It is the one place
-where a concentration is turned into text.
+unit: M from 1 000 000 µM, mM from 1000 µM, µM from 1 µM and nM below that, to
+four significant figures on a label. It is the one place where a concentration is
+turned into text.
 
 ---- Inputs ----
 concentration_um : Any
     Concentration in micromolar (µM); anything float() accepts, or None when the
     user gave none.
+significant : int
+    Significant figures written: 4 on a label, more in a cell of a table, so the
+    number read back from the cell is the one kept.
 
 ---- Globals read ----
 MISSING_CONCENTRATION (module constant).
 
 ---- Outputs ----
 str
-    For example '2 µM', '2 mM' (from 2000 µM) or '1.5 mM'; the unit is written
-    with the micro sign. MISSING_CONCENTRATION ('? µM') for None. Raises ValueError
-    or TypeError if the value is neither None nor a number.
+    For example '2 µM', '2 mM' (from 2000 µM), '1.2 mM' (from 1200 µM) or
+    '500 nM' (from 0.5 µM); the unit is written with the micro sign.
+    MISSING_CONCENTRATION ('? µM') for None. Raises ValueError or TypeError if the
+    value is neither None nor a number.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-mM = uM / 1000; M = uM / 1 000 000.
+mM = uM / 1000; M = uM / 1 000 000; nM = uM × 1000.
 
 ---- Helpers ----
 None.
@@ -20745,6 +23758,139 @@ None.
 None.
 ```
 
+#### `panel_name_teller`
+
+```text
+---- Summary ----
+Main function to name a panel of the standard plot in words the user knows, from
+its key.
+
+---- Inputs ----
+key : str
+    Panel key: 'oxygen', 'vo2', 'delta_psi' or 'haem:<name of the haem>'.
+
+---- Globals read ----
+HAEM_PANEL_PREFIX, PANEL_NAMES (module constants).
+
+---- Outputs ----
+str
+    'Oxygen', 'OCR', 'Δψ' or the name of the haem; any other key as it is.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `panel_order_merger`
+
+```text
+---- Summary ----
+Main function to keep the order the user gave the panels of one file in the order
+saved for the dataset: the panels on the plot take, in their new order, the places
+they had in the saved order, so a panel that is not on this file's plot (Δψ on a
+file without regions) stays where it was.
+
+---- Inputs ----
+saved : Sequence[str]
+    Panel keys in the order saved so far; empty for the standard order.
+shown : Sequence[str]
+    Panel keys of the plot the user moved a panel on, top first, after the move.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    Every key of ``saved`` and of ``shown`` once; the keys of ``shown`` are in the
+    order of ``shown``.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A key of ``shown`` that is new to ``saved`` is first added at its end. Then the
+places held by keys of ``shown`` are filled with ``shown`` in order: saved
+[oxygen, vo2, delta_psi, haem:a] and shown [haem:a, oxygen, vo2] give
+[haem:a, oxygen, delta_psi, vo2].
+
+---- Helpers ----
+None.
+```
+
+#### `panel_order_mover`
+
+```text
+---- Summary ----
+Main function to move one panel of a plot one place up or down, by swapping it
+with its neighbour.
+
+---- Inputs ----
+shown : Sequence[str]
+    Panel keys of the plot, top first.
+key : str
+    Key of the panel to move.
+step : int
+    -1 to move it up, 1 to move it down.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[List[str]]
+    The keys in their new order, or None when the panel cannot move that way (it
+    is at that end, or not on the plot).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+[oxygen, vo2, haem:a] with vo2 moved up (-1) gives [vo2, oxygen, haem:a].
+
+---- Helpers ----
+None.
+```
+
+#### `panel_order_placer`
+
+```text
+---- Summary ----
+Main function to find the order the panels of a plot are drawn in: the order the
+user gave them, and a panel that order does not know (a haem ticked since, Δψ just
+switched on) just above the panel that follows it in the standard order, or at the
+bottom when none follows it.
+
+---- Inputs ----
+standard : Sequence[str]
+    Panel keys of the plot in the standard order, top first, each once.
+order : Sequence[str]
+    Panel keys in the order the user gave them; empty for the standard order. Keys
+    of panels that are not on this plot are passed over.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[int]
+    The position in ``standard`` of each panel, top first.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+standard [oxygen, vo2, haem:a, haem:b, delta_psi] and order [vo2, oxygen, haem:b]
+give [vo2, oxygen, haem:a, haem:b, delta_psi]: haem:a goes just above haem:b,
+which follows it in the standard order, and delta_psi, which nothing follows, to
+the bottom.
+
+---- Helpers ----
+None.
+```
+
 #### `program_title_builder`
 
 ```text
@@ -20879,6 +24025,38 @@ None.
 excel_sheet_namer
 ```
 
+#### `_kept_fraction_finder`
+
+```text
+---- Summary ----
+Helper function to find the share of a recording its trimming keeps, and whether
+the file is trimmed at all.
+
+---- Inputs ----
+summary : dict
+    File summary (DATA_FORMAT.md), with 'name' and 'duration_min'.
+limits : Dict[str, dict]
+    {file name: {'trim_start', 'trim_end' (min on the recording, None for no trim),
+    ...}}; a file missing is not trimmed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[float, bool]
+    (share kept, 0 to 1; True when the file is trimmed at either end).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+share kept = (trim end - trim start) / duration, the trim end being the duration
+and the trim start 0 when not trimmed, kept within 0 to 1.
+
+---- Helpers ----
+None.
+```
+
 #### `_name_lister`
 
 ```text
@@ -20909,12 +24087,81 @@ None.
 None.
 ```
 
+#### `_processing_table_builder`
+
+```text
+---- Summary ----
+Helper function to build the table of the sheet that says how the numbers of one
+experiment were worked out: the fit and the background, where ΔD starts, the two
+regions and each haem's level in them, the numbers of delta psi, the OD scaling
+and the baseline of the OCR's % of baseline. Only the lines the experiment has are
+written.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md. Read: metadata (fit_file,
+    haem_background, OD, volume, dilution_factor), haem_delta_abs
+    (attrs['delta_abs_baseline']), haem_levels, delta_psi (attrs['delta_psi']),
+    whether VoO2_OD is there and VoO2_baseline (attrs['baseline_percent']).
+
+---- Globals read ----
+PROCESSING_COLUMNS (module constant).
+
+---- Outputs ----
+pd.DataFrame
+    Columns What, For (a haem, or empty), Value (a number or text) and Unit; no
+    rows for an experiment that was only imported.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_sheet_table_builder`
+
+```text
+---- Summary ----
+Helper function to give a table of the experiment the headings of its sheet: the
+spectrum numbers in plain words and each measurement with its unit.
+
+---- Inputs ----
+frame : pd.DataFrame
+    A table of the experiment: the time, for the haems the spectrum index, then
+    one column per measurement.
+heading : Optional[str]
+    Heading of each measurement column, with {name} for the column's own name
+    ('{name} ΔD (mOD)'); None keeps the headings of the table.
+
+---- Globals read ----
+SPECTRUM_NUMBER_TEXT (module constant); TIME_COLUMN, SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+pd.DataFrame
+    A copy with the new headings; the values are unchanged.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_spectral_csv_exporter`
 
 ```text
 ---- Summary ----
 Helper function to write one CSV per spectral dataset and data type, with
-wavelengths down and one column per spectrum.
+wavelengths down and one column per spectrum, headed by its time to
+SPECTRUM_TIME_DECIMALS decimals (trailing zeros dropped) so that no two spectra
+share a heading.
 
 ---- Inputs ----
 experiment : dict
@@ -20923,7 +24170,7 @@ folder : Path
     Existing folder the CSV files are written to.
 
 ---- Globals read ----
-SPECTRAL_CSV_TYPES (module constant).
+SPECTRAL_CSV_TYPES, SPECTRUM_TIME_DECIMALS (module constants).
 
 ---- Outputs ----
 List[dict]
@@ -20940,6 +24187,36 @@ None.
 None.
 ```
 
+#### `_spectral_list_reader`
+
+```text
+---- Summary ----
+Helper function to read the list of spectral CSV files a workbook already holds, so
+a workbook written again without writing the spectra again still lists them. Only
+the files still beside the workbook are kept.
+
+---- Inputs ----
+workbook_path : Path
+    The workbook about to be written again; it may not exist.
+
+---- Globals read ----
+SPECTRAL_SHEET, SPECTRAL_FILE_COLUMN (module constants).
+
+---- Outputs ----
+List[dict]
+    The records of _spectral_csv_exporter, one per CSV file listed and still
+    there; empty when there is no workbook, it cannot be read or it lists none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `averages_table_builder`
@@ -20947,27 +24224,36 @@ None.
 ```text
 ---- Summary ----
 Main function to build the Averages worksheet table: one row per window with the
-mean, SD and change from baseline of VoO2 and of each haem.
+mean, SD and difference from baseline of the OCR, of each haem in every view and
+of delta psi.
 
 ---- Inputs ----
 averages : dict
     Event-window averages, as added to the experiment by
-    calculate_experiment_averages (DATA_FORMAT.md); uses averages['windows'].
+    experiment_averages_calculator (DATA_FORMAT.md); uses averages['windows'].
 
 ---- Globals read ----
-None.
+HAEM_VIEW_TEXTS, HAEM_UNITS, OCR_UNITS, AVERAGE_STATISTICS, DELTA_PSI_TEXT and
+DELTA_PSI_UNIT (module constants).
 
 ---- Outputs ----
 pd.DataFrame
     Columns Average, Kind (baseline, settled or quick), Start time (min), End time
-    (min), then mean, SD and change from baseline (%) for VoO2 and each haem.
+    (min); then for the OCR its mean, SD, difference from baseline and '(% of
+    baseline)'; for each haem in each view (the one averaged view, without a view
+    name, when the windows hold no views) its mean, SD and difference from
+    baseline; and, for an experiment with delta psi, its mean, SD, difference from
+    baseline and 'spectra used' ('180 of 240'). Each heading ends in its unit in
+    brackets ('OCR mean (µM min⁻¹)', 'bH ΔD SD (mOD)', 'bH mean (% oxidised)'),
+    from averages['settings']; a measurement whose source the settings do not
+    name gets no unit.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-Change from baseline = window mean as a percentage of the average0 mean (calculated
-in the averaging step).
+Difference from baseline = window mean - average0 mean; % of baseline = window
+mean / average0 mean x 100 (both calculated in the averaging step).
 
 ---- Helpers ----
 _name_lister
@@ -20979,25 +24265,30 @@ _name_lister
 ---- Summary ----
 Main function to export one experiment to <output_dir>/<name>/<name>.xlsx (or into
 a folder inside that, such as the full/ of a trimmed experiment's whole recording),
-with the CcO2, CsO2 and VoO2 sheets, Averages, Events and Metadata, and optionally
-every processed table and the spectral CSV files.
+with a sheet for every table it has (the oxygen, the OCR, the haems in every view,
+delta psi), then Averages, Events, how it was worked out and Metadata, and
+optionally the spectral CSV files.
 
 ---- Inputs ----
 experiment : dict
     Experiment dictionary, as defined in DATA_FORMAT.md.
 output_dir : Path
     Results folder.
-full : bool
-    True adds every processed table in the order of DATA_SHEETS.
 spectra : bool
     True also writes the spectral CSV files next to the workbook (large and slow)
     and an index sheet linking to them.
 subfolder : str
     Folder inside the experiment's folder to write into (FULL_FOLDER); '' for the
     experiment's folder itself.
+keeps_spectra_list : bool
+    True, with ``spectra`` False, lists again the spectral CSV files the workbook
+    being replaced listed and that are still beside it (those written earlier in
+    the same run), without writing them again.
 
 ---- Globals read ----
-BASIC_SHEETS, DATA_SHEETS and schema.DELTA_HAEM_SOURCES.
+DATA_SHEETS, HAEM_VIEW_TEXTS, METADATA_TEXTS,
+PROCESSING_SHEET, SPECTRAL_SHEET and SPECTRAL_FILE_COLUMN (module constants);
+TIME_COLUMN.
 
 ---- Outputs ----
 List[Path]
@@ -21011,41 +24302,12 @@ None.
 
 ---- Helpers ----
 _frame_writer
+_processing_table_builder
+_sheet_table_builder
 _spectral_csv_exporter
+_spectral_list_reader
 averages_table_builder
 file_name_sanitiser
-```
-
-#### `saved_settings_reader`
-
-```text
----- Summary ----
-Main function to read the OD, volume, dilution factor and events saved in the
-workbook of an earlier export.
-
----- Inputs ----
-output_dir : Path
-    Results folder.
-experiment_name : str
-    Experiment name (file name without the extension).
-
----- Globals read ----
-SETTINGS_KEYS (module constant).
-
----- Outputs ----
-Optional[dict]
-    {'OD', 'volume', 'dilution_factor', 'events': [{'datapoint', 'label',
-    'concentration_uM', 'ignored'}]}, or None when there is no readable workbook or
-    nothing was saved.
-
----- Globals mutated ----
-None. Reads the workbook from disk.
-
----- Equations ----
-None.
-
----- Helpers ----
-workbook_path_builder
 ```
 
 #### `size_describer`
@@ -21106,43 +24368,52 @@ Tuple[float, float]
 None.
 
 ---- Equations ----
-kept fraction = (trim end - trim start) / duration, the trim end being the duration
-and the trim start 0 when not trimmed, kept within 0 to 1.
 trimmed bytes = sum over files and spectrometers of
-    n_spectra x kept fraction x n_wavelengths x sum(bytes_per_value).
-full bytes = the same with a fraction of 1, over the trimmed files only.
+    n_spectra x share kept x n_wavelengths x sum(bytes_per_value),
+with the share kept of _kept_fraction_finder.
+full bytes = the same with a share of 1, over the trimmed files only.
 
 ---- Helpers ----
-None.
+_kept_fraction_finder
 ```
 
-#### `workbook_path_builder`
+#### `workbook_size_estimator`
 
 ```text
 ---- Summary ----
-Main function to build the path of the workbook of an experiment.
+Main function to work out roughly how large the workbooks of the export of the
+import would be, from the number of data points of each file and the part kept by
+the trimming.
 
 ---- Inputs ----
-output_dir : Path
-    Results folder.
-experiment_name : str
-    Experiment name; made safe for file names.
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md), with 'duration_min' and 'frames' (the number
+    of data points); a summary without 'frames' counts as having none.
+limits : Dict[str, dict]
+    {file name: {'trim_start', 'trim_end' (min on the recording, None for no trim),
+    ...}}; a file missing is not trimmed.
+bytes_per_point : float
+    Bytes one data point takes in the workbook, over its sheets together
+    (config.WORKBOOK_POINT_BYTES).
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-Path
-    <output_dir>/<name>/<name>.xlsx.
+Tuple[float, float]
+    (bytes of the trimmed workbook of every file, bytes of the whole recording's
+    workbook of the trimmed files only).
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-None.
+trimmed bytes = sum over files of n_points x share kept x bytes_per_point, with the
+share kept of _kept_fraction_finder.
+full bytes = the same with a share of 1, over the trimmed files only.
 
 ---- Helpers ----
-file_name_sanitiser
+_kept_fraction_finder
 ```
 
 ## `utils_shared/individual_experiment_plotter.py`
@@ -21253,9 +24524,8 @@ location : Optional[str]
     Legend location; None uses config["LEGEND_LOCATION"].
 
 ---- Globals read ----
-config keys LEGEND_LOCATION, LEGEND_COLUMNS, LEGEND_FRAME, LEGEND_FONT_SIZE,
-LEGEND_FRAME_LINE_WIDTH and LEGENDS_OUTSIDE (legend in the white space right of
-the axes).
+config keys LEGEND_LOCATION, LEGEND_COLUMNS, LEGEND_FRAME, LEGEND_FONT_SIZE and
+LEGEND_FRAME_LINE_WIDTH.
 
 ---- Outputs ----
 Legend
@@ -21329,8 +24599,8 @@ None. Shows a warning when the source is missing (side effect).
 None.
 
 ---- Helpers ----
-problem_shower
 source_resolver
+warning_shower
 ```
 
 #### `_height_ratio_calculator`
@@ -21399,8 +24669,10 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to list the panels to draw: oxygen, VO2, one for each configured
-haem panel with matching data, then delta psi for a file that has it.
+Helper function to list the panels to draw. The standard order is oxygen, OCR, one
+for each configured haem panel with matching data (every a haem, then every b, then
+every c, whatever the order they were configured in), then delta psi for a file
+that has it; the panels the user moved are in the order they were given.
 
 ---- Inputs ----
 experiment : dict
@@ -21412,14 +24684,18 @@ haem_data : Optional[pd.DataFrame]
     Haem data frame, or None.
 
 ---- Globals read ----
-config keys PLOT_SET_AND_MEASURED_O2, PLOT_VO2, O2_PANEL_TITLE, VO2_PANEL_TITLE,
-HAEM_PANELS, PLOT_DELTA_PSI and DELTA_PSI_AXIS_LABEL.
+config keys PLOT_SET_AND_MEASURED_O2, PLOT_VO2, HAEM_PANELS, PLOT_DELTA_PSI,
+DELTA_PSI_AXIS_LABEL and PANEL_ORDER (the keys of the panels in the order the user
+gave them; missing or empty for the standard order); HAEM_PANEL_PREFIX.
 
 ---- Outputs ----
 List[dict]
-    Panel specifications {type, title, haems}; type is oxygen, vo2, haem or
-    delta_psi (the last only when PLOT_DELTA_PSI is set and the experiment has a
-    delta_psi table). Raises ValueError when no panel is selected.
+    Panel specifications {type, key, title, haems}, top first; type is oxygen,
+    vo2, haem or delta_psi (the last only when PLOT_DELTA_PSI is set and the
+    experiment has a delta_psi table), and key tells the panels apart: the type,
+    or for a haem panel HAEM_PANEL_PREFIX then the name of its first haem as
+    configured. Only haem and delta_psi panels have a title (their axis label) and
+    only haem panels have haems. Raises ValueError when no panel is selected.
 
 ---- Globals mutated ----
 None. Shows a warning for haems missing from the data (side effect).
@@ -21428,8 +24704,10 @@ None. Shows a warning for haems missing from the data (side effect).
 None.
 
 ---- Helpers ----
+haem_order_finder
 measurement_column_finder
 name_simplifier
+panel_order_placer
 warning_shower
 ```
 
@@ -21479,10 +24757,10 @@ band on every axis with a warning sign above it. Only used in the previews.
 ---- Inputs ----
 axes : List[Axes]
     Axes of the experiment, top to bottom.
-window_name : str
-    Window name, for example 'average3'.
 window : dict
     {start_time, end_time, reason} of the skipped window.
+colour : str
+    Colour of the band and of the warning sign.
 
 ---- Globals read ----
 None.
@@ -21505,7 +24783,8 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to draw the averaging windows behind the data on every axis.
+Helper function to draw the averaging windows behind the data on every axis, the
+baseline in its own colour with its name above the top axis.
 
 ---- Inputs ----
 axes : List[Axes]
@@ -21517,54 +24796,23 @@ config : dict
     config.py.
 
 ---- Globals read ----
-config keys PLOT_AVERAGING_WINDOWS, the AVERAGING_WINDOW_* appearance settings and
-the QUICK_WINDOW_* colours of the quick windows.
+config keys PLOT_AVERAGING_WINDOWS, the AVERAGING_WINDOW_* appearance settings,
+the QUICK_WINDOW_* colours of the quick windows, the BASELINE_WINDOW_* colours
+and name of the baseline, SHOW_SKIPPED_WINDOWS and
+SKIPPED_WINDOW_COLOUR.
 
 ---- Outputs ----
 None
     Nothing.
 
 ---- Globals mutated ----
-None. Adds shaded spans and labels to the axes (side effect).
+None. Adds shaded spans to the axes (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _skipped_window_drawer
-_window_label_builder
-```
-
-#### `_window_label_builder`
-
-```text
----- Summary ----
-Helper function to build the text of an averaging window from
-AVERAGING_WINDOW_LABEL_FORMAT.
-
----- Inputs ----
-window_name : str
-    Window name, for example 'average3'.
-config : dict
-    Individual-experiment plot settings, as built by Config.plot_config in
-    config.py.
-
----- Globals read ----
-config key AVERAGING_WINDOW_LABEL_FORMAT ({n} is the number, {name} the window
-name).
-
----- Outputs ----
-str
-    Label text; empty when the format is empty.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
 ```
 
 #### `_ylim_calculator`
@@ -21649,7 +24897,7 @@ _panel_builder
 _vo2_ymax_calculator
 _window_drawer
 _ylim_calculator
-concentration_formatter
+event_text_writer
 name_simplifier
 source_resolver
 time_getter
@@ -21660,8 +24908,8 @@ value_getter
 
 ```text
 ---- Summary ----
-Main function to plot one experiment in its own figure, optionally save it as svg
-and png, then show or close it.
+Main function to plot one experiment in its own figure with its name as a faint
+note in the corner, optionally save it as svg and png, then close it.
 
 ---- Inputs ----
 experiment : dict
@@ -21676,14 +24924,12 @@ fig : Optional[Figure]
     window). It is left open. None makes a new figure.
 
 ---- Globals read ----
-config keys FIGURE_SIZE, FIGURE_DPI, TITLE_STYLE, LAYOUT_PAD_PT, FIT_MARGINS,
-TITLE_GAP_PT, SAVE_FIGURES, TIGHT_BBOX, SHOW_INDIVIDUAL_FIGURES and the title
+config keys FIGURE_SIZE, FIGURE_DPI, LAYOUT_PAD_PT, SAVE_FIGURES and the title
 settings.
 
 ---- Outputs ----
 Tuple[Figure, List[Axes]]
-    The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set or a figure was
-    given) and its axes.
+    The figure (already closed unless a figure was given) and its axes.
 
 ---- Globals mutated ----
 None. Writes <export_root>/<name>/<name>.svg and .png and prints a message (side
@@ -21754,6 +25000,379 @@ None.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+None.
+```
+
+## `utils_shared/journal_files.py`
+
+The journal files of the journals folder: what each journal asks of a figure, read into
+
+### JOURNAL FILE HELPERS
+
+#### `_number_checker`
+
+```text
+---- Summary ----
+Helper function to say whether a value of a journal file is a number above 0.
+
+---- Inputs ----
+value : Any
+    The value read from the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True for a whole or decimal number above 0 (True and False are not numbers).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_widths_reader`
+
+```text
+---- Summary ----
+Helper function to read the widths of a journal file: the number of columns, then
+the width in mm.
+
+---- Inputs ----
+widths : Any
+    The 'widths_mm' of the file, such as {"1": 89, "1.5": 120, "2": 183}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[float, float]
+    {columns: width in mm}, narrowest first, a whole number of columns as an int.
+    Raises ValueError, in plain words, for anything else.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_number_checker
+```
+
+### MAIN FUNCTIONS
+
+#### `journal_answers_fitter`
+
+```text
+---- Summary ----
+Main function to fit the journal and the width of every figure in the answers to
+the journals there are: a journal that is no longer in the journals folder becomes
+the standard one, and a width the journal does not take becomes the widest it takes
+that is no wider (its narrowest when there is none).
+
+---- Inputs ----
+answers : dict
+    The answers (config.DEFAULT_ANSWERS with the ones saved for a dataset).
+specs : Dict[str, dict]
+    The journals (config.JOURNAL_SPECS); the standard journal is among them.
+
+---- Globals read ----
+JOURNAL_ANSWER_PAIRS, STANDARD_JOURNAL.
+
+---- Outputs ----
+Tuple[dict, List[str]]
+    (a copy of the answers with every journal and width one that can be drawn, one
+    plain sentence for each change, to show the user).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `journal_file_reader`
+
+```text
+---- Summary ----
+Main function to read one journal file into what the settings keep for a journal.
+
+---- Inputs ----
+path : Path
+    A .json file of the journals folder (DATA_FORMAT.md, journal file).
+
+---- Globals read ----
+NUMBER_NAMES, OPTIONAL_NUMBERS.
+
+---- Outputs ----
+dict
+    The journal as in config.JOURNAL_SPECS: name, widths_mm {columns: mm},
+    page_height_mm (the tallest figure), font_min_pt, font_max_pt (None when the
+    journal gives no largest text), panel_letter_pt, panel_letter_case ('upper' or
+    'lower'), font_family, line_min_pt and line_max_pt (None when not given), dpi
+    and paper_mm ((width, height) of the printed page, None when not given).
+    Raises ValueError saying, in plain words, what is wrong with the file.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_number_checker
+_widths_reader
+```
+
+#### `journal_specs_loader`
+
+```text
+---- Summary ----
+Main function to read every journal file of the journals folders. A journal is
+named after its file (nature.json is 'nature'); a file in an earlier folder wins
+over one of the same name in a later folder, so the user's own copy is the one
+used. A file that cannot be used is left out and named in one sentence. The
+standard journal is always there: with no usable file of its own, the numbers kept
+in the program are used.
+
+---- Inputs ----
+folders : Sequence[Path]
+    The journals folders, the user's own first; a folder that is missing is
+    passed over.
+
+---- Globals read ----
+JOURNAL_ORDER, STANDARD_JOURNAL, STANDARD_SPEC.
+
+---- Outputs ----
+Tuple[Dict[str, dict], List[str]]
+    ({journal: what it asks, as journal_file_reader gives it}, in the order of
+    JOURNAL_ORDER and then by name; one plain sentence for each file left out).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+journal_file_reader
+```
+
+#### `journals_folder_lister`
+
+```text
+---- Summary ----
+Main function to list the journals folders in the order they are read: the user's
+own, then the one that comes with the program (the same folder when run from
+source).
+
+---- Inputs ----
+places : UserPlaces
+    Where the program's own files and the user's things are (user_places_finder).
+
+---- Globals read ----
+JOURNALS_FOLDER_NAME (from utils_shared.user_places).
+
+---- Outputs ----
+List[Path]
+    The folders, each once.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `utils_shared/master_page_exporter.py`
+
+The master page: one page of a journal as a PDF, with a figure on it at its printed
+
+### MAIN FUNCTIONS
+
+#### `master_file_namer`
+
+```text
+---- Summary ----
+Main function to name the master page of a file for a journal.
+
+---- Inputs ----
+name : str
+    Name of the experiment file, without its ending.
+journal : str
+    The journal as the settings name it (a key of config.JOURNAL_SPECS).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    '<name>_master_<journal>.pdf', cleaned by the rule every file name goes through.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+file_name_sanitiser
+```
+
+#### `master_page_drawer`
+
+```text
+---- Summary ----
+Main function to draw the master page: the picture of the figure, the box of its
+legend, the grey lines of the text and one small line at the top saying what the
+page is.
+
+---- Inputs ----
+picture : Any
+    The figure as a picture: an array (rows, columns, 3 or 4) of colours.
+layout : Dict[str, Any]
+    Where everything sits, from master_page_layout_builder.
+header : str
+    The small line at the top of the page.
+
+---- Globals read ----
+LEGEND_TEXT, MM_PER_INCH, NOTE_COLOUR, NOTE_FONT_PT, POINTS_PER_MM, TEXT_COLOUR,
+TEXT_THICKNESS_MM.
+
+---- Outputs ----
+Figure
+    The page, of the page's own size, with one axes over all of it measured in mm
+    from the top left corner.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+master_text_lines_lister
+```
+
+#### `master_page_exporter`
+
+```text
+---- Summary ----
+Main function to save the master page of a figure: one page of the journal as a
+PDF, the figure on it exactly as large as it is printed.
+
+---- Inputs ----
+fig : Figure
+    The figure, drawn at its printed size.
+spec : dict
+    What the journal asks (config.JOURNAL_SPECS entry).
+journal : str
+    The journal as the settings name it, for the file name.
+name : str
+    Name of the experiment file, without its ending.
+folder : Path
+    Folder the PDF is saved in; it is made when missing.
+
+---- Globals read ----
+A4_NOTE, MASTER_DPI, MM_PER_INCH.
+
+---- Outputs ----
+Path
+    The PDF that was saved. Raises OSError when it cannot be written (a
+    PermissionError when it is open in another program).
+
+---- Globals mutated ----
+None. Writes the PDF (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+master_file_namer
+master_page_drawer
+master_page_layout_builder
+```
+
+#### `master_page_layout_builder`
+
+```text
+---- Summary ----
+Main function to work out where everything sits on the master page. The widest
+figure the journal takes is centred on the page, which gives the margin at the
+sides, and the same margin is used at the top and the bottom. The figure starts at
+the top left of that area, its legend sits under it, and the text fills the
+journal's columns: from the top in a column beside the figure, from under the
+legend in a column the figure covers.
+
+---- Inputs ----
+spec : dict
+    What the journal asks (config.JOURNAL_SPECS entry): its 'widths_mm' and its
+    'paper_mm' (None: A4).
+figure_size_mm : Tuple[float, float]
+    (width, height) of the figure in mm.
+
+---- Globals read ----
+A4_MM, GUTTER_MM, LEGEND_GAP_MM, LEGEND_HEIGHT_MM, TEXT_GAP_MM.
+
+---- Outputs ----
+Dict[str, Any]
+    In mm, measured from the top left corner of the page: 'page_mm' (width,
+    height), 'is_page_given' (False when A4 stands in), 'margin_mm', 'column_mm'
+    (the width of a column of text), 'figure_mm' and 'legend_mm' (left, top,
+    width, height) and 'columns_mm', one (left, top, width, bottom) per column
+    of text.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+margin = (page width - widest figure) / 2;
+column = (widest figure - gutter x (columns - 1)) / columns, with as many columns
+as the widest figure spans (Nature: (210 - 183) / 2 = 13.5 mm and
+(183 - 5) / 2 = 89 mm on an A4 page).
+
+---- Helpers ----
+None.
+```
+
+#### `master_text_lines_lister`
+
+```text
+---- Summary ----
+Main function to list the grey lines that stand for the text of the paper: every
+column filled from its top to its bottom, the last line of each paragraph shorter.
+
+---- Inputs ----
+layout : Dict[str, Any]
+    Where everything sits, from master_page_layout_builder.
+
+---- Globals read ----
+PARAGRAPH_LINES, SHORT_LINE_SHARE, TEXT_STEP_MM, TEXT_THICKNESS_MM.
+
+---- Outputs ----
+List[Tuple[float, float, float]]
+    (left, top, width) of each line in mm, column by column from the top.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The n-th line of a column (from 0) has its top at top + n x TEXT_STEP_MM, and is
+drawn while its bottom is not below the bottom of the column.
 
 ---- Helpers ----
 None.
@@ -23976,6 +27595,8 @@ names : List[str]
     Name of each component.
 colours : List[str]
     Colour of each component.
+style : dict
+    Greys and line widths of the figure (config.COMPONENT_FIGURE_STYLE).
 
 ---- Globals read ----
 None.
@@ -24008,11 +27629,15 @@ window : tuple
     (start, end) of the wavelengths shown (nm).
 colours : dict
     {haem type: colour} of the lines.
+peaks_nm : dict
+    {haem type: usual peaks (nm)} (config.HAEM_USUAL_PEAKS_NM).
+style : dict
+    Line width and transparency of the lines (config.COMPONENT_FIGURE_STYLE).
 is_labelled : bool
     True to write the haem type above each line.
 
 ---- Globals read ----
-REFERENCE_PEAKS (module constant).
+None.
 
 ---- Outputs ----
 None
@@ -24045,6 +27670,8 @@ names : List[str]
     Name of each component.
 colours : List[str]
     Colour of each component.
+style : dict
+    Greys and line widths of the figure (config.COMPONENT_FIGURE_STYLE).
 fig : Optional[Figure]
     Figure to draw in; None makes a new one.
 
@@ -24087,6 +27714,10 @@ colours : List[str]
     Colour of each component.
 type_colours : dict
     {'a', 'b', 'c': colour} of the guide lines.
+peaks_nm : dict
+    {haem type: usual peaks (nm)} of the guide lines (config.HAEM_USUAL_PEAKS_NM).
+style : dict
+    Greys and line widths of the figure (config.COMPONENT_FIGURE_STYLE).
 fig : Optional[Figure]
     Figure to draw in; None makes a new one.
 
@@ -27636,21 +31267,24 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to write one event as 'label, time' for the event listings.
+Helper function to write one event as 'time: label' for the event listings.
 
 ---- Inputs ----
 event : dict
     Event from the file summary (time in minutes).
 entry : dict
-    Current label, concentration_uM and ignored flag of that event.
+    Current label, stock_uM, added_uL, concentration_uM and ignored flag of that
+    event (event_entries, DATA_FORMAT.md).
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 str
-    For example '  15.01 min: nd-011992' or with the concentration (in µM, mM or
-    M) and '[IGNORED]' when they apply.
+    For example '  15.01 min: nd-011992', with what was added and the
+    concentration in the chamber ('  20.05 min: KCN, 10 µL of 200 mM, 800 µM in
+    the chamber'), or the concentration alone when it was typed, and '[IGNORED]'
+    when they apply.
 
 ---- Globals mutated ----
 None.
@@ -27659,7 +31293,7 @@ None.
 None.
 
 ---- Helpers ----
-concentration_formatter
+event_amount_writer
 ```
 
 #### `_first_event_finder`
@@ -28165,11 +31799,12 @@ b_haem_column_finder
 
 ```text
 ---- Summary ----
-Main function to have the label and concentration of every event filled in in the
-labels table, starting from the saved or file values, an event being left out by
-writing ignore as its label. Labels that could be written more tidily (8 ug ml-1
-as 8 µg mL⁻¹) are then offered in their tidy forms, once. Nothing is asked when no
-file has events.
+Main function to have the label, the stock and the volume added (or the
+concentration in the chamber) of every event filled in in the labels table,
+starting from the saved or file values, an event being left out by writing ignore
+as its label. Labels that could be written more tidily (8 ug ml-1 as 8 µg mL⁻¹) are
+then offered in their tidy forms, once, and the concentrations worked out. Nothing
+is asked when no file has events.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -28185,22 +31820,23 @@ kept : Set[str]
     forms again, and the labels kept this time are added.
 
 ---- Globals read ----
-IGNORE_LABEL.
+IGNORE_LABEL; settings.CHAMBER_VOLUME_ML.
 
 ---- Outputs ----
 Dict[str, List[dict]]
-    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}.
-    An event labelled ignore is left out and has no concentration.
+    {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md). An event
+    labelled ignore is left out and has no stock or concentration.
 
 ---- Globals mutated ----
 None. Adds to ``kept`` and reads from and prints to the terminal (side effects).
 
 ---- Equations ----
-None.
+See event_concentration_filler.
 
 ---- Helpers ----
 _event_line_builder
 _tidy_labels_offerer
+event_concentration_filler
 event_entries_builder
 info_printer
 ```
@@ -28210,8 +31846,8 @@ info_printer
 ```text
 ---- Summary ----
 Main function to give the events of every file as the labels table starts them:
-the label, concentration and whether it is left out as saved for the dataset, or
-else the file's own text, with no concentration.
+the label, stock, volume added, concentrations and whether it is left out as saved
+for the dataset, or else the file's own text, with no concentration.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -28224,8 +31860,8 @@ IGNORE_LABEL.
 
 ---- Outputs ----
 Dict[str, List[dict]]
-    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
-    per event of the file, in its order; an event left out is labelled ignore.
+    {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md), one per event
+    of the file, in its order; an event left out is labelled ignore.
 
 ---- Globals mutated ----
 None.
@@ -28321,8 +31957,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to ask which haems are plotted, and in which order, when they are
-plotted: whether they are is answered by the Haems box of the window's settings
+Main function to ask which haems are plotted, when they are plotted (their panels
+are moved with the arrows beside them in the window): whether they are is answered by the Haems box of the window's settings
 strip, in answers['plot_haems'].
 
 ---- Inputs ----
@@ -28528,19 +32164,24 @@ yes_no_asker
 ```text
 ---- Summary ----
 Main function to list the kinds of OCR that can be offered: the OCR itself, the OCR
-per OD when OD values were entered, and the OCR as a percentage of its range.
+per OD when OD values were entered, the OCR as a percentage of its range and, for
+the plot of each file, the OCR as a percentage of its baseline.
 
 ---- Inputs ----
 has_od : bool
     True when OD values were entered (scaling by OD is on).
+has_baseline : bool
+    True where the OCR can be shown as % of baseline (the plot of each file); the
+    figures of several files, which have a % of baseline of their own, leave it
+    out.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 List[str]
-    The keys 'raw', 'od' (only with OD values) and 'percent', in the order they are
-    offered.
+    The keys 'raw', 'od' (only with OD values), 'percent' and 'baseline' (only
+    with has_baseline), in the order they are offered.
 
 ---- Globals mutated ----
 None.
@@ -28561,7 +32202,7 @@ the units of the plot axes.
 
 ---- Inputs ----
 keys : List[str]
-    OCR kinds offered: 'raw', 'od' and/or 'percent'.
+    OCR kinds offered: 'raw', 'od', 'percent' and/or 'baseline'.
 
 ---- Globals read ----
 OCR_LABELS (module constant).
@@ -28746,17 +32387,14 @@ path_cleaner
 
 ```text
 ---- Summary ----
-Main function to gather the OD values and event labels saved for each file, so they
-can be offered as defaults: those in the dataset's settings file, or, for a file
-with none there yet, those in its workbook from an earlier run.
+Main function to gather the OD values and event labels saved for each file in the
+dataset's settings file, so they can be offered as defaults.
 
 ---- Inputs ----
 summaries : List[dict]
     File summaries (DATA_FORMAT.md).
 remembered : Dict[str, dict]
     The files part of the dataset's settings (dataset_settings, DATA_FORMAT.md).
-export_root : Path
-    Results folder, where the workbooks of an earlier run are looked for.
 
 ---- Globals read ----
 SAVED_VALUE_KEYS (imported constant).
@@ -28767,17 +32405,13 @@ Dict[str, dict]
     None when nothing is}.
 
 ---- Globals mutated ----
-None. Prints progress and a note when values come from the workbooks (side
-effects).
+None.
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-info_printer
-progress_clearer
-progress_printer
-saved_settings_reader
+None.
 ```
 
 #### `signal_asker`
@@ -28785,13 +32419,20 @@ saved_settings_reader
 ```text
 ---- Summary ----
 Main function to ask whether the oxygen traces and the OCR are plotted, and which
-OCR.
+OCR. The OCR as % of baseline needs the averaging windows: with none set up it
+says so and offers the window step of the processing (4.6); without windows the
+OCR goes back to what it was.
 
 ---- Inputs ----
 answers : dict
-    Answers dictionary the values are stored in; must hold normalise_od.
+    Answers dictionary the values are stored in; must hold normalise_od and
+    averaging.
 defaults : dict
     Default answers.
+windows_adder : Optional[Callable[[], bool]]
+    Function that runs the window step of the processing, stores what is chosen
+    in ``answers`` and returns True when the windows are then set up; None when
+    the step cannot be run.
 
 ---- Globals read ----
 None.
@@ -28808,6 +32449,7 @@ None.
 
 ---- Helpers ----
 choice_asker
+info_printer
 ocr_kind_lister
 ocr_option_builder
 yes_no_asker
@@ -28849,6 +32491,38 @@ None.
 _columns_text_builder
 choice_asker
 number_asker
+```
+
+#### `spectra_export_asker`
+
+```text
+---- Summary ----
+Main function to ask, at the end of the questions, whether the run writes the
+spectra as csv files. It is not asked when the export of the import wrote them
+already: one line says so, and the run does not write them a second time.
+
+---- Inputs ----
+has_spectra : bool
+    True when the export of the import (3.4) wrote the spectra as csv files.
+default : bool
+    The answer Enter gives.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the run is to write the spectra as csv files.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+yes_no_asker
 ```
 
 #### `temperature_asker`
@@ -29397,7 +33071,8 @@ Where the program keeps the user's own things: the program folder from source, a
 ```text
 ---- Summary ----
 Where the program's own files are, and where the user's own things are kept: the
-fits, the folder used last, the logs and the data folders offered by number.
+fits, the journal files, the folder used last, the logs and the data folders offered
+by number.
 Detailed structure can be found in DATA_FORMAT.md.
 ```
 
@@ -29504,23 +33179,24 @@ _launch_log_shortener
 
 ```text
 ---- Summary ----
-Main function to make the Mac app's own folder, with its fits and logs folders, and
-to copy in each fit that comes with the program and is not there yet, the haem
-library and the presets in their own folders. A fit already there is never
-overwritten, so the user's changes are kept. Run from source, nothing is done:
-everything stays in the program folder.
+Main function to make the Mac app's own folder, with its fits, journals and logs
+folders, and to copy in each fit and each journal file that comes with the program
+and is not there yet, the haem library and the presets in their own folders. A
+file already there is never overwritten, so the user's changes are kept. Run from
+source, nothing is done: everything stays in the program folder.
 
 ---- Inputs ----
 places : UserPlaces
     Where the user's things are kept (user_places_finder).
 
 ---- Globals read ----
-FITS_FOLDER_NAME (module constant).
+FITS_FOLDER_NAME, JOURNALS_FOLDER_NAME (module constants).
 
 ---- Outputs ----
 None
-    Nothing. Raises OSError when the folders cannot be made; a fit that cannot be
-    copied is left out.
+    Nothing. Raises OSError when the folders cannot be made; a fit or a journal
+    file that cannot be copied is left out (the journal is then read from the
+    program's own copy).
 
 ---- Globals mutated ----
 None. Makes folders and copies files (side effects).
@@ -29551,8 +33227,8 @@ program_folder : Optional[Path]
     find it (inside the app, or the folder above utils_shared).
 
 ---- Globals read ----
-FITS_FOLDER_NAME, LAST_ANSWERS_NAME, LOGS_FOLDER_NAME, OWN_FOLDER_NAME (module
-constants); sys.frozen and sys._MEIPASS (set by the app).
+FITS_FOLDER_NAME, JOURNALS_FOLDER_NAME, LAST_ANSWERS_NAME, LOGS_FOLDER_NAME,
+OWN_FOLDER_NAME (module constants); sys.frozen and sys._MEIPASS (set by the app).
 
 ---- Outputs ----
 UserPlaces
@@ -30414,6 +34090,9 @@ _nav_state_setter
 _navigator
 _opened_teller
 _pane_writer
+_panel_arrow_checker
+_panel_arrow_clicker
+_panel_arrows_drawer
 _picture_shower
 _pointer_mover
 _resizer
@@ -30437,6 +34116,7 @@ input_reader
 output_capturer
 pictures_publisher
 run
+saved_plot_publisher
 session_attacher
 spec_publisher
 strip_choices_setter
@@ -31308,8 +34988,8 @@ above the picture for their handles, and the overlay shades the picture and
 draws them. While the picture for the latest settings is still being made, or
 the program is making pictures of its own (drawing_sign_shower), the
 "Drawing ..." sign is on the plot (over the previous picture when there is
-one). Once the questions about each file are over, a file not drawn with the
-last settings says so instead.
+one). Once the questions about each file are over, a file whose plot was not
+saved with the last settings says so instead.
 
 ---- Inputs ----
 None.
@@ -31325,14 +35005,106 @@ None
 None. Redraws the plot area and the status line (side effect).
 
 ---- Equations ----
-scale = min(width / picture width, (height - handle band) / picture height),
-at most 1.5.
+scale = min((width - arrow band) / picture width,
+(height - handle band) / picture height), at most 1.5; the arrow band is kept
+left of the picture only while the panels can be moved.
 
 ---- Helpers ----
 _drawing_sign_drawer
+_panel_arrow_checker
 _lock_drawer
 _message_shower
+_panel_arrows_drawer
 _time_line_drawer
+```
+
+##### `_panel_arrow_checker`
+
+```text
+---- Summary ----
+Method to tell whether the panels of the picture shown can be moved up and
+down: it is the plot of a file with two panels or more, the settings strip is
+in use, no edges are dragged on it and it is not locked.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the arrows of the panels have their place beside the picture.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_panel_arrow_clicker`
+
+```text
+---- Summary ----
+Method to act on a click on an arrow beside a panel: the panel moves one place
+up or down, told to the program as a change of the settings strip, which draws
+the plots again. The arrows are hidden until they are.
+
+---- Inputs ----
+event : Any
+    The Tk click event.
+
+---- Globals read ----
+PANEL_ORDER_CHANGE.
+
+---- Outputs ----
+bool
+    True when the click was on an arrow, used or not.
+
+---- Globals mutated ----
+None. Queues the change and hides the arrows (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_panel_arrows_drawer
+_strip_change_teller
+panel_arrow_finder
+panel_order_mover
+```
+
+##### `_panel_arrows_drawer`
+
+```text
+---- Summary ----
+Method to draw an up and a down arrow left of each panel of the plot of a
+file, while its panels can be moved. They are left out while the plot is being
+drawn again, so a click always moves a panel of the order on screen.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PANEL_ARROW_BAND_PX and the PANEL_ARROW colours (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area and keeps where the arrows are (side effects).
+
+---- Equations ----
+The triangle of an arrow fills the middle half of its square.
+
+---- Helpers ----
+_panel_arrow_checker
+panel_arrow_placer
 ```
 
 ##### `_pointer_mover`
@@ -31571,8 +35343,8 @@ None.
 
 ```text
 ---- Summary ----
-Method to act on a click on the plot of a file: an edge under the mouse is
-taken, to be dragged; otherwise, while the question waiting can be answered
+Method to act on a click on the plot of a file: an arrow beside a panel moves
+the panel; an edge under the mouse is taken, to be dragged; otherwise, while the question waiting can be answered
 with a drag, the drag starts here. Its answer replaces what was in the answer
 box, can still be edited, and is accepted with Enter.
 
@@ -31595,6 +35367,7 @@ None.
 
 ---- Helpers ----
 _band_drawer
+_panel_arrow_clicker
 pointed_time_finder
 ```
 
@@ -31664,9 +35437,9 @@ _edges_refresher
 ---- Summary ----
 Method to build the terminal, the answer box with its Help button (greyed out
 until the Help box is made), Confirm and the table (both hidden until a table
-is asked for) on the left, and the plot with the overlay of its edges, its file
-controls, the settings strip and the edges row (hidden until edges are dragged)
-on the right.
+is asked for) on the left, and on the right the file controls, under them the
+plot with the overlay of its edges, then the settings strip and the edges row
+(hidden until edges are dragged).
 
 ---- Inputs ----
 None.
@@ -32006,6 +35779,38 @@ input_reader
 text_sender
 ```
 
+##### `saved_plot_publisher`
+
+```text
+---- Summary ----
+Method to show the plot saved for a file, once the questions about each file
+are over: it takes the place of the file's preview, so the file shows its saved
+plot in the later steps. It is called from the question thread, after
+window_closer.
+
+---- Inputs ----
+name : str
+    Name of the file.
+png : bytes
+    Picture of the saved plot.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the picture for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `session_attacher`
 
 ```text
@@ -32068,8 +35873,8 @@ None.
 ```text
 ---- Summary ----
 Method to tell the settings strip what it offers: the spectrometers of its
-"Spectra" drop-down, whether % oxidised is in "Haems as", and whether the per
-OD boxes are shown.
+"Spectra" drop-down, whether % oxidised is in "Haems as", whether per OD is
+offered, and whether % of baseline is in "OCR as".
 
 ---- Inputs ----
 spectra : List[str]
@@ -32078,6 +35883,8 @@ has_percent : bool
     True when at least one file has both regions.
 has_od : bool
     True when OD values were entered.
+has_baseline : bool
+    True when the averaging windows are set up.
 
 ---- Globals read ----
 None.
@@ -32417,8 +36224,9 @@ None.
 ---- Summary ----
 Method to end the previews when the browser steps are over: the preview thread
 is stopped (so it cannot clash with the processing that follows) and the file
-controls are switched off. The pictures drawn with the last settings stay; a
-file without one says it was not drawn with them.
+controls are switched off. The pictures drawn with the last settings stay
+until the saved plot of each file takes their place (saved_plot_publisher); a
+file without one says its plot was not saved with them.
 
 ---- Inputs ----
 None.
@@ -32560,6 +36368,76 @@ None.
 ---- Equations ----
 across = (x - left) / width; up = 1 - (y - top) / height;
 time = start + (across - axis left) / (axis right - axis left) * (end - start).
+
+---- Helpers ----
+None.
+```
+
+#### `panel_arrow_finder`
+
+```text
+---- Summary ----
+Main function to find the arrow of a panel under a point of the plot area.
+
+---- Inputs ----
+x : float
+    Distance from the left edge of the plot area, in pixels.
+y : float
+    Distance from the top edge of the plot area, in pixels.
+arrows : List[Tuple[str, int, float, float, float, float, bool]]
+    The arrows, as panel_arrow_placer gives them.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Tuple[str, int, bool]]
+    (key of the panel, -1 for up or 1 for down, whether the arrow can be used),
+    or None when the point is on no arrow.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+On an arrow: left <= x <= right and top <= y <= bottom of its square.
+
+---- Helpers ----
+None.
+```
+
+#### `panel_arrow_placer`
+
+```text
+---- Summary ----
+Main function to place an up and a down arrow left of each panel of a picture, in
+the room kept beside it: the up arrow just above the middle of the panel, the down
+arrow just under it. The up arrow of the top panel and the down arrow of the
+bottom one cannot be used.
+
+---- Inputs ----
+picture_box : Tuple[float, float, float, float]
+    (left, top, width, height) of the picture in the plot area, in pixels.
+time_axis : TimeAxis
+    Where the panels sit in the picture (its panels, top first).
+band_px : float
+    Width of the room kept left of the picture, in pixels.
+
+---- Globals read ----
+PANEL_ARROW_SIZE_PX (module constant).
+
+---- Outputs ----
+List[Tuple[str, int, float, float, float, float, bool]]
+    For each arrow: the key of its panel, -1 for up or 1 for down, the left, top,
+    right and bottom of its square in pixels, and whether it can be used.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+middle y = picture top + (1 - (panel bottom + panel top) / 2) x picture height;
+side = PANEL_ARROW_SIZE_PX, or half the height of the panel less 1 px when that is
+smaller; the squares are centred on picture left - band / 2, the up one from
+middle - 1 - side to middle - 1, the down one from middle + 1 to middle + 1 + side.
 
 ---- Helpers ----
 None.
@@ -32744,7 +36622,8 @@ Detailed structure can be found in DATA_FORMAT.md.
 ```text
 ---- Summary ----
 Where the time axis shared by the panels sits in a preview picture, and the times at
-its two ends, so a point of the picture can be turned into a time.
+its two ends, so a point of the picture can be turned into a time; and where each
+panel that can be moved sits, so the window can put its arrows beside it.
 Detailed structure can be found in DATA_FORMAT.md.
 ```
 
@@ -32764,10 +36643,11 @@ Detailed structure can be found in DATA_FORMAT.md.
 ```text
 ---- Summary ----
 Helper function to export the imported data of one file, read once: for a trimmed
-file the whole recording into the full folder of its results folder, then the data
-kept by the trimming (all of it for a file not trimmed) into its results folder,
-with the OD values and labels entered. A file that is no longer trimmed loses the
-whole recording written for it earlier in this run, as it has nothing called full.
+file, when the choice asks for it, the whole recording into the full folder of its
+results folder, then the data kept by the trimming (all of it for a file not
+trimmed) into its results folder, with the OD values and labels entered. A file
+that is no longer trimmed loses the whole recording written for it earlier in this
+run, as it has nothing called full.
 
 ---- Inputs ----
 session : ViewerSession
@@ -32779,13 +36659,13 @@ limits : dict
 details : dict
     {file name: {OD, volume, dilution_factor, events}}; may lack the file.
 choice : str
-    A key of SPECTRA_BY_EXPORT: 'summary', 'trimmed' or 'all'.
+    A key of EXPORT_PARTS: 'summary', 'summary_full', 'spectra' or 'spectra_full'.
 keep_full : bool
     True leaves a whole recording already written in this run as it is (the edges
     changed, and the whole recording does not depend on them).
 
 ---- Globals read ----
-FULL_FOLDER, SPECTRA_BY_EXPORT (module constants); settings.DEFAULT_ANSWERS.
+FULL_FOLDER, EXPORT_PARTS (module constants); settings.DEFAULT_ANSWERS.
 
 ---- Outputs ----
 None
@@ -33023,9 +36903,9 @@ None.
 Main function to export the imported data of every file (or of the files named), so
 it can be plotted outside the program: in each file's results folder the workbook
 of the data kept by the trimming (the oxygen, OCR, events with their labels, and the
-OD values and edges), and for a trimmed file the whole recording in its full folder;
-the spectra as csv files beside them if chosen. No haem decomposition, OD scaling
-or averaging is applied; the ignored parts are left in.
+OD values and edges); for a trimmed file the whole recording in its full folder, if
+chosen; the spectra as csv files beside each workbook, if chosen. No haem
+decomposition, OD scaling or averaging is applied; the ignored parts are left in.
 
 ---- Inputs ----
 session : ViewerSession
@@ -33035,8 +36915,9 @@ limits : dict
 details : dict
     {file name: {OD, volume, dilution_factor, events}} (details_stage_runner).
 choice : str
-    A key of SPECTRA_BY_EXPORT: 'summary' (the workbooks only), 'trimmed' (and the
-    trimmed spectra) or 'all' (and the spectra of the whole recordings too).
+    A key of EXPORT_PARTS: 'summary' (the workbook of the trimmed data),
+    'summary_full' (and the whole recording of a trimmed file), 'spectra' (the
+    trimmed data with its spectra) or 'spectra_full' (both, each with its spectra).
 names : Optional[List[str]]
     Files to export; None for every file.
 keep_full : bool
@@ -33052,8 +36933,9 @@ List[str]
     The problems: a file that could not be exported is named in them and left out.
 
 ---- Globals mutated ----
-None. Reads the files, writes <results>/<file>/<file>.xlsx (and full/ inside it for
-a trimmed file, and the spectra), and notes the results folder in session.exported
+None. Reads the files, writes <results>/<file>/<file>.xlsx (and, as chosen, full/
+inside it for a trimmed file and the spectra), and notes the results folder in
+session.exported
 once something is written (side effects).
 
 ---- Equations ----
@@ -33319,8 +37201,9 @@ None.
 
 ---- Outputs ----
 Optional[TimeAxis]
-    The place and the range of the time axis, or None when the figure has no panel
-    or its axis has no length.
+    The place and the range of the time axis, with the key, bottom and top of each
+    panel of the standard plot (experiment_drawer names them), top first; or None
+    when the figure has no panel or its axis has no length.
 
 ---- Globals mutated ----
 None.
@@ -33895,11 +37778,12 @@ _strip_shower
 
 ```text
 ---- Summary ----
-Helper function to ask, at the end of the import, what to export now so it can be
-plotted outside the program (nothing, the workbooks, the workbooks and the trimmed
-spectra, or the spectra of the whole recordings too, with the size of the spectra
-worked out for these files), and to do it. Enter gives nothing. The choice and the
-limits exported are kept in the session, so new edges can export again.
+Helper function to ask, at the end of the import, whether to export the files of
+each experiment now so they can be plotted outside the program (nothing; the
+workbook of the trimmed data; that and the whole recording of each trimmed file;
+either of those with the spectra as csv files; each with its size worked out for
+these files), and to do it. Enter gives nothing. The choice and the limits exported
+are kept in the session, so new edges can export again.
 
 ---- Inputs ----
 session : ViewerSession
@@ -33910,7 +37794,8 @@ details : Dict[str, dict]
     OD values and events of every file, as entered in section 3.
 
 ---- Globals read ----
-WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES.
+WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES,
+settings.WORKBOOK_POINT_BYTES; EXPORT_PARTS.
 
 ---- Outputs ----
 None
@@ -33921,7 +37806,8 @@ None. Reads from and prints to the terminal, writes the files and sets
 session.export_choice and session.export_limits (side effects).
 
 ---- Equations ----
-None.
+Size of a choice = the trimmed workbooks, + the whole recordings' workbooks when
+it writes them, + the spectra of each when it writes them.
 
 ---- Helpers ----
 choice_asker
@@ -33932,6 +37818,7 @@ progress_printer
 size_describer
 spectra_size_estimator
 text_colourer
+workbook_size_estimator
 ```
 
 #### `_export_refresher`
@@ -33980,7 +37867,8 @@ text_colourer
 ---- Summary ----
 Helper function to set the figure of each file from the standard settings or the
 ones last saved for the dataset, keeping only what this run allows: the OCR per OD
-and the haems scaled by OD only when OD values were entered, the haems in %
+and the haems scaled by OD only when OD values were entered, the OCR as % of
+baseline only when the averaging windows are set up, the haems in %
 oxidised only when a file has both regions (delta D otherwise), and the haems only
 when they are decomposed, limited to those of the fit in use (all of them when none
 of the saved ones is in it). The Haems box of the settings strip says whether the
@@ -33991,7 +37879,7 @@ answers hold them, which the settings strip may have changed.
 ---- Inputs ----
 answers : dict
     Answers dictionary the figure settings are stored in; must hold normalise_od,
-    decompose, ocr_mode, haem_mode and haem_per_od.
+    decompose, averaging, ocr_mode, haem_mode and haem_per_od.
 defaults : dict
     The standard or saved answers (plot_o2, plot_ocr, haems, event_label_angle).
 fit : Optional[dict]
@@ -34099,22 +37987,23 @@ info_printer
 
 ```text
 ---- Summary ----
-Helper function to have the label and concentration of every event filled in in
-the labels table of the window (3.2).
+Helper function to have the label, the stock and the volume added (or the
+concentration in the chamber) of every event filled in in the labels table of the
+window (3.2).
 
 ---- Inputs ----
 session : ViewerSession
     The browser session, whose window has the table.
 entries : Dict[str, List[dict]]
-    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]} to
-    start from (event_entries_builder).
+    {file name: [event entry, ...]} to start from (event_entries_builder,
+    event_entries in DATA_FORMAT.md).
 
 ---- Globals read ----
-IGNORE_LABEL (imported constant).
+IGNORE_LABEL (imported constant); settings.CHAMBER_VOLUME_ML.
 
 ---- Outputs ----
 Dict[str, List[dict]]
-    The events with the labels and concentrations typed.
+    The events with the labels, stocks, volumes and concentrations typed.
 
 ---- Globals mutated ----
 None. Shows and hides the table and reads from and prints to the terminal (side
@@ -34156,6 +38045,49 @@ None.
 
 ---- Helpers ----
 info_printer
+```
+
+#### `_master_page_saver`
+
+```text
+---- Summary ----
+Helper function to save the master page of the file shown: its figure, drawn as it
+will be saved, on one page of the journal of the strip (the standard journal for
+"None"), as a PDF in the results folder. What was saved, or why it was not, is
+said in one sentence.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (the file shown, the fit in use, the regions, the results
+    folder).
+answers : dict
+    The answers the figure is drawn with.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the PDF and prints to the terminal; the details of a problem go to
+the log (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+info_printer
+master_page_exporter
+preview_figure_builder
+problem_shower
+warning_shower
 ```
 
 #### `_od_lister`
@@ -34452,15 +38384,19 @@ Helper function to make a change in the settings strip what the run uses, and
 redraw the plot of the step being asked. Unticking the haems leaves them out of the
 run; ticking them, picking a fit or ticking library haems under Build a fit works
 them out with the fit in the strip; a new background works them out again, and so
-does another spectrometer. A new way of showing the haems, or a per OD box, redraws
-the plot with it. A number typed in the Δψ row is kept in the answers (the two
+does another spectrometer. A new way of showing the haems or the OCR, a per OD box,
+or a new choice of what the event labels show, redraws the plot with it. A panel moved with the arrow beside it, or the Standard order
+button, changes the order kept for the panels of every file, said in the terminal.
+A number typed in the Δψ row is kept in the answers (the two
 filled-in midpoints with it), said in the terminal and Δψ worked out again. A fit
 that cannot be used is reported and the strip is set back. Keep to compare keeps
 the fit, the background, the regions and the numbers of Δψ in use, drawn dashed
 over the haems and over Δψ until one of the two is chosen (Keep this one carries
 on with what is on the plot, Go back to kept puts the kept one back in use) or
 the haems are left out. A new journal, width or height redraws only the figure of
-each file, the one plot drawn at its size.
+each file, the one plot drawn at its size. A click on Export master saves the
+master page of the file shown while that figure is on the plot, and says when it
+can be saved otherwise.
 
 ---- Inputs ----
 session : ViewerSession
@@ -34474,7 +38410,7 @@ changes : Dict[str, object]
     strip_values).
 
 ---- Globals read ----
-None.
+LABEL_CHANGE_TEXTS.
 
 ---- Outputs ----
 None
@@ -34494,6 +38430,8 @@ _strip_shower
 form_answers_builder
 info_printer
 kept_decomposition_builder
+panel_name_teller
+panel_order_merger
 psi_answers_builder
 psi_change_describer
 size_answers_builder
@@ -34507,9 +38445,10 @@ Helper function to show in the settings strip what the run uses now: the haems
 ticked when they are worked out, the fit, the decomposition kept to compare with,
 the spectrometer, how the haems and the OCR are shown, the journal and the size.
 It also says what the strip offers: the spectrometers every file has, % oxidised
-when at least one file has both regions, and the per OD boxes when OD values were
-entered. Haems in % oxidised go back to delta D when no file has both regions any
-more.
+when at least one file has both regions, per OD when OD values were entered, and
+the OCR as % of baseline once the averaging windows are set up
+(session.has_windows). Haems in % oxidised go back to delta D when no file has
+both regions any more.
 
 ---- Inputs ----
 session : ViewerSession
@@ -34617,7 +38556,8 @@ None.
 ```text
 ---- Summary ----
 Helper function to run the window step on the plot of every file: the averaging
-windows are shaded on the plot. The settled windows (blue) have one length and one
+windows are shaded on the plot, the baseline before the first addition in gold
+with its name. The settled windows (blue) have one length and one
 gap before the next addition for every window of every file: pulling the start of
 any of them changes the length, pulling its end the gap. The quick windows (green)
 have one length and one start after their addition: pulling the start of any of
@@ -34844,9 +38784,10 @@ from the standard settings or the ones last saved for the dataset, and ask wheth
 it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
 the angle of the event labels): only that part's questions are asked, with the
 current choices as the defaults, and the figure is drawn and asked about again. The
-settings strip turns the haems on or off and sets how they are shown, the per OD
-scaling, the journal and the size, so 'which haems' asks only which ones in which
-order, and none of those is asked.
+settings strip turns the haems on or off and sets how they and the OCR are shown,
+the journal and the size, so 'which haems' asks only which ones in which
+order, and none of those is asked. The OCR asked for as % of baseline with no
+averaging windows set up offers the window step of the processing.
 
 ---- Inputs ----
 session : ViewerSession
@@ -34879,6 +38820,7 @@ None.
 _answers_previewer
 _figure_starter
 _strip_shower
+_windows_chooser
 accept_asker
 haem_choice_asker
 info_printer
@@ -35085,15 +39027,16 @@ exported : Optional[List[Path]]
     when the caller does not need to know.
 
 ---- Globals read ----
-STAGE_TITLES (module constant); settings.STANDARD_FIT; REGION_KEYS.
+STAGE_TITLES (module constant); settings.STANDARD_FIT; REGION_KEYS; EXPORT_PARTS.
 
 ---- Outputs ----
-Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool, Dict[str, dict]]
-    (limits, fit, details, plotted, regions): the trim and ignore limits of every
-    file, the fit (None when the haems are not decomposed), the OD values and
-    events of every file, whether the figure of each file has at least one panel,
-    and the oxidised and reduced region of every file as _regions_chooser gives
-    them (those saved with the dataset when the step was not asked).
+Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool, Dict[str, dict], bool]
+    (limits, fit, details, plotted, regions, has_spectra): the trim and ignore
+    limits of every file, the fit (None when the haems are not decomposed), the OD
+    values and events of every file, whether the figure of each file has at least
+    one panel, the oxidised and reduced region of every file as _regions_chooser
+    gives them (those saved with the dataset when the step was not asked), and
+    whether the export of the import wrote the spectra as csv files.
 
 ---- Globals mutated ----
 None. Stores the answers in ``answers``, reads from and prints to the terminal,
@@ -35362,12 +39305,16 @@ decomposition in use to compare the next ones with (with a line saying which one
 kept; while one is kept it reads "Keep this one", and a second button goes back to
 the kept one), a drop-down of the spectrometer whose spectra hold the haems (shown when the
 files share more than one), a drop-down of how the haems are shown with a "per OD"
-box, an "OCR per OD" box (both boxes shown only when OD values were entered), a
+box (shown only when OD values were entered), a drop-down of how the OCR is shown
+(per OD only when OD values were entered, % of baseline only when the averaging
+windows are set up), a
 row of the numbers of Δψ (shown only while Δψ is worked out: the midpoint of bH
 and of bL and the fall typed, each midpoint with the other haem reduced filled in,
 a button for the paper's values, and the share, the temperature and the limits as
-text, or as boxes when "More" is ticked), a drop-down of the journal, a drop-down of the widths that journal allows and a typing
-box for the height. It tells the window what the user changed and can be
+text, or as boxes when "More" is ticked), a drop-down of the journal, a drop-down of the widths that journal allows, a typing
+box for the height, a button that exports the master page (a page of the
+journal with the figure of the file shown on it) and a button that puts the panels
+of the plot back in the standard order. It tells the window what the user changed and can be
 set by the program; it changes nothing by itself. It starts greyed out, until the
 program says it is listening. Every method runs on the window thread, except
 values_reader.
@@ -35392,7 +39339,11 @@ _form_handler
 _haems_handler
 _height_handler
 _journal_handler
+_label_mode_handler
+_master_handler
 _more_toggler
+_ocr_handler
+_order_handler
 _paper_handler
 _per_od_handler
 _psi_handler
@@ -35452,7 +39403,11 @@ _form_handler
 _haems_handler
 _height_handler
 _journal_handler
+_label_mode_handler
+_master_handler
 _more_toggler
+_ocr_handler
+_order_handler
 _paper_handler
 _per_od_handler
 _psi_handler
@@ -35745,6 +39700,61 @@ _size_refresher
 width_choices_lister
 ```
 
+##### `_label_mode_handler`
+
+```text
+---- Summary ----
+Method to take what the event labels show, picked in the drop-down.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+LABEL_FORM_TEXTS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+```
+
+##### `_master_handler`
+
+```text
+---- Summary ----
+Method to take the button that exports the master page: a page of the journal
+with the figure of the file shown on it. The strip keeps nothing: the click is
+told as {MASTER_CHANGE: True}, and the program saves the page.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MASTER_CHANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the function given as on_change (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_more_toggler`
 
 ```text
@@ -35770,6 +39780,34 @@ None.
 
 ---- Helpers ----
 _size_refresher
+```
+
+##### `_order_handler`
+
+```text
+---- Summary ----
+Method to take the button that puts the panels of the plot back in the standard
+order. The strip keeps nothing: the click is told as {PANEL_ORDER_CHANGE: []},
+and the program draws the plots again.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PANEL_ORDER_CHANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reports the click (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_paper_handler`
@@ -35802,15 +39840,43 @@ _size_refresher
 psi_values_builder
 ```
 
+##### `_ocr_handler`
+
+```text
+---- Summary ----
+Method to take the way of showing the OCR picked in the drop-down.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+```
+
 ##### `_per_od_handler`
 
 ```text
 ---- Summary ----
-Method to take one of the two per OD tick boxes.
+Method to take the per OD tick box of the haems.
 
 ---- Inputs ----
 name : str
-    'haem_per_od' or 'ocr_per_od', the value of the box clicked.
+    'haem_per_od', the value of the box clicked.
 
 ---- Globals read ----
 None.
@@ -35871,8 +39937,9 @@ follow the journal, the width and the height are greyed for "None", the button
 that keeps a decomposition is greyed while no haems are shown, the button that
 goes back to the kept one and the line saying which one is kept show only
 while one is, the spectrometer shows only when
-there is a choice, the per OD boxes only when OD values were entered (the one
-of the haems greyed for % oxidised, which has no per OD), the Δψ row only
+there is a choice, the per OD box of the haems only when OD values were
+entered (greyed for % oxidised, which has no per OD), the ways of showing the
+OCR that can be used now, the Δψ row only
 while Δψ is worked out (its filled-in midpoints following the typed ones and
 the fall), and the whole strip is greyed while the program is not listening.
 
@@ -35880,7 +39947,8 @@ the fall), and the whole strip is greyed while the program is not listening.
 None.
 
 ---- Globals read ----
-HAEM_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
+HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX,
+NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
 (BACK_TEXT is set on its button once, when it is built.)
 
 ---- Outputs ----
@@ -35896,6 +39964,7 @@ None.
 ---- Helpers ----
 haem_form_choices_lister
 height_checker
+ocr_form_choices_lister
 psi_seconds_filler
 psi_summary_writer
 width_choices_lister
@@ -35994,7 +40063,8 @@ _change_reporter
 ---- Summary ----
 Method to say what the strip offers: the spectrometers of the "Spectra"
 drop-down (shown only with more than one), whether % oxidised is in the "Haems
-as" drop-down, and whether the two per OD boxes are shown. The values stay.
+as" drop-down, whether the per OD box of the haems is shown and per OD is in
+the "OCR as" drop-down, and whether % of baseline is in it. The values stay.
 
 ---- Inputs ----
 spectra : List[str]
@@ -36002,7 +40072,10 @@ spectra : List[str]
 has_percent : bool
     True when at least one file has both regions, so % oxidised is offered.
 has_od : bool
-    True when OD values were entered, so the per OD boxes are shown.
+    True when OD values were entered, so per OD is offered.
+has_baseline : bool
+    True when the averaging windows are set up, so the OCR is offered as % of
+    baseline.
 
 ---- Globals read ----
 None.
@@ -36199,8 +40272,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to turn the spectrometer and the ways of showing the haems and the
-OCR of the strip into the answers of the run.
+Main function to turn the spectrometer, the ways of showing the haems and the OCR
+and what the event labels show of the strip into the answers of the run.
 
 ---- Inputs ----
 values : Dict[str, Any]
@@ -36212,9 +40285,9 @@ None.
 
 ---- Outputs ----
 Dict[str, Any]
-    The answers to update: decomposition_dataset for the spectrometer, haem_mode
-    and haem_per_od as given, and ocr_mode 'od' for the OCR per OD box ticked,
-    'raw' for it unticked. Empty when the values hold none of them.
+    The answers to update: decomposition_dataset for the spectrometer, and
+    haem_mode, haem_per_od, ocr_mode and label_mode as given. Empty when the
+    values hold none of them.
 
 ---- Globals mutated ----
 None.
@@ -36360,6 +40433,37 @@ None.
 
 ---- Helpers ----
 fit_describer
+```
+
+#### `ocr_form_choices_lister`
+
+```text
+---- Summary ----
+Main function to list the ways of showing the OCR the "OCR as" drop-down offers,
+each with its words.
+
+---- Inputs ----
+has_od : bool
+    True when OD values were entered, so the OCR per OD is offered.
+has_baseline : bool
+    True when the averaging windows are set up, so % of baseline is offered.
+
+---- Globals read ----
+OCR_FORM_TEXTS.
+
+---- Outputs ----
+List[Tuple[str, str]]
+    [(ocr_mode, words)] in the order of the drop-down: the OCR, per OD when
+    offered, % of the range, % of baseline when offered.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `minutes_checker`
@@ -36623,8 +40727,9 @@ Main function to give the strip values that show the answers of the run.
 ---- Inputs ----
 answers : dict
     The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
-    haem_per_od, ocr_mode, delta_psi and the numbers of Δψ, journal, columns,
-    height, size_mode); a fit_file of None shows an empty fit.
+    haem_per_od, ocr_mode, label_mode, delta_psi and the numbers of Δψ, journal,
+    columns, height, size_mode); a fit_file of None shows an empty fit, and a
+    missing label_mode the labels in the chamber.
 has_haems : bool
     True when the haems are worked out and shown, which ticks the box.
 haem_files : Sequence[str]
@@ -36640,9 +40745,7 @@ NO_JOURNAL.
 ---- Outputs ----
 Dict[str, Any]
     All the strip values (DATA_FORMAT.md). A figure of the standard size
-    (size_mode other than 'custom') shows the journal as "None"; the OCR per OD
-    box is ticked for the OCR per OD, unticked for the plain OCR and its % of the
-    range; the Δψ row shows when the haems are worked out and Δψ is switched on.
+    (size_mode other than 'custom') shows the journal as "None"; the Δψ row shows when the haems are worked out and Δψ is switched on.
 
 ---- Globals mutated ----
 None.
@@ -36660,7 +40763,8 @@ psi_values_builder
 ---- Summary ----
 Main function to check values meant for the strip before they are shown: the
 names, the background, the haems ticked, whether a decomposition is kept and its
-words, the spectrometer, the way of showing the haems, the per OD boxes, the
+words, the spectrometer, the ways of showing the haems and the OCR, the per OD
+box, the
 numbers of the Δψ row (numbers, a share above 0, limits above 0 and below 100
 with the lowest first), the journal, a width the journal allows and a height the
 page allows. The width and the height are checked against the journal given with
@@ -36671,7 +40775,8 @@ values : Dict[str, Any]
     Some or all of the strip values (DATA_FORMAT.md).
 
 ---- Globals read ----
-VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS, PSI_FIELDS.
+VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS,
+OCR_FORM_TEXTS, LABEL_FORM_TEXTS, PSI_FIELDS.
 
 ---- Outputs ----
 None
@@ -36728,14 +40833,16 @@ The tables of the window, filled in by clicking a cell and typing: the OD values
 ```text
 ---- Summary ----
 A table of the window, filled in by clicking a cell and typing: a fixed first
-column (the file, or the time of an event), then cells of three kinds (a number
-above 0, a number of 0 or more or nothing, a label), the rows grouped under the
-name of their file where the table says so. Tab moves across, Enter and the arrows
-move down and up, and Enter in the last row goes on to Confirm. A cell that cannot
-be used turns red; in a row whose label is the skip word the other cells are greyed
-out and not read. Entering a cell tells the window which file it belongs to. The
-table tells nothing else by itself: the program reads it when Confirm is pressed.
-Every method runs on the window thread, except problems_lister and values_reader.
+column (the file, or the time of an event), any columns that are only shown (the
+text in the file), then cells of the kinds of cell_reader, the rows grouped under
+the name of their file where the table says so. Tab moves across, Enter and the
+arrows move down and up, and Enter in the last row goes on to Confirm. A cell that
+cannot be used turns red; in a row whose label is the skip word the other cells are
+greyed out and not read. A cell the program works out from the others of the
+table (the concentration in the chamber) is filled in green as they are typed.
+Entering a cell tells the window which file it belongs to. The table tells nothing
+else by itself: the program reads it when Confirm is pressed. Every method runs on
+the window thread, except problems_lister and values_reader.
 
 ---- Attributes ----
 frame : Any
@@ -36743,7 +40850,7 @@ frame : Any
 
 ---- Globals read ----
 CELL_WIDTHS, MINIMUM_HEIGHT_PX, ERROR_BACKGROUND, HEADING_TEXT, SKIPPED_BACKGROUND,
-SKIPPED_TEXT, LABEL.
+SKIPPED_TEXT, LABEL, PAIR, WORKED_BACKGROUND, WORKED_TEXT.
 
 ---- Methods ----
 __init__
@@ -36757,6 +40864,7 @@ _size_follower
 _skip_checker
 _wheel_binder
 _wheel_scroller
+_worked_refresher
 cell_focuser
 problems_lister
 rows_setter
@@ -36811,8 +40919,9 @@ _wheel_binder
 ```text
 ---- Summary ----
 Method to keep what was typed in one cell, to turn the cell red when it cannot
-be used, and, for a label, to grey out or bring back the other cells of its
-row as the label is or is not the skip word.
+be used, for a label to grey out or bring back the other cells of its row as
+the label is or is not the skip word, and to work out again the cells the
+program fills in.
 
 ---- Inputs ----
 row : int
@@ -36835,6 +40944,7 @@ None.
 
 ---- Helpers ----
 _row_skipper
+_worked_refresher
 cell_reader
 ```
 
@@ -36932,20 +41042,20 @@ _cell_revealer
 
 ```text
 ---- Summary ----
-Method to find the cells that hold something that cannot be used, and the
-needed cells left empty, in the order of the table. The greyed-out cells of a
-skipped row are not looked at.
+Method to find the cells that hold something that cannot be used, the needed
+cells left empty, and the empty cell of a pair filled in by half, in the order
+of the table. The greyed-out cells of a skipped row are not looked at.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-EMPTY, LABEL, NEEDED_KINDS.
+EMPTY, LABEL, NEEDED_KINDS, PAIR.
 
 ---- Outputs ----
 List[Tuple[int, str, str]]
     (row, name of the value, problem) for each such cell; the problem is the
-    kind of the cell when what it holds is wrong, or EMPTY.
+    kind of the cell when what it holds is wrong, EMPTY, or PAIR.
 
 ---- Globals mutated ----
 None.
@@ -37094,6 +41204,37 @@ None.
 
 ---- Helpers ----
 wheel_step_finder
+```
+
+##### `_worked_refresher`
+
+```text
+---- Summary ----
+Method to fill in the cells the program works out from the others (the
+concentration in the chamber, from the stock and the volume added): such a
+cell shows the value in green and cannot be typed in; once the program can no
+longer work it out, it is emptied and can be typed in again. The cells of a
+skipped row are left greyed out.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+WORKED_BACKGROUND, WORKED_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the text and the state of the cells (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_skip_checker
+values_reader
 ```
 
 ##### `cell_focuser`
@@ -37270,6 +41411,34 @@ None.
 None.
 ```
 
+#### `_concentration_writer`
+
+```text
+---- Summary ----
+Helper function to write a concentration in a cell with its most readable unit, or
+nothing.
+
+---- Inputs ----
+value_um : Optional[float]
+    The concentration (µM), or None.
+
+---- Globals read ----
+CELL_FIGURES.
+
+---- Outputs ----
+str
+    For example '200 mM' or ''.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+concentration_formatter
+```
+
 #### `_number_writer`
 
 ```text
@@ -37305,24 +41474,24 @@ None.
 ```text
 ---- Summary ----
 Main function to read what was typed in one cell: a number (with a point or a comma
-as the decimal sign) above 0 or of 0 or more, as the kind asks, or a label; or
-nothing yet, which is never wrong here (a needed cell left empty is found when
-Confirm is pressed).
+as the decimal sign) above 0 or of 0 or more, as the kind asks, a label, or a
+concentration with or without its unit; or nothing yet, which is never wrong here
+(a needed cell left empty is found when Confirm is pressed).
 
 ---- Inputs ----
 text : str
     What the cell holds.
 kind : str
-    ABOVE_ZERO, ZERO_OR_MORE or LABEL.
+    ABOVE_ZERO, ABOVE_ZERO_OR_EMPTY, ZERO_OR_MORE, LABEL, STOCK or CHAMBER.
 
 ---- Globals read ----
-ABOVE_ZERO, LABEL.
+ABOVE_ZERO, ABOVE_ZERO_OR_EMPTY, CHAMBER, DEFAULT_UNITS, LABEL, STOCK.
 
 ---- Outputs ----
 Tuple[Any, bool]
-    (value, is_valid): (the number or the label without its outer spaces, True)
-    when it can be used; (None, True) for an empty cell; (None, False) for a
-    number that is not one, or is below its limit.
+    (value, is_valid): (the number, the concentration in µM or the label without
+    its outer spaces, True) when it can be used; (None, True) for an empty cell;
+    (None, False) for a number that is not one, or is below its limit.
 
 ---- Globals mutated ----
 None.
@@ -37331,6 +41500,7 @@ None.
 None.
 
 ---- Helpers ----
+concentration_reader
 typed_number_reader
 ```
 
@@ -37338,8 +41508,10 @@ typed_number_reader
 
 ```text
 ---- Summary ----
-Main function to take the labels and concentrations typed in the labels table back
-into the events of each file.
+Main function to take the labels, stocks, volumes added and concentrations typed
+in the labels table back into the events of each file. The concentrations are
+worked out again afterwards (event_concentration_filler), so a concentration the
+table filled in is not relied on.
 
 ---- Inputs ----
 table : dict
@@ -37348,16 +41520,16 @@ table : dict
 values : List[Dict[str, Any]]
     What AnswerTable.values_reader gave for it, row by row.
 entries : Dict[str, List[dict]]
-    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]} the
-    table was built from; not changed.
+    {file name: [event entry, ...]} the table was built from (event_entries,
+    DATA_FORMAT.md); not changed.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 Dict[str, List[dict]]
-    A copy of ``entries`` with each event's label and concentration_uM as typed;
-    a label left empty keeps the one it had.
+    A copy of ``entries`` with each event's label, stock_uM, added_uL and
+    concentration_uM as typed; a label left empty keeps the one it had.
 
 ---- Globals mutated ----
 None.
@@ -37373,20 +41545,24 @@ None.
 
 ```text
 ---- Summary ----
-Main function to lay out the labels table: one row per event, with its time, label
-and concentration, under the name of its file; files without events have no rows.
+Main function to lay out the labels table: one row per event, with its time, the
+text in the file, its label, stock, volume added and concentration in the chamber,
+under the name of its file; files without events have no rows. The concentration
+is worked out by the table from the stock and the volume while they are typed.
 
 ---- Inputs ----
 summaries : List[dict]
     File summaries (DATA_FORMAT.md), in the order of the files.
 entries : Dict[str, List[dict]]
-    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
-    per event of the summary, in the same order.
+    {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md), one per event
+    of the summary, in the same order.
 skip_word : str
-    The label that leaves an event out; its row's concentration is greyed out.
+    The label that leaves an event out; its row's other cells are greyed out.
+chamber_ml : float
+    Volume of the chamber (mL), above 0.
 
 ---- Globals read ----
-LABEL_COLUMNS.
+LABEL_COLUMNS, LABEL_PAIRS, LABEL_SHOWN_COLUMNS.
 
 ---- Outputs ----
 dict
@@ -37399,7 +41575,46 @@ None.
 None.
 
 ---- Helpers ----
+_concentration_writer
 _number_writer
+label_worked_writer
+```
+
+#### `label_worked_writer`
+
+```text
+---- Summary ----
+Main function to work out, as the labels table is typed in, the concentration in
+the chamber of each row that has a stock and a volume added, the same label in a
+file adding up.
+
+---- Inputs ----
+rows : List[dict]
+    The rows of the labels table (table_rows, DATA_FORMAT.md), in their order.
+values : List[Dict[str, Any]]
+    What AnswerTable.values_reader gives for them now, row by row.
+skip_word : str
+    The label that leaves an event out.
+chamber_ml : float
+    Volume of the chamber (mL), above 0.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Optional[str]]
+    For each row, the concentration in the chamber to show, such as '800 µM'; None
+    for a row the program does not fill in (no stock and volume, or left out).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See event_concentration_filler.
+
+---- Helpers ----
+concentration_formatter
+event_concentration_filler
 ```
 
 #### `od_rows_reader`

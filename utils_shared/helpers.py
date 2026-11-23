@@ -21,6 +21,11 @@ HAEM_NAME_PREFIXES = ('cytochrome', 'cyt', 'haem', 'heme')
 # The haem types in the order the haems are listed, plotted and exported; a name of no
 # known type comes after them.
 HAEM_TYPE_ORDER = ('a', 'b', 'c')
+# The key of each panel of the standard plot, by which the order the user gave the
+# panels is kept: the panels there is one of with their name in words, and a haem
+# panel as this prefix then the name of its haem ('haem:Cyt bH').
+PANEL_NAMES = {'oxygen': 'Oxygen', 'vo2': 'OCR', 'delta_psi': 'Δψ'}
+HAEM_PANEL_PREFIX = 'haem:'
 # written where the user gave no concentration
 MISSING_CONCENTRATION = '? µM'
 # the version at the end of a title, as the release writes it: "... (V2.7)"
@@ -38,32 +43,37 @@ ZIP_FIXES = {'darwin': 'install the Portimao app (README, section 1.1)',
 
 
 # ---- concentration_formatter ---------------------------------------------------------
-def concentration_formatter(concentration_um: Any) -> str:
+def concentration_formatter(concentration_um: Any, significant: int = 4) -> str:
     """
     ---- Summary ----
     Main function to write a concentration given in micromolar with the most readable
-    unit: M from 1 000 000 µM, mM from 1000 µM and µM below that. It is the one place
-    where a concentration is turned into text.
+    unit: M from 1 000 000 µM, mM from 1000 µM, µM from 1 µM and nM below that, to
+    four significant figures on a label. It is the one place where a concentration is
+    turned into text.
 
     ---- Inputs ----
     concentration_um : Any
         Concentration in micromolar (µM); anything float() accepts, or None when the
         user gave none.
+    significant : int
+        Significant figures written: 4 on a label, more in a cell of a table, so the
+        number read back from the cell is the one kept.
 
     ---- Globals read ----
     MISSING_CONCENTRATION (module constant).
 
     ---- Outputs ----
     str
-        For example '2 µM', '2 mM' (from 2000 µM) or '1.5 mM'; the unit is written
-        with the micro sign. MISSING_CONCENTRATION ('? µM') for None. Raises ValueError
-        or TypeError if the value is neither None nor a number.
+        For example '2 µM', '2 mM' (from 2000 µM), '1.2 mM' (from 1200 µM) or
+        '500 nM' (from 0.5 µM); the unit is written with the micro sign.
+        MISSING_CONCENTRATION ('? µM') for None. Raises ValueError or TypeError if the
+        value is neither None nor a number.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    mM = uM / 1000; M = uM / 1 000 000.
+    mM = uM / 1000; M = uM / 1 000 000; nM = uM × 1000.
 
     ---- Helpers ----
     None.
@@ -74,10 +84,12 @@ def concentration_formatter(concentration_um: Any) -> str:
         return MISSING_CONCENTRATION
     value = float(concentration_um)
     if abs(value) >= 1_000_000:
-        return f'{value / 1_000_000:g} M'
+        return f'{value / 1_000_000:.{significant}g} M'
     if abs(value) >= 1000:
-        return f'{value / 1000:g} mM'
-    return f'{value:g} µM'
+        return f'{value / 1000:.{significant}g} mM'
+    if 0 < abs(value) < 1:
+        return f'{value * 1000:.{significant}g} nM'
+    return f'{value:.{significant}g} µM'
 
 
 # ---- excel_sheet_namer ---------------------------------------------------------------
@@ -369,6 +381,176 @@ def name_simplifier(value: Any) -> str:
     """
 
     return re.sub(r'[^a-z0-9]', '', str(value).lower())
+
+
+# ---- panel_name_teller ---------------------------------------------------------------
+def panel_name_teller(key: str) -> str:
+    """
+    ---- Summary ----
+    Main function to name a panel of the standard plot in words the user knows, from
+    its key.
+
+    ---- Inputs ----
+    key : str
+        Panel key: 'oxygen', 'vo2', 'delta_psi' or 'haem:<name of the haem>'.
+
+    ---- Globals read ----
+    HAEM_PANEL_PREFIX, PANEL_NAMES (module constants).
+
+    ---- Outputs ----
+    str
+        'Oxygen', 'OCR', 'Δψ' or the name of the haem; any other key as it is.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if key.startswith(HAEM_PANEL_PREFIX):
+        return key[len(HAEM_PANEL_PREFIX):]
+    return PANEL_NAMES.get(key, key)
+
+
+# ---- panel_order_merger --------------------------------------------------------------
+def panel_order_merger(saved: Sequence[str], shown: Sequence[str]) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to keep the order the user gave the panels of one file in the order
+    saved for the dataset: the panels on the plot take, in their new order, the places
+    they had in the saved order, so a panel that is not on this file's plot (Δψ on a
+    file without regions) stays where it was.
+
+    ---- Inputs ----
+    saved : Sequence[str]
+        Panel keys in the order saved so far; empty for the standard order.
+    shown : Sequence[str]
+        Panel keys of the plot the user moved a panel on, top first, after the move.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[str]
+        Every key of ``saved`` and of ``shown`` once; the keys of ``shown`` are in the
+        order of ``shown``.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    A key of ``shown`` that is new to ``saved`` is first added at its end. Then the
+    places held by keys of ``shown`` are filled with ``shown`` in order: saved
+    [oxygen, vo2, delta_psi, haem:a] and shown [haem:a, oxygen, vo2] give
+    [haem:a, oxygen, delta_psi, vo2].
+
+    ---- Helpers ----
+    None.
+    """
+
+    shown = list(dict.fromkeys(shown))
+    merged = list(dict.fromkeys(saved))
+    merged += [key for key in shown if key not in merged]
+    places = [place for place, key in enumerate(merged) if key in shown]
+    for place, key in zip(places, shown):
+        merged[place] = key
+    return merged
+
+
+# ---- panel_order_mover ---------------------------------------------------------------
+def panel_order_mover(shown: Sequence[str], key: str, step: int) -> Optional[List[str]]:
+    """
+    ---- Summary ----
+    Main function to move one panel of a plot one place up or down, by swapping it
+    with its neighbour.
+
+    ---- Inputs ----
+    shown : Sequence[str]
+        Panel keys of the plot, top first.
+    key : str
+        Key of the panel to move.
+    step : int
+        -1 to move it up, 1 to move it down.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[List[str]]
+        The keys in their new order, or None when the panel cannot move that way (it
+        is at that end, or not on the plot).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    [oxygen, vo2, haem:a] with vo2 moved up (-1) gives [vo2, oxygen, haem:a].
+
+    ---- Helpers ----
+    None.
+    """
+
+    order = list(shown)
+    if key not in order:
+        return None
+    place = order.index(key)
+    other = place + step
+    if step not in (-1, 1) or not 0 <= other < len(order):
+        return None
+    order[place], order[other] = order[other], order[place]
+    return order
+
+
+# ---- panel_order_placer --------------------------------------------------------------
+def panel_order_placer(standard: Sequence[str], order: Sequence[str]) -> List[int]:
+    """
+    ---- Summary ----
+    Main function to find the order the panels of a plot are drawn in: the order the
+    user gave them, and a panel that order does not know (a haem ticked since, Δψ just
+    switched on) just above the panel that follows it in the standard order, or at the
+    bottom when none follows it.
+
+    ---- Inputs ----
+    standard : Sequence[str]
+        Panel keys of the plot in the standard order, top first, each once.
+    order : Sequence[str]
+        Panel keys in the order the user gave them; empty for the standard order. Keys
+        of panels that are not on this plot are passed over.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[int]
+        The position in ``standard`` of each panel, top first.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    standard [oxygen, vo2, haem:a, haem:b, delta_psi] and order [vo2, oxygen, haem:b]
+    give [vo2, oxygen, haem:a, haem:b, delta_psi]: haem:a goes just above haem:b,
+    which follows it in the standard order, and delta_psi, which nothing follows, to
+    the bottom.
+
+    ---- Helpers ----
+    None.
+    """
+
+    standard = list(standard)
+    placed = [key for key in dict.fromkeys(order) if key in standard]
+    # from the last to the first, so the panels that follow one are placed before it
+    for place in range(len(standard) - 1, -1, -1):
+        key = standard[place]
+        if key in placed:
+            continue
+        after = standard[place + 1:place + 2]
+        placed.insert(placed.index(after[0]) if after else len(placed), key)
+    return [standard.index(key) for key in placed]
 
 
 # ---- program_title_builder -----------------------------------------------------------

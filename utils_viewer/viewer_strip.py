@@ -1,7 +1,7 @@
 """
 The settings strip under the plot: the haems, the fit, the background, the decomposition
-kept to compare with, the spectrometer, how the haems and the OCR are shown, the numbers
-of Δψ, the journal, the figure size and the times of the edges dragged on the plot.
+kept to compare with, the spectrometer, how the haems and the OCR are shown, what the
+event labels show, the numbers of Δψ, the journal, the figure size and the times of the edges dragged on the plot.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+from utils_shared.event_concentrations import LABEL_MODES
 from utils_shared.questions import typed_number_reader
 from utils_shared.spectral_decomposer import (BACKGROUND_SHORT_NAMES,
                                               fit_describer,
@@ -53,7 +54,8 @@ VALUE_NAMES = ('plot_haems',
                'spectra',
                'haem_mode',
                'haem_per_od',
-               'ocr_per_od',
+               'ocr_mode',
+               'label_mode',
                'delta_psi',
                ) + PSI_FIELDS + ('journal',
                                  'columns',
@@ -64,6 +66,14 @@ HAEM_FORM_TEXTS = {'delta': 'ΔD (mOD)',
                    'percent': '% oxidised',
                    'abs': 'Absorbance (mOD)',
                    }
+# The ways of showing the OCR, in the order of the "OCR as" drop-down, with its words.
+OCR_FORM_TEXTS = {'raw': 'µM min⁻¹',
+                  'od': 'per OD (µM min⁻¹ OD⁻¹)',
+                  'percent': '% of the range',
+                  'baseline': '% of baseline',
+                  }
+# What the event labels show, in the order of the "Labels as" drop-down, with its words.
+LABEL_FORM_TEXTS = LABEL_MODES
 # The button that folds the tick boxes of the library haems out and away.
 BUILD_CLOSED_TEXT = 'Build a fit ▸'
 BUILD_OPEN_TEXT = 'Build a fit ▾'
@@ -76,6 +86,16 @@ BACK_TEXT = 'Go back to kept'
 # What a click on BACK_TEXT is told as: a click, not a value the strip keeps.
 BACK_CHANGE = 'go_back'
 KEPT_PREFIX = 'Kept to compare (dashed on the plot): '
+# The button that saves one page of the journal as a PDF with the figure of the file
+# shown on it, and what a click on it is told as: a click, not a value the strip keeps.
+MASTER_TEXT = 'Export master'
+MASTER_CHANGE = 'export_master'
+# What a new order of the panels of the plot is told as: the keys of the panels on the
+# plot, top first, after an arrow beside one moved it (the window tells it), or an
+# empty list for the standard order, after a click on the button below. Not a value
+# the strip keeps.
+PANEL_ORDER_CHANGE = 'panel_order'
+ORDER_TEXT = 'Standard order'
 LAST_TICK_NOTE = 'One haem at least stays ticked: tick another first, or choose a preset.'
 HEIGHT_HELP = 'a share of a page: a number above 0 and up to 1, such as 0.5'
 ERROR_BACKGROUND = '#ffd6d6'
@@ -379,12 +399,16 @@ class SettingsStrip:
     kept; while one is kept it reads "Keep this one", and a second button goes back to
     the kept one), a drop-down of the spectrometer whose spectra hold the haems (shown when the
     files share more than one), a drop-down of how the haems are shown with a "per OD"
-    box, an "OCR per OD" box (both boxes shown only when OD values were entered), a
+    box (shown only when OD values were entered), a drop-down of how the OCR is shown
+    (per OD only when OD values were entered, % of baseline only when the averaging
+    windows are set up), a
     row of the numbers of Δψ (shown only while Δψ is worked out: the midpoint of bH
     and of bL and the fall typed, each midpoint with the other haem reduced filled in,
     a button for the paper's values, and the share, the temperature and the limits as
-    text, or as boxes when "More" is ticked), a drop-down of the journal, a drop-down of the widths that journal allows and a typing
-    box for the height. It tells the window what the user changed and can be
+    text, or as boxes when "More" is ticked), a drop-down of the journal, a drop-down of the widths that journal allows, a typing
+    box for the height, a button that exports the master page (a page of the
+    journal with the figure of the file shown on it) and a button that puts the panels
+    of the plot back in the standard order. It tells the window what the user changed and can be
     set by the program; it changes nothing by itself. It starts greyed out, until the
     program says it is listening. Every method runs on the window thread, except
     values_reader.
@@ -409,7 +433,11 @@ class SettingsStrip:
     _haems_handler
     _height_handler
     _journal_handler
+    _label_mode_handler
+    _master_handler
     _more_toggler
+    _ocr_handler
+    _order_handler
     _paper_handler
     _per_od_handler
     _psi_handler
@@ -475,7 +503,11 @@ class SettingsStrip:
         _haems_handler
         _height_handler
         _journal_handler
+        _label_mode_handler
+        _master_handler
         _more_toggler
+        _ocr_handler
+        _order_handler
         _paper_handler
         _per_od_handler
         _psi_handler
@@ -499,7 +531,8 @@ class SettingsStrip:
                                         'spectra': standard['decomposition_dataset'],
                                         'haem_mode': standard['haem_mode'],
                                         'haem_per_od': bool(standard['haem_per_od']),
-                                        'ocr_per_od': standard['ocr_mode'] == 'od',
+                                        'ocr_mode': standard['ocr_mode'],
+                                        'label_mode': standard['label_mode'],
                                         'journal': NO_JOURNAL,
                                         'columns': standard['columns'],
                                         'height': standard['height'],
@@ -511,8 +544,10 @@ class SettingsStrip:
         self._width_columns: List[float] = []
         self._spectra_names: List[str] = []
         self._form_keys: List[str] = []
+        self._ocr_keys: List[str] = []
         self._has_percent = False
         self._has_od = False
+        self._has_baseline = False
         self._fit_names: List[str] = [self._values['fit_file']]
         self._haems_by_file: Dict[str, str] = {}
         self._tick_vars: Dict[str, Any] = {}
@@ -584,7 +619,7 @@ class SettingsStrip:
 
         # ---- 3 Second row: the spectrometer and how the haems and the OCR are shown --
         # _size_refresher places the parts in use: the spectrometer only when there is
-        # a choice, the per OD boxes only when OD values were entered.
+        # a choice, the per OD box only when OD values were entered.
         middle = tk.Frame(self.frame, bg=background)
         middle.pack(pady=(0, 3))
         self._spectra_label = tk.Label(middle, text='Spectra', bg=background)
@@ -601,16 +636,14 @@ class SettingsStrip:
             activebackground=background,
             highlightthickness=0,
             )
-        self._ocr_od = tk.BooleanVar(master=parent, value=self._values['ocr_per_od'])
-        self._ocr_od_box = tk.Checkbutton(
-            middle,
-            text='OCR per OD',
-            variable=self._ocr_od,
-            command=lambda: self._per_od_handler('ocr_per_od'),
-            bg=background,
-            activebackground=background,
-            highlightthickness=0,
-            )
+        self._ocr_label = tk.Label(middle, text='OCR as', bg=background)
+        self._ocr_combo = ttk.Combobox(middle, state='readonly', width=22)
+        self._label_mode_label = tk.Label(middle, text='Labels as', bg=background)
+        self._label_mode_combo = ttk.Combobox(middle,
+                                              state='readonly',
+                                              width=15,
+                                              values=list(LABEL_FORM_TEXTS.values()),
+                                              )
 
         # ---- 3.1 The Δψ row, placed only while Δψ is worked out ----------------------
         # First line: each haem's midpoint, typed, then (after the arrow) its midpoint
@@ -718,11 +751,25 @@ class SettingsStrip:
         self._height_entry.pack(side='left', padx=(0, 4))
         self._note = tk.Label(lower, text='', bg=background, fg=NOTE_TEXT, anchor='w')
         self._note.pack(side='left', padx=(0, 4))
+        # the button that saves a page of the journal with the figure on it
+        self._master_button = tk.Button(lower,
+                                        text=MASTER_TEXT,
+                                        command=self._master_handler,
+                                        )
+        self._master_button.pack(side='left', padx=(8, 4))
+        # the button that puts the panels of the plot back in the standard order
+        self._order_button = tk.Button(lower,
+                                       text=ORDER_TEXT,
+                                       command=self._order_handler,
+                                       )
+        self._order_button.pack(side='left', padx=(4, 4))
 
         # ---- 5 What the user does ----------------------------------------------------
         self._fit_combo.bind('<<ComboboxSelected>>', self._fit_handler)
         self._spectra_combo.bind('<<ComboboxSelected>>', self._spectra_handler)
         self._form_combo.bind('<<ComboboxSelected>>', self._form_handler)
+        self._ocr_combo.bind('<<ComboboxSelected>>', self._ocr_handler)
+        self._label_mode_combo.bind('<<ComboboxSelected>>', self._label_mode_handler)
         self._background_combo.bind('<<ComboboxSelected>>', self._background_handler)
         self._journal_combo.bind('<<ComboboxSelected>>', self._journal_handler)
         self._width_combo.bind('<<ComboboxSelected>>', self._width_handler)
@@ -1090,6 +1137,70 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _label_mode_handler ---------------------------------------------------------
+    def _label_mode_handler(self, event: Any = None) -> None:
+        """
+        ---- Summary ----
+        Method to take what the event labels show, picked in the drop-down.
+
+        ---- Inputs ----
+        event : Any
+            The Tk event (unused).
+
+        ---- Globals read ----
+        LABEL_FORM_TEXTS.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        """
+
+        before = dict(self._values)
+        self._values['label_mode'] = list(LABEL_FORM_TEXTS)[
+            self._label_mode_combo.current()
+            ]
+        self._label_mode_combo.selection_clear()
+        self._change_reporter(before)
+
+    # ---- _master_handler -------------------------------------------------------------
+    def _master_handler(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the button that exports the master page: a page of the journal
+        with the figure of the file shown on it. The strip keeps nothing: the click is
+        told as {MASTER_CHANGE: True}, and the program saves the page.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        MASTER_CHANGE.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the function given as on_change (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._on_change({MASTER_CHANGE: True})
+
     # ---- _more_toggler ---------------------------------------------------------------
     def _more_toggler(self) -> None:
         """
@@ -1119,6 +1230,36 @@ class SettingsStrip:
 
         self._is_more_open = bool(self._more.get())
         self._size_refresher()
+
+    # ---- _order_handler --------------------------------------------------------------
+    def _order_handler(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the button that puts the panels of the plot back in the standard
+        order. The strip keeps nothing: the click is told as {PANEL_ORDER_CHANGE: []},
+        and the program draws the plots again.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        PANEL_ORDER_CHANGE.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Reports the click (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._on_change({PANEL_ORDER_CHANGE: []})
 
     # ---- _paper_handler --------------------------------------------------------------
     def _paper_handler(self) -> None:
@@ -1160,15 +1301,49 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _ocr_handler ----------------------------------------------------------------
+    def _ocr_handler(self, event: Any = None) -> None:
+        """
+        ---- Summary ----
+        Method to take the way of showing the OCR picked in the drop-down.
+
+        ---- Inputs ----
+        event : Any
+            The Tk event (unused).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        """
+
+        before = dict(self._values)
+        self._values['ocr_mode'] = self._ocr_keys[self._ocr_combo.current()]
+        self._ocr_combo.selection_clear()
+        self._size_refresher()
+        self._change_reporter(before)
+
     # ---- _per_od_handler -------------------------------------------------------------
     def _per_od_handler(self, name: str) -> None:
         """
         ---- Summary ----
-        Method to take one of the two per OD tick boxes.
+        Method to take the per OD tick box of the haems.
 
         ---- Inputs ----
         name : str
-            'haem_per_od' or 'ocr_per_od', the value of the box clicked.
+            'haem_per_od', the value of the box clicked.
 
         ---- Globals read ----
         None.
@@ -1188,8 +1363,7 @@ class SettingsStrip:
         """
 
         before = dict(self._values)
-        box = self._haem_od if name == 'haem_per_od' else self._ocr_od
-        self._values[name] = bool(box.get())
+        self._values[name] = bool(self._haem_od.get())
         self._change_reporter(before)
 
     # ---- _psi_handler ----------------------------------------------------------------
@@ -1252,8 +1426,9 @@ class SettingsStrip:
         that keeps a decomposition is greyed while no haems are shown, the button that
         goes back to the kept one and the line saying which one is kept show only
         while one is, the spectrometer shows only when
-        there is a choice, the per OD boxes only when OD values were entered (the one
-        of the haems greyed for % oxidised, which has no per OD), the Δψ row only
+        there is a choice, the per OD box of the haems only when OD values were
+        entered (greyed for % oxidised, which has no per OD), the ways of showing the
+        OCR that can be used now, the Δψ row only
         while Δψ is worked out (its filled-in midpoints following the typed ones and
         the fall), and the whole strip is greyed while the program is not listening.
 
@@ -1261,7 +1436,8 @@ class SettingsStrip:
         None.
 
         ---- Globals read ----
-        HAEM_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX, NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
+        HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX,
+        NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
         (BACK_TEXT is set on its button once, when it is built.)
 
         ---- Outputs ----
@@ -1277,6 +1453,7 @@ class SettingsStrip:
         ---- Helpers ----
         haem_form_choices_lister
         height_checker
+        ocr_form_choices_lister
         psi_seconds_filler
         psi_summary_writer
         width_choices_lister
@@ -1318,6 +1495,8 @@ class SettingsStrip:
         choice_state = 'readonly' if self._is_enabled else 'disabled'
         button_state = 'normal' if self._is_enabled else 'disabled'
         self._haems_box.configure(state=button_state)
+        self._master_button.configure(state=button_state)
+        self._order_button.configure(state=button_state)
         self._fit_combo.configure(state=choice_state)
         self._background_combo.configure(state=choice_state)
         self._build_button.configure(state=button_state)
@@ -1351,20 +1530,36 @@ class SettingsStrip:
         self._spectra_combo.set(values['spectra'])
         self._spectra_combo.configure(state=haem_state)
         self._haem_od.set(values['haem_per_od'])
-        self._ocr_od.set(values['ocr_per_od'])
+        # A way of showing the OCR that is not offered now (% of baseline before the
+        # windows are set up) is still shown as the choice in use.
+        forms = ocr_form_choices_lister(self._has_od, self._has_baseline)
+        self._ocr_keys = [key for key, _ in forms]
+        self._ocr_combo.configure(state='readonly', values=[text for _, text in forms])
+        if values['ocr_mode'] in self._ocr_keys:
+            self._ocr_combo.current(self._ocr_keys.index(values['ocr_mode']))
+        else:
+            self._ocr_combo.set(OCR_FORM_TEXTS.get(values['ocr_mode'], ''))
+        self._ocr_combo.configure(state=choice_state)
+        self._label_mode_combo.configure(state='readonly')
+        self._label_mode_combo.current(
+            list(LABEL_FORM_TEXTS).index(values['label_mode']),
+            )
+        self._label_mode_combo.configure(state=choice_state)
         can_scale = (self._is_enabled and
                      values['plot_haems'] and
                      values['haem_mode'] != 'percent'
                      )
         self._haem_od_box.configure(state='normal' if can_scale else 'disabled')
-        self._ocr_od_box.configure(state=button_state)
         has_choice = len(self._spectra_names) > 1
         parts = [(self._spectra_label, has_choice, (4, 4)),
                  (self._spectra_combo, has_choice, (0, 12)),
                  (self._form_label, True, (4, 4)),
                  (self._form_combo, True, (0, 4)),
                  (self._haem_od_box, self._has_od, (0, 12)),
-                 (self._ocr_od_box, self._has_od, (0, 4)),
+                 (self._ocr_label, True, (4, 4)),
+                 (self._ocr_combo, True, (0, 12)),
+                 (self._label_mode_label, True, (4, 4)),
+                 (self._label_mode_combo, True, (0, 4)),
                  ]
         for part, _, _ in parts:
             part.pack_forget()
@@ -1523,12 +1718,14 @@ class SettingsStrip:
                        spectra: List[str],
                        has_percent: bool,
                        has_od: bool,
+                       has_baseline: bool = False,
                        ) -> None:
         """
         ---- Summary ----
         Method to say what the strip offers: the spectrometers of the "Spectra"
         drop-down (shown only with more than one), whether % oxidised is in the "Haems
-        as" drop-down, and whether the two per OD boxes are shown. The values stay.
+        as" drop-down, whether the per OD box of the haems is shown and per OD is in
+        the "OCR as" drop-down, and whether % of baseline is in it. The values stay.
 
         ---- Inputs ----
         spectra : List[str]
@@ -1536,7 +1733,10 @@ class SettingsStrip:
         has_percent : bool
             True when at least one file has both regions, so % oxidised is offered.
         has_od : bool
-            True when OD values were entered, so the per OD boxes are shown.
+            True when OD values were entered, so per OD is offered.
+        has_baseline : bool
+            True when the averaging windows are set up, so the OCR is offered as % of
+            baseline.
 
         ---- Globals read ----
         None.
@@ -1558,6 +1758,7 @@ class SettingsStrip:
         self._spectra_names = list(spectra)
         self._has_percent = bool(has_percent)
         self._has_od = bool(has_od)
+        self._has_baseline = bool(has_baseline)
         self._size_refresher()
 
     # ---- fits_setter -----------------------------------------------------------------
@@ -1794,8 +1995,8 @@ def _page_journal_finder(journal: str) -> str:
 def form_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
     """
     ---- Summary ----
-    Main function to turn the spectrometer and the ways of showing the haems and the
-    OCR of the strip into the answers of the run.
+    Main function to turn the spectrometer, the ways of showing the haems and the OCR
+    and what the event labels show of the strip into the answers of the run.
 
     ---- Inputs ----
     values : Dict[str, Any]
@@ -1807,9 +2008,9 @@ def form_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
 
     ---- Outputs ----
     Dict[str, Any]
-        The answers to update: decomposition_dataset for the spectrometer, haem_mode
-        and haem_per_od as given, and ocr_mode 'od' for the OCR per OD box ticked,
-        'raw' for it unticked. Empty when the values hold none of them.
+        The answers to update: decomposition_dataset for the spectrometer, and
+        haem_mode, haem_per_od, ocr_mode and label_mode as given. Empty when the
+        values hold none of them.
 
     ---- Globals mutated ----
     None.
@@ -1824,11 +2025,9 @@ def form_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
     answers: Dict[str, Any] = {}
     if 'spectra' in values:
         answers['decomposition_dataset'] = values['spectra']
-    for name in ('haem_mode', 'haem_per_od'):
+    for name in ('haem_mode', 'haem_per_od', 'ocr_mode', 'label_mode'):
         if name in values:
             answers[name] = values[name]
-    if 'ocr_per_od' in values:
-        answers['ocr_mode'] = 'od' if values['ocr_per_od'] else 'raw'
     return answers
 
 
@@ -2028,6 +2227,43 @@ def kept_decomposition_builder(answers: dict,
             'regions': copy.deepcopy(regions),
             'text': text,
             }
+
+
+# ---- ocr_form_choices_lister ---------------------------------------------------------
+def ocr_form_choices_lister(has_od: bool, has_baseline: bool) -> List[Tuple[str, str]]:
+    """
+    ---- Summary ----
+    Main function to list the ways of showing the OCR the "OCR as" drop-down offers,
+    each with its words.
+
+    ---- Inputs ----
+    has_od : bool
+        True when OD values were entered, so the OCR per OD is offered.
+    has_baseline : bool
+        True when the averaging windows are set up, so % of baseline is offered.
+
+    ---- Globals read ----
+    OCR_FORM_TEXTS.
+
+    ---- Outputs ----
+    List[Tuple[str, str]]
+        [(ocr_mode, words)] in the order of the drop-down: the OCR, per OD when
+        offered, % of the range, % of baseline when offered.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return [(key, text)
+            for key, text in OCR_FORM_TEXTS.items()
+            if (key != 'od' or has_od) and (key != 'baseline' or has_baseline)
+            ]
 
 
 # ---- minutes_checker -----------------------------------------------------------------
@@ -2414,8 +2650,9 @@ def strip_values_builder(answers: dict,
     ---- Inputs ----
     answers : dict
         The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
-        haem_per_od, ocr_mode, delta_psi and the numbers of Δψ, journal, columns,
-        height, size_mode); a fit_file of None shows an empty fit.
+        haem_per_od, ocr_mode, label_mode, delta_psi and the numbers of Δψ, journal,
+        columns, height, size_mode); a fit_file of None shows an empty fit, and a
+        missing label_mode the labels in the chamber.
     has_haems : bool
         True when the haems are worked out and shown, which ticks the box.
     haem_files : Sequence[str]
@@ -2431,9 +2668,7 @@ def strip_values_builder(answers: dict,
     ---- Outputs ----
     Dict[str, Any]
         All the strip values (DATA_FORMAT.md). A figure of the standard size
-        (size_mode other than 'custom') shows the journal as "None"; the OCR per OD
-        box is ticked for the OCR per OD, unticked for the plain OCR and its % of the
-        range; the Δψ row shows when the haems are worked out and Δψ is switched on.
+        (size_mode other than 'custom') shows the journal as "None"; the Δψ row shows when the haems are worked out and Δψ is switched on.
 
     ---- Globals mutated ----
     None.
@@ -2455,7 +2690,8 @@ def strip_values_builder(answers: dict,
             'spectra': str(answers.get('decomposition_dataset') or ''),
             'haem_mode': answers['haem_mode'],
             'haem_per_od': bool(answers['haem_per_od']),
-            'ocr_per_od': answers['ocr_mode'] == 'od',
+            'ocr_mode': answers['ocr_mode'],
+            'label_mode': answers.get('label_mode', 'chamber'),
             **psi_values_builder(answers, has_haems and answers['delta_psi']),
             'journal': answers['journal'] if is_custom else NO_JOURNAL,
             'columns': answers['columns'],
@@ -2469,7 +2705,8 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
     ---- Summary ----
     Main function to check values meant for the strip before they are shown: the
     names, the background, the haems ticked, whether a decomposition is kept and its
-    words, the spectrometer, the way of showing the haems, the per OD boxes, the
+    words, the spectrometer, the ways of showing the haems and the OCR, the per OD
+    box, the
     numbers of the Δψ row (numbers, a share above 0, limits above 0 and below 100
     with the lowest first), the journal, a width the journal allows and a height the
     page allows. The width and the height are checked against the journal given with
@@ -2480,7 +2717,8 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         Some or all of the strip values (DATA_FORMAT.md).
 
     ---- Globals read ----
-    VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS, PSI_FIELDS.
+    VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS,
+    OCR_FORM_TEXTS, LABEL_FORM_TEXTS, PSI_FIELDS.
 
     ---- Outputs ----
     None
@@ -2533,11 +2771,19 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         raise ValueError(f"The strip cannot show the haems as '{values['haem_mode']}'; "
                          f"it has {', '.join(HAEM_FORM_TEXTS)}.",
                          )
-    for name in ('haem_per_od', 'ocr_per_od'):
-        if name in values and not isinstance(values[name], bool):
-            raise ValueError('A per OD box of the strip is True or False; '
-                             f'{values[name]!r} is not.',
-                             )
+    if 'ocr_mode' in values and values['ocr_mode'] not in OCR_FORM_TEXTS:
+        raise ValueError(f"The strip cannot show the OCR as '{values['ocr_mode']}'; "
+                         f"it has {', '.join(OCR_FORM_TEXTS)}.",
+                         )
+    if 'label_mode' in values and values['label_mode'] not in LABEL_FORM_TEXTS:
+        raise ValueError(
+            f"The labels of the strip cannot show '{values['label_mode']}'; "
+            f"they show {', '.join(LABEL_FORM_TEXTS)}.",
+            )
+    if 'haem_per_od' in values and not isinstance(values['haem_per_od'], bool):
+        raise ValueError('The per OD box of the strip is True or False; '
+                         f"{values['haem_per_od']!r} is not.",
+                         )
     if 'delta_psi' in values and not isinstance(values['delta_psi'], bool):
         raise ValueError('Whether the strip shows the Δψ row is True or False; '
                          f"{values['delta_psi']!r} is not.",

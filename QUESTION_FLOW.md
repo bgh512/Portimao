@@ -1,4 +1,4 @@
-# Portimao question flow (V2.16)
+# Portimao question flow (V2.17)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -17,15 +17,20 @@ Every question in the order it is asked, with where each answer leads. The quest
 - **Yes → / No →** says which question comes next. **Next** means the next question in this list.
 - In sections 1 to 3 the numbers on screen are the numbers here. A question asked again keeps its number, and when a question is skipped the next one keeps its own, so 3.3 follows 3.2 when 3.2.1 is not asked. From section 4 on, the numbers here are for reference: on screen they are given in the order the questions are asked, so when a branch is skipped the later numbers move up, and every "Do you accept...?" question takes a number of its own.
 - A "Do you accept...?" question with one way to change is a yes or no question, `(Y/n)`: the grey line just above it says what **n** does ("Type n to change the labels again."). One with more ways to change is a numbered list starting with **1) Yes, accept**, which moves on; its other answers (**2) No, ...**, and **3**, **4** ... where there are more) each say what is asked again, with your last answers as the defaults.
-- The plot on the right is redrawn after each step marked **(plot)**. You can flick through the files with the arrows or the drop-down at any time while a question waits. The file shown and the one on each side of it are redrawn at once; any other file is drawn when you go to it, with its last plot under the **Drawing ...** sign meanwhile. From section 6 on, a file you did not look at after your last change says it was not drawn with your final settings.
-- The **strip** under the plot shows what the run uses: **Haems** (ticked when the haems are worked out and shown), the **Fit** and the **Background**; **Spectra** (the spectrometer whose spectra hold the haems), **Haems as** (how the haems are shown) and the two **per OD** boxes; the **Δψ** row (the numbers of Δψ, only while Δψ is worked out, 4.5); the **Journal**, the **Width** and the **Height** of the figure of each file.
+- The plot on the right is redrawn after each step marked **(plot)**. You can flick through the files with the arrows or the drop-down above the plot at any time while a question waits. The file shown and the one on each side of it are redrawn at once; any other file is drawn when you go to it, with its last plot under the **Drawing ...** sign meanwhile. From section 6 on, every file shows the plot saved for it (after **5.8**); a file whose plot could not be saved says so.
+- The **strip** under the plot shows what the run uses: **Haems** (ticked when the haems are worked out and shown), the **Fit** and the **Background**; **Spectra** (the spectrometer whose spectra hold the haems), **Haems as** (how the haems are shown) with its **per OD** box, **OCR as** (how the OCR is shown) and **Labels as** (what the event labels show); the **Δψ** row (the numbers of Δψ, only while Δψ is worked out, 4.5); the **Journal**, the **Width** and the **Height** of the figure of each file, the **Export master** button and the **Standard order** button.
+    - The **panels** of the plot of a file can be moved: while the strip can be used, a small up and a down arrow sit left of each panel, and a click moves that panel one place (the arrow that cannot be used, up on the top panel, is paler). No question is asked: the plot is redrawn at once and one line in the terminal says the new order. The order holds for every file and for the figure saved for each, and is kept with the dataset. A panel that comes later (a haem ticked since, Δψ switched on) is drawn just above the panel that follows it in the standard order, or at the bottom. **Standard order** puts the panels back: oxygen, OCR, the haems a then b then c, Δψ. The arrows are away while edges are dragged on the plot (trimming, the regions, the averaging windows) and while the plot is being redrawn.
     - **Spectra** is shown only when your files share more than one spectrometer (Cyt and NADH). Picking the other one works the haems out from its spectra.
     - **Haems as** swaps the haems between ΔD (mOD), the change from the start; % oxidised (reduced region = 0 %, oxidised region = 100 %); and Absorbance (mOD). % oxidised is in the list only when at least one file has both regions (4.4); a file without both stays in ΔD, as its axis says. The choice holds for every plot of your files and for the figure saved for each file.
-    - **per OD** (beside Haems as) scales the haems by OD, and **OCR per OD** the OCR. Both boxes are shown only once you have entered OD values (3.1), and a message says so then. The haems' box is greyed while they are in % oxidised, which has no per OD.
+    - **per OD** (beside Haems as) scales the haems by OD. The box is shown only once you have entered OD values (3.1), and a message says so then. It is greyed while the haems are in % oxidised, which has no per OD.
+    - **OCR as** swaps the OCR between µM min⁻¹; per OD (µM min⁻¹ OD⁻¹), in the list only once you have entered OD values (3.1); % of the range; and % of baseline (the average in the baseline window = 100 %), in the list only once the averaging windows are set up (4.6). A file without a baseline (less than 10 s of data before its first addition, or no addition) keeps its usual OCR, as its axis says, and one line says so. The choice holds for every plot of your files and for the figure saved for each file.
+    - **Labels as** swaps the event labels between **In the chamber** (the concentration in the chamber after the addition, `400 µM KCN`; the standard) and **What was added** (`10 µL of 200 mM KCN`). An event with no stock and volume shows its concentration in the chamber either way, and one with no concentration its label alone. The choice holds for every plot of your files, the figure saved for each file and the labels under the windows of the haem and OCR figure, and is kept with the dataset.
     - While your files are on the plot (sections 2 to 5), you can change it whenever a question waits. The plot is redrawn at once, the run uses the change, and the question goes on waiting.
     - Unticking Haems leaves the haems out of the run. Ticking it, or picking a fit, works them out with the fit shown and ticks the box.
     - If a fit cannot be used, one line says why and the strip goes back to what it showed.
     - A new journal, width or height redraws the plot only in section 5, the one plot drawn at the figure's size. Before that the change is kept for section 5.
+    - The **Journal** list holds every journal of the `journals` folder. Choosing one makes the figure follow what it asks: the widths offered, the tallest figure, the text sizes, the panel letters, the font and the thickness of the lines.
+    - **Export master** saves one page of the journal as a PDF in the results folder (`<file>_master_<journal>.pdf`): the figure of the file shown at its printed size, a box where its legend goes and grey lines where the text of the paper goes. It works in section 5, where that figure is on the plot; before that, one line says so. With **None** the page is Nature's. A journal whose page size is not known is shown on an A4 page, and the page says so.
     - The strip is greyed out while you choose the folder, during the questions of 4.A.1, and from section 6 on.
     - In section 2 the strip has one more row, above the others: the times of the trimmed and ignored edges of the file shown, and **Every file** (see section 2). While **4.4** waits, that row holds the times of the oxidised and the reduced region instead (see 4.C).
 - While the program draws a picture of its own (the components found from the data, the figures of sections 6 and 7), a yellow **Drawing ...** sign is on the plot. It goes when the picture is shown or the next question is asked.
@@ -44,7 +49,7 @@ Every question in the order it is asked, with where each answer leads. The quest
 |---|---|---|---|
 | 1.2.1 | *(only when the folder already holds results of these files; above it: "results already holds results of 12 of these 12 files.")* Do you want to write over them? `(y/N)` | the standard plot is drawn **(plot)**, then **2.1**; results written later replace those there | **1.2** again, offering a free name beside it (`results_2`), with the line "Type another folder, or a new name: a name without a path is made inside the data folder." |
 
-The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. A dataset saved with Δψ switched on (4.5) also has its Δψ panel, the lowest, on the files with both regions. The haems are worked out with the standard fit (the preset `bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
+The standard plot of every file is then drawn with no question asked: the set and measured oxygen, the OCR and the haems (as the change from the start), with the event labels as written in the file. A dataset saved with Δψ switched on (4.5) also has its Δψ panel (the lowest, unless you moved it) on the files with both regions, and a dataset saved with its panels moved is drawn in that order. The haems are worked out with the standard fit (the preset `bswitch_no2_mycobl_b557.csv`), or with the fit last saved for the dataset. If that fit is not in the `fits/` folder or cannot be read, or the files do not share the spectrometer it is used on, a message says the haems are not shown yet, and only the oxygen and the OCR are drawn. A dataset last saved without haems is drawn without them, and its strip offers the standard fit. The strip then becomes usable: Haems is ticked when the haems are shown.
 
 ---
 
@@ -61,19 +66,19 @@ TRIM = data that is not imported, plotted or used. IGNORE = data that is plotted
 |---|---|---|
 | 2.1 | Drag the edges on the plot, or type the times in the strip under it. Press Enter when every file looks right. (above it, in grey: what TRIM and IGNORE mean, and "Grey edges trim, amber edges ignore; with "Every file" ticked, a change moves every file.") | Enter with the answer box empty: the limits of every file are listed, the plot shows the data they keep **(plot)**, then **3.1**. Anything typed in the answer box instead gets one line saying to type the times in the strip, and 2.1 goes on waiting. |
 
-If you exported the data at 3.4 and this step is asked again (**4.3**, or going back at **5.8**), each file whose edges changed is exported again with the same choice, and a message says how many. The whole recording of a file is written only when the file has just become trimmed, and taken away when it is no longer trimmed.
+If you exported the data at 3.4 and this step is asked again (**4.3**, or going back at **5.8**), each file whose edges changed is exported again with the same choice, and a message says how many. With a choice that writes the whole recordings (3 or 5), the whole recording of a file is written only when the file has just become trimmed, and taken away when it is no longer trimmed.
 
 ---
 
 ## 3. OD values and event labels
 
-The last part of the import: what is known about each run (the OD values, the temperature and the event labels), then the offer to export what was imported. The OD values and event labels saved for the dataset are offered as defaults. For a dataset whose settings file holds none yet, those found in the workbooks of an earlier run are offered instead, and a message says so. The plot is the standard plot, cut to the limits of section 2.
+The last part of the import: what is known about each run (the OD values, the temperature and the event labels), then the offer to export what was imported. The OD values and event labels saved for the dataset (in `portimao_settings.json`) are offered as defaults. The plot is the standard plot, cut to the limits of section 2.
 
 ### 3.A OD values and temperature
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 3.1 | Do you want to scale by OD? `(y/N)` (above it, in grey: "Scaling by OD divides the OCR and the haems by dilution factor × OD × volume; a per OD box for each then shows in the strip under the plot.") | **3.1.1** | **3.1.2** (no OD scaling anywhere in the run) |
+| 3.1 | Do you want to scale by OD? `(y/N)` (above it, in grey: "Scaling by OD divides the OCR and the haems by dilution factor × OD × volume; the strip under the plot then offers per OD for each.") | **3.1.1** | **3.1.2** (no OD scaling anywhere in the run) |
 
 The OD table opens on the terminal side, with one row per file and a column each for the OD, the volume (mL) and the dilution factor. The values stored for a file are filled in, and the dilution factor is 1 when none is stored. Clicking a cell of a file shows that file on the plot.
 
@@ -81,7 +86,7 @@ The OD table opens on the terminal side, with one row per file and a column each
 |---|---|---|
 | 3.1.1 | Fill in the OD, volume and dilution of each file, then press Confirm. (above it, in grey: "One row per file: the OD of the cells added, the volume of cells (mL) spun down and resuspended in 5 mL, and the dilution factor if the cells were diluted mid run.") | If a cell is empty or not a number above 0, one line names those cells and the table stays open. Otherwise the table closes, the values of every file are listed and the next step is **3.1.2**. |
 
-Once the values are in, the strip under the plot shows its two boxes, **per OD** (the haems) and **OCR per OD**, and a message says so: "The OCR and the haems can now be shown per OD: tick or untick the two per OD boxes in the strip under the plot." The plot follows the boxes from here on, and so does the figure saved for each file.
+Once the values are in, the strip under the plot shows the **per OD** box of the haems and has per OD in the **OCR as** list, and a message says so: "The OCR and the haems can now be shown per OD, in the strip under the plot: the per OD box beside Haems as, and per OD under OCR as." The plot follows them from here on, and so does the figure saved for each file.
 
 The temperature is asked of every dataset, whether or not you scale by OD: one value for all its runs, kept with the dataset. Δψ (4.5) is worked out with it; nothing else uses it. It is the same value as the Temperature of the Δψ row of the strip (4.D): changing one changes the other.
 
@@ -93,11 +98,15 @@ The temperature is asked of every dataset, whether or not you scale by OD: one v
 
 If no file has any event, nothing is asked here and the next step is **3.4**.
 
-The labels table opens on the terminal side: one row per event, under the name of its file, with the time of the event (min), its label and its final concentration (µM). Each label starts as saved for the dataset, or else as written in the file; an event left out before reads `ignore`. Clicking a cell of a file shows that file on the plot. The **Symbols** row under the table types µ, ⁻¹, ₂ and the like into the cell last typed in.
+The labels table opens on the terminal side: one row per event, under the name of its file, with the time of the event (min), the text in the file (grey, not typed in), its label, the **Stock**, the volume **Added (µL)** and the concentration **In the chamber**. Each row starts as saved for the dataset, or else with the label as written in the file; an event left out before reads `ignore`. Clicking a cell of a file shows that file on the plot. The **Symbols** row under the table types µ, ⁻¹, ₂ and the like into the cell last typed in.
+
+- Type the stock with its unit (nM, µM, mM or M, in any capitals; `u` for µ); a number alone is mM. Once a row has both a stock and a volume, its concentration in the chamber fills itself in, in green, and cannot be typed in: stock × volume ÷ 5 mL (the chamber), the same label added again in a file adding up (10 µL of 200 mM KCN gives 400 µM, the next 800 µM). The maths is in `MATHS.md`, section 8.
+- A row with no stock and volume takes a concentration in the chamber typed by hand (a number alone is µM), or none.
+- Concentrations are written in their most readable unit: 1.2 mM, not 1200 µM.
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.2 | Fill in the label and the concentration of each event, then press Confirm. (above it, in grey: "One row per event. Write ignore as the label to leave an event out.") | A concentration may be left empty. An event labelled `ignore` (in any capitals) is left out, and its concentration is greyed out. If a label is empty or a concentration is not a number of 0 or more, one line names those cells and the table stays open. Otherwise the table closes: **3.2.1** if a label could be written more tidily, otherwise the labels of every file are listed and drawn **(plot)**, then **3.3**. |
+| 3.2 | Fill in the label, the stock and the volume added of each event, then press Confirm. (above it, in grey: "One row per event. Write ignore as the label to leave an event out. Type the stock with its unit (nM, µM, mM or M; a number alone is mM) and the volume added, and the concentration in the chamber (5 mL) is worked out, the same label added again adding up. Or leave them empty and type the concentration in the chamber (a number alone is µM).") | An event labelled `ignore` (in any capitals) is left out, and its other cells are greyed out. If a label is empty, a stock, volume or concentration cannot be used, or a row has a stock without a volume (or a volume without a stock), one line names those cells and the table stays open. Otherwise the table closes: **3.2.1** if a label could be written more tidily; the concentrations are worked out from the labels as they then are, the labels of every file are listed (with what was added and the concentration in the chamber) and drawn **(plot)**, then **3.3**. |
 
 A label is written more tidily with `u` in front of a unit as µ (`100 uM` as 100 µM), a litre as a capital L, a space between a number and its unit, and `-1` after a unit or anything after `^` raised (`8ug ml-1` as 8 µg mL⁻¹). Only units are changed: a name with numbers in it (`nd-011992`) and a formula (`H2O2`) are left as they are. The labels that could be tidier are listed as "label -> tidy form", then:
 
@@ -113,13 +122,13 @@ A label is written more tidily with `u` in front of a unit as µ (`100 uM` as 10
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.4 | What would you like to export now, so you can plot it yourself? `(1/2/3/4)` (above it, in grey: "The spectra are large, and writing them takes a while.") 1) Nothing 2) The summary: a workbook for each file (a few MB) 3) The trimmed data: the summaries and the trimmed spectra as csv files (about *size*) 4) All the data: the summaries and the spectra, trimmed and full (about *size*). Enter gives 1, also for a dataset exported before. | **1**: nothing is written, then **4.1**. **2, 3 or 4**: every file is exported, then a message says where, and **4.1** |
+| 3.4 | Would you like to export the individual experiment files now? `(1/2/3/4/5)` (above it, in grey: "The summary sheet is a workbook for each file; the raw CSVs are its spectra, which are large and take a while to write."; and, when no file is trimmed: "No file is trimmed, so "trimmed and full" writes the same as "trimmed".") 1) No 2) Summary sheet, trimmed (about *size*) 3) Summary sheet, trimmed and full (about *size*) 4) Summary sheet and raw CSVs, trimmed (about *size*) 5) Summary sheet and raw CSVs, trimmed and full (about *size*). Enter gives 1, also for a dataset exported before. | **1**: nothing is written, then **4.1**. **2 to 5**: every file is exported, then a message says where, and **4.1** |
 
-The sizes are worked out for your files: about 1.2 GB of spectra for each 100 MB `.paf` file, less for a trimmed one. Each file is exported to its own folder in the results folder, `<results>/<file>/`:
+The sizes are worked out for your files, less for a trimmed one: about 0.3 MB of workbook and 1.2 GB of spectra for each 100 MB `.paf` file. Each file is exported to its own folder in the results folder, `<results>/<file>/`:
 
-- `<file>.xlsx`: the trimmed data (all of it for a file not trimmed), with the sheets **CcO2** and **CsO2** (the measured and set oxygen), **VoO2** (the OCR), **Events** (the time, the text in the file, your label and concentration, and whether the event is ignored) and **Metadata** (your OD, volume and dilution, the trimmed and ignored edges in minutes, and the spectrometers). The run later writes this workbook again with its own results added.
-- the spectra csv files, with 3 and 4: one per spectrometer and kind (`Cyt_transmiss.csv`, `Cyt_intensity.csv`, `Cyt_attenuation.csv`, and the same for `NADH`), wavelengths down and one column per spectrum.
-- `full/`, only for a file you trimmed: the same for the whole recording (the spectra only with 4). It does not record the edges, so it stays as it is when they change.
+- `<file>.xlsx`, with every choice but 1: the trimmed data (all of it for a file not trimmed), with the sheets **Measured O2** and **Set O2**, **OCR**, **Events** (the time, the text in the file, your label, the stock (mM) and volume added (µL), what the addition added and the concentration in the chamber (µM), and whether the event is ignored) and **Metadata** (your OD, volume and dilution, the trimmed and ignored edges in minutes, and the spectrometers). The run later writes this workbook again with its own results added.
+- the spectra csv files, with 4 and 5: one per spectrometer and kind (`Cyt_transmiss.csv`, `Cyt_intensity.csv`, `Cyt_attenuation.csv`, and the same for `NADH`), wavelengths down and one column per spectrum; the workbook lists them on a first sheet, **Spectral data**.
+- `full/`, with 3 and 5, only for a file you trimmed: the same for the whole recording (its spectra with 5). It does not record the edges, so it stays as it is when they change.
 
 Nothing is scaled by OD, decomposed or averaged, and the ignored parts are included.
 
@@ -218,7 +227,7 @@ Asked when the last choice of 4.1.1, or No at 4.2, is taken. The strip is greyed
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 4.5 | *(only when Δψ can be worked out)* Do you want to work out Δψ? `(y/N)` (above it, in grey: "Δψ is the membrane potential, worked out from how reduced bH and bL are.") | the plot is redrawn **(plot)** with a **Δψ (mV)** panel under the haems, the **Δψ** row shows in the strip, and a message says where the panel is and ends "Change the numbers of the method in the Δψ row of the strip under the plot.", with under it "To compare fits, click Keep to compare, change the fit or the background, then click Keep this one or Go back to kept."; then **4.6** | **4.6** (no Δψ in the run) |
+| 4.5 | *(only when Δψ can be worked out)* Do you want to work out Δψ? `(y/N)` (above it, in grey: "Δψ is the membrane potential, worked out from how reduced bH and bL are.") | the plot is redrawn **(plot)** with a **Δψ (mV)** panel under the haems (or where you moved it to), the **Δψ** row shows in the strip, and a message says it has its own panel and ends "Change the numbers of the method in the Δψ row of the strip under the plot.", with under it "To compare fits, click Keep to compare, change the fit or the background, then click Keep this one or Go back to kept."; then **4.6** | **4.6** (no Δψ in the run) |
 
 The Δψ panel is the lowest panel of the plot of each file with both regions: one line, with gaps where bH or bL is less than 10 % or more than 90 % reduced, as Δψ cannot be given there. A file without both regions has no Δψ panel. The panel is also in the figure saved for each file (section 5), and Δψ is in the workbook of each file when every table is exported (8.1). The limits of 10 and 90 % are the ones the program starts with.
 
@@ -239,6 +248,7 @@ An averaging window is a stretch around an addition that an average is taken ove
 
 The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Every window of a kind has the same length, so each moves with its addition in every file and one setting fits the whole dataset. The window before the first addition is the baseline, which both kinds are compared with; it is there whenever either kind is ticked, with the length and the gap of the settled windows.
 
+- The baseline is **shaded gold** on the plot of every file, with "baseline" and its length by its first edge. It is as long as a settled window and ends the same time before the first addition, so pulling its edges changes the settled windows too.
 - The settled windows are **shaded blue** on the plot of every file, 120 s long and ending 30 s before the next addition; the quick windows are **shaded green**, 30 s long and starting 10 s after their addition; or both are as they were saved with the dataset. They are over the plot only in this step; the steps before it show none.
 - **Pull the start** of a settled window, by its handle or its line, to change its length; **pull its end** to change the gap before the addition. **Pull the start** of a quick window to change how long after the addition it starts (its length stays); **pull its end** to change its length. Every window of that kind in every file follows, in steps of 5 s, and the plot is not drawn again. The end of the last settled window cannot be pulled: it stays 0.5 min before the end of the recording.
 - **Type** the numbers in the two rows of the strip under the plot, in seconds: **Settled window** and **Gap before the next addition** in the first, **Quick window** and **Start after the addition** in the second. Press Enter or leave the box. A window of 0 s is not taken.
@@ -249,9 +259,9 @@ The windows are placed around the events as they were left in 3.B: an event mark
 
 | # | Question | Leads to |
 |---|---|---|
-| 4.6 | Drag an edge of any window on the plot, or type the numbers in the strip under it, where each kind of window has its tick box. Press Enter when the windows look right, or untick both kinds for none. (above it, in grey: what the windows are, "A settled window (blue) ends a set time before the next addition, the last one 0.5 min before the end of the recording; a quick window (green) starts a set time after its addition. Each kind has one length, in every file." and which edge to pull for what) | Enter with the answer box empty: one line for each kind says the windows chosen (or one line that there are none), a warning names those that do not fit, the plot is redrawn with the windows **(plot)**, then **5.1**. Anything typed in the answer box instead gets one line saying to type the numbers in the strip, and 4.6 goes on waiting. |
+| 4.6 | Drag an edge of any window on the plot, or type the numbers in the strip under it, where each kind of window has its tick box. Press Enter when the windows look right, or untick both kinds for none. (above it, in grey: what the windows are, "The baseline (gold) is the window before the first addition, as long as a settled window; every other window is compared with it.", "A settled window (blue) ends a set time before the next addition, the last one 0.5 min before the end of the recording; a quick window (green) starts a set time after its addition. Each kind has one length, in every file." and which edge to pull for what) | Enter with the answer box empty: one line for each kind says the windows chosen (or one line that there are none), a warning names those that do not fit, the plot is redrawn with the windows **(plot)**, then **5.1**. Anything typed in the answer box instead gets one line saying to type the numbers in the strip, and 4.6 goes on waiting. |
 
-Three later figures need the averaging windows: the 2x2 grid (**6.3**), the time response (**7.1**) and the haem and OCR response (**7.2**). They use the windows chosen here and never ask for a window or a gap of their own. When you say yes to one of them and no windows are set up (both kinds unticked in 4.6, or no file with an addition), one line says "No averaging windows are set up, and this figure needs them.", and 4.6.1 is asked before the figure's own questions. It keeps this number wherever it is asked.
+Three later figures need the averaging windows: the 2x2 grid (**6.3**), the time response (**7.1**) and the haem and OCR response (**7.2**). They use the windows chosen here and never ask for a window or a gap of their own. When you say yes to one of them and no windows are set up (both kinds unticked in 4.6, or no file with an addition), one line says "No averaging windows are set up, and this figure needs them.", and 4.6.1 is asked before the figure's own questions. It keeps this number wherever it is asked. The OCR as % of baseline (**5.3.1**) needs them in the same way: there, without windows, the OCR stays as it was and the figure of each file is drawn again.
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
@@ -265,7 +275,7 @@ Each of the three figures uses one kind of window, with the baseline. With both 
 |---|---|---|
 | 4.6.2 | Which windows should this figure use? `(1/2)` 1) Settled, before the next addition; 2) Quick, after each addition | the figure's own questions |
 
-The plots and the workbook of each experiment (section 5) show both kinds: the quick windows green, the others blue, and a **Kind** column in the Averages sheet.
+The plots and the workbook of each experiment (section 5) show both kinds: the quick windows green, the settled windows blue and the baseline gold with "Baseline" written above it, and a **Kind** column in the Averages sheet.
 
 ---
 
@@ -280,7 +290,7 @@ The figure saved for each file is drawn at once **(plot)**, at its real size and
 - the event labels at 45°;
 - Nature, 1 column wide and 0.5 of a page tall.
 
-The haems are in the figure when Haems is ticked in the strip. How the haems are shown (Haems as), the two per OD boxes, the journal, the width and the height are set in the strip too, as you left them in the earlier sections: each change redraws the figure at once. A message under the first one says so.
+The haems are in the figure when Haems is ticked in the strip. How the haems are shown (Haems as, with its per OD box), how the OCR is shown (OCR as), the journal, the width and the height are set in the strip too, as you left them in the earlier sections: each change redraws the figure at once. A message under the first one says so.
 
 | # | Question | Leads to |
 |---|---|---|
@@ -294,9 +304,9 @@ Each part's questions offer your current choices as the defaults. After them the
 |---|---|---|
 | 5.2 | Do you want to plot the set and measured [O2] (CsO2 and CcO2)? `(Y/n)` | **5.3** |
 | 5.3 | Do you want to plot the OCR? `(Y/n)` | **Yes**: **5.3.1**. **No**: the figure is drawn **(plot)**, then **5.1**. |
-| 5.3.1 | Which OCR would you like to plot? 1) OCR (µM min⁻¹) 2) OCR / OD (µM min⁻¹ OD⁻¹), *only offered if you said yes to OD scaling in 3.1*. 3) OCR (% of the range) | the figure is drawn **(plot)**, then **5.1** |
+| 5.3.1 | Which OCR would you like to plot? 1) OCR (µM min⁻¹) 2) OCR / OD (µM min⁻¹ OD⁻¹), *only offered if you said yes to OD scaling in 3.1*. 3) OCR (% of the range) 4) OCR (% of baseline) | the figure is drawn **(plot)**, then **5.1** |
 
-The first two are the **OCR per OD** box of the strip, unticked and ticked; the box is unticked for the % of the range, and ticking or unticking it then leaves the % of the range.
+These are the choices of **OCR as** in the strip, which shows the one picked. The % of baseline is the OCR divided by its average in the baseline window (the window before the first addition, 4.6) × 100, so the baseline is 100 %. It needs the averaging windows: when none are set up, one line says "No averaging windows are set up, and the % of baseline needs them." and **4.6.1** is asked; without windows the OCR stays as it was, and one line says so. A file without a baseline keeps its usual OCR (per OD if you entered OD values, otherwise µM min⁻¹), as its axis says, and one line says so.
 
 ### 5.B Which haems
 
@@ -304,7 +314,7 @@ Whether the haems are plotted at all is the Haems box in the strip; this questio
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.4.1 | Which haems would you like to plot, and in which order? (the numbers of the haems; the grey line above says to separate them with commas, and the haems shown are brighter in the list and are what Enter gives) | the figure is drawn **(plot)**, then **5.1** |
+| 5.4.1 | Which haems would you like to plot? (the numbers of the haems; the grey line above says to separate them with commas, and the haems shown are brighter in the list and are what Enter gives; their panels are moved with the arrows beside them) | the figure is drawn **(plot)**, then **5.1** |
 
 ### 5.C How the haems are shown
 
@@ -326,15 +336,20 @@ The strip sets the journal, width and height of this figure, so these questions 
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.7 | Which journal format would you like? 1) None (use the default: Nature, *the figure's default width and height*) 2) Nature 3) Science 4) Cell 5) PNAS | **None**: the default size is used. **A journal**: **5.7.1** |
-| 5.7.1 | How wide should the figure be? (the widths that journal allows) | **5.7.2** |
+| 5.7 | Which journal format would you like? 1) None (use the default: Nature, *the figure's default width and height*) 2) Nature 3) Science 4) Cell 5) PNAS 6) ACS journals 7) PLOS ONE (every journal of the `journals` folder) | **None**: the default size is used. **A journal**: **5.7.1** |
+| 5.7.1 | How wide should the figure be? (the widths that journal allows: 1, 1.5 or 2 columns for most, 1, 2 or 3 columns for Science) | **5.7.2** |
 | 5.7.2 | How tall should the figure be, as a fraction of the page height (1 = a full page = *X* mm)? | the figure is drawn at its real size **(plot)** |
 
 ### 5.F Going back
 
 | # | Question | Leads to |
 |---|---|---|
-| 5.8 | Do you want to go back to any of these steps? 1) No, continue 2) Trimming and ignoring 3) OD values and event labels 4) Processing 5) Individual experiment plots | **1**: **6.1**. **2, 3, 4 or 5**: that section's questions are asked again from its first question, with your answers as the defaults. Your answers to the later sections are kept. Then **5.8** is asked again. |
+| 5.8 | Do you want to go back to any of these steps? 1) No, continue 2) Trimming and ignoring 3) OD values and event labels 4) Processing 5) Individual experiment plots | **1**: the plot of every file is saved, then **6.1**. **2, 3, 4 or 5**: that section's questions are asked again from its first question, with your answers as the defaults. Your answers to the later sections are kept. Then **5.8** is asked again. |
+
+After **1**, the plot of every file is saved in the results folder straight away (svg and png, in the file's own folder), unless nothing is plotted. Each file is read again for it, so this takes a moment: the terminal counts the files ("Saving the plot of file 3 of 12: *name*") and the window shows each plot as it is saved **(plot)**. A file whose plot could not be saved says so in one line, and is tried again when the run starts.
+
+- The run does not draw these plots a second time. They are saved again only when a later answer changes them: at once when a later figure adds the averaging windows (**4.6.1**), and in the run when a summary figure changes the haem fit.
+- If you cancel after this, the plots stay in the results folder, and the closing line says so.
 
 ---
 
@@ -344,7 +359,7 @@ If nothing is plotted in section 5, a message says these figures reuse the panel
 
 From here on the strip is greyed out: these figures ask their own journal and size.
 
-Each figure is drawn from your data once its questions are answered (this reads the files again, so it takes a moment, and the **Drawing ...** sign is on the plot meanwhile) and shown in the plot area. Nothing is saved to the results folder until the run starts.
+Each figure is drawn from your data once its questions are answered (this reads the files again, so it takes a moment, and the **Drawing ...** sign is on the plot meanwhile) and shown in the plot area. None of these figures is saved to the results folder until the run starts.
 
 ### 6.A Two experiments side by side
 
@@ -435,7 +450,7 @@ The figure is built up in the plot window in stages. First only the baseline OCR
 
 | # | Question | Leads to |
 |---|---|---|
-| 7.2.1 | Which OCR would you like to use? (the same options as 5.3.1) | the OCR plots are drawn **(plot)**, accept question, then **7.2.2** |
+| 7.2.1 | Which OCR would you like to use? (the first three options of 5.3.1; this figure has a % of baseline of its own) | the OCR plots are drawn **(plot)**, accept question, then **7.2.2** |
 | 7.2.2 | How would you like to show the haems? (the same options as Haems as in the strip, but % oxidised is offered only when every file of the figure has both regions, as the figure averages the files together) | **7.2.3** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **7.2.4** |
 | 7.2.3 | Do you want to scale the haems by OD as well? `(Y/n)` | all the haems are drawn **(plot)**, accept question, then **7.2.4** |
 | 7.2.4 | Which haems should get a row, and in which order? | drawn **(plot)**, accept question, then **7.2.5** |
@@ -454,12 +469,13 @@ Each is a yes or no question, `(Y/n)`, with what **n** does on the grey line abo
 
 ## 8. Data export
 
-Every experiment always gets a workbook with CcO2, CsO2, VoO2, the events and your OD, volume and dilution entries.
+Every experiment always gets a workbook with everything worked out for it, each sheet named in plain words with the unit in its headings: **Measured O2**, **Set O2**, **OCR** and, when they were worked out, **OCR per OD**, **OCR % of range**, **OCR % of baseline** (every file with a baseline window, whichever way the OCR is plotted), the haems in every view (**Haems ΔD**, **Haems absorbance**, **Haems % oxidised**, and the first two **per OD**), **Δψ** and **Averages**; then **Events**, **How it was worked out** (the fit and the background, where ΔD starts, the oxidised and reduced regions and each haem's level in them, the numbers Δψ was worked out with, the OD scaling, the baseline window and the average OCR in it that is 100 % of baseline) and **Metadata**.
 
 | # | Question | Leads to |
 |---|---|---|
-| 8.1 | Do you want to put every processed table in the workbook (OD-scaled, haems, percent, ...)? `(y/N)` | **8.2** |
-| 8.2 | Do you want to export the spectra as csv files (large, and it takes a while)? `(y/N)` | **9** |
+| 8.1 | *(only when the spectra were not exported at 3.4)* Do you want to export the spectra as csv files (large, and it takes a while)? `(y/N)` | **9** |
+
+If you exported the raw CSVs at 3.4 (choice 4 or 5), 8.1 is not asked: one line says the spectra are not written again, and the workbook of each experiment still lists them on its **Spectral data** sheet.
 
 ---
 

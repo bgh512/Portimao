@@ -1,6 +1,6 @@
 # Portimao maths
 
-How Portimao works out its haem numbers, written so that the maths can be checked without reading the code. Each quantity has its equation, what every letter in it is (with its unit), a worked example in numbers, and the test that checks it. The numbers of each example are the numbers of its test, so the example and the program cannot drift apart: the tests are in the `tests/` folder of the development copy and are run each time the program is changed.
+How Portimao works out its haem numbers (and, in section 8, the concentration of each addition), written so that the maths can be checked without reading the code. Each quantity has its equation, what every letter in it is (with its unit), a worked example in numbers, and the test that checks it. The numbers of each example are the numbers of its test, so the example and the program cannot drift apart: the tests are in the `tests/` folder of the development copy and are run each time the program is changed.
 
 Two words used throughout:
 
@@ -408,14 +408,73 @@ The change of a window, settled or quick, is measured from the one baseline of i
 
 ```text
 difference = m − m_0
-change = m ÷ m_0 × 100
+OCR (% of baseline) = m ÷ m_0 × 100
 ```
 
 - m: the average of the measurement in the window (in the unit of the measurement)
 - m_0: its average in the baseline
-- difference: in the unit of the measurement
-- change: in % of the baseline; left empty for a haem shown as ΔD, which starts at 0
+- difference: in the unit of the measurement; worked out for the OCR, for every haem in every way it can be shown (ΔD, absorbance, % oxidised) and for Δψ
+- OCR (% of baseline): in %, 100 meaning no change; worked out for the OCR only. A haem and Δψ have no percentage of the baseline: ΔD starts at 0, and the other levels can be near 0 or below it, where a percentage means nothing.
 
-Example: an OCR that averages 10 in the baseline (7.5 to 9.5 min), 4 in the quick window after the first addition (10.5 to 11.5 min) and 6 in the settled window before the second (17.5 to 19.5 min). The quick window gives a difference of 4 − 10 = −6 and a change of 4 ÷ 10 × 100 = 40 %; the settled window gives 6 − 10 = −4 and 6 ÷ 10 × 100 = 60 %.
+Each experiment's workbook gives these in its Averages sheet, one row per window: for the OCR the average, the spread, the difference and the % of baseline; for each haem, in each way it can be shown, the average, the spread and the difference (% oxidised only for a file with both regions); for Δψ the same three and the spectra used.
 
-Checked by: `test_both_kinds_are_averaged_from_one_baseline` in `tests/test_averaging_windows.py`.
+Δψ is empty wherever bH or bL is outside its limits (section 6), so a window can hold a Δψ for only some of its spectra. Its average and spread are taken over the spectra that have one, and "spectra used" says how many that was out of all the spectra of the window (5 of 9). A window with no Δψ at all is left empty (0 of 9).
+
+Example 1: an OCR that averages 10 in the baseline (7.5 to 9.5 min), 4 in the quick window after the first addition (10.5 to 11.5 min) and 6 in the settled window before the second (17.5 to 19.5 min). The quick window gives a difference of 4 − 10 = −6 and 4 ÷ 10 × 100 = 40 % of the baseline; the settled window gives 6 − 10 = −4 and 6 ÷ 10 × 100 = 60 %.
+
+Example 2: the haem bH in the same baseline and settled window. As ΔD it averages 0.5 and −2.0 mOD: a difference of −2.0 − 0.5 = −2.5 mOD. As absorbance, 12.5 and 10.0 mOD: 10.0 − 12.5 = −2.5 mOD. As % oxidised, 80 and 50 %: 50 − 80 = −30 (in % oxidised).
+
+Example 3: Δψ averages 130 mV in the baseline. Of the nine spectra of the settled window the first four have no Δψ and the last five have 116, 116, 118, 120 and 120 mV. The average is (116 + 116 + 118 + 120 + 120) ÷ 5 = 118 mV, the spread 2 mV, the difference 118 − 130 = −12 mV, and the spectra used are 5 of 9.
+
+Checked by: `test_both_kinds_are_averaged_from_one_baseline`, `test_every_haem_view_and_delta_psi_are_averaged` and `test_the_averages_sheet_holds_every_view` in `tests/test_averaging_windows.py`.
+
+### 7.4 The OCR shown as % of baseline
+
+The same percentage, taken at every time of the run and not only in the windows, is one of the ways the OCR can be plotted (**OCR as** in the strip, question 5.3.1):
+
+```text
+y = x ÷ b × 100
+```
+
+- x: the OCR at one time (µM min⁻¹)
+- b: the average of the OCR in the baseline window of that file (µM min⁻¹), the m_0 of 7.3
+- y: the OCR at that time, in % of baseline; 100 where the OCR is what it was in the baseline, 0 where there is no oxygen consumption
+
+- The OCR per OD gives the same y: the OD divides x and b alike.
+- A file without a baseline (less than 10 s of data before its first addition, or no addition) has no % of baseline; so has a file whose b is 0. Its plot keeps the OCR in µM min⁻¹ (per OD when OD values were entered), as its axis says.
+- Each experiment's workbook gives y in its sheet "OCR % of baseline", for every file with a baseline, and the baseline window and b in "How it was worked out".
+
+Example: an OCR of 10 µM min⁻¹ all through the baseline (7.5 to 9.5 min), so b = 10. Where the OCR is 10, y = 10 ÷ 10 × 100 = 100 %. Where it is 6, y = 6 ÷ 10 × 100 = 60 %. Where it is 2, y = 2 ÷ 10 × 100 = 20 %.
+
+Checked by: `test_the_ocr_is_put_on_its_percent_of_baseline` in `tests/test_averaging_windows.py`.
+
+---
+
+## 8. The concentration of each addition
+
+The labels table (question 3.2) takes, for each addition, its label, the concentration of the stock and the volume added. The program works out the concentration in the chamber from them:
+
+```text
+a = s × v ÷ V
+c = c_before + a
+```
+
+- s: the concentration of the stock, typed with its unit (nM, µM, mM or M; a number alone is mM), worked in µM
+- v: the volume of stock added (µL)
+- V: the volume of the chamber, always 5 mL = 5000 µL
+- a: how much this addition raises the concentration in the chamber (µM)
+- c_before: the concentration in the chamber of the same thing before this addition (µM), 0 for its first addition. Two additions are of the same thing when their labels are alike once capitals, spaces and punctuation are left out ("KCN" and "kcn ")
+- c: the concentration in the chamber after this addition (µM)
+
+- The volume added is not counted in the chamber's volume: 10 µL in 5 mL makes the concentration read 0.2 % high, and three such additions 0.6 %.
+- An addition with no stock and volume can have its concentration in the chamber typed by hand (a number alone is µM). It then counts as c, and a = c − c_before.
+- An event left out (labelled ignore) holds nothing and changes nothing.
+- Each file is worked out on its own.
+- The labels on the plots show c ("In the chamber", the standard) or v and s ("What was added"), chosen with **Labels as** in the strip. A concentration is written in its most readable unit, to four significant figures: 1200 µM as 1.2 mM, 0.5 µM as 500 nM.
+- Each experiment's workbook gives s (in mM), v, a and c in its Events sheet.
+
+Example 1: 10 µL of a 200 mM KCN stock. s = 200 mM = 200 000 µM, so a = 200 000 × 10 ÷ 5000 = 400 µM, and c = 0 + 400 = 400 µM. The same again gives c = 400 + 400 = 800 µM, and a third time 1200 µM (shown as 1.2 mM). 5 µL of a 10 mM BD stock in between gives 10 000 × 5 ÷ 5000 = 10 µM of BD, and does not change the KCN.
+
+Example 2: BD typed by hand as 10 µM in the chamber; then 5 µL of 10 mM BD gives c = 10 + 10 = 20 µM; then BD typed as 50 µM gives a = 50 − 20 = 30 µM.
+
+Checked by: `test_one_addition`, `test_the_same_thing_added_again_adds_up`, `test_a_concentration_typed`, `test_a_stock_typed_with_its_unit` and `test_the_text_of_the_labels` in `tests/test_event_concentrations.py`.

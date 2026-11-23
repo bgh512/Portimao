@@ -39,6 +39,7 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        height_checker,
                                        kept_decomposition_builder,
                                        NO_JOURNAL,
+                                       ocr_form_choices_lister,
                                        psi_answers_builder,
                                        psi_change_describer,
                                        psi_number_checker,
@@ -52,13 +53,16 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        width_choices_lister,
                                        )
 from utils_viewer.viewer_table import (ABOVE_ZERO,
+                                       ABOVE_ZERO_OR_EMPTY,
                                        cell_reader,
+                                       CHAMBER,
                                        EMPTY,
                                        label_entries_reader,
                                        label_table_builder,
                                        LABEL,
                                        od_rows_reader,
                                        od_table_builder,
+                                       STOCK,
                                        table_problem_teller,
                                        wheel_step_finder,
                                        ZERO_OR_MORE,
@@ -84,8 +88,9 @@ SUMMARIES = [{'name': 'kd_run1',
 def test_cells_of_the_tables() -> None:
     """
     ---- Summary ----
-    Main function to check the three kinds of cell: a number above 0 (with a point or
-    a comma), a number of 0 or more, and a label without its outer spaces; an empty
+    Main function to check the kinds of cell: a number above 0 (with a point or a
+    comma), a number of 0 or more, a label without its outer spaces, a volume added,
+    a stock and a concentration in the chamber with or without their unit; an empty
     cell is "not filled in" and never wrong; words, numbers below the limit and
     numbers that are not finite are wrong.
 
@@ -129,6 +134,20 @@ def test_cells_of_the_tables() -> None:
     assert cell_reader('  10 µM KCN ', LABEL) == ('10 µM KCN', True)
     assert cell_reader('0', LABEL) == ('0', True)
     assert cell_reader(' ', LABEL) == (None, True)
+
+    # ---- 4 A volume added, which may be left empty -----------------------------------
+    assert cell_reader('10', ABOVE_ZERO_OR_EMPTY) == (pytest.approx(10.0), True)
+    assert cell_reader('', ABOVE_ZERO_OR_EMPTY) == (None, True)
+    assert cell_reader('0', ABOVE_ZERO_OR_EMPTY) == (None, False)
+
+    # ---- 5 A stock (mM alone) and a concentration in the chamber (µM alone) ----------
+    assert cell_reader('200', STOCK) == (pytest.approx(200_000.0), True)
+    assert cell_reader('200 µM', STOCK) == (pytest.approx(200.0), True)
+    assert cell_reader('0', STOCK) == (None, False)
+    assert cell_reader('400', CHAMBER) == (pytest.approx(400.0), True)
+    assert cell_reader('1.2 mM', CHAMBER) == (pytest.approx(1200.0), True)
+    assert cell_reader('0', CHAMBER) == (pytest.approx(0.0), True)
+    assert cell_reader('KCN', CHAMBER) == (None, False)
 
 
 # ---- test_event_labels_from_the_table ------------------------------------------------
@@ -178,6 +197,9 @@ def test_event_labels_from_the_table(monkeypatch: pytest.MonkeyPatch) -> None:
     assert (first['label'], first['ignored']) == ('100 µM KCN', False)
     assert second == {'datapoint': 20,
                       'label': IGNORE_LABEL,
+                      'stock_uM': None,
+                      'added_uL': None,
+                      'addition_uM': None,
                       'concentration_uM': None,
                       'ignored': True,
                       }
@@ -246,7 +268,7 @@ def test_rows_of_the_labels_table() -> None:
     assert entries['kd_run2'] == []
 
     # ---- 2 One row per event, under its file's name ----------------------------------
-    table = label_table_builder(SUMMARIES, entries, IGNORE_LABEL)
+    table = label_table_builder(SUMMARIES, entries, IGNORE_LABEL, 5.0)
     assert table['skip_word'] == IGNORE_LABEL
     assert [(r['group'], r['first'], r['position']) for r in table['rows']] == [
         ('kd_run1', '15.00', 0),
@@ -254,22 +276,39 @@ def test_rows_of_the_labels_table() -> None:
         ('kd_run1', '31.25', 2),
         ]
     assert table['rows'][0]['name'] == 'kd_run1 at 15.00 min'
+    assert table['rows'][0]['shown'] == {'text': '100uM KCN'}
     assert table['rows'][0]['cells'] == {'label': '100 µM KCN',
-                                         'concentration_uM': '100',
+                                         'stock_uM': '',
+                                         'added_uL': '',
+                                         'concentration_uM': '100 µM',
                                          }
     assert table['rows'][1]['cells']['concentration_uM'] == ''
 
     # ---- 3 The typed values go back to their events ----------------------------------
-    values = [{'label': '200 µM KCN', 'concentration_uM': 200.0},
-              {'label': None, 'concentration_uM': 1.5},
-              {'label': IGNORE_LABEL, 'concentration_uM': None},
+    values = [{'label': 'KCN',
+               'stock_uM': 200_000.0,
+               'added_uL': 10.0,
+               'concentration_uM': None,
+               },
+              {'label': None,
+               'stock_uM': None,
+               'added_uL': None,
+               'concentration_uM': 1.5,
+               },
+              {'label': IGNORE_LABEL,
+               'stock_uM': None,
+               'added_uL': None,
+               'concentration_uM': None,
+               },
               ]
     result = label_entries_reader(table, values, entries)
-    assert [e['label'] for e in result['kd_run1']] == ['200 µM KCN',
+    assert [e['label'] for e in result['kd_run1']] == ['KCN',
                                                        'nd-011992',
                                                        IGNORE_LABEL,
                                                        ]
-    assert [e['concentration_uM'] for e in result['kd_run1']] == [200.0, 1.5, None]
+    assert [e['stock_uM'] for e in result['kd_run1']] == [200_000.0, None, None]
+    assert [e['added_uL'] for e in result['kd_run1']] == [10.0, None, None]
+    assert [e['concentration_uM'] for e in result['kd_run1']] == [None, 1.5, None]
     assert entries['kd_run1'][0]['label'] == '100 µM KCN'  # the start is not changed
 
 
@@ -385,7 +424,7 @@ def test_height_typed_in_the_strip() -> None:
 
     ---- Equations ----
     A Nature page is 170 mm: 0.5 of it is 85 mm and the whole is 170 mm. A Science
-    page is 230 mm: 0.25 of it is 57.5 mm. "None" uses the Nature page.
+    page is 199 mm: 0.5 of it is 99.5 mm. "None" uses the Nature page.
 
     ---- Helpers ----
     None.
@@ -393,9 +432,9 @@ def test_height_typed_in_the_strip() -> None:
 
     assert height_checker('0.5', 'nature') == (pytest.approx(0.5), 'of a page (85 mm)')
     assert height_checker('1', 'nature') == (pytest.approx(1.0), 'of a page (170 mm)')
-    assert height_checker('0,25', 'science') == (pytest.approx(0.25),
-                                                 'of a page (57.5 mm)',
-                                                 )
+    assert height_checker('0,5', 'science') == (pytest.approx(0.5),
+                                                'of a page (99.5 mm)',
+                                                )
     assert height_checker('0.5', NO_JOURNAL) == (pytest.approx(0.5),
                                                  'of a page (85 mm)',
                                                  )
@@ -696,8 +735,8 @@ def test_answers_shown_in_the_strip() -> None:
     ---- Summary ----
     Main function to check that the answers of a run are shown in the strip as they
     are meant (the standard size as the journal "None", a chosen journal by its name,
-    the box ticked only when the haems are worked out, the OCR per OD box ticked only
-    for the OCR per OD), that the strip can show them, and that its journal, width and
+    the box ticked only when the haems are worked out, the OCR as the answers have
+    it), that the strip can show them, and that its journal, width and
     height give the same answers back.
 
     ---- Inputs ----
@@ -732,7 +771,8 @@ def test_answers_shown_in_the_strip() -> None:
                       'spectra': 'Cyt',
                       'haem_mode': 'delta',
                       'haem_per_od': True,
-                      'ocr_per_od': True,
+                      'ocr_mode': 'od',
+                      'label_mode': 'chamber',
                       'delta_psi': False,
                       'psi_bH_mV': 40.0,
                       'psi_bL_mV': -20.0,
@@ -764,6 +804,7 @@ def test_answers_shown_in_the_strip() -> None:
                   haem_mode='percent',
                   haem_per_od=False,
                   ocr_mode='percent',
+                  label_mode='added',
                   )
     values = strip_values_builder(chosen, False, [], kept='made_up.csv, Valencia')
     assert values == {'plot_haems': False,
@@ -775,7 +816,8 @@ def test_answers_shown_in_the_strip() -> None:
                       'spectra': 'NADH',
                       'haem_mode': 'percent',
                       'haem_per_od': False,
-                      'ocr_per_od': False,
+                      'ocr_mode': 'percent',
+                      'label_mode': 'added',
                       'delta_psi': False,
                       'psi_bH_mV': 40.0,
                       'psi_bL_mV': -20.0,
@@ -808,8 +850,8 @@ def test_values_meant_for_the_strip() -> None:
     name, an unknown journal, a width the journal does not allow, a height over a page,
     an unknown background, haems ticked that are not a list of names, a comparing that
     is not True or False, a kept decomposition not in words, a spectrometer not given
-    by its name, a way of showing the haems the strip does not have and a per OD box
-    that is not True or False are each refused.
+    by its name, a way of showing the haems or the OCR the strip does not have and a
+    per OD box that is not True or False are each refused.
 
     ---- Inputs ----
     None.
@@ -843,7 +885,8 @@ def test_values_meant_for_the_strip() -> None:
     strip_values_checker({'spectra': 'NADH',
                           'haem_mode': 'percent',
                           'haem_per_od': False,
-                          'ocr_per_od': True,
+                          'ocr_mode': 'baseline',
+                          'label_mode': 'added',
                           },
                          )
     strip_values_checker({})
@@ -860,7 +903,9 @@ def test_values_meant_for_the_strip() -> None:
                   {'spectra': None},
                   {'haem_mode': 'conc'},
                   {'haem_per_od': 'yes'},
-                  {'ocr_per_od': 1},
+                  {'ocr_mode': 'per_cell'},
+                  {'label_mode': 'both'},
+                  {'ocr_per_od': True},
                   ):
         with pytest.raises(ValueError):
             strip_values_checker(wrong)
@@ -1037,10 +1082,11 @@ def test_numbers_of_the_delta_psi_row() -> None:
 def test_haems_and_ocr_shown_from_the_strip() -> None:
     """
     ---- Summary ----
-    Main function to check the "Haems as" drop-down and the per OD boxes: % oxidised is
-    in the list only when a file has both regions, and the spectrometer, the way of
-    showing the haems and the two boxes give the answers of the run (the OCR per OD
-    box ticked is the OCR per OD, unticked the plain OCR), only for what changed.
+    Main function to check the "Haems as" and the "OCR as" drop-downs and the per OD
+    box: % oxidised is in the list only when a file has both regions, the OCR per OD
+    only when OD values were entered and its % of baseline only when the averaging
+    windows are set up; and the spectrometer, the ways of showing the haems and the
+    OCR and the box give the answers of the run, only for what changed.
 
     ---- Inputs ----
     None.
@@ -1071,18 +1117,32 @@ def test_haems_and_ocr_shown_from_the_strip() -> None:
                                               ('abs', 'Absorbance (mOD)'),
                                               ]
 
+    assert ocr_form_choices_lister(False, False) == [('raw', 'µM min⁻¹'),
+                                                     ('percent', '% of the range'),
+                                                     ]
+    assert ocr_form_choices_lister(True, True) == [('raw', 'µM min⁻¹'),
+                                                   ('od', 'per OD (µM min⁻¹ OD⁻¹)'),
+                                                   ('percent', '% of the range'),
+                                                   ('baseline', '% of baseline'),
+                                                   ]
+    assert [key for key, _ in ocr_form_choices_lister(False, True)] == ['raw',
+                                                                        'percent',
+                                                                        'baseline',
+                                                                        ]
+
     # ---- 2 The strip values as answers -----------------------------------------------
     assert form_answers_builder({'spectra': 'NADH',
                                  'haem_mode': 'percent',
                                  'haem_per_od': False,
-                                 'ocr_per_od': True,
+                                 'ocr_mode': 'od',
                                  },
                                 ) == {'decomposition_dataset': 'NADH',
                                       'haem_mode': 'percent',
                                       'haem_per_od': False,
                                       'ocr_mode': 'od',
                                       }
-    assert form_answers_builder({'ocr_per_od': False}) == {'ocr_mode': 'raw'}
+    assert form_answers_builder({'ocr_mode': 'baseline'}) == {'ocr_mode': 'baseline'}
+    assert form_answers_builder({'label_mode': 'added'}) == {'label_mode': 'added'}
     assert form_answers_builder({'journal': 'cell', 'plot_haems': True}) == {}
 
 
@@ -1167,6 +1227,10 @@ def test_plots_follow_the_strip() -> None:
     # the OCR's % of the range is no per OD, so it stays without OD values too
     ranged = _answers_previewer(dict(answers, ocr_mode='percent'), None, 'standard')
     assert (ranged['ocr_mode'], ranged['plot_haems']) == ('percent', False)
+    # nor is its % of baseline: asked for, it stays, and the file is drawn with its
+    # usual OCR while the plot has no windows
+    based = _answers_previewer(dict(answers, ocr_mode='baseline'), None, 'standard')
+    assert (based['ocr_mode'], based['averaging']) == ('baseline', False)
 
     # ---- 3 The raw plot and the figure of each file ----------------------------------
     raw = shown(_answers_previewer(answers, fit, 'raw', True))

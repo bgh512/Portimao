@@ -15,9 +15,14 @@ from utils_shared.averaging import (quick_span_lister,
                                     window_span_lister,
                                     window_value_setter,
                                     )
-from utils_shared.helpers import file_name_sanitiser
+from utils_shared.helpers import (file_name_sanitiser,
+                                  panel_name_teller,
+                                  panel_order_merger,
+                                  )
+from utils_shared.master_page_exporter import master_page_exporter
 from utils_shared.individual_experiment_exporter import (size_describer,
                                                          spectra_size_estimator,
+                                                         workbook_size_estimator,
                                                          )
 from utils_shared.pca_fitter import (component_builder,
                                      component_classifier,
@@ -78,14 +83,17 @@ from utils_shared.survey import (decomposition_asker,
                                  trim_minutes_setter,
                                  trim_pointer_reader,
                                  )
-from utils_shared.user_notices import problem_teller, warning_shower
+from utils_shared.user_notices import problem_shower, problem_teller, warning_shower
 from utils_viewer.viewer_edges import EdgeChoice
 from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
+                                         EXPORT_PARTS,
                                          import_data_exporter,
                                          pca_example_picture_builder,
                                          pca_picture_builder,
                                          pca_spectra_gatherer,
                                          preview_drawer,
+                                         preview_figure_builder,
+                                         PreviewSpec,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
@@ -93,6 +101,9 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        form_answers_builder,
                                        HAEM_FORM_TEXTS,
                                        kept_decomposition_builder,
+                                       MASTER_CHANGE,
+                                       OCR_FORM_TEXTS,
+                                       PANEL_ORDER_CHANGE,
                                        psi_answers_builder,
                                        psi_change_describer,
                                        size_answers_builder,
@@ -108,6 +119,10 @@ from utils_viewer.viewer_table import (label_entries_reader,
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 WARNING_COLOUR = '\x1b[1;31m'  # bold red
+# what the event labels show, as the terminal says it when Labels as is changed
+LABEL_CHANGE_TEXTS = {'chamber': 'the concentration in the chamber (400 µM KCN)',
+                      'added': 'what was added (10 µL of 200 mM KCN)',
+                      }
 PCA_COMPONENTS_TITLE = 'PCA components'
 PCA_EXAMPLES_TITLE = 'PCA examples (smallest and largest residual)'
 STAGE_TITLES = {'trim': 'Trimming and ignoring',
@@ -143,8 +158,8 @@ WINDOW_FIELDS = [('window_s', 'Settled window'),
 WINDOW_SWITCH = ('is_on', 'Settled windows')
 QUICK_FIELDS = [('quick_s', 'Quick window'), ('delay_s', 'Start after the addition')]
 QUICK_SWITCH = ('quick_is_on', 'Quick windows')
-WINDOW_KEY_TEXT = ('blue = settled window, green = quick window, red hatched = a '
-                   'window that does not fit')
+WINDOW_KEY_TEXT = ('gold = baseline, blue = settled window, green = quick window, red '
+                   'hatched = a window that does not fit')
 WINDOW_NUDGE = ('Type the numbers of the windows in the strip under the plot, or drag '
                 'the edges of a window; press Enter with this box empty when the '
                 'windows look right.')
@@ -389,11 +404,12 @@ def _export_asker(session: ViewerSession,
                   ) -> None:
     """
     ---- Summary ----
-    Helper function to ask, at the end of the import, what to export now so it can be
-    plotted outside the program (nothing, the workbooks, the workbooks and the trimmed
-    spectra, or the spectra of the whole recordings too, with the size of the spectra
-    worked out for these files), and to do it. Enter gives nothing. The choice and the
-    limits exported are kept in the session, so new edges can export again.
+    Helper function to ask, at the end of the import, whether to export the files of
+    each experiment now so they can be plotted outside the program (nothing; the
+    workbook of the trimmed data; that and the whole recording of each trimmed file;
+    either of those with the spectra as csv files; each with its size worked out for
+    these files), and to do it. Enter gives nothing. The choice and the limits exported
+    are kept in the session, so new edges can export again.
 
     ---- Inputs ----
     session : ViewerSession
@@ -404,7 +420,8 @@ def _export_asker(session: ViewerSession,
         OD values and events of every file, as entered in section 3.
 
     ---- Globals read ----
-    WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES.
+    WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES,
+    settings.WORKBOOK_POINT_BYTES; EXPORT_PARTS.
 
     ---- Outputs ----
     None
@@ -415,7 +432,8 @@ def _export_asker(session: ViewerSession,
     session.export_choice and session.export_limits (side effects).
 
     ---- Equations ----
-    None.
+    Size of a choice = the trimmed workbooks, + the whole recordings' workbooks when
+    it writes them, + the spectra of each when it writes them.
 
     ---- Helpers ----
     choice_asker
@@ -426,27 +444,46 @@ def _export_asker(session: ViewerSession,
     size_describer
     spectra_size_estimator
     text_colourer
+    workbook_size_estimator
     """
 
-    # ---- 1 Ask what to export, with the size of the spectra --------------------------
-    trimmed_bytes, full_bytes = spectra_size_estimator(session.summaries,
-                                                       limits,
-                                                       settings.SPECTRA_CSV_BYTES,
-                                                       )
-    options = [('none', 'Nothing'),
-               ('summary', 'The summary: a workbook for each file (a few MB)'),
-               ('trimmed',
-                'The trimmed data: the summaries and the trimmed spectra as '
-                f'csv files ({size_describer(trimmed_bytes)})',
+    # ---- 1 Ask what to export, with the size of each choice --------------------------
+    sheets_bytes = workbook_size_estimator(session.summaries,
+                                           limits,
+                                           settings.WORKBOOK_POINT_BYTES,
+                                           )
+    spectra_bytes = spectra_size_estimator(session.summaries,
+                                           limits,
+                                           settings.SPECTRA_CSV_BYTES,
+                                           )
+    sizes = {}
+    for key, (with_full, with_spectra) in EXPORT_PARTS.items():
+        size = sheets_bytes[0] + (sheets_bytes[1] if with_full else 0.0)
+        if with_spectra:
+            size += spectra_bytes[0] + (spectra_bytes[1] if with_full else 0.0)
+        sizes[key] = size_describer(size)
+    options = [('none', 'No'),
+               ('summary', f"Summary sheet, trimmed ({sizes['summary']})"),
+               ('summary_full',
+                f"Summary sheet, trimmed and full ({sizes['summary_full']})",
                 ),
-               ('all',
-                'All the data: the summaries and the spectra, trimmed and full '
-                f'({size_describer(trimmed_bytes + full_bytes)})',
+               ('spectra',
+                f"Summary sheet and raw CSVs, trimmed ({sizes['spectra']})",
+                ),
+               ('spectra_full',
+                'Summary sheet and raw CSVs, trimmed and full '
+                f"({sizes['spectra_full']})",
                 ),
                ]
-    info_printer('The spectra are large, and writing them takes a while.')
-    choice = choice_asker('What would you like to export now, so you can plot it '
-                          'yourself?',
+    info_printer('The summary sheet is a workbook for each file; the raw CSVs are its '
+                 'spectra, which are large and take a while to write.',
+                 )
+    if sheets_bytes[1] <= 0:
+        info_printer('No file is trimmed, so "trimmed and full" writes the same as '
+                     '"trimmed".',
+                     )
+    choice = choice_asker('Would you like to export the individual experiment files '
+                          'now?',
                           options,
                           'none',
                           number='3.4',
@@ -467,10 +504,14 @@ def _export_asker(session: ViewerSession,
         info_printer(text_colourer(f'Not exported: {problem}', WARNING_COLOUR), depth=2)
     session.export_choice = choice
     session.export_limits = {name: dict(values) for name, values in limits.items()}
+    full_text = ('; the whole recording of a trimmed file is in the full folder inside '
+                 'its own'
+                 if EXPORT_PARTS[choice][0]
+                 else ''
+                 )
     info_printer(
         f'Exported {len(session.summaries) - len(problems)} file(s) to '
-        f'{session.export_root}, one folder each; the whole recording of a '
-        f'trimmed file is in the full folder inside its own. Nothing is scaled '
+        f'{session.export_root}, one folder each{full_text}. Nothing is scaled '
         f'by OD, decomposed or averaged, and the ignored parts are included.',
         depth=2,
         )
@@ -555,7 +596,8 @@ def _figure_starter(answers: dict,
     ---- Summary ----
     Helper function to set the figure of each file from the standard settings or the
     ones last saved for the dataset, keeping only what this run allows: the OCR per OD
-    and the haems scaled by OD only when OD values were entered, the haems in %
+    and the haems scaled by OD only when OD values were entered, the OCR as % of
+    baseline only when the averaging windows are set up, the haems in %
     oxidised only when a file has both regions (delta D otherwise), and the haems only
     when they are decomposed, limited to those of the fit in use (all of them when none
     of the saved ones is in it). The Haems box of the settings strip says whether the
@@ -566,7 +608,7 @@ def _figure_starter(answers: dict,
     ---- Inputs ----
     answers : dict
         Answers dictionary the figure settings are stored in; must hold normalise_od,
-        decompose, ocr_mode, haem_mode and haem_per_od.
+        decompose, averaging, ocr_mode, haem_mode and haem_per_od.
     defaults : dict
         The standard or saved answers (plot_o2, plot_ocr, haems, event_label_angle).
     fit : Optional[dict]
@@ -592,7 +634,7 @@ def _figure_starter(answers: dict,
     ocr_kind_lister
     """
 
-    kinds = ocr_kind_lister(answers['normalise_od'])
+    kinds = ocr_kind_lister(answers['normalise_od'], bool(answers['averaging']))
     haem_mode = answers['haem_mode']
     if haem_mode == 'percent' and not include_percent:
         haem_mode = 'delta'
@@ -781,22 +823,23 @@ def _label_table_filler(session: ViewerSession,
                         ) -> Dict[str, List[dict]]:
     """
     ---- Summary ----
-    Helper function to have the label and concentration of every event filled in in
-    the labels table of the window (3.2).
+    Helper function to have the label, the stock and the volume added (or the
+    concentration in the chamber) of every event filled in in the labels table of the
+    window (3.2).
 
     ---- Inputs ----
     session : ViewerSession
         The browser session, whose window has the table.
     entries : Dict[str, List[dict]]
-        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]} to
-        start from (event_entries_builder).
+        {file name: [event entry, ...]} to start from (event_entries_builder,
+        event_entries in DATA_FORMAT.md).
 
     ---- Globals read ----
-    IGNORE_LABEL (imported constant).
+    IGNORE_LABEL (imported constant); settings.CHAMBER_VOLUME_ML.
 
     ---- Outputs ----
     Dict[str, List[dict]]
-        The events with the labels and concentrations typed.
+        The events with the labels, stocks, volumes and concentrations typed.
 
     ---- Globals mutated ----
     None. Shows and hides the table and reads from and prints to the terminal (side
@@ -811,13 +854,23 @@ def _label_table_filler(session: ViewerSession,
     label_table_builder
     """
 
-    table = label_table_builder(session.summaries, entries, IGNORE_LABEL)
+    table = label_table_builder(session.summaries,
+                                entries,
+                                IGNORE_LABEL,
+                                settings.CHAMBER_VOLUME_ML,
+                                )
+    chamber = f'{settings.CHAMBER_VOLUME_ML:g} mL'
     values = _table_filler(session,
                            table,
-                           question='Fill in the label and the concentration of each '
-                           'event, then press Confirm.',
+                           question='Fill in the label, the stock and the volume added '
+                           'of each event, then press Confirm.',
                            note=f'One row per event. Write {IGNORE_LABEL} as the label '
-                           'to leave an event out.',
+                           'to leave an event out. Type the stock with its unit (nM, '
+                           'µM, mM or M; a number alone is mM) and the volume added, '
+                           f'and the concentration in the chamber ({chamber}) is '
+                           'worked out, the same label added again adding up. Or '
+                           'leave them empty and type the concentration in the '
+                           'chamber (a number alone is µM).',
                            number='3.2',
                            )
     return label_entries_reader(table, values, entries)
@@ -863,6 +916,85 @@ def _limits_lister(summaries: List[dict], limits: Dict[str, dict]) -> None:
         info_printer(f"  {summary['name']}: keep {start} {end}; ignore the first "
                      f"{v['ignore_start']:g} and the last {v['ignore_end']:g}",
                      )
+
+
+# ---- _master_page_saver --------------------------------------------------------------
+def _master_page_saver(session: ViewerSession,
+                       answers: dict,
+                       limits: Dict[str, dict],
+                       details: Dict[str, dict],
+                       ) -> None:
+    """
+    ---- Summary ----
+    Helper function to save the master page of the file shown: its figure, drawn as it
+    will be saved, on one page of the journal of the strip (the standard journal for
+    "None"), as a PDF in the results folder. What was saved, or why it was not, is
+    said in one sentence.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (the file shown, the fit in use, the regions, the results
+        folder).
+    answers : dict
+        The answers the figure is drawn with.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    details : Dict[str, dict]
+        OD values and events of every file.
+
+    ---- Globals read ----
+    settings.JOURNAL_SPECS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Writes the PDF and prints to the terminal; the details of a problem go to
+    the log (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _answers_previewer
+    info_printer
+    master_page_exporter
+    preview_figure_builder
+    problem_shower
+    warning_shower
+    """
+
+    # ---- 1 Draw the figure of the file shown, as it will be saved --------------------
+    name = session.summaries[session.current]['name']
+    spec = PreviewSpec(answers=_answers_previewer(answers, session.fit, 'final'),
+                       limits=copy.deepcopy(limits),
+                       fit=session.fit,
+                       details=copy.deepcopy(details),
+                       show_ignored=False,
+                       regions=copy.deepcopy(session.regions),
+                       )
+    figure, notes = preview_figure_builder(session, spec, name)
+    if figure is None:
+        warning_shower(f'The master page of {name} was not saved. {notes}')
+        return
+
+    # ---- 2 Save it on a page of the journal ------------------------------------------
+    journal = spec.answers['journal']
+    try:
+        path = master_page_exporter(figure,
+                                    settings.JOURNAL_SPECS[journal],
+                                    journal,
+                                    name,
+                                    session.export_root,
+                                    )
+    except Exception as exc:  # a page that cannot be saved must never stop the questions
+        problem_shower(f'The master page of {name} was not saved', exc)
+        return
+    info_printer(f'Saved the master page of {name} '
+                 f"({settings.JOURNAL_SPECS[journal]['name']}) as {path.name} in "
+                 f'{session.export_root}.',
+                 )
 
 
 # ---- _od_lister ----------------------------------------------------------------------
@@ -1432,15 +1564,19 @@ def _strip_change_applier(session: ViewerSession,
     redraw the plot of the step being asked. Unticking the haems leaves them out of the
     run; ticking them, picking a fit or ticking library haems under Build a fit works
     them out with the fit in the strip; a new background works them out again, and so
-    does another spectrometer. A new way of showing the haems, or a per OD box, redraws
-    the plot with it. A number typed in the Δψ row is kept in the answers (the two
+    does another spectrometer. A new way of showing the haems or the OCR, a per OD box,
+    or a new choice of what the event labels show, redraws the plot with it. A panel moved with the arrow beside it, or the Standard order
+    button, changes the order kept for the panels of every file, said in the terminal.
+    A number typed in the Δψ row is kept in the answers (the two
     filled-in midpoints with it), said in the terminal and Δψ worked out again. A fit
     that cannot be used is reported and the strip is set back. Keep to compare keeps
     the fit, the background, the regions and the numbers of Δψ in use, drawn dashed
     over the haems and over Δψ until one of the two is chosen (Keep this one carries
     on with what is on the plot, Go back to kept puts the kept one back in use) or
     the haems are left out. A new journal, width or height redraws only the figure of
-    each file, the one plot drawn at its size.
+    each file, the one plot drawn at its size. A click on Export master saves the
+    master page of the file shown while that figure is on the plot, and says when it
+    can be saved otherwise.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1454,7 +1590,7 @@ def _strip_change_applier(session: ViewerSession,
         strip_values).
 
     ---- Globals read ----
-    None.
+    LABEL_CHANGE_TEXTS.
 
     ---- Outputs ----
     None
@@ -1474,10 +1610,23 @@ def _strip_change_applier(session: ViewerSession,
     form_answers_builder
     info_printer
     kept_decomposition_builder
+    panel_name_teller
+    panel_order_merger
     psi_answers_builder
     psi_change_describer
     size_answers_builder
     """
+
+    # ---- 0 The master page: a click, which changes nothing ---------------------------
+    if changes.get(MASTER_CHANGE):
+        if session.is_figure and session.master_exporter is not None:
+            session.master_exporter()
+        else:
+            info_printer('The master page shows the figure of a file on a page of the '
+                         'journal, so it can be exported once that figure is on the '
+                         'plot, in the individual experiment plots.',
+                         )
+        return
 
     # ---- 1 The journal, the width and the height -------------------------------------
     sizes = size_answers_builder(changes)
@@ -1501,16 +1650,33 @@ def _strip_change_applier(session: ViewerSession,
         info_printer('The haems are now shown as '
                      f"{HAEM_FORM_TEXTS[changes['haem_mode']]}.",
                      )
-    for name, subject in (('haem_per_od', 'The haems are'),
-                          ('ocr_per_od', 'The OCR is'),
-                          ):
-        if name in changes:
-            info_printer(f"{subject} {'now' if changes[name] else 'no longer'} shown "
-                         'per OD.',
-                         )
+    if 'haem_per_od' in changes:
+        info_printer('The haems are '
+                     f"{'now' if changes['haem_per_od'] else 'no longer'} shown per "
+                     'OD.',
+                     )
+    if 'ocr_mode' in changes:
+        info_printer(f"The OCR is now shown as {OCR_FORM_TEXTS[changes['ocr_mode']]}.")
+    if 'label_mode' in changes:
+        info_printer('The event labels now show '
+                     f"{LABEL_CHANGE_TEXTS[changes['label_mode']]}.",
+                     )
     is_redrawn = is_redrawn or bool(forms)
 
-    # ---- 2.2 The numbers of delta psi ------------------------------------------------
+    # ---- 2.2 The order of the panels -------------------------------------------------
+    if PANEL_ORDER_CHANGE in changes:
+        shown = list(changes[PANEL_ORDER_CHANGE])
+        answers['panel_order'] = panel_order_merger(answers.get('panel_order') or [],
+                                                    shown,
+                                                    ) if shown else []
+        info_printer('The panels are now, from the top: '
+                     f"{', '.join(panel_name_teller(key) for key in shown)}."
+                     if shown
+                     else 'The panels are back in the standard order.',
+                     )
+        is_redrawn = True
+
+    # ---- 2.3 The numbers of delta psi ------------------------------------------------
     psi_answers = psi_answers_builder(changes, answers)
     if psi_answers:
         answers.update(psi_answers)
@@ -1591,9 +1757,10 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     ticked when they are worked out, the fit, the decomposition kept to compare with,
     the spectrometer, how the haems and the OCR are shown, the journal and the size.
     It also says what the strip offers: the spectrometers every file has, % oxidised
-    when at least one file has both regions, and the per OD boxes when OD values were
-    entered. Haems in % oxidised go back to delta D when no file has both regions any
-    more.
+    when at least one file has both regions, per OD when OD values were entered, and
+    the OCR as % of baseline once the averaging windows are set up
+    (session.has_windows). Haems in % oxidised go back to delta D when no file has
+    both regions any more.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1632,7 +1799,11 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
                        )
     if answers['haem_mode'] == 'percent' and not has_percent:
         answers['haem_mode'] = 'delta'
-    session.window.strip_choices_setter(sorted(common), has_percent, session.has_od)
+    session.window.strip_choices_setter(sorted(common),
+                                        has_percent,
+                                        session.has_od,
+                                        session.has_windows,
+                                        )
     fit = session.fit
     session.window.strip_setter(strip_values_builder(answers,
                                                      fit is not None,
@@ -1766,7 +1937,8 @@ def _windows_chooser(session: ViewerSession,
     """
     ---- Summary ----
     Helper function to run the window step on the plot of every file: the averaging
-    windows are shaded on the plot. The settled windows (blue) have one length and one
+    windows are shaded on the plot, the baseline before the first addition in gold
+    with its name. The settled windows (blue) have one length and one
     gap before the next addition for every window of every file: pulling the start of
     any of them changes the length, pulling its end the gap. The quick windows (green)
     have one length and one start after their addition: pulling the start of any of
@@ -1883,6 +2055,10 @@ def _windows_chooser(session: ViewerSession,
     # ---- 3 Drag or type the windows until Enter --------------------------------------
     info_printer('AVERAGING WINDOWS = the stretches around each addition that its '
                  'averages are taken over.',
+                 )
+    info_printer('The baseline (gold) is the window before the first addition, as '
+                 'long as a settled window; every other window is compared with it.',
+                 tight=True,
                  )
     info_printer('A settled window (blue) ends a set time before the next addition, '
                  f'the last one {final_gap:g} min before the end of the recording; a '
@@ -2090,10 +2266,10 @@ def details_stage_runner(session: ViewerSession,
     temperature_asker
     """
 
-    # ---- 1 Read the values of earlier runs -------------------------------------------
+    # ---- 1 Read the values saved for the dataset -------------------------------------
     summaries = session.summaries
     details: Dict[str, dict] = {s['name']: {} for s in summaries}
-    saved = saved_values_reader(summaries, remembered, session.export_root)
+    saved = saved_values_reader(summaries, remembered)
     for name, values in (details_before or {}).items():
         saved[name] = dict(saved.get(name) or {}, **values)
     def redraw() -> bool:
@@ -2119,8 +2295,9 @@ def details_stage_runner(session: ViewerSession,
     _strip_shower(session, answers)
     if answers['normalise_od']:
         _od_lister(details)
-        info_printer('The OCR and the haems can now be shown per OD: tick or untick '
-                     'the two per OD boxes in the strip under the plot.',
+        info_printer('The OCR and the haems can now be shown per OD, in the strip '
+                     'under the plot: the per OD box beside Haems as, and per OD '
+                     'under OCR as.',
                      )
 
     # ---- 2.1 The temperature of the runs ---------------------------------------------
@@ -2409,9 +2586,10 @@ def plots_stage_runner(session: ViewerSession,
     it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
     the angle of the event labels): only that part's questions are asked, with the
     current choices as the defaults, and the figure is drawn and asked about again. The
-    settings strip turns the haems on or off and sets how they are shown, the per OD
-    scaling, the journal and the size, so 'which haems' asks only which ones in which
-    order, and none of those is asked.
+    settings strip turns the haems on or off and sets how they and the OCR are shown,
+    the journal and the size, so 'which haems' asks only which ones in which
+    order, and none of those is asked. The OCR asked for as % of baseline with no
+    averaging windows set up offers the window step of the processing.
 
     ---- Inputs ----
     session : ViewerSession
@@ -2444,6 +2622,7 @@ def plots_stage_runner(session: ViewerSession,
     _answers_previewer
     _figure_starter
     _strip_shower
+    _windows_chooser
     accept_asker
     haem_choice_asker
     info_printer
@@ -2470,6 +2649,7 @@ def plots_stage_runner(session: ViewerSession,
                                                ),
                            )
     _figure_starter(answers, defaults, session.fit, include_percent)
+    session.has_windows = bool(answers['averaging'])
     _strip_shower(session, answers)
     def is_plotted() -> bool:
         return bool(answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems'])
@@ -2484,6 +2664,51 @@ def plots_stage_runner(session: ViewerSession,
                               show_ignored=False,
                               )
     session.redraw, session.is_figure = redraw, True
+    # the Export master button of the strip saves a journal page with this figure
+    def master_exporter() -> None:
+        if is_plotted():
+            _master_page_saver(session, answers, limits, details)
+        else:
+            info_printer('Nothing is set to be plotted, so there is no figure to put '
+                         'on a master page.',
+                         )
+    session.master_exporter = master_exporter
+    # The OCR as % of baseline needs the averaging windows: with none set up, the
+    # window step of the processing is run here, over the processing plot.
+    def windows_adder() -> bool:
+        def processing_redraw() -> bool:
+            return preview_drawer(session,
+                                  _answers_previewer(dict(answers, averaging=False),
+                                                     session.fit,
+                                                     'analysis',
+                                                     session.has_od,
+                                                     ),
+                                  limits,
+                                  session.fit,
+                                  details,
+                                  )
+        session.redraw, session.is_figure = processing_redraw, False
+        session.window.strip_state_setter(False)
+        try:
+            processing_redraw()
+            # with neither kind kept, the settled windows are the ones ticked
+            is_any = answers['settled_windows'] or answers['quick_windows']
+            _windows_chooser(session,
+                             answers,
+                             dict(answers,
+                                  averaging=True,
+                                  settled_windows=(answers['settled_windows']
+                                                   or not is_any
+                                                   ),
+                                  ),
+                             limits,
+                             details,
+                             )
+        finally:
+            session.window.strip_state_setter(True)
+            session.redraw, session.is_figure = redraw, True
+        session.has_windows = bool(answers['averaging'])
+        return session.has_windows
 
     # ---- 2 Change one part at a time until the figure is accepted --------------------
     while True:
@@ -2510,12 +2735,12 @@ def plots_stage_runner(session: ViewerSession,
         # ---- 2.3 Ask that part's questions -------------------------------------------
         current = dict(answers)
         if choice == 'signals':
-            signal_asker(answers, current)
+            signal_asker(answers, current, windows_adder)
         elif choice == 'haems':
             haem_choice_asker(answers, current, session.fit)
         else:
             label_angle_asker(answers, current)
-        _strip_shower(session, answers)  # the OCR chosen may untick its per OD box
+        _strip_shower(session, answers)  # the OCR chosen shows under OCR as
 
 
 # ---- processing_stage_runner ---------------------------------------------------------
@@ -2604,6 +2829,7 @@ def processing_stage_runner(session: ViewerSession,
     # they are edges over it, and the steps before it show none. The answers keep the
     # windows of the last time meanwhile, so a run stopped here loses nothing.
     drawn = {'windows': False}
+    session.has_windows = False
     def redraw() -> bool:
         shown = dict(answers, averaging=answers['averaging'] and drawn['windows'])
         return preview_drawer(session,
@@ -2733,7 +2959,7 @@ def processing_stage_runner(session: ViewerSession,
             lowest, highest = (answers[answer]
                                for answer in settings.DELTA_PSI_LIMIT_ANSWERS
                                )
-            info_printer('Δψ (mV) is the lowest panel of the plot, for the files with '
+            info_printer('Δψ (mV) has its own panel on the plot, for the files with '
                          'both regions; it has gaps where bH or bL is less than '
                          f'{lowest:g} % or more than {highest:g} % reduced. Change '
                          'the numbers of the method in the Δψ row of the strip under '
@@ -2756,6 +2982,9 @@ def processing_stage_runner(session: ViewerSession,
         redraw()
     _windows_chooser(session, answers, defaults, limits, details)
     drawn['windows'] = True
+    # the strip now offers the OCR as % of baseline, when there are windows
+    session.has_windows = bool(answers['averaging'])
+    _strip_shower(session, answers)
     if answers['averaging']:
         redraw()
     # Read now: Go back to kept may have put the kept regions back since they were
@@ -2952,6 +3181,7 @@ def viewer_asker(summaries: List[dict],
                             Dict[str, dict],
                             bool,
                             Dict[str, Dict[str, float]],
+                            bool,
                             ]:
     """
     ---- Summary ----
@@ -2985,15 +3215,16 @@ def viewer_asker(summaries: List[dict],
         when the caller does not need to know.
 
     ---- Globals read ----
-    STAGE_TITLES (module constant); settings.STANDARD_FIT; REGION_KEYS.
+    STAGE_TITLES (module constant); settings.STANDARD_FIT; REGION_KEYS; EXPORT_PARTS.
 
     ---- Outputs ----
-    Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool, Dict[str, dict]]
-        (limits, fit, details, plotted, regions): the trim and ignore limits of every
-        file, the fit (None when the haems are not decomposed), the OD values and
-        events of every file, whether the figure of each file has at least one panel,
-        and the oxidised and reduced region of every file as _regions_chooser gives
-        them (those saved with the dataset when the step was not asked).
+    Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool, Dict[str, dict], bool]
+        (limits, fit, details, plotted, regions, has_spectra): the trim and ignore
+        limits of every file, the fit (None when the haems are not decomposed), the OD
+        values and events of every file, whether the figure of each file has at least
+        one panel, the oxidised and reduced region of every file as _regions_chooser
+        gives them (those saved with the dataset when the step was not asked), and
+        whether the export of the import wrote the spectra as csv files.
 
     ---- Globals mutated ----
     None. Stores the answers in ``answers``, reads from and prints to the terminal,
@@ -3159,7 +3390,14 @@ def viewer_asker(summaries: List[dict],
     # Read now: the strip may have changed the haems, or gone back to the kept regions,
     # after the figure was accepted.
     plotted = bool(answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems'])
-    return state['limits'], session.fit, state['details'], plotted, session.regions
+    has_spectra = EXPORT_PARTS.get(session.export_choice, (False, False))[1]
+    return (state['limits'],
+            session.fit,
+            state['details'],
+            plotted,
+            session.regions,
+            has_spectra,
+            )
 
 
 # ---- windows_stage_runner ------------------------------------------------------------

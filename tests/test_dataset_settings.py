@@ -253,7 +253,10 @@ def test_od_values_and_labels_are_kept(tmp_path: Path) -> None:
                        },
               }
     events = [{'datapoint': np.int64(120),
-               'label': '1 µL 10 mM KCN',
+               'label': 'KCN',
+               'stock_uM': np.float64(10_000.0),
+               'added_uL': 1,
+               'addition_uM': np.float64(2.0),
                'concentration_uM': np.float64(2.0),
                'ignored': np.bool_(False),
                },
@@ -269,10 +272,15 @@ def test_od_values_and_labels_are_kept(tmp_path: Path) -> None:
     assert files['run1']['trim_start'] == 3.0
     assert files['run1']['OD'] == 0.5
     assert files['run1']['events'][0] == {'datapoint': 120,
-                                          'label': '1 µL 10 mM KCN',
+                                          'label': 'KCN',
+                                          'stock_uM': 10_000.0,
+                                          'added_uL': 1.0,
+                                          'addition_uM': 2.0,
                                           'concentration_uM': 2.0,
                                           'ignored': False,
                                           }
+    # an event saved before the stock and the volume were asked keeps them empty
+    assert files['run1']['events'][1]['stock_uM'] is None
     assert files['old_run'] == {'trim_start': None, 'OD': 0.7}
 
     # ---- 3 Saved, read back and offered ----------------------------------------------
@@ -280,7 +288,6 @@ def test_od_values_and_labels_are_kept(tmp_path: Path) -> None:
     saved = dataset_settings_reader(tmp_path)['files']
     offered = saved_values_reader([{'name': 'run1'}, {'name': 'new_run'}],
                                   saved,
-                                  tmp_path / 'results',
                                   )
     assert offered['run1'] == {'OD': 0.5,
                                'volume': 1.0,

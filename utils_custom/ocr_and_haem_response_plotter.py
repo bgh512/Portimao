@@ -20,8 +20,9 @@ from utils_custom.run_namer import (condition_classifier,
                                     experiment_classifier,
                                     ORDER_TITLES,
                                     )
+from utils_shared.event_concentrations import event_amount_writer
 from utils_shared.figure_layout import figure_finisher, gap_space_calculator
-from utils_shared.helpers import concentration_formatter, name_simplifier
+from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_plotter import _HideTopTickLabels
 from utils_shared.schema import DELTA_HAEM_SOURCES, finite_float_converter
 from utils_shared.user_notices import warning_shower
@@ -559,7 +560,13 @@ def _haem_block_plotter(fig: Figure,
                 continue
             x = _response_axes_preparer(ax,
                                         windows,
-                                        _tick_label_builder(references[order], windows),
+                                        _tick_label_builder(references[order],
+                                                            windows,
+                                                            config.get(
+                                                                'EVENT_LABEL_MODE',
+                                                                'chamber',
+                                                                ),
+                                                            ),
                                         last_row,
                                         config,
                                         baseline_level,
@@ -1134,7 +1141,12 @@ def _ocr_block_plotter(fig: Figure,
         # ---- 2.2 Prepare the axes ----------------------------------------------------
         x = _response_axes_preparer(ax,
                                     windows,
-                                    _tick_label_builder(references[order], windows),
+                                    _tick_label_builder(references[order],
+                                                        windows,
+                                                        config.get('EVENT_LABEL_MODE',
+                                                                   'chamber',
+                                                                   ),
+                                                        ),
                                     True,
                                     config,
                                     )
@@ -2053,7 +2065,10 @@ def _test_bar_drawer(ax: Axes,
 
 
 # ---- _tick_label_builder -------------------------------------------------------------
-def _tick_label_builder(experiment: Optional[dict], window_names: list) -> list:
+def _tick_label_builder(experiment: Optional[dict],
+                        window_names: list,
+                        mode: str = 'chamber',
+                        ) -> list:
     """
     ---- Summary ----
     Helper function to build the x tick labels of the averaging windows: Baseline, then
@@ -2064,13 +2079,16 @@ def _tick_label_builder(experiment: Optional[dict], window_names: list) -> list:
         Reference experiment whose events label the windows, or None.
     window_names : list
         Averaging window names, for example ['average0', 'average1'].
+    mode : str
+        What the labels show (Labels as in the strip): 'chamber' or 'added'.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     list
-        One label per window; additions are written as label and concentration.
+        One label per window; additions are written as label, then the concentration
+        in the chamber or the volume and stock added.
 
     ---- Globals mutated ----
     None.
@@ -2079,7 +2097,7 @@ def _tick_label_builder(experiment: Optional[dict], window_names: list) -> list:
     None.
 
     ---- Helpers ----
-    concentration_formatter
+    event_amount_writer
     finite_float_converter
     """
 
@@ -2101,14 +2119,11 @@ def _tick_label_builder(experiment: Optional[dict], window_names: list) -> list:
         else:
             event = events[number - 1]
             label = event.get('label') or event.get('name') or f'Addition {number}'
-            conc = event.get('concentration_uM')
             try:
-                labels.append(f'{label}\n{concentration_formatter(conc)}'
-                              if conc is not None
-                              else str(label),
-                              )
+                amount = event_amount_writer(event, mode)
             except (TypeError, ValueError):
-                labels.append(str(label))
+                amount = ''
+            labels.append(f'{label}\n{amount}' if amount else str(label))
     return labels
 
 

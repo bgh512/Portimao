@@ -11,7 +11,9 @@ import numpy as np
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
-from utils_shared.averaging import experiment_averages_calculator
+from utils_shared.averaging import (baseline_percent_adder,
+                                    experiment_averages_calculator,
+                                    )
 from utils_shared.delta_psi import delta_psi_table_builder
 from utils_shared.normalisation import experiment_normaliser, percent_converter
 from utils_shared.paf_reader import experiment_paf_loader, PafError
@@ -23,6 +25,11 @@ from utils_shared.spectral_decomposer import (BACKGROUND_LABELS,
                                               )
 from utils_shared.trimming import experiment_trimmer
 from utils_shared.user_notices import problem_shower, warning_shower
+
+
+# ---- CONSTANTS -----------------------------------------------------------------------
+# the unit of the OCR a file keeps when it cannot be shown as % of baseline
+OCR_UNIT_TEXTS = {'raw': 'µM min⁻¹', 'od': 'µM min⁻¹ OD⁻¹'}
 
 
 # ---- EXPERIMENT PROCESSING HELPERS ---------------------------------------------------
@@ -72,14 +79,16 @@ def _skip_reporter(step: str, error: Exception) -> None:
 def event_settings_merger(experiment: dict, events: List[dict]) -> None:
     """
     ---- Summary ----
-    Main function to copy the label, concentration and ignored flag entered for each
-    event onto the experiment, and to move ignored events out of the working event list.
+    Main function to copy the label, stock, volume added, concentrations and ignored
+    flag entered for each event onto the experiment, and to move ignored events out of
+    the working event list.
 
     ---- Inputs ----
     experiment : dict
         Experiment dictionary, as defined in DATA_FORMAT.md.
     events : List[dict]
-        Entered events: {datapoint, label, concentration_uM, ignored}.
+        Entered events: {datapoint, label, stock_uM, added_uL, addition_uM,
+        concentration_uM, ignored}; the numbers may be missing.
 
     ---- Globals read ----
     None.
@@ -105,7 +114,8 @@ def event_settings_merger(experiment: dict, events: List[dict]) -> None:
         item = entered.get(event['datapoint'])
         if item:
             event['label'] = item['label'] or event['text']
-            event['concentration_uM'] = item['concentration_uM']
+            for key in ('stock_uM', 'added_uL', 'addition_uM', 'concentration_uM'):
+                event[key] = item.get(key)
             event['ignored'] = bool(item.get('ignored', False))
 
     # ---- 2 Separate the ignored events -----------------------------------------------
@@ -128,8 +138,9 @@ def experiment_data_processor(info: dict,
     Main function to read (or take) one experiment and process its data: trim, decompose
     into haems, find each haem's oxidised and reduced level and its % oxidised (a file
     with both regions), work out delta psi from bH and bL (when switched on), scale by
-    OD, put the OCR on its % of the range, choose the plotted sources and average
-    around the events. It draws and saves nothing.
+    OD, put the OCR on its % of the range, choose the plotted sources, average
+    around the events and put the OCR on its % of baseline (a file with a baseline).
+    It draws and saves nothing.
 
     ---- Inputs ----
     info : dict
@@ -149,14 +160,19 @@ def experiment_data_processor(info: dict,
     settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
     settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS,
     settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_LIMIT_ANSWERS;
-    BACKGROUND_LABELS.
+    BACKGROUND_LABELS, OCR_UNIT_TEXTS.
 
     ---- Outputs ----
     dict
-        {experiment, od_available, vo2_source, haem_source}. A file with both regions
+        {experiment, od_available, vo2_source, haem_source, plotted_haem_source}.
+        plotted_haem_source is the haem source when this file's haems are drawn (the
+        haems are plotted and the file was decomposed), otherwise None: every plot of
+        the file takes it from here. A file with both regions
         has experiment['haem_levels'] and experiment['haem_percent'] (DATA_FORMAT.md);
         when % oxidised is asked for a file without them, its haem source is
-        'delta_abs'. With delta psi switched on, a file with % oxidised, one bH and
+        'delta_abs'. A file with a baseline window has experiment['VoO2_baseline'];
+        when the OCR is asked for as % of baseline for a file without one, its OCR
+        source is 'od' (with OD values) or 'raw'. With delta psi switched on, a file with % oxidised, one bH and
         one bL has experiment['delta_psi']. Prints progress and the reason when a step is skipped (side
         effect).
 
@@ -168,6 +184,7 @@ def experiment_data_processor(info: dict,
 
     ---- Helpers ----
     _skip_reporter
+    baseline_percent_adder
     delta_psi_table_builder
     event_settings_merger
     experiment_attenuation_adder
@@ -374,6 +391,13 @@ def experiment_data_processor(info: dict,
 
     # ---- 5 Choose the sources and average --------------------------------------------
     vo2_source, haem_source = cfg.source_chooser(od_available)
+    # The % of baseline is worked out from the baseline window, so the averages are
+    # taken in the OCR's own unit, and the view is put on once they are there.
+    is_baseline_view = vo2_source == 'baseline'
+    plain_vo2_source = 'od' if a['normalise_od'] and od_available else 'raw'
+    if is_baseline_view:
+        vo2_source = plain_vo2_source
+    experiment.pop('VoO2_baseline', None)
     if haem_source is not None and not (a['plot_haems'] or a['averaging']):
         haem_source = None
     # A file without both regions has no % oxidised, so its haems stay in delta D.
@@ -384,6 +408,7 @@ def experiment_data_processor(info: dict,
                   'shown as ΔD.',
                   )
     # Event-window averages.
+    has_baseline = False
     if a['averaging']:
         if not metadata['events']:
             warning_shower('  Averaging skipped: this file has no events.')
@@ -407,6 +432,11 @@ def experiment_data_processor(info: dict,
                                                else None,
                                                delay_minutes=a['delay_minutes'],
                                                is_settled=a['settled_windows'],
+                                               haem_views=cfg.haem_view_lister(
+                                                   od_available,
+                                                   )
+                                               if 'haem_conc' in experiment
+                                               else None,
                                                )
                 print(f"  Calculated {len(experiment['averages']['windows'])} event "
                       f'averages',
@@ -424,12 +454,25 @@ def experiment_data_processor(info: dict,
                                    f"{', '.join(skipped)} (not enough time for the "
                                    f'window and gap)',
                                    )
+                has_baseline = baseline_percent_adder(experiment)
             except (KeyError, ValueError, TypeError) as exc:
                 _skip_reporter('the averaging around the additions', exc)
+    # A file without a baseline keeps its usual OCR, as its axis says. Nothing is
+    # said while no windows are set up: every file is then without one.
+    if is_baseline_view and has_baseline:
+        vo2_source = 'baseline'
+    elif is_baseline_view and a['averaging']:
+        print(f'  This file has no baseline, so its OCR is shown as '
+              f'{OCR_UNIT_TEXTS[plain_vo2_source]}, not as % of baseline.',
+              )
 
     # ---- 6 Return the processed experiment -------------------------------------------
+    # The one place that says whether this file's haems are drawn: the run, the
+    # window's plot and the previews of several files all read it.
+    has_haem_panels = bool(a['plot_haems'] and 'haem_conc' in experiment)
     return {'experiment': experiment,
             'od_available': od_available,
             'vo2_source': vo2_source,
             'haem_source': haem_source,
+            'plotted_haem_source': haem_source if has_haem_panels else None,
             }

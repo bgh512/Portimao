@@ -1,26 +1,47 @@
 """
 The tables of the window, filled in by clicking a cell and typing: the OD values of each
-file and the label and concentration of each event.
+file and the label, stock, volume added and concentration of each event.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import functools
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.event_concentrations import (concentration_reader,
+                                               event_concentration_filler,
+                                               )
+from utils_shared.helpers import concentration_formatter
 from utils_shared.questions import typed_number_reader
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-# The kinds of cell: a number above 0 that must be filled in, a number of 0 or more that
-# may be left empty, and a label that must be filled in.
+# The kinds of cell: a number above 0 that must be filled in, a number above 0 that may
+# be left empty, a number of 0 or more that may be left empty, a label that must be
+# filled in, a stock (a concentration above 0 with its unit, mM when none is typed) and
+# a concentration in the chamber (0 or more with its unit, µM when none is typed), both
+# of which may be left empty.
 ABOVE_ZERO = 'above_zero'
+ABOVE_ZERO_OR_EMPTY = 'above_zero_or_empty'
 ZERO_OR_MORE = 'zero_or_more'
 LABEL = 'label'
+STOCK = 'stock'
+CHAMBER = 'chamber'
 NEEDED_KINDS = (ABOVE_ZERO, LABEL)
 EMPTY = 'empty'  # the problem of a needed cell left empty
+# the problem of one cell of a pair filled in without the other (the stock and the
+# volume added)
+PAIR = 'pair'
+# The unit of a number typed alone in a cell of each concentration kind
+# (event_concentrations.UNIT_FACTORS_UM).
+DEFAULT_UNITS = {STOCK: 'mm', CHAMBER: 'um'}
 # what to type in a wrong cell of each kind, in the sentence said after Confirm
 KIND_HINTS = {ABOVE_ZERO: 'a number above 0',
+              ABOVE_ZERO_OR_EMPTY: 'a number above 0',
               ZERO_OR_MORE: 'a number of 0 or more',
+              STOCK: 'a concentration above 0, such as 200 mM',
+              CHAMBER: 'a concentration, such as 400 µM',
+              PAIR: 'both the stock and the volume added, or neither,',
               }
 # The cells of each table: (name of the value, column heading, kind of cell).
 OD_COLUMNS = (('OD', 'OD', ABOVE_ZERO),
@@ -28,9 +49,27 @@ OD_COLUMNS = (('OD', 'OD', ABOVE_ZERO),
               ('dilution_factor', 'Dilution', ABOVE_ZERO),
               )
 LABEL_COLUMNS = (('label', 'Label', LABEL),
-                 ('concentration_uM', 'Concentration (µM)', ZERO_OR_MORE),
+                 ('stock_uM', 'Stock', STOCK),
+                 ('added_uL', 'Added (µL)', ABOVE_ZERO_OR_EMPTY),
+                 ('concentration_uM', 'In the chamber', CHAMBER),
                  )
-CELL_WIDTHS = {ABOVE_ZERO: 11, ZERO_OR_MORE: 11, LABEL: 26}  # characters
+# The columns of the labels table shown and not typed in: (name, heading).
+LABEL_SHOWN_COLUMNS = (('text', 'Text in the file'),)
+# The cells of the labels table filled in together or not at all.
+LABEL_PAIRS = (('stock_uM', 'added_uL'),)
+CELL_WIDTHS = {ABOVE_ZERO: 11,
+               ABOVE_ZERO_OR_EMPTY: 11,
+               ZERO_OR_MORE: 11,
+               LABEL: 26,
+               STOCK: 11,
+               CHAMBER: 12,
+               }  # characters
+# significant figures of a concentration written in a cell, enough that the number read
+# back from it is the one kept
+CELL_FIGURES = 10
+# a cell worked out by the program from the others of its row, not typed in
+WORKED_BACKGROUND = '#2f4a35'
+WORKED_TEXT = '#a8d8a8'
 # The table takes the room the terminal leaves it, and never less than this.
 MINIMUM_HEIGHT_PX = 120
 NAMED_PROBLEMS = 5  # cells named in the sentence after Confirm; the others are counted
@@ -48,14 +87,16 @@ class AnswerTable:
     """
     ---- Summary ----
     A table of the window, filled in by clicking a cell and typing: a fixed first
-    column (the file, or the time of an event), then cells of three kinds (a number
-    above 0, a number of 0 or more or nothing, a label), the rows grouped under the
-    name of their file where the table says so. Tab moves across, Enter and the arrows
-    move down and up, and Enter in the last row goes on to Confirm. A cell that cannot
-    be used turns red; in a row whose label is the skip word the other cells are greyed
-    out and not read. Entering a cell tells the window which file it belongs to. The
-    table tells nothing else by itself: the program reads it when Confirm is pressed.
-    Every method runs on the window thread, except problems_lister and values_reader.
+    column (the file, or the time of an event), any columns that are only shown (the
+    text in the file), then cells of the kinds of cell_reader, the rows grouped under
+    the name of their file where the table says so. Tab moves across, Enter and the
+    arrows move down and up, and Enter in the last row goes on to Confirm. A cell that
+    cannot be used turns red; in a row whose label is the skip word the other cells are
+    greyed out and not read. A cell the program works out from the others of the
+    table (the concentration in the chamber) is filled in green as they are typed.
+    Entering a cell tells the window which file it belongs to. The table tells nothing
+    else by itself: the program reads it when Confirm is pressed. Every method runs on
+    the window thread, except problems_lister and values_reader.
 
     ---- Attributes ----
     frame : Any
@@ -63,7 +104,7 @@ class AnswerTable:
 
     ---- Globals read ----
     CELL_WIDTHS, MINIMUM_HEIGHT_PX, ERROR_BACKGROUND, HEADING_TEXT, SKIPPED_BACKGROUND,
-    SKIPPED_TEXT, LABEL.
+    SKIPPED_TEXT, LABEL, PAIR, WORKED_BACKGROUND, WORKED_TEXT.
 
     ---- Methods ----
     __init__
@@ -77,6 +118,7 @@ class AnswerTable:
     _skip_checker
     _wheel_binder
     _wheel_scroller
+    _worked_refresher
     cell_focuser
     problems_lister
     rows_setter
@@ -140,7 +182,12 @@ class AnswerTable:
         self._on_finish = on_finish
         self._on_file = on_file
         self._columns: List[Tuple[str, str, str]] = []
+        self._shown_columns: List[Tuple[str, str]] = []
         self._kinds: Dict[str, str] = {}
+        self._pairs: List[Tuple[str, str]] = []
+        self._worked: Optional[dict] = None
+        self._worked_rows: set = set()
+        self._is_filling = False
         self._skip_word: Optional[str] = None
         self._rows: List[dict] = []
         self._texts: List[Dict[str, str]] = []
@@ -177,8 +224,9 @@ class AnswerTable:
         """
         ---- Summary ----
         Method to keep what was typed in one cell, to turn the cell red when it cannot
-        be used, and, for a label, to grey out or bring back the other cells of its
-        row as the label is or is not the skip word.
+        be used, for a label to grey out or bring back the other cells of its row as
+        the label is or is not the skip word, and to work out again the cells the
+        program fills in.
 
         ---- Inputs ----
         row : int
@@ -201,6 +249,7 @@ class AnswerTable:
 
         ---- Helpers ----
         _row_skipper
+        _worked_refresher
         cell_reader
         """
 
@@ -213,6 +262,10 @@ class AnswerTable:
             )
         if kind == LABEL and self._skip_word:
             self._row_skipper(row)
+        # a cell the program fills in changes this one's text, which must not start
+        # the filling again
+        if self._worked is not None and not self._is_filling:
+            self._worked_refresher()
 
     # ---- _cell_mover -----------------------------------------------------------------
     def _cell_mover(self, row: int, key: str, step: int) -> str:
@@ -335,20 +388,20 @@ class AnswerTable:
     def _problem_finder(self) -> List[Tuple[int, str, str]]:
         """
         ---- Summary ----
-        Method to find the cells that hold something that cannot be used, and the
-        needed cells left empty, in the order of the table. The greyed-out cells of a
-        skipped row are not looked at.
+        Method to find the cells that hold something that cannot be used, the needed
+        cells left empty, and the empty cell of a pair filled in by half, in the order
+        of the table. The greyed-out cells of a skipped row are not looked at.
 
         ---- Inputs ----
         None.
 
         ---- Globals read ----
-        EMPTY, LABEL, NEEDED_KINDS.
+        EMPTY, LABEL, NEEDED_KINDS, PAIR.
 
         ---- Outputs ----
         List[Tuple[int, str, str]]
             (row, name of the value, problem) for each such cell; the problem is the
-            kind of the cell when what it holds is wrong, or EMPTY.
+            kind of the cell when what it holds is wrong, EMPTY, or PAIR.
 
         ---- Globals mutated ----
         None.
@@ -372,6 +425,14 @@ class AnswerTable:
                     found.append((row, key, kind))
                 elif value is None and kind in NEEDED_KINDS:
                     found.append((row, key, EMPTY))
+            if is_skipped:
+                continue
+            for pair in self._pairs:
+                is_filled = [cell_reader(texts[key], self._kinds[key])[0] is not None
+                             for key in pair
+                             ]
+                if is_filled[0] != is_filled[1]:
+                    found.append((row, pair[is_filled.index(False)], PAIR))
         return found
 
     # ---- _row_skipper ----------------------------------------------------------------
@@ -538,6 +599,60 @@ class AnswerTable:
         if step and self._inner.winfo_height() > self._canvas.winfo_height():
             self._canvas.yview_scroll(step, 'units')
 
+    # ---- _worked_refresher -----------------------------------------------------------
+    def _worked_refresher(self) -> None:
+        """
+        ---- Summary ----
+        Method to fill in the cells the program works out from the others (the
+        concentration in the chamber, from the stock and the volume added): such a
+        cell shows the value in green and cannot be typed in; once the program can no
+        longer work it out, it is emptied and can be typed in again. The cells of a
+        skipped row are left greyed out.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        WORKED_BACKGROUND, WORKED_TEXT.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the text and the state of the cells (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _skip_checker
+        values_reader
+        """
+
+        key = self._worked['key']
+        texts = self._worked['writer'](self._rows, self.values_reader())
+        self._is_filling = True
+        try:
+            for row, text in enumerate(texts):
+                cell, variable = self._cells[row][key], self._variables[row][key]
+                if self._skip_checker(row) or text is None:
+                    if row in self._worked_rows:
+                        self._worked_rows.discard(row)
+                        variable.set('')
+                    if not self._skip_checker(row):
+                        cell.configure(state='normal', fg=self._colours['text'])
+                    continue
+                if variable.get() != text:
+                    variable.set(text)
+                cell.configure(state='readonly',
+                               readonlybackground=WORKED_BACKGROUND,
+                               fg=WORKED_TEXT,
+                               )
+                self._worked_rows.add(row)
+        finally:
+            self._is_filling = False
+
     # ---- TABLE FUNCTIONS -------------------------------------------------------------
 
     # ---- cell_focuser ----------------------------------------------------------------
@@ -650,20 +765,31 @@ class AnswerTable:
         for child in self._inner.winfo_children():
             child.destroy()
         self._columns = [tuple(column) for column in table['columns']]
+        self._shown_columns = [tuple(column)
+                               for column in table.get('shown_columns') or ()
+                               ]
         self._kinds = {key: kind for key, _, kind in self._columns}
+        self._pairs = [tuple(pair) for pair in table.get('pairs') or ()]
+        self._worked = table.get('worked')
+        self._worked_rows = set()
         self._skip_word = table.get('skip_word')
         self._rows = [dict(row) for row in table['rows']]
         self._texts, self._variables, self._cells = [], [], []
         self._last_cell = None
+        first_cell = 1 + len(self._shown_columns)  # the grid column of the first cell
 
         # ---- 2 The column widths and headings ----------------------------------------
         # A label column takes the spare width; without one, the first column does.
         has_label = LABEL in self._kinds.values()
         self._inner.columnconfigure(0, weight=0 if has_label else 1)
-        for column, (_, _, kind) in enumerate(self._columns, start=1):
+        for column in range(1, first_cell):
+            self._inner.columnconfigure(column, weight=0)
+        for column, (_, _, kind) in enumerate(self._columns, start=first_cell):
             self._inner.columnconfigure(column, weight=1 if kind == LABEL else 0)
-        headings = [table['first_heading'],
-                    ] + [heading for _, heading, _ in self._columns]
+        headings = ([table['first_heading']] +
+                    [heading for _, heading in self._shown_columns] +
+                    [heading for _, heading, _ in self._columns]
+                    )
         for column, heading in enumerate(headings):
             label = tk.Label(self._inner,
                              text=heading,
@@ -690,7 +816,7 @@ class AnswerTable:
                                  )
                 label.grid(row=place,
                            column=0,
-                           columnspan=len(self._columns) + 1,
+                           columnspan=len(self._columns) + first_cell,
                            sticky='w',
                            pady=(6, 2),
                            )
@@ -705,8 +831,18 @@ class AnswerTable:
                              )
             label.grid(row=place, column=0, sticky='ew', padx=(0, 6), pady=1)
             self._wheel_binder(label)
+            for column, (key, _) in enumerate(self._shown_columns, start=1):
+                label = tk.Label(self._inner,
+                                 text=(entry.get('shown') or {}).get(key, ''),
+                                 bg=colours['background'],
+                                 fg=HEADING_TEXT,
+                                 font=(self._font[0], self._font[1], 'italic'),
+                                 anchor='w',
+                                 )
+                label.grid(row=place, column=column, sticky='w', padx=(0, 6), pady=1)
+                self._wheel_binder(label)
             texts, variables, cells = {}, {}, {}
-            for column, (key, _, kind) in enumerate(self._columns, start=1):
+            for column, (key, _, kind) in enumerate(self._columns, start=first_cell):
                 texts[key] = entry['cells'].get(key) or ''
                 variables[key] = tk.StringVar(master=self._inner, value=texts[key])
                 cell = tk.Entry(self._inner,
@@ -743,6 +879,9 @@ class AnswerTable:
             place += 1
 
         # ---- 4 Check each cell as it is typed in -------------------------------------
+        # The cells the program fills in are worked out once, after every cell is
+        # checked.
+        self._is_filling = True
         for row, variables in enumerate(self._variables):
             for key, _, _ in self._columns:
                 variables[key].trace_add('write',
@@ -751,6 +890,9 @@ class AnswerTable:
                                                                                      ),
                                          )
                 self._cell_checker(row, key)
+        self._is_filling = False
+        if self._worked is not None:
+            self._worked_refresher()
         self._canvas.yview_moveto(0.0)
 
     # ---- symbol_inserter -------------------------------------------------------------
@@ -867,6 +1009,37 @@ def _cell_name_joiner(names: Sequence[str]) -> str:
     return f'{shown} and {extra} more' if extra > 0 else shown
 
 
+# ---- _concentration_writer -----------------------------------------------------------
+def _concentration_writer(value_um: Optional[float]) -> str:
+    """
+    ---- Summary ----
+    Helper function to write a concentration in a cell with its most readable unit, or
+    nothing.
+
+    ---- Inputs ----
+    value_um : Optional[float]
+        The concentration (µM), or None.
+
+    ---- Globals read ----
+    CELL_FIGURES.
+
+    ---- Outputs ----
+    str
+        For example '200 mM' or ''.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    concentration_formatter
+    """
+
+    return '' if value_um is None else concentration_formatter(value_um, CELL_FIGURES)
+
+
 # ---- _number_writer ------------------------------------------------------------------
 def _number_writer(value: Optional[float]) -> str:
     """
@@ -906,24 +1079,24 @@ def cell_reader(text: str, kind: str = ABOVE_ZERO) -> Tuple[Any, bool]:
     """
     ---- Summary ----
     Main function to read what was typed in one cell: a number (with a point or a comma
-    as the decimal sign) above 0 or of 0 or more, as the kind asks, or a label; or
-    nothing yet, which is never wrong here (a needed cell left empty is found when
-    Confirm is pressed).
+    as the decimal sign) above 0 or of 0 or more, as the kind asks, a label, or a
+    concentration with or without its unit; or nothing yet, which is never wrong here
+    (a needed cell left empty is found when Confirm is pressed).
 
     ---- Inputs ----
     text : str
         What the cell holds.
     kind : str
-        ABOVE_ZERO, ZERO_OR_MORE or LABEL.
+        ABOVE_ZERO, ABOVE_ZERO_OR_EMPTY, ZERO_OR_MORE, LABEL, STOCK or CHAMBER.
 
     ---- Globals read ----
-    ABOVE_ZERO, LABEL.
+    ABOVE_ZERO, ABOVE_ZERO_OR_EMPTY, CHAMBER, DEFAULT_UNITS, LABEL, STOCK.
 
     ---- Outputs ----
     Tuple[Any, bool]
-        (value, is_valid): (the number or the label without its outer spaces, True)
-        when it can be used; (None, True) for an empty cell; (None, False) for a
-        number that is not one, or is below its limit.
+        (value, is_valid): (the number, the concentration in µM or the label without
+        its outer spaces, True) when it can be used; (None, True) for an empty cell;
+        (None, False) for a number that is not one, or is below its limit.
 
     ---- Globals mutated ----
     None.
@@ -932,6 +1105,7 @@ def cell_reader(text: str, kind: str = ABOVE_ZERO) -> Tuple[Any, bool]:
     None.
 
     ---- Helpers ----
+    concentration_reader
     typed_number_reader
     """
 
@@ -939,8 +1113,13 @@ def cell_reader(text: str, kind: str = ABOVE_ZERO) -> Tuple[Any, bool]:
         return None, True
     if kind == LABEL:
         return text.strip(), True
+    if kind in (STOCK, CHAMBER):
+        return concentration_reader(text, DEFAULT_UNITS[kind], kind == CHAMBER)
     value = typed_number_reader(text)
-    if value is None or value < 0 or (kind == ABOVE_ZERO and value == 0):
+    if (value is None or
+        value < 0 or
+        (kind in (ABOVE_ZERO, ABOVE_ZERO_OR_EMPTY) and value == 0)
+        ):
         return None, False
     return value, True
 
@@ -952,8 +1131,10 @@ def label_entries_reader(table: dict,
                          ) -> Dict[str, List[dict]]:
     """
     ---- Summary ----
-    Main function to take the labels and concentrations typed in the labels table back
-    into the events of each file.
+    Main function to take the labels, stocks, volumes added and concentrations typed
+    in the labels table back into the events of each file. The concentrations are
+    worked out again afterwards (event_concentration_filler), so a concentration the
+    table filled in is not relied on.
 
     ---- Inputs ----
     table : dict
@@ -962,16 +1143,16 @@ def label_entries_reader(table: dict,
     values : List[Dict[str, Any]]
         What AnswerTable.values_reader gave for it, row by row.
     entries : Dict[str, List[dict]]
-        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]} the
-        table was built from; not changed.
+        {file name: [event entry, ...]} the table was built from (event_entries,
+        DATA_FORMAT.md); not changed.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     Dict[str, List[dict]]
-        A copy of ``entries`` with each event's label and concentration_uM as typed;
-        a label left empty keeps the one it had.
+        A copy of ``entries`` with each event's label, stock_uM, added_uL and
+        concentration_uM as typed; a label left empty keeps the one it had.
 
     ---- Globals mutated ----
     None.
@@ -989,7 +1170,8 @@ def label_entries_reader(table: dict,
     for row, found in zip(table['rows'], values):
         entry = result[row['file']][row['position']]
         entry['label'] = found.get('label') or entry['label']
-        entry['concentration_uM'] = found.get('concentration_uM')
+        for key in ('stock_uM', 'added_uL', 'concentration_uM'):
+            entry[key] = found.get(key)
     return result
 
 
@@ -997,23 +1179,28 @@ def label_entries_reader(table: dict,
 def label_table_builder(summaries: List[dict],
                         entries: Dict[str, List[dict]],
                         skip_word: str,
+                        chamber_ml: float,
                         ) -> dict:
     """
     ---- Summary ----
-    Main function to lay out the labels table: one row per event, with its time, label
-    and concentration, under the name of its file; files without events have no rows.
+    Main function to lay out the labels table: one row per event, with its time, the
+    text in the file, its label, stock, volume added and concentration in the chamber,
+    under the name of its file; files without events have no rows. The concentration
+    is worked out by the table from the stock and the volume while they are typed.
 
     ---- Inputs ----
     summaries : List[dict]
         File summaries (DATA_FORMAT.md), in the order of the files.
     entries : Dict[str, List[dict]]
-        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
-        per event of the summary, in the same order.
+        {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md), one per event
+        of the summary, in the same order.
     skip_word : str
-        The label that leaves an event out; its row's concentration is greyed out.
+        The label that leaves an event out; its row's other cells are greyed out.
+    chamber_ml : float
+        Volume of the chamber (mL), above 0.
 
     ---- Globals read ----
-    LABEL_COLUMNS.
+    LABEL_COLUMNS, LABEL_PAIRS, LABEL_SHOWN_COLUMNS.
 
     ---- Outputs ----
     dict
@@ -1026,7 +1213,9 @@ def label_table_builder(summaries: List[dict],
     None.
 
     ---- Helpers ----
+    _concentration_writer
     _number_writer
+    label_worked_writer
     """
 
     rows = []
@@ -1042,18 +1231,96 @@ def label_table_builder(summaries: List[dict],
                          'group': name,
                          'first': time,
                          'name': f'{name} at {time} min',
+                         'shown': {'text': str(event.get('text') or '')},
                          'cells': {'label': entry['label'],
-                                   'concentration_uM': _number_writer(
-                                       entry['concentration_uM'],
+                                   'stock_uM': _concentration_writer(
+                                       entry.get('stock_uM'),
+                                       ),
+                                   'added_uL': _number_writer(entry.get('added_uL')),
+                                   'concentration_uM': _concentration_writer(
+                                       entry.get('concentration_uM'),
                                        ),
                                    },
                          },
                         )
     return {'first_heading': 'Time (min)',
+            'shown_columns': LABEL_SHOWN_COLUMNS,
             'columns': LABEL_COLUMNS,
+            'pairs': LABEL_PAIRS,
+            'worked': {'key': 'concentration_uM',
+                       'writer': functools.partial(label_worked_writer,
+                                                   skip_word=skip_word,
+                                                   chamber_ml=chamber_ml,
+                                                   ),
+                       },
             'skip_word': skip_word,
             'rows': rows,
             }
+
+
+# ---- label_worked_writer -------------------------------------------------------------
+def label_worked_writer(rows: List[dict],
+                        values: List[Dict[str, Any]],
+                        skip_word: str,
+                        chamber_ml: float,
+                        ) -> List[Optional[str]]:
+    """
+    ---- Summary ----
+    Main function to work out, as the labels table is typed in, the concentration in
+    the chamber of each row that has a stock and a volume added, the same label in a
+    file adding up.
+
+    ---- Inputs ----
+    rows : List[dict]
+        The rows of the labels table (table_rows, DATA_FORMAT.md), in their order.
+    values : List[Dict[str, Any]]
+        What AnswerTable.values_reader gives for them now, row by row.
+    skip_word : str
+        The label that leaves an event out.
+    chamber_ml : float
+        Volume of the chamber (mL), above 0.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Optional[str]]
+        For each row, the concentration in the chamber to show, such as '800 µM'; None
+        for a row the program does not fill in (no stock and volume, or left out).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    See event_concentration_filler.
+
+    ---- Helpers ----
+    concentration_formatter
+    event_concentration_filler
+    """
+
+    places: Dict[str, List[int]] = {}
+    for place, row in enumerate(rows):
+        places.setdefault(row['file'], []).append(place)
+    shown: List[Optional[str]] = [None] * len(rows)
+    for file_places in places.values():
+        events = []
+        for place in file_places:
+            found = values[place]
+            label = str(found.get('label') or rows[place]['cells'].get('label') or '')
+            events.append({'label': label,
+                           'stock_uM': found.get('stock_uM'),
+                           'added_uL': found.get('added_uL'),
+                           'concentration_uM': found.get('concentration_uM'),
+                           'ignored': label.strip().lower() == skip_word,
+                           },
+                          )
+        for place, event in zip(file_places,
+                                event_concentration_filler(events, chamber_ml),
+                                ):
+            if event['stock_uM'] is not None:
+                shown[place] = concentration_formatter(event['concentration_uM'])
+    return shown
 
 
 # ---- od_rows_reader ------------------------------------------------------------------

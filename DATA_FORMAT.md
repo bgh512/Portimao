@@ -17,6 +17,7 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'VoO2'` | pd.DataFrame | (n_ocr_points, 2) | µM/min | Oxygen consumption rate (OCR): `Time (min)` and `VoO2`. Always there: a file without it is refused. It has fewer rows than the oxygen tables, as the time points where the instrument has no OCR value (the start of a recording, and the end when the trace is shorter than the clock) are left out |
 | `'VoO2_OD'` | pd.DataFrame | (n_points, 2) | | Optional. OCR divided by dilution factor x OD x volume |
 | `'VoO2_percent'` | pd.DataFrame | (n_points, 2) | % | Optional. OCR scaled to 0-100 % of its range |
+| `'VoO2_baseline'` | pd.DataFrame | (n_points, 2) | % of baseline | Optional: only for a file with a baseline window (`baseline_percent_adder`, after the averaging). `VoO2` divided by its average in the baseline window (`average0`) x 100. `attrs['baseline_percent']` holds `'start_time'` and `'end_time'` of that window (min) and `'baseline_mean'` (`{column: the average in it}`, µM min⁻¹). The maths is in `MATHS.md` |
 | `'haem_conc'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mM for a 1 cm light path | Optional. Fitted haem concentrations; columns `Time (min)`, `spectrum_index` and one per haem. The fit shapes times `HAEM_FACTOR` are in OD/mM/cm, so the amounts are mM x cm; with components found from data they are in arbitrary units. Fitted beside the background named by the answer `'haem_background'` (kept with the dataset's answers; the standard, in `config.DEFAULT_ANSWERS`, is `rowan_scatter`; the choices are `BACKGROUND_LABELS` in `spectral_decomposer.py`). When the change from the first spectrum is fitted, these are the changes from the first spectrum (the first kept, in a trimmed run) |
 | `'haem_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. Haem concentration x peak of the fit spectrum; a change from the first spectrum when `haem_conc` is |
 | `'haem_delta_abs'` | pd.DataFrame | (n_spectra, 2 + n_haems) | mOD | Optional. ΔD, the change from the start: `haem_abs` shifted so that each haem is 0 where it starts, the median of its first 50 spectra with a value after the ignored start (`REFERENCE_WINDOW_POINTS` in `config.py`). `attrs['delta_abs_baseline']` holds what was subtracted: `'level_by_haem'` (mOD), `'window_by_haem'` (the first and last time, in min, of the spectra each start was taken from), `'window_points'` and `'window_seconds'`. The maths is in `MATHS.md` |
@@ -52,6 +53,7 @@ What is known about one experiment, stored as `experiment['metadata']`. The firs
 | `'trimmed_before_minutes'`, `'trimmed_after_minutes'` | float | | min | Optional. Where the recording was cut, on the original time |
 | `'ignore_first_minutes'`, `'ignore_last_minutes'` | float | | min | Start and end left out of the averages and references |
 | `'fit_file'` | str or None | | | Fit (preset or fit file) of the decomposition, or `Your own haems: <files without .csv>` for haems ticked under Build a fit (`fit_describer`); None when the haems were not decomposed |
+| `'haem_background'` | str or None | | | Background fitted under the haems, by its short name (`BACKGROUND_SHORT_NAMES`, `Rowan scatter`); None when the haems were not decomposed |
 | `'processed'` | str | | | Date and time of the run, `YYYY-MM-DD HH:MM` |
 
 #### `event`
@@ -63,7 +65,10 @@ One addition (a text event of the instrument software). Created by `experiment_p
 | `'datapoint'` | int | | | Spectrum number stored with the addition, counted from 1 |
 | `'text'` | str | | | What was typed in the instrument software, e.g. `1ul 8mm nd-011992`. The file holds no concentration |
 | `'label'` | str | | | Name shown in the figures: the text, until the user renames it |
-| `'concentration_uM'` | float or None | | µM | Final concentration entered by the user; None when none was given |
+| `'stock_uM'` | float or None | | µM | Concentration of the stock added, typed by the user with its unit; None when none was given |
+| `'added_uL'` | float or None | | µL | Volume of the stock added; None when none was given (a stock and a volume are given together or not at all) |
+| `'addition_uM'` | float or None | | µM | How much the addition raised the concentration in the chamber: stock × added ÷ chamber (`config.CHAMBER_VOLUME_ML`), or a typed concentration minus the one before it of the same label (`event_concentration_filler`, MATHS.md section 8); None when unknown |
+| `'concentration_uM'` | float or None | | µM | Concentration in the chamber after the addition: worked out from the stock and the volume, the same label in a file adding up, or typed by the user; None when none was given |
 | `'time'` | float | | min | Time of the addition; counted from the new 0 after a start trim |
 | `'row_index'` | int | | | Row of the time base, `datapoint` - 1; removed when the experiment is trimmed |
 | `'ignored'` | bool | | | Set when the answers are merged: True for an addition the user chose to ignore |
@@ -137,7 +142,7 @@ Event-window statistics of one experiment. Created by `experiment_averages_calcu
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
-| `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key`, `baseline_minimum_seconds`, `quick_minutes` (None without quick windows), `delay_minutes`, `is_settled` (False without settled windows) |
+| `'settings'` | dict | | | `window_minutes`, `gap_minutes`, `final_window_gap_minutes`, `vo2_source`, `vo2_key`, `haem_source`, `haem_key`, `haem_view_keys` (`{view: key of the haem table it was averaged from}`, for example `{'abs': 'haem_abs_OD'}`; it gives the unit of each view), `baseline_minimum_seconds`, `quick_minutes` (None without quick windows), `delay_minutes`, `is_settled` (False without settled windows) |
 | `'windows'` | dict | | | `{window name: window record}`; `average0` is the baseline window (it starts at the start of the recording when the recording starts later than the window would), then the settled windows `average1` ... one per event (ending before the next addition), then the quick windows `quick1` ... one per event (starting after their own addition) |
 | `'skipped'` | dict | | | `{window name: {start_time, end_time, reason, kind}}` of the windows that do not fit between two additions (or after the last one), and of `average0` when its data span less than `baseline_minimum_seconds` (the run then has no baseline); they have no record in `'windows'` and are drawn red in the previews |
 
@@ -151,7 +156,9 @@ Window record:
 | `'end_time'` | float | | min | End of the window |
 | `'kind'` | str | | | `'baseline'`, `'settled'` or `'quick'` (`WINDOW_KINDS`) |
 | `'vo2'` | dict | | | `{measurement: statistics}` for the OCR |
-| `'haem'` | dict | | | `{haem name: statistics}` |
+| `'haem'` | dict | | | `{haem name: statistics}` of the haems as the plot shows them (the figures read this one) |
+| `'haem_views'` | dict | | | `{view: {haem name: statistics}}` for every way the haems can be shown that the experiment has: `'delta'` (ΔD), `'abs'` (absorbance) and `'percent'` (% oxidised), the keys of `config.HAEM_SOURCE_BY_MODE`, per OD when the plot is (`Config.haem_view_lister`). Their `'change'` is always NaN. Empty when no views were asked for |
+| `'delta_psi'` | dict | | | Only for an experiment with `'delta_psi'`: the statistics of Δψ (mV) over the spectra of the window that have a value (`'change'` always NaN), with `'spectra_used'` (int, the spectra with a value) and `'spectra_in_window'` (int, all the spectra of the window) |
 
 Statistics of one measurement in one window:
 
@@ -314,7 +321,8 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 |---|---|---|---|---|
 | `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`results`), otherwise the full path |
 | `'answers'` | dict | | | Terminal answers |
-| `'answers'['delta_psi']` | bool | | | Whether Δψ is worked out for the files with both regions (`utils_shared/delta_psi.py`) and drawn as the lowest panel of the plot of each; off unless switched on at question 4.5, which is asked only when a file has both regions and the fit has one bH and one bL |
+| `'answers'['delta_psi']` | bool | | | Whether Δψ is worked out for the files with both regions (`utils_shared/delta_psi.py`) and drawn as a panel of the plot of each (the lowest in the standard order); off unless switched on at question 4.5, which is asked only when a file has both regions and the fit has one bH and one bL |
+| `'answers'['panel_order']` | List[str] | (n_panels,) | | The panels of the plot of each file in the order the user moved them to, top first, by their keys: `oxygen`, `vo2`, `delta_psi`, and `haem:` then the name of the haem (`haem:Cyt bH`). Empty for the standard order (oxygen, OCR, the haems a then b then c, Δψ). A panel the order does not know is drawn just above the panel that follows it in the standard order, or at the bottom (`panel_order_placer`); a move made on one file keeps the places of the panels that file does not have (`panel_order_merger`, both in `utils_shared/helpers.py`) |
 | `'answers'['temperature_c']` | float | | °C | Temperature of the runs, for Δψ; asked once per dataset in the import (question 3.1.2), from 0 to 100, 37 unless changed |
 | `'answers'['psi_bH_first_mV']`, `['psi_bL_first_mV']`, `['psi_bH_second_mV']`, `['psi_bL_second_mV']` | float | | mV | The midpoint potentials of the Δψ maths: of bH and of bL with the other haem oxidised (first) and reduced (second); +40, −20, −30 and −90 unless changed. `config.DELTA_PSI_MIDPOINT_ANSWERS` names them for the maths |
 | `'answers'['psi_share']` | float | | | Share of the membrane potential between bH and bL; 0.5 unless changed |
@@ -322,12 +330,13 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 | `'files'` | dict | | | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end', 'OD', 'volume', 'dilution_factor', 'events', 'regions'}}`, built by `file_settings_merger`; a file or key may be missing (a dataset saved before the OD values and labels were kept has only the four limits) |
 | `'files'[name]['trim_start']`, `['trim_end']`, `['ignore_start']`, `['ignore_end']` | Optional[float] | | min | Trim times are on the original recording (`None` for no trim), ignore times count from the new 0 after trimming |
 | `'files'[name]['OD']`, `['volume']`, `['dilution_factor']` | float | | OD, mL, none | The OD values last entered (3.1.1); kept when a later run does not scale by OD, so they are offered again |
-| `'files'[name]['events']` | List[dict] | (n_events,) | | `[{'datapoint': int, 'label': str ('ignore' for an event left out), 'concentration_uM': Optional[float] (µM), 'ignored': bool}]`, one per event of the file, in its order |
+| `'files'[name]['events']` | List[dict] | (n_events,) | | `event_entries` of the file, one per event, in its order; the four numbers are missing in a dataset saved before the stock and the volume were asked |
+| `'answers'['label_mode']` | str | | | What the event labels show (Labels as in the strip), a key of `event_concentrations.LABEL_MODES`: `'chamber'` (the concentration in the chamber, `400 µM KCN`, the standard) or `'added'` (the volume and the stock added, `10 µL of 200 mM KCN`) |
 | `'files'[name]['regions']` | Dict[str, float] | | min | `{'oxidised_start', 'oxidised_end', 'reduced_start', 'reduced_end'}`: the oxidised and the reduced region of the file as times on the original recording, so a later change of the trim leaves them on the same data. A region not chosen has its two edges together; a file with neither chosen has no `'regions'` |
 
 #### `strip_values`
 
-What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/viewer_strip.py`). Built from the answers by `strip_values_builder`, given by `ViewerGui.strip_reader`, and taken in part or whole by `ViewerGui.strip_setter` (checked by `strip_values_checker`). Each change the user makes is told once, as a dict of the values it changed (a new journal can change the width and the height too), to the function registered with `ViewerGui.strip_listener_setter`. That function runs on the program thread while a question waits. `size_answers_builder` turns the journal, width and height back into answers, and `form_answers_builder` the spectrometer, the way of showing the haems and the per OD boxes. The names are those of the answers in `config.DEFAULT_ANSWERS`, except `spectra`, `ocr_per_od` and the numbers of the Δψ row, which `psi_answers_builder` turns into answers (`psi_values_builder` the other way). What the strip offers is given apart, with `ViewerGui.strip_choices_setter(spectra, has_percent, has_od)`: the spectrometers every file has (the drop-down shows only with more than one), whether at least one file has both regions (% oxidised is then in the list, `haem_form_choices_lister`), and whether OD values were entered (the per OD boxes then show).
+What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/viewer_strip.py`). Built from the answers by `strip_values_builder`, given by `ViewerGui.strip_reader`, and taken in part or whole by `ViewerGui.strip_setter` (checked by `strip_values_checker`). Each change the user makes is told once, as a dict of the values it changed (a new journal can change the width and the height too), to the function registered with `ViewerGui.strip_listener_setter`. That function runs on the program thread while a question waits. A new order of the panels is told the same way though the strip keeps no value for it: as `{'panel_order': [keys]}` (`viewer_strip.PANEL_ORDER_CHANGE`), the keys of the panels of the file shown, top first, after a click on an arrow beside a panel (the window tells it), or an empty list after a click on *Standard order*. `size_answers_builder` turns the journal, width and height back into answers, and `form_answers_builder` the spectrometer, the ways of showing the haems and the OCR, the per OD box and what the event labels show. The names are those of the answers in `config.DEFAULT_ANSWERS`, except `spectra` and the numbers of the Δψ row, which `psi_answers_builder` turns into answers (`psi_values_builder` the other way). What the strip offers is given apart, with `ViewerGui.strip_choices_setter(spectra, has_percent, has_od, has_baseline)`: the spectrometers every file has (the drop-down shows only with more than one), whether at least one file has both regions (% oxidised is then in the list, `haem_form_choices_lister`), whether OD values were entered (the per OD box of the haems then shows, and per OD is in the "OCR as" list), and whether the averaging windows are set up (% of baseline is then in the "OCR as" list, `ocr_form_choices_lister`).
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
@@ -340,7 +349,8 @@ What the settings strip under the plot shows (`SettingsStrip`, `utils_viewer/vie
 | `'spectra'` | str | | | The spectrometer whose spectra hold the haems (the answer `decomposition_dataset`), e.g. `'Cyt'`; `''` when none is known |
 | `'haem_mode'` | str | | | How the haems are shown: `'delta'` (ΔD), `'percent'` (% oxidised) or `'abs'` (absorbance), the keys of `viewer_strip.HAEM_FORM_TEXTS` (the words of the drop-down) |
 | `'haem_per_od'` | bool | | | Whether the haems are scaled by OD (the answer of the same name); not used for % oxidised |
-| `'ocr_per_od'` | bool | | | Whether the OCR is per OD: True for the answer `ocr_mode` `'od'`, False for `'raw'` and `'percent'`. A click gives `'od'` or `'raw'` |
+| `'ocr_mode'` | str | | | How the OCR is shown, a key of `OCR_FORM_TEXTS` (the "OCR as" drop-down): `'raw'` (µM min⁻¹), `'od'` (per OD, offered only with OD values), `'percent'` (% of the range) or `'baseline'` (% of baseline, offered only once the averaging windows are set up) |
+| `'label_mode'` | str | | | What the event labels show, a key of `LABEL_FORM_TEXTS` (the "Labels as" drop-down): `'chamber'` (In the chamber) or `'added'` (What was added) |
 | `'delta_psi'` | bool | | | Whether the Δψ row is shown: the haems are worked out and the answer `delta_psi` is on. Never told as a change; question 4.5 switches Δψ on and off |
 | `'psi_bH_mV'`, `'psi_bL_mV'` | float | | mV | The midpoint potential of bH and of bL with the other haem oxidised (the answers `psi_bH_first_mV` and `psi_bL_first_mV`); any number |
 | `'psi_fall_mV'` | float | | mV | How far each midpoint falls when the other haem is reduced: `psi_bH_first_mV` − `psi_bH_second_mV`. The row fills in the two midpoints with the other haem reduced from it (`psi_seconds_filler`), and `psi_answers_builder` turns a change of any of the three into all four midpoint answers |
@@ -373,14 +383,29 @@ The OD values of every file as the OD table of the window starts and ends them, 
 | `'volume'` | Optional[float] | | mL | Volume of cells spun down; `None` as above |
 | `'dilution_factor'` | Optional[float] | | | Dilution factor; `None` as above |
 
+#### `event_entries`
+
+The events of every file as the labels table (question 3.2) starts and ends them: `{file name: [entry, ...]}`, one entry per event of the file, in its order. Built by `event_entries_builder` (`utils_shared/survey.py`) from the dataset's settings or the file's own text, laid out by `label_table_builder` and read back by `label_entries_reader` (`utils_viewer/viewer_table.py`); `event_asker` then works out the concentrations (`event_concentration_filler`, `utils_shared/event_concentrations.py`). Kept in the dataset's settings (`'files'[name]['events']`) and copied onto each `event`.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'datapoint'` | int | | | Spectrum number of the event, which ties it to its `event` |
+| `'label'` | str | | | The label; `'ignore'` for an event left out |
+| `'stock_uM'`, `'added_uL'` | Optional[float] | | µM, µL | The stock and the volume added, as on `event`; None for an event left out |
+| `'addition_uM'`, `'concentration_uM'` | Optional[float] | | µM | What the addition adds, and the concentration in the chamber after it, as on `event` |
+| `'ignored'` | bool | | | True for an event left out |
+
 #### `table_rows`
 
-A table to fill in on the terminal side of the window (`AnswerTable`, `utils_viewer/viewer_table.py`): the OD table (`od_table_builder`, one row per file) or the labels table (`label_table_builder`, one row per event under the name of its file). Taken by `ViewerGui.table_shower`. `ViewerGui.table_reader` gives back the values row by row (one `{name of the value: value}` per row: a float, a label, or `None` for a cell that is empty, wrong or greyed out) and the cells that cannot be used, as `('row name: column heading', problem)` with the problem `'empty'` or the kind of the cell.
+A table to fill in on the terminal side of the window (`AnswerTable`, `utils_viewer/viewer_table.py`): the OD table (`od_table_builder`, one row per file) or the labels table (`label_table_builder`, one row per event under the name of its file). Taken by `ViewerGui.table_shower`. `ViewerGui.table_reader` gives back the values row by row (one `{name of the value: value}` per row: a float, a concentration in µM, a label, or `None` for a cell that is empty, wrong or greyed out) and the cells that cannot be used, as `('row name: column heading', problem)` with the problem `'empty'`, `'pair'` or the kind of the cell.
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
 | `'first_heading'` | str | | | Heading of the fixed first column: `'File'` or `'Time (min)'` |
-| `'columns'` | Sequence[Tuple[str, str, str]] | (n_columns,) | | `(name of the value, column heading, kind)` for each column typed in; the kind is `'above_zero'` (a number above 0, needed), `'zero_or_more'` (a number of 0 or more, or nothing) or `'label'` (text, needed) |
+| `'shown_columns'` | Sequence[Tuple[str, str]] | (n_shown,) | | Optional. `(name, heading)` of each column shown after the first and not typed in, in grey italics: the labels table's `('text', 'Text in the file')` |
+| `'columns'` | Sequence[Tuple[str, str, str]] | (n_columns,) | | `(name of the value, column heading, kind)` for each column typed in; the kind is `'above_zero'` (a number above 0, needed), `'above_zero_or_empty'` (a number above 0, or nothing), `'zero_or_more'` (a number of 0 or more, or nothing), `'label'` (text, needed), `'stock'` (a concentration above 0 with its unit, mM when none is typed, or nothing) or `'chamber'` (a concentration of 0 or more with its unit, µM when none is typed, or nothing) |
+| `'pairs'` | Sequence[Tuple[str, str]] | (n_pairs,) | | Optional. Names of two values filled in together or not at all (the stock and the volume added); the empty one of a pair filled in by half is a problem `'pair'` |
+| `'worked'` | Optional[dict] | | | Optional. `{'key': name of the value, 'writer': function(rows, values) -> [text or None per row]}`: the cell the table fills in itself as the others are typed (the concentration in the chamber, `label_worked_writer`), in green and not typed in; a row given None is typed in as usual |
 | `'skip_word'` | Optional[str] | | | A label that leaves its row out (`'ignore'`): the row's other cells are greyed out and not read; `None` for none |
 | `'rows'` | List[dict] | (n_rows,) | | One per row, in the order shown; the keys below |
 | `'file'` | str | | | File the row belongs to; entering one of its cells shows that file on the plot |
@@ -388,6 +413,7 @@ A table to fill in on the terminal side of the window (`AnswerTable`, `utils_vie
 | `'group'` | Optional[str] | | | Heading the row sits under (the file name), shown above the first row of each group; `None` for none |
 | `'first'` | str | | | Text of the fixed first column: the file name, or the time of the event in min with two decimals |
 | `'name'` | str | | | How the row is named in the sentence after Confirm, such as `'run1 at 15.01 min'` |
+| `'shown'` | Dict[str, str] | | | Optional. `{name: text}` of the columns shown and not typed in |
 | `'cells'` | Dict[str, str] | | | `{name of the value: text the cell starts with}`; `''` for an empty cell |
 
 ### 1.2 Dataclasses
@@ -419,7 +445,7 @@ Defined in `utils_viewer/viewer_edges.py`. Created by a step that lets the user 
 |---|---|---|---|---|---|
 | `fields` | List[Tuple[str, str]] | (n_fields,) | | | `(field, name shown before its box in the strip)`, in order; in the trimming step `trim_start` "Trim start", `trim_end` "end", `ignore_start` "Ignore first", `ignore_end` "last"; in the regions step `oxidised_start` "Oxidised from", `oxidised_end` "to", `reduced_start` "Reduced from", `reduced_end` "to"; in the window step `window_s` "Settled window", `gap_s` "Gap before the next addition" |
 | `values` | Dict[str, Dict[str, float]] | | min | | `{file name: {field: value}}` the edges start at; in the trimming step the minutes taken off each edge (`trim_minutes_builder`): the trim end from the end of the recording, the ignore times from the trimmed edges; in the regions step the time of each edge on the time axis of the processing plot (`region_edges_builder`), a region not chosen having its two edges together (the step gives them back as times on the original recording); in the window step `window_s`, `gap_s` (seconds) and `is_on` (1 or 0) of the settled windows and `quick_s`, `delay_s` (seconds) and `quick_is_on` (1 or 0) of the quick windows, the same for every file (`WINDOW_KEYS`, `utils_shared/averaging.py`) |
-| `layout_finder` | Callable | | | | `(file name, its values) -> (edges, parts)`: edges as `[(field, time_min, words by its handle, kind)]`, shaded parts as `[(start_min, end_min, kind)]`, times on the time axis of the plot; kind is a key of `PART_STYLES` (`'trim'` grey and hatched, handles in the top row; `'ignore'` amber, handles in the row under it; `'oxidised'` red, top row; `'reduced'` blue, the row under it; `'average'` blue, top row, for the baseline or a settled averaging window and its start; `'average_end'` blue, the row under it, for its end; `'quick'` green, top row, for a quick averaging window and its start; `'quick_end'` green, the row under it, for its end; `'average_unfit'` red and hatched, for a window of either kind that does not fit) |
+| `layout_finder` | Callable | | | | `(file name, its values) -> (edges, parts)`: edges as `[(field, time_min, words by its handle, kind)]`, shaded parts as `[(start_min, end_min, kind)]`, times on the time axis of the plot; kind is a key of `PART_STYLES` (`'trim'` grey and hatched, handles in the top row; `'ignore'` amber, handles in the row under it; `'oxidised'` red, top row; `'reduced'` blue, the row under it; `'baseline'` gold, top row, for the baseline window and its start; `'baseline_end'` gold, the row under it, for its end; `'average'` blue, top row, for a settled averaging window and its start; `'average_end'` blue, the row under it, for its end; `'quick'` green, top row, for a quick averaging window and its start; `'quick_end'` green, the row under it, for its end; `'average_unfit'` red and hatched, for a window of either kind that does not fit) |
 | `pointer_reader` | Callable | | | | `(file name, its values, field, time_min pointed at) -> value` that puts that edge there |
 | `value_setter` | Callable | | | | `(file name, its values, field, value) -> its new values`, kept within the file's own limits |
 | `key_text` | str | | | `''` | Words under the plot explaining the colours |
@@ -455,6 +481,7 @@ Defined in `utils_shared/user_places.py`. Created by `user_places_finder` when `
 | `program_folder` | Path | | | | The program's own files (`fits/`, `assets/`, `QUESTION_FLOW.md`): the folder of `main.py`, or `sys._MEIPASS` inside the app |
 | `own_folder` | Path | | | | The user's own folder; the data folders directly inside it are offered by number at question 1.1. The program folder, or `~/Portimao` in the app |
 | `fits_folder` | Path | | | | `<own_folder>/fits`: the haem library (`haems/`), the presets (`presets/`), the user's own fit files, and where fits saved from the components go. In the app, each file of the program's fits folder that is missing (subfolders included) is copied in at every start; one already there is never overwritten |
+| `journals_folder` | Path | | | | `<own_folder>/journals`: one `journal file` per journal. In the app, each file of the program's journals folder that is missing is copied in at every start; one already there is never overwritten, and a journal whose file is missing here is read from the program's own copy |
 | `last_answers_file` | Path | | | | `<own_folder>/last_answers.json` (`last_answers`) |
 | `logs_folder` | Path | | | | `<own_folder>/logs`: the self-test log and, in the app, the launch log and the update log |
 | `is_app` | bool | | | | True when running as the Mac app |
@@ -471,6 +498,7 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `time_axis_finder` from 
 | `top` | float | | fraction of the height | | Top edge of the highest panel |
 | `start_min` | float | | min | | Time at the left edge |
 | `end_min` | float | | min | | Time at the right edge |
+| `panels` | List[Tuple[str, float, float]] | (n_panels,) | fraction of the height | `[]` | The key, bottom and top of each panel of the standard plot, top first (the keys of `'answers'['panel_order']`), so the window can put the arrows that move a panel beside it; empty for any other picture |
 
 #### `ViewerSession`
 
@@ -487,11 +515,13 @@ Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by 
 | `kept` | Optional[dict] | | | `None` | The `kept_decomposition` to compare with, set by *Keep to compare* in the strip; `None` when none is kept |
 | `regions` | Dict[str, Dict[str, float]] | | min | `{}` | `{file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}}` as times on the original recording: those saved with the dataset at first, then those of the regions step (4.4), or the kept ones after *Go back to kept*. They are the regions saved with the dataset at the end. A region not chosen has its two edges together |
 | `limits` | Dict[str, dict] | | | `{}` | The trim and ignore limits of every file as last answered (section 2), which say whether a file's regions still hold; empty before the trimming step |
-| `has_od` | bool | | | `False` | True once OD values were entered in this run (3.1): the strip then shows its per OD boxes and the plots can be per OD |
+| `has_od` | bool | | | `False` | True once OD values were entered in this run (3.1): the strip then offers per OD and the plots can be per OD |
+| `has_windows` | bool | | | `False` | True once the window step (4.6) was answered with averaging windows in this run: the strip then offers the OCR as % of baseline |
 | `redraw` | Optional[Callable[[], bool]] | | | `None` | Draws the plot of the step being asked again (set by each stage runner), for a change in the strip |
 | `is_figure` | bool | | | `False` | True while the plot is the figure of each file at its saved size (section 5), so a new journal or size in the strip redraws it |
+| `master_exporter` | Optional[Callable[[], None]] | | | `None` | Saves the master page of the file shown (set by `plots_stage_runner`); called for a click on *Export master* in the strip while `is_figure` is True |
 | `is_choosing_regions` | bool | | | `False` | True while the edges of the regions are on the plot (4.4 and 4.4.1): *Go back to kept* then leaves the regions as they are |
-| `export_choice` | Optional[str] | | | `None` | What the export of the import (3.4) wrote: `'summary'`, `'trimmed'` or `'all'`; `None` before anything is exported. New edges export again with it |
+| `export_choice` | Optional[str] | | | `None` | What the export of the import (3.4) wrote, a key of `EXPORT_PARTS`: `'summary'` (the workbook of the trimmed data), `'summary_full'` (and the whole recording of each trimmed file), `'spectra'` (the trimmed data with its spectra as csv files) or `'spectra_full'` (both, each with its spectra); `None` before anything is exported. New edges export again with it, and the run does not ask for the spectra again (8.1) after either of the last two |
 | `export_limits` | Dict[str, dict] | | | empty | The trim and ignore limits of each file when it was last exported, to find the files whose edges changed |
 | `full_exports` | Dict[str, List[Path]] | | | empty | `{file name: files written in its full/ folder}` in this run, so they are not written again when only the edges change, and are taken away when the file is no longer trimmed |
 | `exported` | List[Path] | | | empty | The results folder, once the export has written into it; `viewer_asker` can share the caller's list, so the caller can say the export is kept when the questions are stopped |
@@ -583,18 +613,22 @@ What the file holds, each item marked **recorded** (taken as true), **calculated
 | Property | Value |
 |---|---|
 | File type | xlsx |
-| Sheets | `CcO2`, `CsO2`, `VoO2` and, for the full export, `VoO2_OD`, `VoO2_percent`, `haem_abs`, `haem_delta_abs`, `haem_abs_OD`, `haem_delta_abs_OD`, `haem_percent` (% oxidised, for a file with both regions; no haem amounts: only cells are measured, and an amount depends on the size of its shape), `delta_psi` (Δψ and the potential at bH and at bL, when worked out); plus `Averages`, `Events` and `Metadata` when available |
-| Location and name | `<results>/<experiment>/<experiment>.xlsx`: the trimmed data (all of it when the file is not trimmed), written by the export at the end of the import and again, with the run's results added, by the run; for a trimmed file the export of the import also writes `<results>/<experiment>/full/<experiment>.xlsx`, the whole recording |
+| Sheets | Always every table the experiment has, in this order (`DATA_SHEETS`, the experiment's key in brackets): `Measured O2` (`CcO2`), `Set O2` (`CsO2`), `OCR` (`VoO2`), `OCR per OD` (`VoO2_OD`), `OCR % of range` (`VoO2_percent`), `OCR % of baseline` (`VoO2_baseline`, for a file with a baseline window), `Haems ΔD` (`haem_delta_abs`), `Haems absorbance` (`haem_abs`), `Haems % oxidised` (`haem_percent`, for a file with both regions), `Haems ΔD per OD` (`haem_delta_abs_OD`), `Haems absorbance per OD` (`haem_abs_OD`), `Δψ` (`delta_psi`: Δψ and the potential at bH and at bL); then `Averages` (when windows were averaged), `Events`, `How it was worked out` (when anything was) and `Metadata`. No haem amounts: only cells are measured, and an amount depends on the size of its shape |
+| Location and name | `<results>/<experiment>/<experiment>.xlsx`: the trimmed data (all of it when the file is not trimmed), written by the export at the end of the import and again, with the run's results added, by the run; for a trimmed file the export of the import also writes, when the whole recordings are chosen (choice 3 or 5 of 3.4), `<results>/<experiment>/full/<experiment>.xlsx`, the whole recording |
 
-The export of the import writes only `CcO2`, `CsO2`, `VoO2`, `Events` and `Metadata`. In the trimmed workbook the Metadata holds the edges (`trimmed_before_minutes`, `trimmed_after_minutes` when trimmed, `ignore_first_minutes`, `ignore_last_minutes`); the whole recording's holds none, so it does not change when they do.
+The export of the import has nothing worked out, so it writes only `Measured O2`, `Set O2`, `OCR`, `Events` and `Metadata`. In the trimmed workbook the Metadata holds the edges (`Trimmed before (min)`, `Trimmed after (min)` when trimmed, `Ignored at the start (min)`, `Ignored at the end (min)`); the whole recording's holds none, so it does not change when they do. The lines of the Metadata the program adds have plain names (`METADATA_TEXTS`: also `OD`, `Volume (mL)`, `Dilution factor`, `Fit`, `Background fitted`, `Processed on`); what comes from the `.paf` file keeps its name.
 
 | Column (data sheets) | Type | Units | Description |
 |---|---|---|---|
 | `Time (min)` | float | min | Time of the point |
-| `spectrum_index` | int | | Spectrum number (haem sheets only) |
-| measurement columns | float | see `experiment` | One per trace or haem |
+| `Spectrum number` | int | | The experiment's `spectrum_index` (haem and Δψ sheets only) |
+| measurement columns | float | in the heading | One per trace or haem, with its unit: `OCR (µM min⁻¹)`, `OCR per OD (µM min⁻¹ OD⁻¹)`, `OCR (% of range)`, `OCR (% of baseline)`, `<haem> ΔD (mOD)`, `<haem> absorbance (mOD)`, `<haem> (% oxidised)`, `<haem> ΔD (mOD OD⁻¹)`, `<haem> absorbance (mOD OD⁻¹)`; the oxygen and Δψ sheets keep the headings of their tables |
 
-The `Averages` sheet has one row per window: `Average`, `Kind` (baseline, settled or quick), `Start time (min)`, `End time (min)` and, per measurement, `<name> mean`, `<name> SD` and `<name> change from baseline (%)`.
+The `Events` sheet has the columns `Event`, `Data point`, `Time (min)`, `Text in the file`, `Label`, `Stock (mM)`, `Added (µL)`, `This addition (µM)`, `In the chamber (µM)` and `Ignored` (the stock, the volume and the two concentrations of `event`, each empty where unknown). Nothing is read back from a workbook: the OD values and labels are kept in the dataset's settings.
+
+The `How it was worked out` sheet has the columns `What`, `For` (a haem, or empty), `Value` and `Unit`, with only the lines the experiment has: `Fit`; `Background fitted`; for each haem `Start of ΔD (what was taken off)` (mOD) and `Start of ΔD, taken from` (`5.00 to 5.41`, min); `Oxidised region` and `Reduced region` (min, on the time of the trimmed data); for each haem `Oxidised level` and `Reduced level` (mOD); `Δψ: haem used` (bH, bL), `Δψ: midpoint potential` (one per midpoint, mV), `Δψ: share`, `Δψ: temperature` (°C), `Δψ: lowest limit` and `Δψ: highest limit` (% reduced), `Δψ: spectra with a value` (`180 of 240`); and, for a file scaled by OD, `OD scaling: OD`, `OD scaling: volume` (mL), `OD scaling: dilution factor` and `OD scaling: how`.
+
+The `Averages` sheet has one row per window: `Average`, `Kind` (baseline, settled or quick), `Start time (min)`, `End time (min)` then `OCR mean (<unit>)`, `OCR SD (<unit>)`, `OCR difference from baseline (<unit>)` and `OCR (% of baseline)`, the unit being that of the OCR that was averaged (`µM min⁻¹`, `µM min⁻¹ OD⁻¹` or `% of range`); for each haem in the views `ΔD` and `absorbance` `<haem> <view> mean (<unit>)`, `<haem> <view> SD (<unit>)` and `<haem> <view> difference from baseline (<unit>)`, in `mOD`, or `mOD OD⁻¹` when the plot is per OD, and for % oxidised `<haem> mean (% oxidised)`, `<haem> SD (% oxidised)` and `<haem> difference from baseline (% oxidised)`; and, for an experiment with Δψ, `Δψ mean (mV)`, `Δψ SD (mV)`, `Δψ difference from baseline (mV)` and `Δψ spectra used` (`5 of 9`: the spectra of the window with a value, of all its spectra). A per in a unit is written as a power of -1, never with a slash. The notes under the table say what each column is.
 
 #### `fit csv`
 
@@ -685,13 +719,13 @@ a3_037v.csv,1
 | File type | CSV |
 | Delimiter | comma |
 | Encoding | UTF-8 |
-| Location and name | `<results>/<experiment>/<dataset>_<type>.csv` (the trimmed spectra) and, for a trimmed file exported with the whole recordings' spectra, `<results>/<experiment>/full/<dataset>_<type>.csv`; type `transmiss`, `intensity` or `attenuation` |
+| Location and name | `<results>/<experiment>/<dataset>_<type>.csv` (the trimmed spectra) and, for a trimmed file exported with the whole recordings and the raw CSVs (choice 5 of 3.4), `<results>/<experiment>/full/<dataset>_<type>.csv`; type `transmiss`, `intensity` or `attenuation`. The workbook beside them lists them on its `Spectral data` sheet, also when it is written again later in the same run without writing them again |
 | Size | About 19, 8 and 21 bytes per value for the three types (`SPECTRA_CSV_BYTES` in `config.py`), so about 1.2 GB for a 100 MB `.paf` file |
 
 | Column | Type | Units | Description |
 |---|---|---|---|
 | `Wavelength (nm)` | float | nm | Wavelength |
-| `<time> min` | float | see the type | One column per spectrum |
+| `<time> min` | float | see the type | One column per spectrum, headed by its time in minutes to 6 decimals with the trailing zeros dropped (`0.008333 min`, `2 min`), so no two spectra share a heading |
 
 #### `ocr_and_haem_response.xlsx`
 
@@ -726,6 +760,43 @@ a3_037v.csv,1
 - **Difference spectra:** per experiment, the minuend and subtrahend window averages by wavelength and their difference.
 - **Haem percentages:** per experiment, the fitted haem coefficients and the percentages calculated from them.
 - **Waterfall:** the difference spectra with the shared baseline fit (`INTERCEPT` and `SLOPE` formulas) and the corrected spectra.
+
+#### `journal file`
+
+What one journal asks of a figure. Read by `journal_specs_loader` (`utils_shared/journal_files.py`) into `config.JOURNAL_SPECS` when the program starts; a file that cannot be used is left out and named in `config.JOURNAL_PROBLEMS`.
+
+| Property | Value |
+|---|---|
+| File type | JSON: the name of each thing, then its value |
+| Encoding | UTF-8 |
+| Location and name | `journals/<journal>.json` in the user's own folder (`UserPlaces.journals_folder`); the file name, in lower case, is the journal's name in the answers (`nature.json` is `'nature'`). Nature, Science, Cell and PNAS are offered first, the others by name |
+
+| Name | Type | Units | Kept in `JOURNAL_SPECS` as | Description |
+|---|---|---|---|---|
+| `name` | text | | `'name'` | The journal as shown to the user |
+| `widths_mm` | `{"columns": width}` | columns, mm | `'widths_mm'` (the columns as numbers, narrowest first) | The widths a figure can have, by the number of columns: `{"1": 89, "1.5": 120, "2": 183}` |
+| `tallest_figure_mm` | number above 0 | mm | `'page_height_mm'` | The tallest figure; the height of a figure is a share of it |
+| `smallest_text_pt` | number above 0 | pt | `'font_min_pt'` | The smallest text; the text of a figure is lifted to it |
+| `largest_text_pt` | number above 0, or `null` | pt | `'font_max_pt'` | The largest text; `null` when the journal gives none, and no text is then too large |
+| `panel_letter_pt` | number above 0 | pt | `'panel_letter_pt'` | Size of the bold panel letters |
+| `panel_letter_case` | `"upper"` or `"lower"` | | `'panel_letter_case'` | A, B, C or a, b, c |
+| `fonts` | list of text | | `'font_family'` | The fonts, the wanted one first; the first that is on the computer is used |
+| `thinnest_line_pt` | number above 0, or `null` | pt | `'line_min_pt'` | The thinnest line; every thinner line of a figure is thickened to it (`figure_lines_fitter`) |
+| `thickest_line_pt` | number above 0, or `null` | pt | `'line_max_pt'` | The thickest line; every thicker line is thinned to it |
+| `picture_dpi` | number above 0 | dots per inch | `'dpi'` | Sharpness of the pictures saved of a figure |
+| `page_mm` | `[width, height]`, or `null` | mm | `'paper_mm'` | The printed page, for the master page; `null` when not known, and A4 then stands in |
+| `read_at`, `confirmed`, `notes` | text | | not kept | Where the numbers were read, which were confirmed by hand and when, and what is still to confirm; for the reader of the file only |
+
+Refused, with the reason in one sentence: a file that is not readable JSON; a missing `name`, width, tallest figure, smallest text, panel letter size or picture sharpness; a number that is not above 0; a largest text under the smallest, or a thickest line under the thinnest; a page smaller than the largest figure. With no usable `nature.json`, the numbers for Nature kept in the program (`STANDARD_SPEC`) are used.
+
+#### `master page`
+
+| Property | Value |
+|---|---|
+| File type | PDF, one page of the journal's page size (A4 when the journal file gives none) |
+| Location and name | `<results folder>/<experiment>_master_<journal>.pdf`, written by `master_page_exporter` (`utils_shared/master_page_exporter.py`) for a click on *Export master* in the strip |
+
+The figure of the file as a picture of 600 dots per inch at its printed size, starting at the top left of the text area; under it a box reading "Figure legend"; the journal's columns filled with grey lines standing for text; one small line at the top naming the journal, the page size, the file and the size of the figure. The margin at the sides, top and bottom is (page width - widest figure) / 2 (`master_page_layout_builder`).
 
 #### `last_answers.json`
 
@@ -846,7 +917,8 @@ Project-wide choices, written once. The tables above use these units and symbols
 | Wavelength | nm | none |
 | Oxygen concentration | µM | none |
 | Oxygen consumption rate | µM/min | none |
-| Concentration of an addition | µM | `_uM` in keys; written by `concentration_formatter` as µM, mM or M, and `? µM` when none was given |
+| Concentration of an addition | µM | `_uM` in keys; written by `concentration_formatter` as nM, µM, mM or M (four significant figures on a label), and `? µM` when none was given; the Events sheet gives the stock in mM |
+| Volume added | µL | `_uL` in keys |
 | Haem absorbance | mOD | none |
 | Fractions of a range or baseline | % | none |
 

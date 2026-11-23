@@ -28,13 +28,15 @@ RETIRED_HAEM_MODE_KEYS = ('haem_mode', 'ho_haem_mode')
 def _event_plainer(event: dict) -> dict:
     """
     ---- Summary ----
-    Helper function to keep an event's label, concentration and whether it is ignored
-    as plain numbers and text, so it can be written to the settings file.
+    Helper function to keep an event's label, stock, volume added, concentrations and
+    whether it is ignored as plain numbers and text, so it can be written to the
+    settings file.
 
     ---- Inputs ----
     event : dict
-        {'datapoint', 'label', 'concentration_uM', 'ignored'} as the event questions
-        give it.
+        {'datapoint', 'label', 'stock_uM', 'added_uL', 'addition_uM',
+        'concentration_uM', 'ignored'} as the event questions give it; the numbers
+        may be None or missing (a dataset saved before they were asked).
 
     ---- Globals read ----
     None.
@@ -53,10 +55,12 @@ def _event_plainer(event: dict) -> dict:
     None.
     """
 
-    concentration = event.get('concentration_uM')
+    numbers = {key: (None if event.get(key) is None else float(event[key]))
+               for key in ('stock_uM', 'added_uL', 'addition_uM', 'concentration_uM')
+               }
     return {'datapoint': int(event['datapoint']),
             'label': str(event.get('label') or ''),
-            'concentration_uM': None if concentration is None else float(concentration),
+            **numbers,
             'ignored': bool(event.get('ignored', False)),
             }
 

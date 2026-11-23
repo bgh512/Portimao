@@ -16,8 +16,10 @@ import config as settings
 from utils_custom.run_namer import run_name_lister
 from utils_shared.dataset_settings import dataset_settings_reader, SAVED_VALUE_KEYS
 from utils_shared.delta_psi import b_haem_column_finder
-from utils_shared.helpers import concentration_formatter, file_name_sanitiser
-from utils_shared.individual_experiment_exporter import saved_settings_reader
+from utils_shared.event_concentrations import (event_amount_writer,
+                                               event_concentration_filler,
+                                               )
+from utils_shared.helpers import file_name_sanitiser
 from utils_shared.paf_reader import experiment_summary_reader, PafError
 from utils_shared.questions import (choice_asker,
                                     info_printer,
@@ -36,14 +38,11 @@ from utils_shared.user_notices import problem_teller
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 IGNORE_LABEL = 'ignore'  # the label that leaves an event out, in any capitals
-JOURNAL_NAMES = {'nature': 'Nature',
-                 'science': 'Science',
-                 'cell': 'Cell',
-                 'pnas': 'PNAS',
-                 }
+JOURNAL_NAMES = {key: spec['name'] for key, spec in settings.JOURNAL_SPECS.items()}
 OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'od': 'OCR / OD (µM min⁻¹ OD⁻¹)',
               'percent': 'OCR (% of the range)',
+              'baseline': 'OCR (% of baseline)',
               }
 PCA_CHOICE = '__pca__'
 # raised form of the characters of an exponent typed as -1 or ^2
@@ -98,21 +97,24 @@ def _columns_text_builder(columns: float) -> str:
 def _event_line_builder(event: dict, entry: dict) -> str:
     """
     ---- Summary ----
-    Helper function to write one event as 'label, time' for the event listings.
+    Helper function to write one event as 'time: label' for the event listings.
 
     ---- Inputs ----
     event : dict
         Event from the file summary (time in minutes).
     entry : dict
-        Current label, concentration_uM and ignored flag of that event.
+        Current label, stock_uM, added_uL, concentration_uM and ignored flag of that
+        event (event_entries, DATA_FORMAT.md).
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     str
-        For example '  15.01 min: nd-011992' or with the concentration (in µM, mM or
-        M) and '[IGNORED]' when they apply.
+        For example '  15.01 min: nd-011992', with what was added and the
+        concentration in the chamber ('  20.05 min: KCN, 10 µL of 200 mM, 800 µM in
+        the chamber'), or the concentration alone when it was typed, and '[IGNORED]'
+        when they apply.
 
     ---- Globals mutated ----
     None.
@@ -121,15 +123,19 @@ def _event_line_builder(event: dict, entry: dict) -> str:
     None.
 
     ---- Helpers ----
-    concentration_formatter
+    event_amount_writer
     """
 
-    conc = (''
-            if entry['concentration_uM'] is None
-            else f", {concentration_formatter(entry['concentration_uM'])}"
-            )
+    added = event_amount_writer(entry, 'added')
+    chamber = event_amount_writer(entry, 'chamber')
+    if not chamber:
+        amount = ''
+    elif added != chamber:
+        amount = f', {added}, {chamber} in the chamber'
+    else:
+        amount = f', {chamber}'
     note = '  [IGNORED]' if entry['ignored'] else ''
-    return f"  {event['time']:.2f} min: {entry['label']}{conc}{note}"
+    return f"  {event['time']:.2f} min: {entry['label']}{amount}{note}"
 
 
 # ---- _first_event_finder -------------------------------------------------------------
@@ -865,11 +871,12 @@ def event_asker(summaries: List[dict],
                 ) -> Dict[str, List[dict]]:
     """
     ---- Summary ----
-    Main function to have the label and concentration of every event filled in in the
-    labels table, starting from the saved or file values, an event being left out by
-    writing ignore as its label. Labels that could be written more tidily (8 ug ml-1
-    as 8 µg mL⁻¹) are then offered in their tidy forms, once. Nothing is asked when no
-    file has events.
+    Main function to have the label, the stock and the volume added (or the
+    concentration in the chamber) of every event filled in in the labels table,
+    starting from the saved or file values, an event being left out by writing ignore
+    as its label. Labels that could be written more tidily (8 ug ml-1 as 8 µg mL⁻¹) are
+    then offered in their tidy forms, once, and the concentrations worked out. Nothing
+    is asked when no file has events.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -885,22 +892,23 @@ def event_asker(summaries: List[dict],
         forms again, and the labels kept this time are added.
 
     ---- Globals read ----
-    IGNORE_LABEL.
+    IGNORE_LABEL; settings.CHAMBER_VOLUME_ML.
 
     ---- Outputs ----
     Dict[str, List[dict]]
-        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}.
-        An event labelled ignore is left out and has no concentration.
+        {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md). An event
+        labelled ignore is left out and has no stock or concentration.
 
     ---- Globals mutated ----
     None. Adds to ``kept`` and reads from and prints to the terminal (side effects).
 
     ---- Equations ----
-    None.
+    See event_concentration_filler.
 
     ---- Helpers ----
     _event_line_builder
     _tidy_labels_offerer
+    event_concentration_filler
     event_entries_builder
     info_printer
     """
@@ -918,10 +926,14 @@ def event_asker(summaries: List[dict],
             entry['ignored'] = entry['label'].strip().lower() == IGNORE_LABEL
             if entry['ignored']:
                 entry['label'] = IGNORE_LABEL
-                entry['concentration_uM'] = None
 
-    # ---- 3 Offer the tidy forms and list the labels ----------------------------------
+    # ---- 3 Offer the tidy forms, work out the concentrations and list the labels -----
+    # The same thing added again is known by its label, so the concentrations are
+    # worked out from the labels in their final form.
     _tidy_labels_offerer(with_events, result, kept)
+    result = {name: event_concentration_filler(events, settings.CHAMBER_VOLUME_ML)
+              for name, events in result.items()
+              }
     info_printer('Event labels:')
     for summary in with_events:
         info_printer(f"{summary['name']}:", depth=2)
@@ -935,8 +947,8 @@ def event_entries_builder(summaries: List[dict], saved: dict) -> Dict[str, List[
     """
     ---- Summary ----
     Main function to give the events of every file as the labels table starts them:
-    the label, concentration and whether it is left out as saved for the dataset, or
-    else the file's own text, with no concentration.
+    the label, stock, volume added, concentrations and whether it is left out as saved
+    for the dataset, or else the file's own text, with no concentration.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -949,8 +961,8 @@ def event_entries_builder(summaries: List[dict], saved: dict) -> Dict[str, List[
 
     ---- Outputs ----
     Dict[str, List[dict]]
-        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
-        per event of the file, in its order; an event left out is labelled ignore.
+        {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md), one per event
+        of the file, in its order; an event left out is labelled ignore.
 
     ---- Globals mutated ----
     None.
@@ -976,6 +988,9 @@ def event_entries_builder(summaries: List[dict], saved: dict) -> Dict[str, List[
                                      if ignored
                                      else (before.get('label') or event['text'])
                                      ),
+                           'stock_uM': before.get('stock_uM'),
+                           'added_uL': before.get('added_uL'),
+                           'addition_uM': before.get('addition_uM'),
                            'concentration_uM': before.get('concentration_uM'),
                            'ignored': ignored,
                            },
@@ -1159,8 +1174,8 @@ def free_folder_finder(folder: Path) -> Path:
 def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
     """
     ---- Summary ----
-    Main function to ask which haems are plotted, and in which order, when they are
-    plotted: whether they are is answered by the Haems box of the window's settings
+    Main function to ask which haems are plotted, when they are plotted (their panels
+    are moved with the arrows beside them in the window): whether they are is answered by the Haems box of the window's settings
     strip, in answers['plot_haems'].
 
     ---- Inputs ----
@@ -1193,8 +1208,7 @@ def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> boo
         answers['plot_haems'] = False
         return False
     if answers['plot_haems']:
-        answers['haems'] = multi_asker('Which haems would you like to plot, and in '
-                                       'which order?',
+        answers['haems'] = multi_asker('Which haems would you like to plot?',
                                        list(fit['haem_list']),
                                        default_all=True,
                                        keep_order=True,
@@ -1539,23 +1553,28 @@ def multi_experiment_asker(summaries: List[dict],
 
 
 # ---- ocr_kind_lister -----------------------------------------------------------------
-def ocr_kind_lister(has_od: bool) -> List[str]:
+def ocr_kind_lister(has_od: bool, has_baseline: bool = False) -> List[str]:
     """
     ---- Summary ----
     Main function to list the kinds of OCR that can be offered: the OCR itself, the OCR
-    per OD when OD values were entered, and the OCR as a percentage of its range.
+    per OD when OD values were entered, the OCR as a percentage of its range and, for
+    the plot of each file, the OCR as a percentage of its baseline.
 
     ---- Inputs ----
     has_od : bool
         True when OD values were entered (scaling by OD is on).
+    has_baseline : bool
+        True where the OCR can be shown as % of baseline (the plot of each file); the
+        figures of several files, which have a % of baseline of their own, leave it
+        out.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     List[str]
-        The keys 'raw', 'od' (only with OD values) and 'percent', in the order they are
-        offered.
+        The keys 'raw', 'od' (only with OD values), 'percent' and 'baseline' (only
+        with has_baseline), in the order they are offered.
 
     ---- Globals mutated ----
     None.
@@ -1567,7 +1586,11 @@ def ocr_kind_lister(has_od: bool) -> List[str]:
     None.
     """
 
-    return ['raw'] + (['od'] if has_od else []) + ['percent']
+    return (['raw']
+            + (['od'] if has_od else [])
+            + ['percent']
+            + (['baseline'] if has_baseline else [])
+            )
 
 
 # ---- ocr_option_builder --------------------------------------------------------------
@@ -1579,7 +1602,7 @@ def ocr_option_builder(keys: List[str]) -> List[Tuple[str, str]]:
 
     ---- Inputs ----
     keys : List[str]
-        OCR kinds offered: 'raw', 'od' and/or 'percent'.
+        OCR kinds offered: 'raw', 'od', 'percent' and/or 'baseline'.
 
     ---- Globals read ----
     OCR_LABELS (module constant).
@@ -1651,8 +1674,8 @@ def od_scaling_asker(summaries: List[dict],
         'Do you want to scale by OD?',
         defaults['normalise_od'],
         note='Scaling by OD divides the OCR and the haems by '
-        'dilution factor × OD × volume; a per OD box for '
-        'each then shows in the strip under the plot.',
+        'dilution factor × OD × volume; the strip under the '
+        'plot then offers per OD for each.',
         number='3.1',
         )
     details = {s['name']: {} for s in summaries}
@@ -1840,21 +1863,17 @@ def results_folder_resolver(text: str, data_folder: Optional[Path] = None) -> Pa
 # ---- saved_values_reader -------------------------------------------------------------
 def saved_values_reader(summaries: List[dict],
                         remembered: Dict[str, dict],
-                        export_root: Path,
                         ) -> Dict[str, dict]:
     """
     ---- Summary ----
-    Main function to gather the OD values and event labels saved for each file, so they
-    can be offered as defaults: those in the dataset's settings file, or, for a file
-    with none there yet, those in its workbook from an earlier run.
+    Main function to gather the OD values and event labels saved for each file in the
+    dataset's settings file, so they can be offered as defaults.
 
     ---- Inputs ----
     summaries : List[dict]
         File summaries (DATA_FORMAT.md).
     remembered : Dict[str, dict]
         The files part of the dataset's settings (dataset_settings, DATA_FORMAT.md).
-    export_root : Path
-        Results folder, where the workbooks of an earlier run are looked for.
 
     ---- Globals read ----
     SAVED_VALUE_KEYS (imported constant).
@@ -1865,54 +1884,45 @@ def saved_values_reader(summaries: List[dict],
         None when nothing is}.
 
     ---- Globals mutated ----
-    None. Prints progress and a note when values come from the workbooks (side
-    effects).
+    None.
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    info_printer
-    progress_clearer
-    progress_printer
-    saved_settings_reader
+    None.
     """
 
     saved = {}
-    from_workbooks = False
-    for number, summary in enumerate(summaries, start=1):
-        name = summary['name']
-        entry = remembered.get(name) or {}
+    for summary in summaries:
+        entry = remembered.get(summary['name']) or {}
         kept = {k: entry[k] for k in SAVED_VALUE_KEYS if entry.get(k) is not None}
-        if kept:
-            saved[name] = kept
-            continue
-        progress_printer(f'Looking for earlier values, file {number} of '
-                         f'{len(summaries)} ...',
-                         )
-        saved[name] = saved_settings_reader(export_root, name)
-        from_workbooks = from_workbooks or bool(saved[name])
-    progress_clearer()
-    if from_workbooks:
-        info_printer(
-            '\nOD values and event labels from the workbooks of an earlier run '
-            'are offered as defaults.',
-            )
+        saved[summary['name']] = kept or None
     return saved
 
 
 # ---- signal_asker --------------------------------------------------------------------
-def signal_asker(answers: dict, defaults: dict) -> bool:
+def signal_asker(answers: dict,
+                 defaults: dict,
+                 windows_adder: Optional[Callable[[], bool]] = None,
+                 ) -> bool:
     """
     ---- Summary ----
     Main function to ask whether the oxygen traces and the OCR are plotted, and which
-    OCR.
+    OCR. The OCR as % of baseline needs the averaging windows: with none set up it
+    says so and offers the window step of the processing (4.6); without windows the
+    OCR goes back to what it was.
 
     ---- Inputs ----
     answers : dict
-        Answers dictionary the values are stored in; must hold normalise_od.
+        Answers dictionary the values are stored in; must hold normalise_od and
+        averaging.
     defaults : dict
         Default answers.
+    windows_adder : Optional[Callable[[], bool]]
+        Function that runs the window step of the processing, stores what is chosen
+        in ``answers`` and returns True when the windows are then set up; None when
+        the step cannot be run.
 
     ---- Globals read ----
     None.
@@ -1929,6 +1939,7 @@ def signal_asker(answers: dict, defaults: dict) -> bool:
 
     ---- Helpers ----
     choice_asker
+    info_printer
     ocr_kind_lister
     ocr_option_builder
     yes_no_asker
@@ -1942,14 +1953,33 @@ def signal_asker(answers: dict, defaults: dict) -> bool:
                                        defaults['plot_ocr'],
                                        )
     if answers['plot_ocr']:
-        keys = ocr_kind_lister(answers['normalise_od'])
+        keys = ocr_kind_lister(answers['normalise_od'], has_baseline=True)
+        previous = defaults['ocr_mode'] if defaults['ocr_mode'] in keys else keys[0]
         answers['ocr_mode'] = choice_asker('Which OCR would you like to plot?',
                                            ocr_option_builder(keys),
-                                           defaults['ocr_mode']
-                                           if defaults['ocr_mode'] in keys
-                                           else keys[0],
+                                           previous,
                                            depth=2,
                                            )
+        # The % of baseline never asks for a window of its own.
+        if answers['ocr_mode'] == 'baseline' and not answers['averaging']:
+            info_printer('No averaging windows are set up, and the % of baseline '
+                         'needs them.',
+                         depth=2,
+                         )
+            is_added = bool(windows_adder is not None
+                            and yes_no_asker('Do you want to add them now?',
+                                             True,
+                                             depth=2,
+                                             number='4.6.1',
+                                             )
+                            and windows_adder(),
+                            )
+            if not is_added:
+                answers['ocr_mode'] = previous if previous != 'baseline' else keys[0]
+                info_printer('Without averaging windows the OCR stays as '
+                             f"{OCR_LABELS[answers['ocr_mode']]}.",
+                             depth=2,
+                             )
     return answers['plot_o2'] or answers['plot_ocr']
 
 
@@ -2018,7 +2048,7 @@ def size_asker(answers: dict,
                            )
     if journal == 'none':
         answers[keys['mode']] = 'default'
-        answers[keys['journal']] = 'nature'
+        answers[keys['journal']] = settings.STANDARD_JOURNAL
         answers[keys['columns']] = columns_default
         answers[keys['height']] = height_default
         return
@@ -2050,6 +2080,50 @@ def size_asker(answers: dict,
                                            maximum=1,
                                            depth=depth + 1,
                                            )
+
+
+# ---- spectra_export_asker ------------------------------------------------------------
+def spectra_export_asker(has_spectra: bool, default: bool) -> bool:
+    """
+    ---- Summary ----
+    Main function to ask, at the end of the questions, whether the run writes the
+    spectra as csv files. It is not asked when the export of the import wrote them
+    already: one line says so, and the run does not write them a second time.
+
+    ---- Inputs ----
+    has_spectra : bool
+        True when the export of the import (3.4) wrote the spectra as csv files.
+    default : bool
+        The answer Enter gives.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when the run is to write the spectra as csv files.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    yes_no_asker
+    """
+
+    if has_spectra:
+        info_printer('The spectra were exported as csv files at the end of the '
+                     'set-up, so they are not written again; the workbook of each '
+                     'experiment lists them.',
+                     )
+        return False
+    return yes_no_asker('Do you want to export the spectra as csv files (large, and '
+                        'it takes a while)?',
+                        default,
+                        )
 
 
 # ---- temperature_asker ---------------------------------------------------------------

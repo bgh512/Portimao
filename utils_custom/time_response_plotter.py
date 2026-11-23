@@ -17,13 +17,14 @@ from matplotlib.transforms import ScaledTranslation
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import hours_parser
+from utils_shared.event_concentrations import event_text_writer
 from utils_shared.figure_layout import (figure_canvas_fitter,
                                         gap_space_calculator,
                                         panel_letter_adder,
                                         stack_legend_drawer,
                                         text_extent_calculator,
                                         )
-from utils_shared.helpers import concentration_formatter, name_simplifier
+from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_plotter import experiment_drawer
 from utils_shared.user_notices import warning_shower
 
@@ -68,7 +69,7 @@ def _event_label_height_calculator(experiments: list, individual_config: dict) -
     None.
 
     ---- Helpers ----
-    concentration_formatter
+    event_text_writer
     text_extent_calculator
     """
 
@@ -84,10 +85,7 @@ def _event_label_height_calculator(experiments: list, individual_config: dict) -
     heights = []
     for experiment in experiments:
         for event in experiment.get('metadata', {}).get('events', []):
-            conc = event.get('concentration_uM')
-            text = (f'{concentration_formatter(conc)} '
-                    f"{event.get('label', '')}".strip()
-                    )
+            text = event_text_writer(event, c.get('EVENT_LABEL_MODE', 'chamber'))
             heights.append(text_extent_calculator(text,
                                                   c['EVENT_LABEL_FONTSIZE'],
                                                   c['EVENT_LABEL_ROTATION'],
@@ -1077,14 +1075,24 @@ def time_response_figure_plotter(experiments: dict,
                 else None
                 )
     pad, gap = config['EDGE_PAD_PT'], config['TITLE_GAP_PT']
-    figure_canvas_fitter(fig, pad, suptitle, gap)
+    figure_canvas_fitter(fig,
+                         pad,
+                         suptitle,
+                         gap,
+                         line_limits_pt=config.get('LINE_LIMITS_PT'),
+                         )
     if config['PANEL_LETTERS']:
         panel_letter_adder(fig,
                            panels,
                            config['PANEL_LETTER_FONT_SIZE'],
                            config['PANEL_LETTER_CASE'],
                            )
-    figure_canvas_fitter(fig, pad, suptitle, gap)
+    figure_canvas_fitter(fig,
+                         pad,
+                         suptitle,
+                         gap,
+                         line_limits_pt=config.get('LINE_LIMITS_PT'),
+                         )
     _placeholder_drawer(fig, hidden, config)
     fig.time_response_picks = {'kinetic': [(group, label, experiment['experiment_name'])
                                            for group, label, experiment

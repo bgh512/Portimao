@@ -21,9 +21,7 @@ STRAIN_ROWS = ('knockdown', 'control')
 GROUP_STYLES = {'knockdown': {'colour': '#0072B2', 'linestyle': '-', 'marker': 's'},
                 'control': {'colour': '#D55E00', 'linestyle': '--', 'marker': '^'},
                 }
-HAEM_AXIS_LABELS = {'raw': 'Haem concentration',
-                    'od': 'Haem concentration (/OD)',
-                    'percent': 'Oxidised haem (%)',
+HAEM_AXIS_LABELS = {'percent': 'Oxidised haem (%)',
                     'abs': 'Haem absorbance (mOD)',
                     'abs_od': 'Absorbance (mOD OD$^{-1}$)',
                     'delta_abs': 'ΔD (mOD)',
@@ -101,6 +99,7 @@ def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
             'SUPTITLE_FONT_SIZE': fonts['title'],
             'UNIT_PT': unit,
             'EDGE_PAD_PT': style['edge_pad'],
+            'LINE_LIMITS_PT': style['line_limits'],
             'TITLE_GAP_PT': style['title_gap'],
             'PANEL_LETTERS': True,
             'PANEL_LETTER_CASE': spec['panel_letter_case'],
@@ -210,8 +209,9 @@ def ocr_and_haem_response_config_builder(cfg: Config,
     cfg : Config
         Figure style derived from the answers (config.py).
     answers : dict
-        Terminal answers; uses ho_haems, ho_metric, ho_pub_columns and ho_pub_height,
-        and ho_blocks (the blocks drawn so far while the figure is being built).
+        Terminal answers; uses ho_haems, ho_metric, ho_pub_columns, ho_pub_height and
+        label_mode, and ho_blocks (the blocks drawn so far while the figure is being
+        built).
     haem_names : list
         Haem names of the fit, in fit order.
 
@@ -254,6 +254,9 @@ def ocr_and_haem_response_config_builder(cfg: Config,
              'HAEM_RESPONSE_SHOW': list(answers['ho_haems'] or []),
              'HAEM_RESPONSE_METRIC': answers['ho_metric'],
              'OCR_VO2_COLUMN': None,
+             # what the labels of the additions under the windows show: "chamber" or
+             # "added" (Labels as in the strip)
+             'EVENT_LABEL_MODE': answers.get('label_mode', 'chamber'),
              'GROUP_STYLES': GROUP_STYLES,
              'FIGURE_SIZE': size,
              'FIGURE_DPI': cfg.FIGURE_DPI,
@@ -263,6 +266,7 @@ def ocr_and_haem_response_config_builder(cfg: Config,
              'TITLE_FONT_SIZE': fonts['title'],
              'UNIT_PT': unit,
              'EDGE_PAD_PT': style['edge_pad'],
+             'LINE_LIMITS_PT': style['line_limits'],
              'TITLE_GAP_PT': style['title_gap'],
              'THIN_LINE_WIDTH': style['thin_line_width'],
              'HEIGHT_RATIOS': {'baseline': 7, 'ocr_response': 7, 'haem_response': 18},
@@ -437,6 +441,7 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list) -
             'SUPTITLE_FONT_SIZE': fonts['title'],
             'UNIT_PT': unit,
             'EDGE_PAD_PT': style['edge_pad'],
+            'LINE_LIMITS_PT': style['line_limits'],
             'TITLE_GAP_PT': style['title_gap'],
             'THIN_LINE_WIDTH': style['thin_line_width'],
             'HEIGHT_RATIOS': (2.2, 2.2, 1.6),
