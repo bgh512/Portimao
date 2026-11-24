@@ -30,7 +30,7 @@ NOTE_LINES = ('Time response: workbook for checking the maths by hand',
               'Difference spectra sheet',
               '  For every experiment: the mean attenuation spectrum of the '
               'penultimate window (minuend) and of the final window '
-              '(subtrahend), and difference = minuend - subtrahend. The windows '
+              '(subtrahend), and difference = minuend − subtrahend. The windows '
               'are the event averaging windows of the run; their start and end '
               'times (minutes) are in the header of each block.',
               '',
@@ -38,8 +38,8 @@ NOTE_LINES = ('Time response: workbook for checking the maths by hand',
               '  The difference spectrum of each experiment is decomposed into '
               'the haem spectra of the fit plus scatter terms by least squares. '
               'The fitted coefficient of each haem is listed. Percentage = 100 '
-              'x coefficient / sum of the coefficients ("signed" basis) or / '
-              'sum of the absolute coefficients ("absolute" basis); the basis '
+              '× c ÷ Σc ("signed" basis) or 100 × c ÷ Σ|c| ("absolute" basis), '
+              'with c the coefficient of the haem; the basis '
               'used is written in the sheet. The percentages add up to 100 on '
               'the signed basis.',
               '',
@@ -47,7 +47,7 @@ NOTE_LINES = ('Time response: workbook for checking the maths by hand',
               '  Mean = average of the difference spectra of the group; baseline '
               '= straight line fitted to the mean between the two wavelengths '
               'given in the header (SLOPE and INTERCEPT); corrected = '
-              'difference - baseline. The waterfall figure then aligns and '
+              'difference − baseline. The waterfall figure then aligns and '
               'offsets the corrected spectra for display only.',
               )
 
@@ -107,13 +107,19 @@ def _difference_sheet_writer(workbook: object,
             subtrahend = averages['windows'][difference['subtrahend']]
             sheet.merge_range(2, col, 2, col + 3, f'{group}, {label}', formats['group'])
             sheet.merge_range(3, col, 3, col + 3, name, formats['header'])
-            sheet.merge_range(4, col, 4, col + 3,
+            sheet.merge_range(4,
+                              col,
+                              4,
+                              col + 3,
                               f"Minuend {difference['minuend']}: "
                               f"{minuend['start_time']:.2f}-"
                               f"{minuend['end_time']:.2f} min",
                               formats['header'],
                               )
-            sheet.merge_range(5, col, 5, col + 3,
+            sheet.merge_range(5,
+                              col,
+                              5,
+                              col + 3,
                               f"Subtrahend {difference['subtrahend']}: "
                               f"{subtrahend['start_time']:.2f}-"
                               f"{subtrahend['end_time']:.2f} min",
@@ -126,10 +132,16 @@ def _difference_sheet_writer(workbook: object,
             for number, wavelength in enumerate(wavelengths):
                 row = 7 + number
                 number_writer(sheet, row, col, wavelength, formats['number'])
-                number_writer(sheet, row, col + 1, minuend['mean'][number],
+                number_writer(sheet,
+                              row,
+                              col + 1,
+                              minuend['mean'][number],
                               formats['number'],
                               )
-                number_writer(sheet, row, col + 2, subtrahend['mean'][number],
+                number_writer(sheet,
+                              row,
+                              col + 2,
+                              subtrahend['mean'][number],
                               formats['number'],
                               )
                 formula_writer(sheet,
@@ -347,10 +359,12 @@ def _waterfall_sheet_writer(workbook: object,
     for group, items in groups.items():
         wavelengths = np.column_stack([e['difference_spectrum']['wavelengths']
                                        for _, e in items
-                                       ])
+                                       ],
+                                      )
         spectra = np.column_stack([e['difference_spectrum']['spectrum']
                                    for _, e in items
-                                   ])
+                                   ],
+                                  )
         x_min = config['WATERFALL_BASELINE_X_MIN']
         x_max = config['WATERFALL_BASELINE_X_MAX']
         degree = config['WATERFALL_BASELINE_DEGREE']
@@ -410,7 +424,10 @@ def _waterfall_sheet_writer(workbook: object,
                                formats['number'],
                                )
             else:
-                number_writer(sheet, row, base_col, baseline[number, 0],
+                number_writer(sheet,
+                              row,
+                              base_col,
+                              baseline[number, 0],
                               formats['number'],
                               )
             for k in range(count):

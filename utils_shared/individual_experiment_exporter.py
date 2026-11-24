@@ -13,8 +13,12 @@ import numpy as np
 import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.averaging import WINDOW_KINDS
 from utils_shared.helpers import excel_sheet_namer, file_name_sanitiser
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
+from utils_shared.spectral_decomposer import (BACKGROUND_PLAIN_FORMULAS,
+                                              BACKGROUND_SHORT_NAMES,
+                                              )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -243,7 +247,8 @@ def _processing_table_builder(experiment: dict) -> pd.DataFrame:
         whether VoO2_OD is there and VoO2_baseline (attrs['baseline_percent']).
 
     ---- Globals read ----
-    PROCESSING_COLUMNS (module constant).
+    PROCESSING_COLUMNS (module constant); BACKGROUND_PLAIN_FORMULAS,
+    BACKGROUND_SHORT_NAMES.
 
     ---- Outputs ----
     pd.DataFrame
@@ -271,6 +276,15 @@ def _processing_table_builder(experiment: dict) -> pd.DataFrame:
         rows.append(('Fit', '', metadata['fit_file'], ''))
     if metadata.get('haem_background'):
         rows.append(('Background fitted', '', metadata['haem_background'], ''))
+        names = {short: name for name, short in BACKGROUND_SHORT_NAMES.items()}
+        name = names.get(metadata['haem_background'], metadata['haem_background'])
+        if name in BACKGROUND_PLAIN_FORMULAS:
+            rows.append(('Background formula (w in nm)',
+                         '',
+                         BACKGROUND_PLAIN_FORMULAS[name],
+                         'OD',
+                         ),
+                        )
     delta = experiment.get('haem_delta_abs')
     start = (delta.attrs.get('delta_abs_baseline')
              if isinstance(delta, pd.DataFrame)
@@ -338,7 +352,7 @@ def _processing_table_builder(experiment: dict) -> pd.DataFrame:
                   ),
                  ('OD scaling: how',
                   '',
-                  'divided by OD × volume × dilution factor',
+                  'OCR ÷ (OD × volume × dilution factor)',
                   '',
                   ),
                  ]
@@ -543,14 +557,18 @@ def averages_table_builder(averages: dict) -> pd.DataFrame:
     ---- Inputs ----
     averages : dict
         Event-window averages, as added to the experiment by
-        experiment_averages_calculator (DATA_FORMAT.md); uses averages['windows'].
+        experiment_averages_calculator (DATA_FORMAT.md); uses averages['windows'] and
+        the windows of averages['skipped'] the user left out.
 
     ---- Globals read ----
     HAEM_VIEW_TEXTS, HAEM_UNITS, OCR_UNITS, AVERAGE_STATISTICS, DELTA_PSI_TEXT and
-    DELTA_PSI_UNIT (module constants).
+    DELTA_PSI_UNIT (module constants); WINDOW_KINDS (imported).
 
     ---- Outputs ----
     pd.DataFrame
+        One row per window, the baseline first, then the settled and the quick windows
+        in time; a window left out has the Kind 'settled (left out)' or 'quick (left
+        out)' and its numbers empty.
         Columns Average, Kind (baseline, settled or quick), Start time (min), End time
         (min); then for the OCR its mean, SD, difference from baseline and '(% of
         baseline)'; for each haem in each view (the one averaged view, without a view
@@ -616,20 +634,34 @@ def averages_table_builder(averages: dict) -> pd.DataFrame:
         return f'{label} {statistic} ({unit})' if unit else f'{label} {statistic}'
 
     # ---- 3 Build the rows ------------------------------------------------------------
-    rows = []
-    for window_name, window in windows.items():
+    # A window the user left out keeps its row, with its numbers empty, at its place
+    # among the others: the baseline, then the settled, then the quick windows in time.
+    records = list(windows.items()) + [(window_name, window)
+                                       for window_name, window
+                                       in averages.get('skipped', {}).items()
+                                       if window.get('left_out')
+                                       ]
+
+    def kind_finder(window_name: str, window: dict) -> str:
         # a record without a kind is the baseline or a settled window
-        kind = window.get('kind',
+        return window.get('kind',
                           'baseline' if window_name == 'average0' else 'settled',
                           )
+
+    records.sort(key=lambda record: (WINDOW_KINDS.index(kind_finder(*record)),
+                                     record[1]['start_time'],
+                                     ))
+    rows = []
+    for window_name, window in records:
+        kind = kind_finder(window_name, window)
         row = {'Average': window_name,
-               'Kind': kind,
+               'Kind': f'{kind} (left out)' if window.get('left_out') else kind,
                'Start time (min)': window['start_time'],
                'End time (min)': window['end_time'],
                }
         for measurement in vo2_names:
             label = 'OCR' if len(vo2_names) == 1 else f'OCR ({measurement})'
-            stats = window['vo2'].get(measurement, {})
+            stats = window.get('vo2', {}).get(measurement, {})
             for key, statistic in AVERAGE_STATISTICS:
                 row[heading(label, statistic, vo2_unit)] = stats.get(key, np.nan)
             row[f'{label} (% of baseline)'] = stats.get('change', np.nan)
@@ -779,6 +811,28 @@ def experiment_workbook_exporter(experiment: dict,
                              f"long, starting {settings['delay_minutes']:g} min after "
                              'their addition.',
                              )
+            # The windows set on their own say how they differ from the rest; the last
+            # settled window always ends its set time before the end of the recording.
+            events = (experiment.get('metadata') or {}).get('events') or []
+            last_settled = f'average{len(events)}'
+            for window_name, own in sorted((settings.get('each_window') or {}).items()):
+                parts = []
+                if own.get('length_min') is not None:
+                    parts.append(f"{own['length_min']:g} min long")
+                if own.get('gap_min') is not None and window_name != last_settled:
+                    parts.append(f"ending {own['gap_min']:g} min before the next "
+                                 'addition',
+                                 )
+                if own.get('delay_min') is not None:
+                    parts.append(f"starting {own['delay_min']:g} min after its "
+                                 'addition',
+                                 )
+                if not own.get('is_used', True) and window_name != 'average0':
+                    parts.append('left out of the averages')
+                if parts:
+                    notes.append(f"{window_name} is set on its own: "
+                                 f"{', '.join(parts)}.",
+                                 )
             notes += ['Difference from baseline = the average in the window - the '
                       'average in the baseline (average0), in the unit of the '
                       'measurement.',

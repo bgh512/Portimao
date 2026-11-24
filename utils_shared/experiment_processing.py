@@ -13,6 +13,7 @@ import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.averaging import (baseline_percent_adder,
                                     experiment_averages_calculator,
+                                    window_plan_finder,
                                     )
 from utils_shared.delta_psi import delta_psi_table_builder
 from utils_shared.normalisation import experiment_normaliser, percent_converter
@@ -201,6 +202,7 @@ def experiment_data_processor(info: dict,
     source_chooser
     time_getter
     warning_shower
+    window_plan_finder
     """
 
     # ---- 1 Set up the run ------------------------------------------------------------
@@ -286,8 +288,8 @@ def experiment_data_processor(info: dict,
                               for haem, (first, last)
                               in reference['window_by_haem'].items()
                               )
-            print(f"  Decomposed with {a['fit_file']} and a "
-                  f"{BACKGROUND_LABELS[a['haem_background']]} background; the zero "
+            print(f"  Decomposed with {a['fit_file']} and the background "
+                  f"{BACKGROUND_LABELS[a['haem_background']]}; the zero "
                   f'of ΔD is where each haem starts, the median of its first '
                   f"{window_points} spectra ({reference['window_seconds']:.3g} s) "
                   f'after the ignored start: {spans}',
@@ -418,20 +420,23 @@ def experiment_data_processor(info: dict,
                                        if 'haem_conc' in experiment
                                        else None
                                        )
-                final_gap = a['final_gap_minutes']
+                plan = window_plan_finder(a, experiment['experiment_name'])
                 minimum_seconds = settings.BASELINE_MINIMUM_SECONDS
                 experiment_averages_calculator(experiment,
-                                               window_minutes=a['window_minutes'],
-                                               gap_minutes=a['gap_minutes'],
-                                               final_window_gap_minutes=final_gap,
+                                               window_minutes=plan['window_minutes'],
+                                               gap_minutes=plan['gap_minutes'],
+                                               final_window_gap_minutes=plan[
+                                                   'final_gap_minutes'
+                                               ],
                                                vo2_source=vo2_source,
                                                haem_source=average_haem_source,
                                                baseline_minimum_seconds=minimum_seconds,
-                                               quick_minutes=a['quick_minutes']
+                                               quick_minutes=plan['quick_minutes']
                                                if a['quick_windows']
                                                else None,
-                                               delay_minutes=a['delay_minutes'],
+                                               delay_minutes=plan['delay_minutes'],
                                                is_settled=a['settled_windows'],
+                                               each_window=plan['each_window'],
                                                haem_views=cfg.haem_view_lister(
                                                    od_available,
                                                    )
@@ -441,7 +446,11 @@ def experiment_data_processor(info: dict,
                 print(f"  Calculated {len(experiment['averages']['windows'])} event "
                       f'averages',
                       )
-                skipped = dict(experiment['averages']['skipped'])
+                # a window the user left out is not a problem to warn of
+                skipped = {name: window
+                           for name, window in experiment['averages']['skipped'].items()
+                           if not window.get('left_out')
+                           }
                 if skipped.pop('average0', None):
                     warning_shower(f'  Warning: there is less than {minimum_seconds:g} '
                                    's of data before the first addition, so this run '

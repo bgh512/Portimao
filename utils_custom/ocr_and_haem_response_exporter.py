@@ -41,13 +41,13 @@ NOTE_LINES = ('OCR and haem response: workbook for checking the maths by hand',
               '("Averages" sheet). The run to file name list is at the top of '
               'the sheet.',
               '  Window mean: the values read from the runs.',
-              '  % of baseline = window mean / baseline window mean x 100 (same '
+              '  % of baseline = window mean ÷ baseline window mean × 100 (same '
               'run).',
-              '  Change from baseline = window mean - baseline window mean (same '
+              '  Change from baseline = window mean − baseline window mean (same '
               'run).',
               '  N = number of runs with a value; Mean = AVERAGE of the runs; SD '
-              '= sample standard deviation, sqrt(sum((x - mean)^2) / (N - 1)), '
-              'written STDEV in Excel; SEM = SD / sqrt(N). These are the means '
+              '= sample standard deviation, √(Σ(x − mean)² ÷ (N − 1)), '
+              'written STDEV in Excel; SEM = SD ÷ √N. These are the means '
               'and error bars drawn in the figure.',
               '',
               'Baseline OCR sheet',
@@ -58,15 +58,15 @@ NOTE_LINES = ('OCR and haem response: workbook for checking the maths by hand',
               '  One row per window and panel: the run values of both groups, '
               'then N, mean, SD, SEM, and the Student t-test with equal '
               'variances (two-sided).',
-              '  pooled variance = ((nA - 1) SDA^2 + (nB - 1) SDB^2) / (nA + nB - '
-              '2); t = (meanA - meanB) / sqrt(pooled variance x (1/nA + 1/nB)); '
-              'df = nA + nB - 2; p = TDIST(|t|, df, 2).',
+              '  pooled variance = ((n_A − 1)·SD_A² + (n_B − 1)·SD_B²) ÷ (n_A + '
+              'n_B − 2); t = (mean_A − mean_B) ÷ √(pooled variance × (1 ÷ n_A + '
+              '1 ÷ n_B)); df = n_A + n_B − 2; p = TDIST(|t|, df, 2).',
               '  "p (TTEST check)" repeats the p value with the Excel function '
               'TTEST on the run values; it has to agree with p.',
               '  Correction across the windows of a panel: the rows of a panel '
               'are listed smallest p first (rank 1, 2, ...). Holm: multiplier = '
-              'm - rank + 1 where m is the number of windows tested in the '
-              'panel; the adjusted p is the running maximum of multiplier x p, '
+              'm − rank + 1 where m is the number of windows tested in the '
+              'panel; the adjusted p is the running maximum of multiplier × p, '
               'capped at 1. Bonferroni: multiplier = m. None: multiplier = 1.',
               '  Significant when the adjusted p is below alpha. Marks drawn in '
               'the figure: * p < alpha, ** p < 0.01, *** p < 0.001 (adjusted '
@@ -112,7 +112,8 @@ def _baseline_sheet_writer(workbook: Any, baseline: dict, formats: dict) -> None
     """
 
     sheet = workbook.add_worksheet('Baseline OCR')
-    sheet.write(0, 0,
+    sheet.write(0,
+                0,
                 f'Baseline OCR (window {BASELINE_WINDOW}), one value per run',
                 formats['title'],
                 )
@@ -198,8 +199,10 @@ def _condition_sheet_writer(workbook: Any,
                          if isinstance(value, (str, int, float, bool))
                          )
     sheet.write(2, 0, f'Settings: {settings}')
-    sheet.write(3, 0, 'Mean, SD and SEM are formulas on the run values: mean = '
-                'AVERAGE, SD = STDEV (n - 1), SEM = SD / sqrt(N).',
+    sheet.write(3,
+                0,
+                'Mean, SD and SEM are formulas on the run values: mean = '
+          'AVERAGE, SD = STDEV (N − 1), SEM = SD ÷ √N.',
                 )
     sheet.set_column(0, 0, 14)
     sheet.set_column(1, 80, 11)
@@ -302,7 +305,10 @@ def _measurement_table_writer(sheet: Any,
     # ---- 2 Write each table ----------------------------------------------------------
     for index, (key, title, stats_key) in enumerate(shown):
         first_col = 1 + index * (width + 1)
-        sheet.merge_range(top_row + 1, first_col, top_row + 1, first_col + width - 1,
+        sheet.merge_range(top_row + 1,
+                          first_col,
+                          top_row + 1,
+                          first_col + width - 1,
                           title,
                           formats['header'],
                           )
@@ -406,7 +412,11 @@ def _statistics_writer(sheet: Any,
     runs = xl_range(row, first_col, row, first_col + n_runs - 1)
     n_cell = xl_rowcol_to_cell(row, first_col + n_runs)
     sd_cell = xl_rowcol_to_cell(row, first_col + n_runs + 2)
-    formula_writer(sheet, row, first_col + n_runs, f'=COUNT({runs})', n,
+    formula_writer(sheet,
+                   row,
+                   first_col + n_runs,
+                   f'=COUNT({runs})',
+                   n,
                    formats['integer'],
                    )
     formula_writer(sheet,
@@ -512,22 +522,30 @@ def _test_row_writer(sheet: Any,
         mean = float(numbers.mean())
         sd = float(numbers.std(ddof=1)) if n > 1 else np.nan
         stats[side] = (n, mean, sd)
-        formula_writer(sheet, row, columns[f'{side}_n'],
+        formula_writer(sheet,
+                       row,
+                       columns[f'{side}_n'],
                        f'=COUNT({ranges[side]})',
                        n,
                        formats['integer'],
                        )
-        formula_writer(sheet, row, columns[f'{side}_mean'],
+        formula_writer(sheet,
+                       row,
+                       columns[f'{side}_mean'],
                        f'=AVERAGE({ranges[side]})',
                        mean,
                        formats['number'],
                        )
-        formula_writer(sheet, row, columns[f'{side}_sd'],
+        formula_writer(sheet,
+                       row,
+                       columns[f'{side}_sd'],
                        f'=STDEV({ranges[side]})',
                        sd,
                        formats['number'],
                        )
-        formula_writer(sheet, row, columns[f'{side}_sem'],
+        formula_writer(sheet,
+                       row,
+                       columns[f'{side}_sem'],
                        f'={cell[f"{side}_sd"]}/SQRT({cell[f"{side}_n"]})',
                        sd / np.sqrt(n),
                        formats['number'],
@@ -537,29 +555,39 @@ def _test_row_writer(sheet: Any,
     (n_a, _, sd_a), (n_b, _, sd_b) = stats['a'], stats['b']
     df = n_a + n_b - 2
     pooled = ((n_a - 1) * sd_a ** 2 + (n_b - 1) * sd_b ** 2) / df
-    formula_writer(sheet, row, columns['df'],
+    formula_writer(sheet,
+                   row,
+                   columns['df'],
                    f'={cell["a_n"]}+{cell["b_n"]}-2',
                    df,
                    formats['integer'],
                    )
-    formula_writer(sheet, row, columns['pooled'],
+    formula_writer(sheet,
+                   row,
+                   columns['pooled'],
                    f'=(({cell["a_n"]}-1)*{cell["a_sd"]}^2+({cell["b_n"]}-1)*'
                    f'{cell["b_sd"]}^2)/{cell["df"]}',
                    pooled,
                    formats['number'],
                    )
-    formula_writer(sheet, row, columns['t'],
+    formula_writer(sheet,
+                   row,
+                   columns['t'],
                    f'=({cell["a_mean"]}-{cell["b_mean"]})/SQRT({cell["pooled"]}*'
                    f'(1/{cell["a_n"]}+1/{cell["b_n"]}))',
                    record['t'],
                    formats['number'],
                    )
-    formula_writer(sheet, row, columns['p'],
+    formula_writer(sheet,
+                   row,
+                   columns['p'],
                    f'=TDIST(ABS({cell["t"]}),{cell["df"]},2)',
                    record['p'],
                    formats['p_value'],
                    )
-    formula_writer(sheet, row, columns['p_check'],
+    formula_writer(sheet,
+                   row,
+                   columns['p_check'],
                    f'=TTEST({ranges["a"]},{ranges["b"]},2,2)',
                    record['p'],
                    formats['p_value'],
@@ -577,11 +605,17 @@ def _test_row_writer(sheet: Any,
                'bonferroni': f'={cell["panel_size"]}',
                'none': '=1',
                }[correction]
-    formula_writer(sheet, row, columns['multiplier'], formula, multiplier,
+    formula_writer(sheet,
+                   row,
+                   columns['multiplier'],
+                   formula,
+                   multiplier,
                    formats['integer'],
                    )
     candidate = multiplier * record['p']
-    formula_writer(sheet, row, columns['candidate'],
+    formula_writer(sheet,
+                   row,
+                   columns['candidate'],
                    f'={cell["multiplier"]}*{cell["p"]}',
                    candidate,
                    formats['p_value'],
@@ -592,24 +626,32 @@ def _test_row_writer(sheet: Any,
                                             columns['candidate'],
                                             row_abs=True,
                                             )
-        formula_writer(sheet, row, columns['running'],
+        formula_writer(sheet,
+                       row,
+                       columns['running'],
                        f'=MAX({first_candidate}:{cell["candidate"]})',
                        running,
                        formats['p_value'],
                        )
     else:
-        formula_writer(sheet, row, columns['running'],
+        formula_writer(sheet,
+                       row,
+                       columns['running'],
                        f'={cell["candidate"]}',
                        candidate,
                        formats['p_value'],
                        )
-    formula_writer(sheet, row, columns['adjusted'],
+    formula_writer(sheet,
+                   row,
+                   columns['adjusted'],
                    f'=MIN(1,{running_cell})',
                    record['p_adjusted'],
                    formats['p_value'],
                    )
     sheet.write_number(row, columns['alpha'], record['alpha'], formats['p_value'])
-    formula_writer(sheet, row, columns['significant'],
+    formula_writer(sheet,
+                   row,
+                   columns['significant'],
                    f'=IF({cell["adjusted"]}<{cell["alpha"]},"yes","no")',
                    'yes' if record['significant'] else 'no',
                    formats['text'],
@@ -617,7 +659,9 @@ def _test_row_writer(sheet: Any,
     if record['panel'] == 'Baseline OCR':
         sheet.write(row, columns['mark'], record['mark'])
     else:
-        formula_writer(sheet, row, columns['mark'],
+        formula_writer(sheet,
+                       row,
+                       columns['mark'],
                        f'=IF({cell["adjusted"]}<{cell["alpha"]},IF({cell["adjusted"]}'
                        f'<0.001,"***",IF({cell["adjusted"]}<0.01,"**","*")),"")',
                        record['mark'],
@@ -661,10 +705,20 @@ def _tests_sheet_writer(workbook: Any, tests: list, formats: dict) -> None:
     sheet = workbook.add_worksheet('Tests')
     n_a = max(max(len(r['values_a']) for r in tests), 1)
     n_b = max(max(len(r['values_b']) for r in tests), 1)
-    names = ['panel', 'measurement', 'window', 'group_a', 'group_b', 'runs_a',
+    names = ['panel',
+             'measurement',
+             'window',
+             'group_a',
+             'group_b',
+             'runs_a',
              'runs_b',
              ]
-    headers = ['Panel', 'Measurement', 'Window', 'Group A', 'Group B', 'Runs A',
+    headers = ['Panel',
+               'Measurement',
+               'Window',
+               'Group A',
+               'Group B',
+               'Runs A',
                'Runs B',
                ]
     columns = {name: index for index, name in enumerate(names)}
@@ -672,25 +726,42 @@ def _tests_sheet_writer(workbook: Any, tests: list, formats: dict) -> None:
     columns['b_first'] = len(names) + n_a
     headers += [f'A value {i + 1}' for i in range(n_a)]
     headers += [f'B value {i + 1}' for i in range(n_b)]
-    later = [('a_n', 'N A'), ('a_mean', 'Mean A'), ('a_sd', 'SD A'),
-             ('a_sem', 'SEM A'), ('b_n', 'N B'), ('b_mean', 'Mean B'),
-             ('b_sd', 'SD B'), ('b_sem', 'SEM B'), ('df', 'df'),
-             ('pooled', 'Pooled variance'), ('t', 't'), ('p', 'p (two-sided)'),
-             ('p_check', 'p (TTEST check)'), ('rank', 'Rank in panel'),
-             ('panel_size', 'm (windows in panel)'), ('multiplier', 'Multiplier'),
-             ('candidate', 'Multiplier x p'), ('running', 'Running maximum'),
-             ('adjusted', 'Adjusted p'), ('alpha', 'Alpha'),
-             ('significant', 'Significant'), ('mark', 'Mark in figure'),
+    later = [('a_n', 'N A'),
+             ('a_mean', 'Mean A'),
+             ('a_sd', 'SD A'),
+             ('a_sem', 'SEM A'),
+             ('b_n', 'N B'),
+             ('b_mean', 'Mean B'),
+             ('b_sd', 'SD B'),
+             ('b_sem', 'SEM B'),
+             ('df', 'df'),
+             ('pooled', 'Pooled variance'),
+             ('t', 't'),
+             ('p', 'p (two-sided)'),
+             ('p_check', 'p (TTEST check)'),
+             ('rank', 'Rank in panel'),
+             ('panel_size', 'm (windows in panel)'),
+             ('multiplier', 'Multiplier'),
+             ('candidate', 'Multiplier x p'),
+             ('running', 'Running maximum'),
+             ('adjusted', 'Adjusted p'),
+             ('alpha', 'Alpha'),
+             ('significant', 'Significant'),
+             ('mark', 'Mark in figure'),
              ]
     for name, header in later:
         columns[name] = len(headers)
         headers.append(header)
-    sheet.write(0, 0, 'Student t-tests (equal variances, two-sided) between the two '
-                'groups, window by window',
+    sheet.write(0,
+                0,
+                'Student t-tests (equal variances, two-sided) between the two '
+          'groups, window by window',
                 formats['title'],
                 )
-    sheet.write(1, 0, 'Group A and B values are the run values of each group in the '
-                'window; see the Notes sheet for the formulas.',
+    sheet.write(1,
+                0,
+                'Group A and B values are the run values of each group in the '
+          'window; see the Notes sheet for the formulas.',
                 )
     for col, header in enumerate(headers):
         sheet.write(3, col, header, formats['header'])

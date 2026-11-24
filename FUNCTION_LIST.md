@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.25
+- **Version:** V2.26
 - **Date:** 24/11/2026
 
 ## Contents
@@ -26939,7 +26939,8 @@ experiment : dict
     whether VoO2_OD is there and VoO2_baseline (attrs['baseline_percent']).
 
 ---- Globals read ----
-PROCESSING_COLUMNS (module constant).
+PROCESSING_COLUMNS (module constant); BACKGROUND_PLAIN_FORMULAS,
+BACKGROUND_SHORT_NAMES.
 
 ---- Outputs ----
 pd.DataFrame

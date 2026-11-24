@@ -80,13 +80,6 @@ HAEM_NAME_WORD = re.compile(r'([abcdo]{1,3})([A-Z]|[0-9]+)?')
 # 1/wavelength^2 exactly. Rowan scatter is the additive background of the lab's own
 # chamber scripts, term for term (tests/test_haem_decomposition.py checks it against
 # their lines).
-BACKGROUND_LABELS = {'scatter_1': 'flat + 1/wavelength',
-                     'scatter_2': 'flat + 1/wavelength + 1/wavelength²',
-                     'linear': 'flat + straight line',
-                     'rowan_scatter': 'flat + wavelength + (wavelength - centre)² '
-                                      '(Rowan scatter)',
-                     'palencia': 'flat + 1/wavelength² (Palencia)',
-                     }
 # The same backgrounds as short names, as the drop-down in the strip lists them, the
 # standard first.
 BACKGROUND_SHORT_NAMES = {'rowan_scatter': 'Rowan scatter',
@@ -95,6 +88,17 @@ BACKGROUND_SHORT_NAMES = {'rowan_scatter': 'Rowan scatter',
                           'scatter_2': 'Inverse²',
                           'linear': 'Linear',
                           }
+# Each background's formula as close to a textbook as plain text gets, for the
+# terminal and the workbooks, which cannot typeset maths (MATHS.md section 1.3).
+BACKGROUND_PLAIN_FORMULAS = {'rowan_scatter': 'B = b₀ + b₁·w + b₂·(w − w_mid)²',
+                             'palencia': 'B = b₀ + b₁ ÷ w²',
+                             'scatter_1': 'B = b₀ + b₁ ÷ w',
+                             'scatter_2': 'B = b₀ + b₁ ÷ w + b₂ ÷ w²',
+                             'linear': 'B = b₀ + b₁·w',
+                             }
+BACKGROUND_LABELS = {name: f'{short}, {BACKGROUND_PLAIN_FORMULAS[name]}'
+                     for name, short in BACKGROUND_SHORT_NAMES.items()
+                     }
 # Each background's formula as a textbook writes it (matplotlib mathtext), as MATHS.md
 # section 1.3 gives it: w the wavelength (nm), w_mid the one halfway along, b0 to b2
 # found by the fit.

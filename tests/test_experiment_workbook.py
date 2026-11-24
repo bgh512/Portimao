@@ -341,6 +341,7 @@ def test_how_it_was_worked_out() -> None:
     assert [tuple(row) for row in table.itertuples(index=False)] == [
         ('Fit', '', 'made-up fit', ''),
         ('Background fitted', '', 'Rowan scatter', ''),
+        ('Background formula (w in nm)', '', 'B = b₀ + b₁·w + b₂·(w − w_mid)²', 'OD'),
         ('Start of ΔD (what was taken off)', 'bH', 12.0, 'mOD'),
         ('Start of ΔD (what was taken off)', 'bL', 6.0, 'mOD'),
         ('Start of ΔD, taken from', 'bH', '0.00 to 1.00', 'min'),
@@ -363,7 +364,7 @@ def test_how_it_was_worked_out() -> None:
         ('OD scaling: OD', '', 0.5, ''),
         ('OD scaling: volume', '', 1.0, 'mL'),
         ('OD scaling: dilution factor', '', 2.0, ''),
-        ('OD scaling: how', '', 'divided by OD × volume × dilution factor', ''),
+        ('OD scaling: how', '', 'OCR ÷ (OD × volume × dilution factor)', ''),
         ]
     assert _processing_table_builder(_imported_experiment_maker()).empty
 
