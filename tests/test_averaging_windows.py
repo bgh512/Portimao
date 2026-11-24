@@ -24,6 +24,7 @@ from utils_shared.averaging import (baseline_percent_adder,
                                     quick_span_lister,
                                     window_kind_picker,
                                     window_layout_finder,
+                                    window_pick_lister,
                                     window_plan_finder,
                                     window_plan_reader,
                                     window_pointer_reader,
@@ -1617,8 +1618,8 @@ def test_the_window_step_holds_the_windows() -> None:
     ---- Summary ----
     Main function to check that the values the window step starts a file with hold
     its windows, in seconds, each window's own values and ticks under its name, and
-    give the same windows back; "Adjust each window" starts on only when a window has
-    a length, a gap or a start of its own.
+    give the same windows back; "Adjust region manually" starts on, with window 1
+    picked, only when a window has a length, a gap or a start of its own.
 
     ---- Inputs ----
     None.
@@ -1655,7 +1656,7 @@ def test_the_window_step_holds_the_windows() -> None:
                       'quick_is_on': 0.0,
                       'final_gap_s': 60.0,
                       'each_is_on': 1.0,
-                      'settled_picked': -1.0,
+                      'settled_picked': 1.0,
                       'quick_picked': -1.0,
                       'average1:window_s': 180.0,
                       'quick2:is_used': 0.0,
@@ -1835,7 +1836,8 @@ def test_the_plot_shows_windows_on_their_own() -> None:
                              'quick1': {'is_used': False},
                              },
                 )
-    values = window_values_maker(plan, True, True)
+    # with "Adjust region manually" off, every window has its edges
+    values = dict(window_values_maker(plan, True, True), each_is_on=0.0)
     edges, parts = window_layout_finder(values,
                                         ADDITIONS,
                                         RECORDING,
@@ -1865,22 +1867,106 @@ def test_the_plot_shows_windows_on_their_own() -> None:
                      ]
     assert 'left_out' in PART_STYLES
 
-    # ---- The ticks and the note of each row ------------------------------------------
-    assert window_row_teller(values, 2) == [('every settled window',
+    # ---- The ticks of each row: the quick windows are hidden for now -----------------
+    assert window_row_teller(values, 2) == [('',
                                              [('average1:is_used', '1', True),
                                               ('average2:is_used', '2', False),
                                               ],
                                              ),
-                                            ('every quick window',
-                                             [('quick1:is_used', '1', False),
-                                              ('quick2:is_used', '2', True),
-                                              ],
-                                             ),
+                                            ('', []),
                                             ]
-    picked = dict(values, settled_picked=0.0, quick_picked=2.0, quick_is_on=0.0)
-    assert window_row_teller(picked, 2)[0][0] == 'the baseline'
-    assert window_row_teller(picked, 2)[1] == ('', [])
-    assert window_row_teller(dict(values, each_is_on=0.0), 2)[0][0] == ''
+    assert window_row_teller(dict(values, is_on=0.0), 2)[0] == ('', [])
+
+
+# ---- test_one_window_is_adjusted_by_hand ---------------------------------------------
+def test_one_window_is_adjusted_by_hand() -> None:
+    """
+    ---- Summary ----
+    Main function to check "Adjust region manually": ticking it picks window 1; the
+    buttons beside it (Baseline 1 2) with the one picked; only the window picked has
+    edges on the plot, the others grey; a click picks another; a typed number changes
+    only that window; with the last window picked the time before the next addition is
+    the time before the end of the file, shown and typed; nothing with it off.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    ADDITIONS, RECORDING, FINAL_GAP_MIN, BASELINE_MINIMUM_S, PLAN (module constants);
+    PART_STYLES of the window.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Additions at 10 and 20, the run 0 to 30, windows 2 min ending 0.5 min before the
+    next addition: the baseline 7.5 to 9.5, window 1 17.5 to 19.5, window 2 (the last)
+    ending 0.5 min before the end of the run, 27.5 to 29.5. With window 2 picked and
+    60 s typed for its time before the end: 30 - 1 = 29, so 27 to 29.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Ticking it picks window 1 -------------------------------------------------
+    step = window_values_maker(PLAN, True, False)
+    assert window_pick_lister(step, 2) == ([], '')
+    on = window_value_setter(step, 'each_is_on', 1.0, 2)
+    assert on['settled_picked'] == 1.0
+    assert window_pick_lister(on, 2) == ([('settled_picked', 0.0, 'Baseline', False),
+                                          ('settled_picked', 1.0, '1', True),
+                                          ('settled_picked', 2.0, '2', False),
+                                          ],
+                                         '',
+                                         )
+
+    # ---- layout ----------------------------------------------------------------------
+    def layout(values: dict) -> tuple:
+        return window_layout_finder(values,
+                                    ADDITIONS,
+                                    RECORDING,
+                                    FINAL_GAP_MIN,
+                                    BASELINE_MINIMUM_S,
+                                    )
+    edges, parts = layout(on)
+    assert edges == [('window_s@average1', 17.5, 'window 120 s', 'average'),
+                     ('gap_s@average1',
+                      19.5,
+                      'ends 30 s before the addition',
+                      'average_end',
+                      ),
+                     ]
+    assert parts == [(7.5, 9.5, 'not_picked'),
+                     (17.5, 19.5, 'average'),
+                     (27.5, 29.5, 'not_picked'),
+                     ]
+    assert 'not_picked' in PART_STYLES
+
+    # ---- 3 A click picks another; a typed number changes only it ---------------------
+    baseline = window_value_setter(on, 'settled_picked', 0.0, 2)
+    assert [key for key, _, _, _ in layout(baseline)[0]] == ['window_s@average0',
+                                                             'gap_s@average0',
+                                                             ]
+    typed = window_value_setter(baseline, 'window_s', 90.0, 2)
+    assert typed == dict(baseline, **{'average0:window_s': 90.0})
+
+    # ---- 4 The last window ends before the end of the file ---------------------------
+    last = window_value_setter(on, 'settled_picked', 2.0, 2)
+    assert window_pick_lister(last, 2)[1] == ('the last window: its time is before '
+                                              'the end of the file')
+    assert window_shown_maker(last, 2) == {'window_s': 120.0, 'gap_s': 30.0}
+    ended = window_value_setter(last, 'gap_s', 60.0, 2)
+    assert ended == dict(last, final_gap_s=60.0)
+    assert layout(ended)[1][2] == (27.0, 29.0, 'average')
+
+    # ---- 5 Off: every window has its edges again -------------------------------------
+    off = window_value_setter(ended, 'each_is_on', 0.0, 2)
+    assert window_pick_lister(off, 2) == ([], '')
+    assert len(layout(off)[0]) == 6
 
 
 # ---- test_the_window_step_keeps_each_file --------------------------------------------

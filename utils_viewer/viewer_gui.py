@@ -1170,7 +1170,7 @@ class ViewerGui:
     def _edge_toggle_taker(self, field: str, is_on: bool) -> None:
         """
         ---- Summary ----
-        Method to take a toggle of the step ("Adjust each window"), which holds on
+        Method to take a toggle of the step ("Adjust region manually"), which holds on
         every file.
 
         ---- Inputs ----
@@ -1197,6 +1197,39 @@ class ViewerGui:
         """
 
         self._edges.every_file_field_setter(field, 1.0 if is_on else 0.0)
+        self._edges_refresher()
+
+    # ---- _edge_pick_taker ------------------------------------------------------------
+    def _edge_pick_taker(self, field: str, value: float) -> None:
+        """
+        ---- Summary ----
+        Method to take a click on a button that picks the window "Adjust region
+        manually" changes, on the file shown only.
+
+        ---- Inputs ----
+        field : str
+            The field of the button ('settled_picked').
+        value : float
+            The number of the window picked (0 the baseline).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the overlay and redraws (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _edges_refresher
+        """
+
+        self._edges.field_setter(field, value)
         self._edges_refresher()
 
     # ---- _edges_refresher ------------------------------------------------------------
@@ -1237,20 +1270,35 @@ class ViewerGui:
             self._edge_row.values_setter(shown)
             # without boxes when the step has one row
             self._second_row.values_setter(shown)
-            # the numbered ticks and the note of each row, and the step's toggles
+            # the numbered ticks and the note of each row, the step's toggles and the
+            # buttons that pick the window they change
             choice, own = self._edges.choice, self._edges.values.get(name)
             rows = [('', []), ('', [])]
             if choice.row_teller is not None and own is not None:
                 rows = choice.row_teller(name, own)
             self._edge_row.ticks_setter(*rows[0])
             self._second_row.ticks_setter(*rows[1])
-            self._options_row.toggles_setter([(field,
-                                               words,
-                                               bool((own or {}).get(field)),
-                                               )
-                                              for field, words in choice.options
-                                              ],
-                                             )
+            self._edge_row.toggles_setter([(field,
+                                            words,
+                                            bool((own or {}).get(field)),
+                                            )
+                                           for field, words in choice.options
+                                           ],
+                                          )
+            picks, note = [], ''
+            if choice.pick_lister is not None and own is not None:
+                picks, note = choice.pick_lister(name, own)
+            self._edge_row.picks_setter(picks, note)
+            if choice.switch is not None:
+                # The step's switch off greys the rest of the box; "Apply to all" is
+                # greyed while one window of one file is adjusted by hand.
+                is_on = bool((own or {}).get(choice.switch[0]))
+                is_by_hand = any((own or {}).get(field) for field, _ in choice.options)
+                if is_by_hand and self._edges.is_every_file:
+                    self._edges.is_every_file = False
+                    self._options_row.every_file_unticker()
+                self._edge_row.state_setter(is_on)
+                self._options_row.state_setter(True, is_on and not is_by_hand)
 
     # ---- _event_handler --------------------------------------------------------------
     def _event_handler(self, event: tuple) -> None:
@@ -1366,7 +1414,8 @@ class ViewerGui:
                                                  choice.unit,
                                                  )
                 else:
-                    # the step's own tick box: ticked when its field is on in any file
+                    # the step's own tick box, on the top line: ticked when its field
+                    # is on in any file
                     field, words = choice.switch
                     self._edge_row.fields_setter(choice.fields,
                                                  any(own.get(field)
@@ -1374,11 +1423,16 @@ class ViewerGui:
                                                      ),
                                                  choice.unit,
                                                  words,
+                                                 is_tick_on_top=True,
                                                  )
+                # a row greyed by another step is usable again
+                self._edge_row.state_setter(True)
+                self._options_row.state_setter(True)
                 self._edge_row.frame.pack(side='top', anchor='w', pady=(0, 2))
                 if choice.second_switch is not None:
                     self._second_row.frame.pack(side='top', anchor='w', pady=(0, 2))
-                if choice.options:
+                if choice.switch is not None:
+                    # "Apply to all" on its own line under the rows
                     self._options_row.fields_setter([],
                                                     choice.is_every_file,
                                                     choice.unit,
@@ -3545,6 +3599,8 @@ class ViewerGui:
                                  self._every_file_taker,
                                  self._area.focuser,
                                  on_tick=self._edge_tick_taker,
+                                 on_toggle=self._edge_toggle_taker,
+                                 on_pick=self._edge_pick_taker,
                                  )
         self._second_row = EdgeRow(tk,
                                    self._strip.time_box,
@@ -3557,7 +3613,7 @@ class ViewerGui:
                                    on_tick=self._edge_tick_taker,
                                    )
         # the "Apply to all" line of a step whose rows have switches of
-        # their own, with the step's toggles
+        # their own
         self._options_row = EdgeRow(tk,
                                     self._strip.time_box,
                                     PLOT_BACKGROUND,
@@ -3566,7 +3622,6 @@ class ViewerGui:
                                                                              'options',
                                                                              ),
                                     self._area.focuser,
-                                    on_toggle=self._edge_toggle_taker,
                                     )
         self._help = tk.Label(right,
                               text='',

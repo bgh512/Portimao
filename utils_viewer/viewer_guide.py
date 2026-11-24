@@ -341,7 +341,9 @@ class GuideState:
         Method to open the earlier step that a change in the boxes above the plot
         belongs to (the fit while at Δψ opens the haems). A change that belongs to a
         later step ticks that step, as done out of order; one that belongs to the step
-        the program waits at, or to no step, opens nothing.
+        the program waits at opens that step again when an earlier one is open (the
+        Averaging tab pressed while Δψ is open), and one that belongs to no step opens
+        nothing.
 
         ---- Inputs ----
         changes : Dict[str, Any]
@@ -372,6 +374,11 @@ class GuideState:
             is_new = index not in self.asked
             self.asked.add(index)
             return is_new
+        if index == self.current and self.shown != self.current:
+            # back to the step waited at (the Averaging tab pressed while Δψ is open),
+            # so its own text shows again
+            self.shown = index
+            return True
         if index == self.current or index not in self.asked or index == self.shown:
             return False
         self.shown = index

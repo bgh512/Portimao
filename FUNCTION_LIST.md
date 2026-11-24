@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.24
+- **Version:** V2.25
 - **Date:** 24/11/2026
 
 ## Contents
@@ -99,6 +99,7 @@
     - [`test_a_change_moves_one_window_or_every_window`](#test_a_change_moves_one_window_or_every_window)
     - [`test_a_pulled_window_on_its_own`](#test_a_pulled_window_on_its_own)
     - [`test_the_plot_shows_windows_on_their_own`](#test_the_plot_shows_windows_on_their_own)
+    - [`test_one_window_is_adjusted_by_hand`](#test_one_window_is_adjusted_by_hand)
     - [`test_the_window_step_keeps_each_file`](#test_the_window_step_keeps_each_file)
 - [`tests/test_compare_layout.py`](#teststest_compare_layoutpy)
     - [`_experiment_maker`](#_experiment_maker)
@@ -788,6 +789,7 @@
     - [`window_plan_reader`](#window_plan_reader)
     - [`window_pointer_reader`](#window_pointer_reader)
     - [`window_row_teller`](#window_row_teller)
+    - [`window_pick_lister`](#window_pick_lister)
     - [`window_shown_maker`](#window_shown_maker)
     - [`window_span_lister`](#window_span_lister)
     - [`window_statistics_calculator`](#window_statistics_calculator)
@@ -4184,8 +4186,8 @@ None.
 ---- Summary ----
 Main function to check that the values the window step starts a file with hold
 its windows, in seconds, each window's own values and ticks under its name, and
-give the same windows back; "Adjust each window" starts on only when a window has
-a length, a gap or a start of its own.
+give the same windows back; "Adjust region manually" starts on, with window 1
+picked, only when a window has a length, a gap or a start of its own.
 
 ---- Inputs ----
 None.
@@ -4298,6 +4300,40 @@ None.
 The baseline 7.5 to 9.5. average1 1 min of its own: 19.5 - 1 = 18.5 to 19.5.
 average2 left out, ending 1 min before the end of the run: 29 - 2 = 27 to 29.
 quick1 left out, 10.5 to 11.5; quick2 20.5 to 21.5.
+
+---- Helpers ----
+None.
+```
+
+#### `test_one_window_is_adjusted_by_hand`
+
+```text
+---- Summary ----
+Main function to check "Adjust region manually": ticking it picks window 1; the
+buttons beside it (Baseline 1 2) with the one picked; only the window picked has
+edges on the plot, the others grey; a click picks another; a typed number changes
+only that window; with the last window picked the time before the next addition is
+the time before the end of the file, shown and typed; nothing with it off.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITIONS, RECORDING, FINAL_GAP_MIN, BASELINE_MINIMUM_S, PLAN (module constants);
+PART_STYLES of the window.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Additions at 10 and 20, the run 0 to 30, windows 2 min ending 0.5 min before the
+next addition: the baseline 7.5 to 9.5, window 1 17.5 to 19.5, window 2 (the last)
+ending 0.5 min before the end of the run, 27.5 to 29.5. With window 2 picked and
+60 s typed for its time before the end: 30 - 1 = 29, so 27 to 29.
 
 ---- Helpers ----
 None.
@@ -7009,7 +7045,8 @@ _status_reader
 Main function to check the changes that leave the guide where it is: how the
 haems, the OCR and the labels are shown (they belong to every step), Δψ unticked
 at a later step (a number of its box opens its step), a change that belongs to the
-step waited at, and any change before the first step; that a
+step waited at (which only opens it again while an earlier step is open, as the
+Averaging tab while Δψ is open), and any change before the first step; that a
 change of a later step (or its tab of the Time regions box) only ticks it as done;
 and that a click opens only a step already asked.
 
@@ -24397,9 +24434,10 @@ Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
     edge 'final_gap_s' (kind 'average_end'). Then the quick windows: the start of
     each is an edge of 'delay_s' (kind 'quick'), its end an edge of 'quick_s'
     (kind 'quick_end'). A part has the kind 'baseline', 'average', 'quick',
-    'average_unfit' for a window that does not fit, or 'left_out' for one left
-    out, which has no edges. Both lists are empty when both kinds are switched off
-    or the file has no additions.
+    'average_unfit' for a window that does not fit, 'left_out' for one left
+    out, or 'not_picked' for a window other than the one picked while "Adjust
+    region manually" is on; the last two have no edges. Both lists are empty when
+    both kinds are switched off or the file has no additions.
 
 ---- Globals mutated ----
 None.
@@ -24543,9 +24581,9 @@ window_span_lister
 
 ```text
 ---- Summary ----
-Main function to give what each row of the window step shows beside its boxes for
-the file shown: which window the boxes are of, with "Adjust each window" on, and a
-numbered tick for each window of its kind, to leave it out.
+Main function to give what each row of the window step shows for the file shown: a
+numbered tick for each window of its kind ("Use: 1 2 3"), to leave it out. The
+quick windows are hidden for now, so their row is always empty.
 
 ---- Inputs ----
 values : Dict[str, float]
@@ -24559,9 +24597,44 @@ OWN_SEPARATOR (module constant).
 ---- Outputs ----
 List[Tuple[str, List[Tuple[str, str, bool]]]]
     [(note, [(field, words, is_ticked)])] for the settled row, then the quick row:
-    the note 'every settled window', 'the baseline', 'settled window 2' (empty with
-    "Adjust each window" off), and the ticks ('average1:is_used', '1', True) ...
-    A row whose kind is switched off has neither.
+    the note is always empty, and the ticks ('average1:is_used', '1', True) ...
+    A row whose kind is switched off has none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `window_pick_lister`
+
+```text
+---- Summary ----
+Main function to give the buttons beside "Adjust region manually" for the file
+shown, one per window of the baseline and the settled windows, and the note beside
+them: while it is on, the window picked is the only one that changes.
+
+---- Inputs ----
+values : Dict[str, float]
+    The values of the file in the window step.
+addition_count : int
+    How many additions the file has (one settled window for each).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[List[Tuple[str, float, str, bool]], str]
+    ([(field, value, words, is_picked)], note): the field set by a click
+    ('settled_picked') and its value (0 the baseline, 1 the first window ...),
+    the words ('Baseline', '1' ...) and whether it is the window picked; the note
+    says when the last window is picked that its time is before the end of the
+    file. Both empty while "Adjust region manually" is off, the windows are
+    switched off or the file has no additions.
 
 ---- Globals mutated ----
 None.
@@ -24579,12 +24652,15 @@ _window_number_finder
 ```text
 ---- Summary ----
 Main function to give the values the boxes of the window step show in place of
-the shared ones: with "Adjust each window" on, those of the window of each kind
-last dragged.
+the shared ones: with "Adjust region manually" on, those of the window of each
+kind picked. For the last settled window the second box shows how long before the
+end of the file it ends.
 
 ---- Inputs ----
 values : Dict[str, float]
     The values of the file in the window step.
+addition_count : Optional[int]
+    How many additions the file has, to know its last window; None for not known.
 
 ---- Globals read ----
 OWN_SEPARATOR, STEP_OWN_FIELDS (module constants).
@@ -24592,7 +24668,7 @@ OWN_SEPARATOR, STEP_OWN_FIELDS (module constants).
 ---- Outputs ----
 Dict[str, float]
     {field: value in seconds} of the fields shown otherwise; empty with "Adjust
-    each window" off or no window dragged.
+    region manually" off or no window picked.
 
 ---- Globals mutated ----
 None.
@@ -24602,6 +24678,7 @@ None.
 
 ---- Helpers ----
 _picked_window_namer
+_window_number_finder
 ```
 
 #### `window_span_lister`
@@ -24700,12 +24777,14 @@ value_getter
 Main function to set one value of the settled or the quick windows (a length, how
 long before the next addition or after its own a window ends or starts, how long
 before the end of the file the last settled window ends, whether there are windows
-of a kind, whether a window is used, or whether "Adjust each window" is on), as
-dragged, typed or ticked in the window step. With "Adjust each window" on, a
-dragged edge sets the value of its window only and makes it the window the boxes
-show, and a typed value goes to that window; with it off, or no window dragged,
-the value is set for every window of its kind, which lose their own values of
-that field. A value that cannot be used leaves everything as it is.
+of a kind, whether a window is used, whether "Adjust region manually" is on, or
+the window picked), as dragged, typed, ticked or clicked in the window step.
+Switching "Adjust region manually" on picks window 1. While it is on, a dragged
+edge sets the value of its window only and makes it the window picked, and a typed
+value goes to the window picked (the time before the next addition of the last
+window is its time before the end of the file); with it off, or no window picked,
+the value is set for every window of its kind, which lose their own values of that
+field. A value that cannot be used leaves everything as it is.
 
 ---- Inputs ----
 values : Dict[str, float]
@@ -24715,7 +24794,10 @@ key : str
     window of the edge dragged ('gap_s@average1'), or the tick of a window
     ('average2:is_used').
 value : float
-    Its new value: seconds, or for a switch or a tick anything but 0 for on.
+    Its new value: seconds, or for a switch or a tick anything but 0 for on, or
+    the number of the window picked (0 the baseline).
+addition_count : Optional[int]
+    How many additions the file has, to know its last window; None for not known.
 
 ---- Globals read ----
 OWN_SEPARATOR, STEP_OWN_FIELDS (module constants).
@@ -24742,8 +24824,9 @@ _window_number_finder
 ```text
 ---- Summary ----
 Main function to give the values the window step starts one file with, from its
-averaging windows: the inverse of window_plan_reader. "Adjust each window" starts
-on when a window has a length, a gap or a start of its own.
+averaging windows: the inverse of window_plan_reader. "Adjust region manually"
+starts on, with window 1 picked, when a window has a length, a gap or a start of
+its own.
 
 ---- Inputs ----
 plan : dict
@@ -36677,7 +36760,8 @@ None.
 ```text
 ---- Summary ----
 Method to set one field on every file, whatever "Apply to all"
-says: for a switch of the whole step (a kind of window, "Adjust each window").
+says: for a switch of the whole step (the averaging windows, "Adjust region
+manually").
 
 ---- Inputs ----
 key : str
@@ -37949,7 +38033,7 @@ _edges_refresher
 
 ```text
 ---- Summary ----
-Method to take a toggle of the step ("Adjust each window"), which holds on
+Method to take a toggle of the step ("Adjust region manually"), which holds on
 every file.
 
 ---- Inputs ----
@@ -37957,6 +38041,36 @@ field : str
     The field of the toggle.
 is_on : bool
     Its new state.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the overlay and redraws (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_edges_refresher
+```
+
+##### `_edge_pick_taker`
+
+```text
+---- Summary ----
+Method to take a click on a button that picks the window "Adjust region
+manually" changes, on the file shown only.
+
+---- Inputs ----
+field : str
+    The field of the button ('settled_picked').
+value : float
+    The number of the window picked (0 the baseline).
 
 ---- Globals read ----
 None.
@@ -40522,7 +40636,9 @@ is_back
 Method to open the earlier step that a change in the boxes above the plot
 belongs to (the fit while at Δψ opens the haems). A change that belongs to a
 later step ticks that step, as done out of order; one that belongs to the step
-the program waits at, or to no step, opens nothing.
+the program waits at opens that step again when an earlier one is open (the
+Averaging tab pressed while Δψ is open), and one that belongs to no step opens
+nothing.
 
 ---- Inputs ----
 changes : Dict[str, Any]
@@ -43973,19 +44089,18 @@ None.
 ---- Summary ----
 Helper function to run the window step on the plot of every file: the averaging
 windows are shaded on the plot, the baseline before the first addition in gold
-with its name. The settled windows (blue) have a length and a gap before the next
+with its name. The windows (blue) have a length and a time before the next
 addition: pulling the start of any of them changes the length, pulling its end the
-gap, and pulling the end of the last one how long before the end of the file it
-ends. The quick windows (green) have a length and a start after their addition:
-pulling the start of any of them changes how long after the addition they start,
-pulling its end the length. A change moves every window of its kind, or with
-Adjust each window ticked only the window dragged (the boxes then show it), on
-every file while Apply to all is ticked, otherwise on the file shown. The four
-values are also typed in the two rows of the Time regions box, where each kind has
-its tick box (with both unticked there are no windows) and a numbered tick per
-window to leave it out (grey). Enter accepts. The windows that do not fit are
-shaded red and named in a warning after Enter. When no file has an addition,
-nothing is asked and nothing is averaged.
+time before the addition, and pulling the end of the last one how long before the
+end of the file it ends. A change moves every window, on every file while Apply to
+all is ticked, otherwise on the file shown. With Adjust region manually ticked,
+one window picked with the buttons beside it changes, on the file shown only; the
+others are grey and have no edges, and Apply to all is greyed. The two values are
+also typed in the Time regions box, under its Averaging windows tick box (unticked
+there are no windows) and a numbered tick per window to leave it out (grey).
+Continue accepts. The windows that do not fit are shaded red and named in a
+warning after Continue. The quick windows are hidden for now. When no file has an
+addition, nothing is asked and nothing is averaged.
 
 ---- Inputs ----
 session : ViewerSession
@@ -44003,8 +44118,7 @@ details : Dict[str, dict]
     ignored there.
 
 ---- Globals read ----
-QUICK_FIELDS, QUICK_SWITCH, WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_NUDGE,
-WINDOW_SWITCH (module constants); settings.BASELINE_MINIMUM_SECONDS,
+WINDOW_NUDGE (module constant); settings.BASELINE_MINIMUM_SECONDS,
 settings.DRAG_STEP_SECONDS.
 
 ---- Outputs ----
@@ -44054,8 +44168,8 @@ details : Dict[str, dict]
     ignored there.
 
 ---- Globals read ----
-QUICK_FIELDS, QUICK_SWITCH, WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_OPTIONS,
-WINDOW_SWITCH (module constants); PICKED_KEYS (imported);
+WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_OPTIONS, WINDOW_SWITCH (module constants);
+PICKED_KEYS (imported);
 settings.BASELINE_MINIMUM_SECONDS, settings.DRAG_STEP_SECONDS.
 
 ---- Outputs ----
@@ -44074,6 +44188,7 @@ on the time axis of the plot.
 _addition_time_lister
 info_printer
 window_layout_finder
+window_pick_lister
 window_plan_finder
 window_pointer_reader
 window_row_teller
@@ -44625,9 +44740,9 @@ The five boxes above the plot: Time regions, View, Haem decomposition, Δψ and 
 ```text
 ---- Summary ----
 The row of the strip shown while edges are dragged on the plot: a typing box for
-each edge, holding its value for the file shown, and the "Apply to all" tick box.
-It
-follows the drag and passes on what the user types or ticks; it changes nothing by
+each edge, holding its value for the file shown, and the "Apply to all" tick box
+(or the step's own switch); for the averaging windows also the numbered ticks, the
+toggles and the buttons that pick a window. It follows the drag and passes on what the user types or ticks; it changes nothing by
 itself. Every method runs on the window thread.
 
 ---- Attributes ----
@@ -44639,11 +44754,14 @@ ERROR_BACKGROUND, ERROR_TEXT, NOTE_TEXT.
 
 ---- Methods ----
 __init__
+_line_packer
 _every_file_handler
 _tick_handler
 _value_handler
 every_file_unticker
 fields_setter
+picks_setter
+state_setter
 ticks_setter
 toggles_setter
 values_setter
@@ -44653,8 +44771,8 @@ values_setter
 
 ```text
 ---- Summary ----
-Method to build the row, with no boxes until fields_setter, and no ticks or
-toggles until ticks_setter and toggles_setter.
+Method to build the row, with no boxes until fields_setter, and no ticks,
+toggles or picks until ticks_setter, toggles_setter and picks_setter.
 
 ---- Inputs ----
 tk : Any
@@ -44673,8 +44791,9 @@ on_return : Callable[[], None]
 on_tick : Optional[Callable[[str, bool], None]]
     Called with (field, new state) when a numbered tick is clicked.
 on_toggle : Optional[Callable[[str, bool], None]]
-    Called with (field, new state) when a toggle beside the tick box is
-    clicked.
+    Called with (field, new state) when a toggle is clicked.
+on_pick : Optional[Callable[[str, float], None]]
+    Called with (field, value) when a button beside the toggles is clicked.
 
 ---- Globals read ----
 NOTE_TEXT.
@@ -44691,6 +44810,36 @@ None.
 
 ---- Helpers ----
 _every_file_handler
+_line_packer
+```
+
+##### `_line_packer`
+
+```text
+---- Summary ----
+Method to place the lines of the row from the top: the boxes, the numbered
+ticks, the toggles and the tick box; or, with the tick box being the step's own
+switch, that first, then the ticks, the toggles and the boxes.
+
+---- Inputs ----
+is_tick_on_top : bool
+    True to put the tick box on the top line.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Packs the lines again (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_every_file_handler`
@@ -44815,7 +44964,7 @@ None.
 Method to make one typing box for each field, each after its name, and set the
 tick box and its words. A name starting with a capital starts a new line (Trim
 before ... after, then Ignore before ... after), and each line ends with the
-unit.
+unit, unless its names already hold it ("Region length (s)").
 
 ---- Inputs ----
 fields : List[Tuple[str, str]]
@@ -44827,6 +44976,9 @@ unit : str
 tick_text : str
     The words of the tick box: "Apply to all", or those of the step's own
     switch.
+is_tick_on_top : bool
+    True to put the tick box on the top line of the row (the step's own
+    switch), False to put it on the bottom line.
 
 ---- Globals read ----
 EVERY_FILE_TEXT, UNIT_HELP.
@@ -44842,7 +44994,70 @@ None. Replaces the boxes (side effect).
 None.
 
 ---- Helpers ----
+_line_packer
 _value_handler
+```
+
+##### `picks_setter`
+
+```text
+---- Summary ----
+Method to show the buttons beside the toggles that pick the window they change
+(Baseline 1 2 3), the one picked in bold and pressed in, with a note after
+them; they are made again only when they change.
+
+---- Inputs ----
+picks : List[Tuple[str, float, str, bool]]
+    [(field, value, words, is_picked)]; empty for none.
+note : str
+    The note after the buttons, or ''.
+
+---- Globals read ----
+NOTE_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the buttons (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `state_setter`
+
+```text
+---- Summary ----
+Method to grey out the boxes, the numbered ticks, the toggles and the picks of
+the row (the step's switch is off), and separately its tick box ("Apply to all"
+while one window is adjusted by hand).
+
+---- Inputs ----
+is_enabled : bool
+    False to grey out everything but the tick box.
+is_tick_enabled : bool
+    False to grey out the tick box.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `ticks_setter`
@@ -44880,7 +45095,7 @@ _tick_handler
 
 ```text
 ---- Summary ----
-Method to show the toggles beside the tick box ("Adjust each window"); they
+Method to show the toggles on their own line ("Adjust region manually"); they
 are made again only when they change.
 
 ---- Inputs ----

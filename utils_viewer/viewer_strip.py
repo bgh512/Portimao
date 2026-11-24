@@ -173,9 +173,9 @@ class EdgeRow:
     """
     ---- Summary ----
     The row of the strip shown while edges are dragged on the plot: a typing box for
-    each edge, holding its value for the file shown, and the "Apply to all" tick box.
-    It
-    follows the drag and passes on what the user types or ticks; it changes nothing by
+    each edge, holding its value for the file shown, and the "Apply to all" tick box
+    (or the step's own switch); for the averaging windows also the numbered ticks, the
+    toggles and the buttons that pick a window. It follows the drag and passes on what the user types or ticks; it changes nothing by
     itself. Every method runs on the window thread.
 
     ---- Attributes ----
@@ -187,11 +187,14 @@ class EdgeRow:
 
     ---- Methods ----
     __init__
+    _line_packer
     _every_file_handler
     _tick_handler
     _value_handler
     every_file_unticker
     fields_setter
+    picks_setter
+    state_setter
     ticks_setter
     toggles_setter
     values_setter
@@ -207,11 +210,12 @@ class EdgeRow:
                  on_return: Callable[[], None],
                  on_tick: Optional[Callable[[str, bool], None]] = None,
                  on_toggle: Optional[Callable[[str, bool], None]] = None,
+                 on_pick: Optional[Callable[[str, float], None]] = None,
                  ) -> None:
         """
         ---- Summary ----
-        Method to build the row, with no boxes until fields_setter, and no ticks or
-        toggles until ticks_setter and toggles_setter.
+        Method to build the row, with no boxes until fields_setter, and no ticks,
+        toggles or picks until ticks_setter, toggles_setter and picks_setter.
 
         ---- Inputs ----
         tk : Any
@@ -230,8 +234,9 @@ class EdgeRow:
         on_tick : Optional[Callable[[str, bool], None]]
             Called with (field, new state) when a numbered tick is clicked.
         on_toggle : Optional[Callable[[str, bool], None]]
-            Called with (field, new state) when a toggle beside the tick box is
-            clicked.
+            Called with (field, new state) when a toggle is clicked.
+        on_pick : Optional[Callable[[str, float], None]]
+            Called with (field, value) when a button beside the toggles is clicked.
 
         ---- Globals read ----
         NOTE_TEXT.
@@ -248,6 +253,7 @@ class EdgeRow:
 
         ---- Helpers ----
         _every_file_handler
+        _line_packer
         """
 
         self._tk = tk
@@ -257,24 +263,30 @@ class EdgeRow:
         self._on_return = on_return
         self._on_tick = on_tick
         self._on_toggle = on_toggle
+        self._on_pick = on_pick
         self._boxes: Dict[str, Any] = {}
         self._shown: Dict[str, str] = {}
         self._tick_vars: Dict[str, Any] = {}
         self._toggle_vars: Dict[str, Any] = {}
+        self._picks: List[Tuple[str, float, str, bool]] = []
         self.frame = tk.Frame(parent, bg=background)
         self._boxes_frame = tk.Frame(self.frame, bg=background)
-        self._boxes_frame.pack(side='top', anchor='w')
-        # the numbered ticks of the windows, with the note of which window the boxes
-        # show
+        # the numbered ticks of the windows ("Use: 1 2 3")
         self._ticks_frame = tk.Frame(self.frame, bg=background)
-        self._ticks_frame.pack(side='top', anchor='w')
         self._row_note: Any = None
+        # the toggles of the step ("Adjust region manually") and, beside them, the
+        # buttons that pick the window they change
+        self._toggles_line = tk.Frame(self.frame, bg=background)
+        self._toggles_frame = tk.Frame(self._toggles_line, bg=background)
+        self._toggles_frame.pack(side='left')
+        self._picks_frame = tk.Frame(self._toggles_line, bg=background)
+        self._picks_frame.pack(side='left')
         # the tick box and the note on a line of their own, so the row fits its box
-        under = tk.Frame(self.frame, bg=background)
-        under.pack(side='top', anchor='w')
+        self._under = tk.Frame(self.frame, bg=background)
+        self._line_packer(False)
         self._help = UNIT_HELP['min']
         self._every_file = tk.BooleanVar(master=parent, value=False)
-        self._tick = tk.Checkbutton(under,
+        self._tick = tk.Checkbutton(self._under,
                                     text=EVERY_FILE_TEXT,
                                     variable=self._every_file,
                                     command=self._every_file_handler,
@@ -283,12 +295,55 @@ class EdgeRow:
                                     highlightthickness=0,
                                     )
         self._tick.pack(side='left', padx=(0, 4))
-        self._toggles_frame = tk.Frame(under, bg=background)
-        self._toggles_frame.pack(side='left')
-        self._note = tk.Label(under, text='', bg=background, fg=NOTE_TEXT)
+        self._note = tk.Label(self._under, text='', bg=background, fg=NOTE_TEXT)
         self._note.pack(side='left', padx=(0, 4))
 
     # ---- ROW HELPERS -----------------------------------------------------------------
+
+    # ---- _line_packer ----------------------------------------------------------------
+    def _line_packer(self, is_tick_on_top: bool) -> None:
+        """
+        ---- Summary ----
+        Method to place the lines of the row from the top: the boxes, the numbered
+        ticks, the toggles and the tick box; or, with the tick box being the step's own
+        switch, that first, then the ticks, the toggles and the boxes.
+
+        ---- Inputs ----
+        is_tick_on_top : bool
+            True to put the tick box on the top line.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Packs the lines again (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        lines = [self._boxes_frame,
+                 self._ticks_frame,
+                 self._toggles_line,
+                 self._under,
+                 ]
+        for line in lines:
+            line.pack_forget()
+        if is_tick_on_top:
+            lines = [self._under,
+                     self._ticks_frame,
+                     self._toggles_line,
+                     self._boxes_frame,
+                     ]
+        for line in lines:
+            line.pack(side='top', anchor='w')
 
     # ---- _every_file_handler ---------------------------------------------------------
     def _every_file_handler(self) -> None:
@@ -438,13 +493,14 @@ class EdgeRow:
                       is_every_file: bool,
                       unit: str = 'min',
                       tick_text: str = EVERY_FILE_TEXT,
+                      is_tick_on_top: bool = False,
                       ) -> None:
         """
         ---- Summary ----
         Method to make one typing box for each field, each after its name, and set the
         tick box and its words. A name starting with a capital starts a new line (Trim
         before ... after, then Ignore before ... after), and each line ends with the
-        unit.
+        unit, unless its names already hold it ("Region length (s)").
 
         ---- Inputs ----
         fields : List[Tuple[str, str]]
@@ -456,6 +512,9 @@ class EdgeRow:
         tick_text : str
             The words of the tick box: "Apply to all", or those of the step's own
             switch.
+        is_tick_on_top : bool
+            True to put the tick box on the top line of the row (the step's own
+            switch), False to put it on the bottom line.
 
         ---- Globals read ----
         EVERY_FILE_TEXT, UNIT_HELP.
@@ -471,6 +530,7 @@ class EdgeRow:
         None.
 
         ---- Helpers ----
+        _line_packer
         _value_handler
         """
 
@@ -478,20 +538,24 @@ class EdgeRow:
         for child in self._boxes_frame.winfo_children():
             child.destroy()
         self._boxes, self._shown = {}, {}
+        self._line_packer(is_tick_on_top)
         # A name with a capital starts a line of its own (Trim, then Ignore), and each
-        # line ends with the unit.
-        line = None
+        # line ends with the unit, unless the names hold it.
+        unit_text = f'({unit})'
+        line, is_unit_named = None, False
         for key, name in fields:
             if line is None or name[:1].isupper():
-                if line is not None:
+                if line is not None and not is_unit_named:
                     tk.Label(line, text=unit, bg=background).pack(side='left',
                                                                   padx=(4, 0),
                                                                   )
                 line = tk.Frame(self._boxes_frame, bg=background)
+                is_unit_named = False
                 line.pack(side='top', anchor='w', pady=(0, 1))
                 gap = 0
             else:
                 gap = 4
+            is_unit_named = is_unit_named or unit_text in name
             tk.Label(line,
                      text=name,
                      bg=background,
@@ -509,12 +573,127 @@ class EdgeRow:
                      )
             box.bind('<FocusOut>', lambda event, name=key: self._value_handler(name))
             self._boxes[key] = box
-        if line is not None:
+        if line is not None and not is_unit_named:
             tk.Label(line, text=unit, bg=background).pack(side='left', padx=(4, 0))
         self._help = UNIT_HELP[unit]
         self._tick.configure(text=tick_text)
         self._every_file.set(is_every_file)
         self._note.configure(text='')
+
+    # ---- picks_setter ----------------------------------------------------------------
+    def picks_setter(self,
+                     picks: List[Tuple[str, float, str, bool]],
+                     note: str,
+                     ) -> None:
+        """
+        ---- Summary ----
+        Method to show the buttons beside the toggles that pick the window they change
+        (Baseline 1 2 3), the one picked in bold and pressed in, with a note after
+        them; they are made again only when they change.
+
+        ---- Inputs ----
+        picks : List[Tuple[str, float, str, bool]]
+            [(field, value, words, is_picked)]; empty for none.
+        note : str
+            The note after the buttons, or ''.
+
+        ---- Globals read ----
+        NOTE_TEXT.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the buttons (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        import tkinter.font as tk_font
+
+        if list(picks) == self._picks and self._picks_frame.winfo_children():
+            return
+        tk, background = self._tk, self._background
+        for child in self._picks_frame.winfo_children():
+            child.destroy()
+        self._picks = list(picks)
+        for field, value, words, is_picked in picks:
+            button = tk.Button(self._picks_frame,
+                               text=words,
+                               padx=4,
+                               pady=0,
+                               relief='sunken' if is_picked else 'raised',
+                               command=lambda name=field, number=value: (
+                                   self._on_pick(name, number)
+                                   if self._on_pick is not None
+                                   else None),
+                               )
+            if is_picked:
+                font = tk_font.Font(font=button.cget('font'))
+                font.configure(weight='bold')
+                button.configure(font=font)
+                button.font = font  # kept, or Tk forgets the font
+            button.pack(side='left', padx=(0, 2))
+        if note:
+            tk.Label(self._picks_frame,
+                     text=note,
+                     bg=background,
+                     fg=NOTE_TEXT,
+                     ).pack(side='left', padx=(4, 0))
+
+    # ---- state_setter ----------------------------------------------------------------
+    def state_setter(self, is_enabled: bool, is_tick_enabled: bool = True) -> None:
+        """
+        ---- Summary ----
+        Method to grey out the boxes, the numbered ticks, the toggles and the picks of
+        the row (the step's switch is off), and separately its tick box ("Apply to all"
+        while one window is adjusted by hand).
+
+        ---- Inputs ----
+        is_enabled : bool
+            False to grey out everything but the tick box.
+        is_tick_enabled : bool
+            False to grey out the tick box.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        state = 'normal' if is_enabled else 'disabled'
+        for frame in (self._boxes_frame,
+                      self._ticks_frame,
+                      self._toggles_frame,
+                      self._picks_frame,
+                      ):
+            for widget in frame.winfo_children():
+                widgets = [widget] + list(widget.winfo_children())
+                for each in widgets:
+                    if isinstance(each,
+                                  (self._tk.Entry,
+                                   self._tk.Checkbutton,
+                                   self._tk.Button,
+                                   ),
+                                  ):
+                        each.configure(state=state)
+        self._tick.configure(state='normal' if is_tick_enabled else 'disabled')
 
     # ---- ticks_setter ----------------------------------------------------------------
     def ticks_setter(self, note: str, ticks: List[Tuple[str, str, bool]]) -> None:
@@ -591,7 +770,7 @@ class EdgeRow:
     def toggles_setter(self, toggles: List[Tuple[str, str, bool]]) -> None:
         """
         ---- Summary ----
-        Method to show the toggles beside the tick box ("Adjust each window"); they
+        Method to show the toggles on their own line ("Adjust region manually"); they
         are made again only when they change.
 
         ---- Inputs ----
@@ -666,9 +845,12 @@ class EdgeRow:
 
         for key, box in self._boxes.items():
             text = '' if values is None else f'{round(values[key], 2):g}'
-            box.configure(bg='white')
+            # a greyed box takes no text until it is enabled again
+            state = str(box.cget('state'))
+            box.configure(bg='white', state='normal')
             box.delete(0, 'end')
             box.insert(0, text)
+            box.configure(state=state)
             self._shown[key] = text
         self._note.configure(text='')
 

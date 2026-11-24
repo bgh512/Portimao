@@ -15,6 +15,7 @@ from utils_shared.averaging import (LEFT_OUT_PROBLEM,
                                     PICKED_KEYS,
                                     quick_span_lister,
                                     window_layout_finder,
+                                    window_pick_lister,
                                     window_plan_finder,
                                     window_plan_reader,
                                     window_pointer_reader,
@@ -198,24 +199,25 @@ REGION_KEY_LINES = ("OXIDISED (red) = haems fully oxidised: each haem's level he
 REGION_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
                 'regions out on the plot; press Continue when every experiment looks '
                 'right.')
-# The boxes of the window step, and its tick boxes (averaging.WINDOW_KEYS):
-# one row for the settled windows, one for the quick windows.
-WINDOW_FIELDS = [('window_s', 'Settled window'),
-                 ('gap_s', 'Gap before the next addition'),
+# The boxes of the window step, and its tick box (averaging.WINDOW_KEYS): the settled
+# windows only. The quick windows are hidden for now; their boxes and tick box stay
+# here for when they come back.
+WINDOW_FIELDS = [('window_s', 'Region length (s)'),
+                 ('gap_s', 'Time before next addition (s)'),
                  ]
-WINDOW_SWITCH = ('is_on', 'Settled windows')
+WINDOW_SWITCH = ('is_on', 'Averaging windows')
 QUICK_FIELDS = [('quick_s', 'Quick window'), ('delay_s', 'Start after the addition')]
 QUICK_SWITCH = ('quick_is_on', 'Quick windows')
-# the toggle beside "Apply to all": a drag or a typed number moves only
-# the window touched
-WINDOW_OPTIONS = [('each_is_on', 'Adjust each window')]
-WINDOW_KEY_TEXT = ('gold = baseline, blue = settled window, green = quick window, red '
-                   'hatched = a window that does not fit, grey = a window left out')
+# the toggle under the Use ticks: while on, only the window picked beside it changes,
+# on the file shown
+WINDOW_OPTIONS = [('each_is_on', 'Adjust region manually')]
+WINDOW_KEY_TEXT = ('gold = baseline, blue = window, grey = left out or not picked, red '
+                   'hatched = a window that does not fit')
 FIGURE_NUDGE = ('Change the figure in the boxes above the plot; press Enter with this box '
                 'empty when it looks right.')
 WINDOW_NUDGE = ('Type the numbers of the windows in the Time regions box above the '
-                'plot, or drag the edges of a window; press Enter with this box empty '
-                'when the windows look right.')
+                'plot, or drag the edges of a window; press Continue when the windows '
+                'look right.')
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
@@ -2663,19 +2665,18 @@ def _windows_chooser(session: ViewerSession,
     ---- Summary ----
     Helper function to run the window step on the plot of every file: the averaging
     windows are shaded on the plot, the baseline before the first addition in gold
-    with its name. The settled windows (blue) have a length and a gap before the next
+    with its name. The windows (blue) have a length and a time before the next
     addition: pulling the start of any of them changes the length, pulling its end the
-    gap, and pulling the end of the last one how long before the end of the file it
-    ends. The quick windows (green) have a length and a start after their addition:
-    pulling the start of any of them changes how long after the addition they start,
-    pulling its end the length. A change moves every window of its kind, or with
-    Adjust each window ticked only the window dragged (the boxes then show it), on
-    every file while Apply to all is ticked, otherwise on the file shown. The four
-    values are also typed in the two rows of the Time regions box, where each kind has
-    its tick box (with both unticked there are no windows) and a numbered tick per
-    window to leave it out (grey). Enter accepts. The windows that do not fit are
-    shaded red and named in a warning after Enter. When no file has an addition,
-    nothing is asked and nothing is averaged.
+    time before the addition, and pulling the end of the last one how long before the
+    end of the file it ends. A change moves every window, on every file while Apply to
+    all is ticked, otherwise on the file shown. With Adjust region manually ticked,
+    one window picked with the buttons beside it changes, on the file shown only; the
+    others are grey and have no edges, and Apply to all is greyed. The two values are
+    also typed in the Time regions box, under its Averaging windows tick box (unticked
+    there are no windows) and a numbered tick per window to leave it out (grey).
+    Continue accepts. The windows that do not fit are shaded red and named in a
+    warning after Continue. The quick windows are hidden for now. When no file has an
+    addition, nothing is asked and nothing is averaged.
 
     ---- Inputs ----
     session : ViewerSession
@@ -2693,8 +2694,7 @@ def _windows_chooser(session: ViewerSession,
         ignored there.
 
     ---- Globals read ----
-    QUICK_FIELDS, QUICK_SWITCH, WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_NUDGE,
-    WINDOW_SWITCH (module constants); settings.BASELINE_MINIMUM_SECONDS,
+    WINDOW_NUDGE (module constant); settings.BASELINE_MINIMUM_SECONDS,
     settings.DRAG_STEP_SECONDS.
 
     ---- Outputs ----
@@ -2729,43 +2729,38 @@ def _windows_chooser(session: ViewerSession,
 
     # ---- 2 Drag or type the windows until Continue -----------------------------------
     guide_step_starter('windows')
-    info_printer('AVERAGING WINDOWS = the stretches around each addition that its '
+    info_printer('AVERAGING WINDOWS = the stretches before each addition that its '
                  'averages are taken over.',
                  )
-    info_printer('The baseline (gold) is the window before the first addition, as '
-                 'long as a settled window; every other window is compared with it.',
+    info_printer('The baseline (gold) is the window before the first addition; every '
+                 'other window (blue) is compared with it.',
                  tight=True,
                  )
-    info_printer('A settled window (blue) ends a set time before the next addition, '
-                 f'the last one {final_gap * 60.0:g} s before the end of the recording '
-                 '(pull its end to change that); a quick window (green) starts a set '
-                 'time after its addition.',
+    info_printer('Each window ends a set time before the next addition, the last one '
+                 f'{final_gap * 60.0:g} s before the end of the recording. Pull the '
+                 'start of a window to change its length, its end to change the time '
+                 'before the addition.',
                  tight=True,
                  )
-    info_printer('Pull the start of a settled window to change its length, its end to '
-                 'change the gap before the addition; pull the start of a quick window '
-                 'to change how long after the addition it starts, its end to change '
-                 'its length.',
-                 tight=True,
-                 )
-    info_printer('A change moves every window of its kind; tick Adjust each window to '
-                 'move only the window you drag, and the boxes then show that window. '
-                 'Untick a number under Use to leave that window out (grey). A change '
-                 'is made on the file shown only; ticking Apply to all copies its '
-                 'windows to every file, and it unticks itself when the next file is '
-                 'shown.',
+    info_printer(
+        'A change moves every window, on the file shown; ticking Apply to all '
+        'copies its windows to every file, and it unticks itself when the next '
+        'file is shown. Untick a number under Use to leave that window out '
+        '(grey), or untick Averaging windows for none.',
+        tight=True,
+        )
+    info_printer('Tick Adjust region manually to change one window of one file: pick '
+                 'it with the buttons beside it, then drag its edges or type its '
+                 'numbers; the other windows are grey until picked.',
                  tight=True,
                  )
     _step_edges_shower(session, 'windows', choice)
     try:
-        enter_waiter(
-            'Drag an edge of any window on the plot, or type the numbers under '
-            'Averaging in the Time regions box above it, where each kind of '
-            'window has its tick box. Click Continue when the windows look '
-            'right, or untick both kinds for none.',
-            WINDOW_NUDGE,
-            number='4.6',
-            )
+        enter_waiter('Drag the windows on the plot, or type their numbers in the Time '
+                     'regions box, press Continue when ready.',
+                     WINDOW_NUDGE,
+                     number='4.6',
+                     )
     finally:
         edges = _step_edges_reader(session)
     _windows_keeper(session, answers, edges, context)
@@ -2800,8 +2795,8 @@ def _windows_choice_builder(session: ViewerSession,
         ignored there.
 
     ---- Globals read ----
-    QUICK_FIELDS, QUICK_SWITCH, WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_OPTIONS,
-    WINDOW_SWITCH (module constants); PICKED_KEYS (imported);
+    WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_OPTIONS, WINDOW_SWITCH (module constants);
+    PICKED_KEYS (imported);
     settings.BASELINE_MINIMUM_SECONDS, settings.DRAG_STEP_SECONDS.
 
     ---- Outputs ----
@@ -2820,6 +2815,7 @@ def _windows_choice_builder(session: ViewerSession,
     _addition_time_lister
     info_printer
     window_layout_finder
+    window_pick_lister
     window_plan_finder
     window_pointer_reader
     window_row_teller
@@ -2852,11 +2848,13 @@ def _windows_choice_builder(session: ViewerSession,
     # ---- 2 The rules of the edges ----------------------------------------------------
     # Each file starts from its own windows: those of the dataset, or of the file when
     # it was fixed by hand.
+    # The Averaging windows tick box is the settled windows' switch; the quick windows
+    # are hidden for now, so they start off.
     is_averaging = bool(defaults['averaging'])
     known = dict(answers, **defaults)
     values = {name: window_values_maker(window_plan_finder(known, name),
-                                        is_averaging and defaults['settled_windows'],
-                                        is_averaging and defaults['quick_windows'],
+                                        is_averaging,
+                                        False,
                                         )
               for name in additions
               }
@@ -2879,17 +2877,22 @@ def _windows_choice_builder(session: ViewerSession,
                                                   step_s,
                                                   )),
                         value_setter=lambda name, values, key, value: (
-                            window_value_setter(values, key, value)),
+                            window_value_setter(values,
+                                                key,
+                                                value,
+                                                len(additions[name]),
+                                                )),
                         key_text=WINDOW_KEY_TEXT,
                         unit='s',
                         switch=WINDOW_SWITCH,
-                        second_fields=list(QUICK_FIELDS),
-                        second_switch=QUICK_SWITCH,
-                        shown_maker=lambda name, values: window_shown_maker(values),
+                        shown_maker=lambda name, values: (
+                            window_shown_maker(values, len(additions[name]))),
                         options=list(WINDOW_OPTIONS),
                         row_teller=lambda name, values: (
                             window_row_teller(values, len(additions[name]))),
                         unmarked_fields=PICKED_KEYS,
+                        pick_lister=lambda name, values: (
+                            window_pick_lister(values, len(additions[name]))),
                         )
     return choice, {'additions': additions,
                     'spans': spans,
@@ -2978,7 +2981,7 @@ def _windows_keeper(session: ViewerSession,
         return
     window_s, gap_s = shared['window_minutes'] * 60.0, shared['gap_minutes'] * 60.0
     if answers['settled_windows']:
-        info_printer(f'Settled windows: {round(window_s, 2):g} s long, ending '
+        info_printer(f'Averaging windows: {round(window_s, 2):g} s long, ending '
                      f'{round(gap_s, 2):g} s before the next addition, the last '
                      f"{round(shared['final_gap_minutes'] * 60.0, 2):g} s before the "
                      'end of the recording.',

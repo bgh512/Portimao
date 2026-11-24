@@ -44,6 +44,8 @@ PART_STYLES = {'trim': (TRIM_COLOUR, 0.25, True, 0),
                'quick': (QUICK_COLOUR, 0.22, False, 0),
                'quick_end': (QUICK_COLOUR, 0.22, False, 1),
                'left_out': (LEFT_OUT_COLOUR, 0.15, False, 0),
+               # a window that cannot be changed until it is picked
+               'not_picked': (LEFT_OUT_COLOUR, 0.22, False, 0),
                }
 HANDLE_ROW_PX = 22
 HANDLE_SIZE_PX = (9, 16)  # (width, height)
@@ -92,6 +94,9 @@ class EdgeChoice:
                                   List[Tuple[str, List[Tuple[str, str, bool]]]],
                                   ]] = None
     unmarked_fields: Tuple[str, ...] = ()
+    pick_lister: Optional[Callable[[str, Dict[str, float]],
+                                   Tuple[List[Tuple[str, float, str, bool]], str],
+                                   ]] = None
 
 
 # ---- EdgeOverlay ---------------------------------------------------------------------
@@ -559,7 +564,8 @@ class EdgeOverlay:
         """
         ---- Summary ----
         Method to set one field on every file, whatever "Apply to all"
-        says: for a switch of the whole step (a kind of window, "Adjust each window").
+        says: for a switch of the whole step (the averaging windows, "Adjust region
+        manually").
 
         ---- Inputs ----
         key : str

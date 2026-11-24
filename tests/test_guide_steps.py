@@ -491,7 +491,8 @@ def test_changes_that_open_nothing() -> None:
     Main function to check the changes that leave the guide where it is: how the
     haems, the OCR and the labels are shown (they belong to every step), Δψ unticked
     at a later step (a number of its box opens its step), a change that belongs to the
-    step waited at, and any change before the first step; that a
+    step waited at (which only opens it again while an earlier step is open, as the
+    Averaging tab while Δψ is open), and any change before the first step; that a
     change of a later step (or its tab of the Time regions box) only ticks it as done;
     and that a click opens only a step already asked.
 
@@ -532,6 +533,11 @@ def test_changes_that_open_nothing() -> None:
     assert not later.change_opener({'delta_psi': False})
     assert later.change_opener({'psi_fall_mV': 60.0})
     assert later.shown == GUIDE_KEYS.index('delta_psi')
+    # the Averaging tab pressed while Δψ is open brings back the averaging step and
+    # its text; pressed again it opens nothing
+    assert later.change_opener({'time_tab': 'windows'})
+    assert not later.is_back() and _status_reader(later)['windows'] == 'open'
+    assert not later.change_opener({'time_tab': 'windows'})
     state = _state_maker(['data_folder', 'trim', 'haems'])
     assert not state.change_opener({'haem_mode': 'abs', 'label_mode': 'added'})
     assert not state.change_opener({'haem_background': 'flat'})  # the step waited at
