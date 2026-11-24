@@ -1,11 +1,12 @@
 """
-The experiment browser window: question terminal on the left, plots on the right.
+The experiment browser window: the guide with its questions on the left, plots on the right.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import base64
 import builtins
 import io
+import math
 import os
 import queue
 import sys
@@ -19,8 +20,15 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 from PIL import Image
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.helpers import panel_order_mover
 from utils_shared.output_capture import CapturedOutput, output_capturer
-from utils_shared.questions import time_request_setter
+from utils_shared.questions import (answer_request_setter,
+                                    COLOUR_QUESTION,
+                                    COLOUR_QUIET,
+                                    COLOUR_SECTION,
+                                    guide_step_setter,
+                                    time_request_setter,
+                                    )
 from utils_shared.run_logging import details_writer
 from utils_shared.user_notices import problem_shower
 from utils_viewer.viewer_edges import (EdgeChoice,
@@ -28,13 +36,23 @@ from utils_viewer.viewer_edges import (EdgeChoice,
                                        HANDLE_BAND_PX,
                                        own_value_lister,
                                        )
+from utils_viewer.viewer_guide import (AnswerArea,
+                                       CARD_BACKGROUND,
+                                       EXPORT_CSV_CHANGE,
+                                       GuidePanel,
+                                       GuideState,
+                                       )
 from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          PreviewSpec,
                                          TimeAxis,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_renderer import PreviewRenderer
-from utils_viewer.viewer_strip import EdgeRow, SettingsStrip, strip_values_checker
+from utils_viewer.viewer_strip import (EdgeRow,
+                                       PANEL_ORDER_CHANGE,
+                                       SettingsStrip,
+                                       strip_values_checker,
+                                       )
 from utils_viewer.viewer_table import AnswerTable
 from utils_viewer.viewer_terminal import (ansi_splitter,
                                           ansi_style_updater,
@@ -43,29 +61,68 @@ from utils_viewer.viewer_terminal import (ansi_splitter,
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-MONO_FONTS = ('Menlo', 'Consolas', 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New')
+# The colour of a question line, which the guide writes larger than the rest.
+QUESTION_FOREGROUND = ansi_style_updater({'fg': None, 'bold': False, 'italic': False},
+                                         COLOUR_QUESTION[2:-1],
+                                         )['fg']
+QUESTION_EXTRA_POINTS = 3
+# The explanations, grey in a terminal, are lighter in the guide so they read easily.
+QUIET_FOREGROUND = ansi_style_updater({'fg': None, 'bold': False, 'italic': False},
+                                      COLOUR_QUIET[2:-1],
+                                      )['fg']
+INFO_COLOUR = '#c8c8c8'
+# A section heading is the stage name, which the guide shows above the step, so the
+# card leaves it out, with the dashes under it.
+SECTION_FOREGROUND = ansi_style_updater({'fg': None, 'bold': False, 'italic': False},
+                                        COLOUR_SECTION[2:-1],
+                                        )['fg']
+GUIDE_FONT_POINTS = 12
+
+MONO_FONTS =('Menlo', 'Consolas', 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New')
+# the plain font of what is typed in the tables, easier to read than the typewriter one
+SANS_FONTS = ('Segoe UI',
+              'Helvetica Neue',
+              'Helvetica',
+              'DejaVu Sans',
+              'Liberation Sans',
+              'Arial',
+              )
 TERMINAL_BACKGROUND = '#1e1e1e'
 TERMINAL_TEXT = '#d4d4d4'
 ANSWER_COLOUR = '#9cdcfe'
 ERROR_COLOUR = '#ff7b86'
 ICON_PATH = Path(__file__).resolve().parent.parent / 'assets' / 'icon.png'
-ANSWER_HINT = ('Type your answer and press Enter. Enter alone gives the brighter '
-               'choice or the value in [brackets].')
-EDGES_HINT = ('Drag the edges on the plot, or type the times in the strip under it, '
-              'then press Enter.')
+CLICK_HINT = 'Click an answer. Enter gives the highlighted one.'
+# a box is shown only for a number or a name: every other answer is a button
+NUMBER_HINT = 'Type a number, then click Continue or press Enter.'
+NAME_HINT = 'Type it in the box, then click Continue or press Enter.'
+# The clicks in the boxes that ask questions of their own while a question waits.
+ASKING_CHANGES = ('edit_ods', 'edit_labels', 'export_csv')
+EDGES_HINT = ('Drag the edges on the plot, or type the times in the Time regions box '
+              'above it, then click Continue.')
 OWN_VALUES_MARK = '  (own times)'  # after a file in the drop-down whose edges differ
-SPAN_HINT = ('Drag across the plot to fill in the answer, or type it, then press Enter. '
-             'Enter alone gives the value in [brackets].')
+SPAN_HINT = ('Drag across the plot to fill in the answer, or type it, then click '
+             'Continue.')
 TABLE_HINT = ('Click a cell and type; Tab moves across, Enter moves down. Press '
               'Confirm when the table is filled in.')
-# While a table is open it fills the terminal side under this many lines of text.
-TABLE_TERMINAL_LINES = 8
-CONFIRM_BACKGROUND = '#264f78'
-CONFIRM_HOVER = '#2f6396'
-CONFIRM_TEXT = '#ffffff'
+# While a table is open it fills the open step under this many lines of text; without
+# one the text takes the room the guide leaves, at least this many lines.
+TABLE_TERMINAL_LINES = 5
+TERMINAL_LINES = 6
 SIGN_BACKGROUND = '#ffd76a'
 SIGN_EDGE = '#e8a317'
 SIGN_TEXT = '#5a3d00'
+SIGN_WORDS = 'Plotting data …'
+SIGN_TEXT_POINTS = 20
+# After a click that gives an answer, the sign is shown when the program has not asked
+# its next question within this time, so a quick answer does not flash it.
+CLICK_SIGN_DELAY_MS = 200
+# The spinning wheel of the "Plotting data …" sign, in the middle of the plot: its
+# size, the number and thickness of its spokes, and how often it turns one spoke on.
+WHEEL_RADIUS_PX = 48
+WHEEL_SPOKES = 12
+WHEEL_SPOKE_WIDTH_PX = 8
+WHEEL_STEP_MS = 80
 POINTER_COLOUR = '#0b62c4'
 FILES_HELP = ('Select a file using the drop-down, or use the arrows to browse the '
               'data.')
@@ -73,10 +130,9 @@ FIGURES_HELP = ('Select a figure using the drop-down, or use the arrows to look 
                 'each one. Experiment plots marked [locked] are final; the figure '
                 'being built is listed after them.')
 ENTRY_BACKGROUND = '#2b2b2b'
-# shown, once the questions about each file are over, for a file not drawn since the
-# last change (only the file looked at and the ones beside it are redrawn)
-NOT_DRAWN_TEXT = ('{name}\n\nNot drawn with your final settings: only the files you '
-                  'looked at are.')
+# shown, once the questions about each file are over, for a file whose plot was not
+# saved with the last settings (nothing is plotted, or its plot could not be saved)
+NOT_DRAWN_TEXT = '{name}\n\nThe plot of this file was not saved with your final settings.'
 MINIMUM_TK = 8.6  # Tk 8.5 (Apple's own Python) draws blank windows
 # The window opens maximised; un-maximised it takes WINDOW_SIZE_PX, made smaller to
 # leave SCREEN_MARGIN_PX for the taskbar, the Dock or the menu bar on a small screen.
@@ -115,6 +171,15 @@ SYMBOLS = ('µ',
            '·',
            )
 PLOT_BACKGROUND = '#f2f2f2'
+# The arrows that move a panel of the plot of a file up or down: the room kept for them
+# left of the picture, the side of the square of each (smaller beside a low panel) and
+# their colours (the arrow that cannot be used, up on the top panel, is paler).
+PANEL_ARROW_BAND_PX = 26
+PANEL_ARROW_SIZE_PX = 18
+PANEL_ARROW_FILL = '#f4f4f2'
+PANEL_ARROW_EDGE = '#9a9a96'
+PANEL_ARROW_COLOUR = '#222222'
+PANEL_ARROW_OFF_COLOUR = '#c8c8c8'
 _CLOSED = object()
 _active_gui: Optional['ViewerGui'] = None
 
@@ -162,8 +227,12 @@ class ViewerGui:
     _answer_sender
     _answer_writer
     _axis_box_finder
+    _back_taker
     _band_drawer
     _callback_error_keeper
+    _click_sign_shower
+    _click_sign_starter
+    _clicked_answer_sender
     _closing_handler
     _confirm_sender
     _display_name_lister
@@ -175,10 +244,14 @@ class ViewerGui:
     _event_handler
     _every_file_taker
     _file_follower
+    _guide_drawer
+    _guide_line_clicker
+    _hint_refresher
     _history_stepper
     _icon_setter
     _image_deliverer
     _image_receiver
+    _keys_shower
     _lock_drawer
     _logic_runner
     _message_shower
@@ -186,6 +259,9 @@ class ViewerGui:
     _navigator
     _opened_teller
     _pane_writer
+    _panel_arrow_checker
+    _panel_arrow_clicker
+    _panel_arrows_drawer
     _picture_shower
     _pointer_mover
     _resizer
@@ -198,8 +274,10 @@ class ViewerGui:
     _time_clicker
     _time_line_drawer
     _typed_edge_taker
+    _wheel_turner
     _widgets_builder
     _window_raiser
+    answer_requester
     drawing_sign_shower
     edges_hider
     edges_reader
@@ -209,12 +287,15 @@ class ViewerGui:
     output_capturer
     pictures_publisher
     run
+    saved_plot_publisher
     session_attacher
     spec_publisher
+    step_teller
     strip_choices_setter
     strip_fits_setter
     strip_library_setter
     strip_listener_setter
+    answer_listener_setter
     strip_reader
     strip_setter
     strip_state_setter
@@ -308,6 +389,7 @@ class ViewerGui:
         self._is_destroyed = False
         self._style: Dict[str, Any] = {'fg': None, 'bold': False, 'italic': False}
         self._is_carriage = False
+        self._is_heading = False  # a section heading is being left out
         self._history: List[str] = []
         self._history_position = 0
         self._fonts: Dict[tuple, Any] = {}
@@ -318,7 +400,18 @@ class ViewerGui:
         self._help_base = ''
         self._is_table_shown = False
         self._is_busy = False
+        self._is_wheel_turning = False  # the wheel of the "Plotting data …" sign
+        self._click_count = 0  # clicks sent to the program, for the sign after a click
         self._strip_listener: Optional[Callable[[Dict[str, Any]], None]] = None
+        self._answer_listener: Optional[Callable[[], None]] = None
+        self._is_strip_on = False
+        self._is_shown_stale = False
+        self._is_arrow_waiting = False
+        self._is_over_arrow = False
+        self._arrows: List[Tuple[str, int, float, float, float, float, bool]] = []
+        self._guide = GuideState()
+        self._request: Optional[Dict[str, Any]] = None
+        self._is_back_shown = False
         self._widgets_builder()
         self._icon_setter()
 
@@ -328,8 +421,8 @@ class ViewerGui:
     def _answer_sender(self, event: Any = None) -> None:
         """
         ---- Summary ----
-        Method to pass the typed answer to the question that is waiting for it. While a
-        table is open the answer box is hidden and Confirm answers instead.
+        Method to pass the answer typed in the box to the question that is waiting for
+        it (Continue under the box, or Enter in it).
 
         ---- Inputs ----
         event : Any
@@ -343,30 +436,25 @@ class ViewerGui:
             Nothing.
 
         ---- Globals mutated ----
-        None. Writes the answer into the terminal, clears and disables the answer box
-        and wakes the question thread (side effects).
+        None. Writes the answer into the open step and wakes the question thread (side
+        effects).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
-        _pane_writer
+        _clicked_answer_sender
         """
 
         if not self._is_waiting or self._is_table_shown:
             return
         answer = self._entry.get()
-        self._is_waiting = False
         if answer.strip():
             self._history.append(answer)
         self._history_position = len(self._history)
-        self._entry.delete(0, 'end')
-        self._entry.configure(state='disabled')
-        self._hint.configure(text='Working ...')
         self._drag_start = None
         self._canvas.delete('band')
-        self._pane_writer(answer + '\n', 'answer')
-        self._answers.put(answer)
+        self._clicked_answer_sender(answer, answer.strip() or 'Continue')
 
     # ---- _answer_writer --------------------------------------------------------------
     def _answer_writer(self, value: Optional[float]) -> None:
@@ -439,6 +527,37 @@ class ViewerGui:
                 top + (1.0 - axis.top) * height,
                 top + (1.0 - axis.bottom) * height,
                 )
+
+    # ---- _back_taker -----------------------------------------------------------------
+    def _back_taker(self) -> None:
+        """
+        ---- Summary ----
+        Method to open the step the program waits at again, after an earlier step was
+        opened ("Back to <step>"), with the answers of its question.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the guide (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _guide_drawer
+        GuideState.back_taker
+        """
+
+        self._guide.back_taker()
+        self._guide_drawer()
 
     # ---- _band_drawer ----------------------------------------------------------------
     def _band_drawer(self, x: float) -> None:
@@ -541,6 +660,119 @@ class ViewerGui:
         self.window_errors.append(text)
         sys.stderr.write(f'Exception in Tkinter callback\n{text}')
 
+    # ---- _click_sign_shower ----------------------------------------------------------
+    def _click_sign_shower(self, count: int) -> None:
+        """
+        ---- Summary ----
+        Method to put the "Plotting data …" sign on the plot when the program is still
+        working on a click: no question has been asked since, and no other click was
+        made. The next question, plot or picture takes it away.
+
+        ---- Inputs ----
+        count : int
+            Number of the click it was started for.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Marks the window busy and draws the sign (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _picture_shower
+        """
+
+        if (self._is_destroyed
+            or self._is_waiting
+            or self._is_finished
+            or self._is_busy
+            or count != self._click_count
+            ):
+            return
+        self._is_busy = True
+        self._picture_shower()
+
+    # ---- _click_sign_starter ---------------------------------------------------------
+    def _click_sign_starter(self) -> None:
+        """
+        ---- Summary ----
+        Method to start the wait after a click that gives an answer: if the program has
+        not asked its next question within CLICK_SIGN_DELAY_MS, the "Plotting data …"
+        sign goes on the plot, so a redraw never looks like nothing happening.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        CLICK_SIGN_DELAY_MS (module constant).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Counts the click and starts a timer (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _click_sign_shower
+        """
+
+        self._click_count += 1
+        count = self._click_count
+        self._root.after(CLICK_SIGN_DELAY_MS, lambda: self._click_sign_shower(count))
+
+    # ---- _clicked_answer_sender ------------------------------------------------------
+    def _clicked_answer_sender(self, answer: str, echo: str) -> None:
+        """
+        ---- Summary ----
+        Method to pass the answer of a button (or of the typing box) to the question
+        that is waiting for it. The open step then keeps what is said from here on:
+        the messages before this answer fold away when the next question is asked.
+
+        ---- Inputs ----
+        answer : str
+            The answer as the question reads it ('y', '2', '1,3', a typed number ...).
+        echo : str
+            The words written under the question for it ('Yes', the choice ...).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Writes the answer into the open step, marks where it ends and wakes the
+        question thread (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _click_sign_starter
+        _pane_writer
+        """
+
+        if not self._is_waiting or self._is_table_shown:
+            return
+        self._is_waiting = False
+        self._hint.configure(text='Working ...')
+        self._pane_writer(f'→ {echo}\n', 'answer')
+        self._text.mark_set('since', 'end-1c')
+        self._answers.put(answer)
+        self._click_sign_starter()
+
     # ---- _closing_handler ------------------------------------------------------------
     def _closing_handler(self) -> None:
         """
@@ -602,13 +834,14 @@ class ViewerGui:
             'break', so Tk does nothing more with the click or key.
 
         ---- Globals mutated ----
-        None. Writes "Confirm" into the terminal and wakes the question thread (side
+        None. Writes "Confirm" into the open step and wakes the question thread (side
         effects).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
+        _click_sign_starter
         _pane_writer
         """
 
@@ -616,8 +849,10 @@ class ViewerGui:
             return 'break'
         self._is_waiting = False
         self._hint.configure(text='Working ...')
-        self._pane_writer('Confirm\n', 'answer')
+        self._pane_writer('→ Confirm\n', 'answer')
+        self._text.mark_set('since', 'end-1c')
         self._answers.put('')
+        self._click_sign_starter()
         return 'break'
 
     # ---- _display_name_lister --------------------------------------------------------
@@ -654,7 +889,10 @@ class ViewerGui:
                       and self._edges.choice.value_copier is None
                       )
         if is_marking:
-            own = set(own_value_lister(self._edges.values))
+            own = set(own_value_lister(self._edges.values,
+                                       self._edges.choice.unmarked_fields,
+                                       ),
+                      )
             return [f'{name}{OWN_VALUES_MARK}' if name in own else name
                     for name in self._names
                     ]
@@ -808,48 +1046,143 @@ class ViewerGui:
         self._root.after(25, self._drain_runner)
 
     # ---- _drawing_sign_drawer --------------------------------------------------------
-    def _drawing_sign_drawer(self) -> None:
+    def _drawing_sign_drawer(self, text: str = SIGN_WORDS) -> None:
         """
         ---- Summary ----
-        Method to draw the "Drawing ..." sign in the top left corner of the plot area,
-        to show that the picture for the latest settings is still being made.
+        Method to draw the "Plotting data …" sign in the middle of the plot area, a large
+        spinning wheel with the words under it, to show that the picture for the
+        latest settings is still being made. The wheel turns until the plot area is
+        drawn again, which takes the sign away.
 
         ---- Inputs ----
-        None.
+        text : str
+            The words under the wheel.
 
         ---- Globals read ----
-        SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT (module constants).
+        SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT, SIGN_TEXT_POINTS, SIGN_WORDS,
+        WHEEL_RADIUS_PX, WHEEL_SPOKES, WHEEL_SPOKE_WIDTH_PX (module constants).
 
         ---- Outputs ----
         None
             Nothing.
 
         ---- Globals mutated ----
-        None. Draws on the plot area (side effect).
+        None. Draws on the plot area and starts the wheel turning (side effects).
+
+        ---- Equations ----
+        Spoke i points at the angle 2 pi i / WHEEL_SPOKES, from 0.45 to 1 radius out
+        of the centre.
+
+        ---- Helpers ----
+        _wheel_turner
+        """
+
+        # ---- 1 The card behind the wheel and its words, in the middle ----------------
+        canvas = self._canvas
+        centre_x = max(canvas.winfo_width(), 200) // 2
+        centre_y = max(canvas.winfo_height(), 160) // 2
+        words = canvas.create_text(centre_x,
+                                   centre_y + WHEEL_RADIUS_PX + 34,
+                                   text=text,
+                                   fill=SIGN_TEXT,
+                                   font=(self._sign_family, SIGN_TEXT_POINTS, 'bold'),
+                                   tags=('drawing_sign',),
+                                   )
+        left, _, right, bottom = canvas.bbox(words)
+        half = max((right - left) // 2, WHEEL_RADIUS_PX) + 32
+        back = canvas.create_rectangle(centre_x - half,
+                                       centre_y - WHEEL_RADIUS_PX - 24,
+                                       centre_x + half,
+                                       bottom + 18,
+                                       fill=SIGN_BACKGROUND,
+                                       outline=SIGN_EDGE,
+                                       width=3,
+                                       tags=('drawing_sign',),
+                                       )
+        canvas.tag_raise(words, back)
+
+        # ---- 2 The spokes of the wheel, turned by _wheel_turner ----------------------
+        for index in range(WHEEL_SPOKES):
+            angle = 2.0 * math.pi * index / WHEEL_SPOKES
+            canvas.create_line(centre_x + 0.45 * WHEEL_RADIUS_PX * math.cos(angle),
+                               centre_y + 0.45 * WHEEL_RADIUS_PX * math.sin(angle),
+                               centre_x + WHEEL_RADIUS_PX * math.cos(angle),
+                               centre_y + WHEEL_RADIUS_PX * math.sin(angle),
+                               width=WHEEL_SPOKE_WIDTH_PX,
+                               capstyle='round',
+                               fill=SIGN_EDGE,
+                               tags=('drawing_sign', f'wheel_spoke_{index}'),
+                               )
+        if not self._is_wheel_turning:
+            self._is_wheel_turning = True
+            self._wheel_turner(0)
+
+    # ---- _edge_tick_taker ------------------------------------------------------------
+    def _edge_tick_taker(self, field: str, is_ticked: bool) -> None:
+        """
+        ---- Summary ----
+        Method to take a numbered tick of a row of the edges (an averaging window used
+        or left out): on every file when "Apply to every experiment" is ticked,
+        otherwise on the file shown.
+
+        ---- Inputs ----
+        field : str
+            The field of the tick.
+        is_ticked : bool
+            Its new state.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the overlay and redraws (side effects).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
-        None.
+        _edges_refresher
         """
 
-        text = self._canvas.create_text(22,
-                                        17,
-                                        text='Drawing ...',
-                                        anchor='nw',
-                                        fill=SIGN_TEXT,
-                                        font=(self._family, 11, 'bold'),
-                                        )
-        left, top, right, bottom = self._canvas.bbox(text)
-        back = self._canvas.create_rectangle(left - 9,
-                                             top - 6,
-                                             right + 9,
-                                             bottom + 6,
-                                             fill=SIGN_BACKGROUND,
-                                             outline=SIGN_EDGE,
-                                             )
-        self._canvas.tag_raise(text, back)
+        self._edges.field_setter(field, 1.0 if is_ticked else 0.0)
+        self._edges_refresher()
+
+    # ---- _edge_toggle_taker ----------------------------------------------------------
+    def _edge_toggle_taker(self, field: str, is_on: bool) -> None:
+        """
+        ---- Summary ----
+        Method to take a toggle of the step ("Adjust each window"), which holds on
+        every file.
+
+        ---- Inputs ----
+        field : str
+            The field of the toggle.
+        is_on : bool
+            Its new state.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the overlay and redraws (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _edges_refresher
+        """
+
+        self._edges.every_file_field_setter(field, 1.0 if is_on else 0.0)
+        self._edges_refresher()
 
     # ---- _edges_refresher ------------------------------------------------------------
     def _edges_refresher(self) -> None:
@@ -884,12 +1217,25 @@ class ViewerGui:
         self._combo.configure(values=self._display_name_lister())
         self._combo.current(self._index)
         if self._edges.is_on and self._index < self._file_count:
-            self._edge_row.values_setter(
-                self._edges.values.get(self._names[self._index]),
-                )
-            self._second_row.values_setter(  # without boxes when the step has one row
-                self._edges.values.get(self._names[self._index]),
-                )
+            name = self._names[self._index]
+            shown = self._edges.shown_values_reader(name)
+            self._edge_row.values_setter(shown)
+            # without boxes when the step has one row
+            self._second_row.values_setter(shown)
+            # the numbered ticks and the note of each row, and the step's toggles
+            choice, own = self._edges.choice, self._edges.values.get(name)
+            rows = [('', []), ('', [])]
+            if choice.row_teller is not None and own is not None:
+                rows = choice.row_teller(name, own)
+            self._edge_row.ticks_setter(*rows[0])
+            self._second_row.ticks_setter(*rows[1])
+            self._options_row.toggles_setter([(field,
+                                               words,
+                                               bool((own or {}).get(field)),
+                                               )
+                                              for field, words in choice.options
+                                              ],
+                                             )
 
     # ---- _event_handler --------------------------------------------------------------
     def _event_handler(self, event: tuple) -> None:
@@ -899,10 +1245,11 @@ class ViewerGui:
 
         ---- Inputs ----
         event : tuple
-            (kind, ...) with kind 'prompt', 'spec', 'session', 'pictures', 'extra',
+            (kind, ...) with kind 'prompt', 'ask' (how the question is answered),
+            'step' (a step of the guide starts), 'spec', 'session', 'pictures', 'extra',
             'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
             'strip_library', 'strip_state', 'busy',
-            'table_show', 'table_hide', 'closed' or 'finished'. The "Drawing ..."
+            'table_show', 'table_hide', 'closed' or 'finished'. The "Plotting data …"
             sign of 'busy' stays until the next question, preview or picture shown.
             With close_after_s, 'finished' also closes the window after that time.
 
@@ -923,14 +1270,18 @@ class ViewerGui:
         _closing_handler
         _display_name_lister
         _edges_refresher
-        _hint_chooser
+        _guide_drawer
+        _hint_refresher
         _image_deliverer
         _image_receiver
+        _keys_shower
         _nav_state_setter
         _navigator
         _pane_writer
         _picture_shower
         _table_layout_setter
+        AnswerArea.request_shower
+        GuideState.step_starter
         """
 
         kind = event[0]
@@ -939,29 +1290,49 @@ class ViewerGui:
             if was_busy and kind == 'prompt':
                 self._picture_shower()  # takes the sign away
         if kind == 'prompt':
-            self._pane_writer(event[1])
             self._is_waiting = True
             if self._is_table_shown:
                 # the cell that still needs something, after a refused Confirm
                 self._hint.configure(text=TABLE_HINT)
                 self._table.cell_focuser()
             else:
-                self._entry.configure(state='normal')
-                self._entry.focus_set()
-                self._hint.configure(text=_hint_chooser(self._time_kind,
-                                                        self._edges.is_on,
-                                                        ),
-                                     )
+                if not self._guide.is_back():
+                    self._area.focuser()
+                self._hint_refresher()
+        elif kind == 'ask':
+            # A new question: what was said before the last answer folds away (it
+            # stays in the run's log), and its answers are shown.
+            self._request = event[1]
+            self._text.tag_add('folded', '1.0', 'since')
+            self._keys_shower()
+            if not self._guide.is_back():
+                self._area.request_shower(self._request)
+            else:
+                # an earlier step is open: its Back to button stays, with Confirm
+                # beside it while a table waits
+                self._guide_drawer()
+        elif kind == 'ask_again':
+            # a table or question opened from the boxes is done: the question that
+            # waits shows its answers again, in its own step
+            self._request = event[1]
+            if self._guide.is_back():
+                self._guide.back_taker()
+                self._guide_drawer()
+            elif self._request is not None:
+                self._area.request_shower(self._request)
+        elif kind == 'step':
+            self._guide.step_starter(event[1])
+            self._guide_drawer()
         elif kind == 'edges':
-            # The row of the edges sits above the rest of the strip.
+            # The rows of the edges sit in the Time regions box, under its tabs.
             choice = event[1]
             self._edges.choice_setter(choice)
             self._second_row.frame.pack_forget()
-            if choice is None:
-                self._edge_row.frame.pack_forget()
-            else:
+            self._edge_row.frame.pack_forget()
+            self._options_row.frame.pack_forget()
+            if choice is not None:
                 if choice.second_switch is not None:
-                    # the second row sits between the first and the rest of the strip
+                    # the second row sits under the first
                     field, words = choice.second_switch
                     self._second_row.fields_setter(choice.second_fields,
                                                    any(own.get(field)
@@ -970,10 +1341,6 @@ class ViewerGui:
                                                    choice.unit,
                                                    words,
                                                    )
-                    self._second_row.frame.pack(side='bottom',
-                                                pady=(0, 4),
-                                                after=self._strip.frame,
-                                                )
                 if choice.switch is None:
                     self._edge_row.fields_setter(choice.fields,
                                                  choice.is_every_file,
@@ -989,19 +1356,19 @@ class ViewerGui:
                                                  choice.unit,
                                                  words,
                                                  )
-                self._edge_row.frame.pack(side='bottom',
-                                          pady=(0, 4),
-                                          after=self._second_row.frame
-                                          if choice.second_switch is not None
-                                          else self._strip.frame,
-                                          )
+                self._edge_row.frame.pack(side='top', anchor='w', pady=(0, 2))
+                if choice.second_switch is not None:
+                    self._second_row.frame.pack(side='top', anchor='w', pady=(0, 2))
+                if choice.options:
+                    self._options_row.fields_setter([],
+                                                    choice.is_every_file,
+                                                    choice.unit,
+                                                    )
+                    self._options_row.frame.pack(side='top', anchor='w', pady=(0, 2))
             self._picture_shower()
             self._edges_refresher()
             if self._is_waiting and not self._is_table_shown:
-                self._hint.configure(text=_hint_chooser(self._time_kind,
-                                                        self._edges.is_on,
-                                                        ),
-                                     )
+                self._hint_refresher()
         elif kind == 'strip':
             self._strip.values_setter(event[1])
         elif kind == 'strip_choices':
@@ -1012,6 +1379,8 @@ class ViewerGui:
             self._strip.library_setter(event[1])
         elif kind == 'strip_state':
             self._strip.state_setter(event[1])
+            self._is_strip_on = bool(event[1])
+            self._picture_shower()  # the arrows of the panels come and go with it
         elif kind == 'busy':
             self._is_busy = True
             self._picture_shower()
@@ -1026,7 +1395,7 @@ class ViewerGui:
             self._canvas.delete('band')
             self._canvas.configure(cursor='crosshair' if event[1] else '')
             if self._is_waiting and not self._is_table_shown:
-                self._hint.configure(text=_hint_chooser(event[1], self._edges.is_on))
+                self._hint_refresher()
         elif kind == 'session':
             self._session = event[1]
             self._names = [s['name'] for s in self._session.summaries]
@@ -1099,16 +1468,30 @@ class ViewerGui:
             self._navigator(self._index)
         elif kind == 'image':
             self._image_receiver(*event[1:])
+        elif kind == 'saved':
+            # The plot saved for a file takes the place of its preview and is shown.
+            name, png = event[1], event[2]
+            self._images[name] = png
+            for kept in (self._failures, self._notes, self._axes, self._previous):
+                kept.pop(name, None)
+            self._has_spec = True
+            if name in self._names:
+                self._navigator(self._names.index(name))
         elif kind == 'closed':
             # No file is drawn any more, so an older picture would never be replaced.
             self._is_browsing_over = True
+            self._is_busy = False
             self._previous, self._previous_axes = {}, {}
             self._nav_state_setter(False)
             self._picture_shower()
         elif kind == 'finished':
             self._is_finished = True
+            if self._is_busy:
+                self._is_busy = False
+                self._picture_shower()  # takes the sign away
             self._nav_state_setter(False)
             self._hint.configure(text='Finished - close this window when you are done')
+            self._area.request_shower(None)
             self._pane_writer('\n[Finished. You can close this window.]\n', 'answer')
             if self._close_after_s is not None:
                 self._root.after(round(self._close_after_s * 1000),
@@ -1116,19 +1499,21 @@ class ViewerGui:
                                  )
 
     # ---- _every_file_taker -----------------------------------------------------------
-    def _every_file_taker(self, is_every_file: bool, is_second: bool = False) -> None:
+    def _every_file_taker(self, is_every_file: bool, row: str = 'first') -> None:
         """
         ---- Summary ----
-        Method to take the tick box of a row of the edges. As "Every file": ticked, a
-        moved or typed edge moves on every file; unticked, on the file shown only. As
-        the step's own switch (EdgeChoice.switch, or second_switch for the second
-        row), it sets the field of the switch to 1 or 0 on every file.
+        Method to take the tick box of a row of the edges. As "Apply to every
+        experiment": ticked, a moved or typed edge moves on every file; unticked, on
+        the file shown only. As the step's own switch (EdgeChoice.switch, or
+        second_switch for the second row), it sets the field of the switch to 1 or 0
+        on every file.
 
         ---- Inputs ----
         is_every_file : bool
             The new state of the tick box.
-        is_second : bool
-            True for the tick box of the second row.
+        row : str
+            'first', 'second' or 'options' (the line of "Apply to every experiment"
+            of a step whose rows have switches).
 
         ---- Globals read ----
         None.
@@ -1149,13 +1534,15 @@ class ViewerGui:
 
         choice = self._edges.choice
         switch = None
-        if choice is not None:
-            switch = choice.second_switch if is_second else choice.switch
+        if choice is not None and row != 'options':
+            switch = choice.second_switch if row == 'second' else choice.switch
         if switch is not None:
-            self._edges.field_setter(switch[0], 1.0 if is_every_file else 0.0)
+            self._edges.every_file_field_setter(switch[0],
+                                                1.0 if is_every_file else 0.0,
+                                                )
             self._edges_refresher()
             return
-        if not is_second:
+        if row != 'second':
             self._edges.is_every_file = is_every_file
 
     # ---- _file_follower --------------------------------------------------------------
@@ -1189,6 +1576,134 @@ class ViewerGui:
         files = self._names[:self._file_count]
         if name in files and files.index(name) != self._index:
             self._navigator(files.index(name))
+
+    # ---- _guide_drawer ---------------------------------------------------------------
+    def _guide_drawer(self) -> None:
+        """
+        ---- Summary ----
+        Method to draw the guide again: its lines with the open step's card under its
+        line and, while an earlier step is open, that step's note and help above its
+        messages and the button back to the step waited at in place of the answers.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the left side of the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _back_taker
+        AnswerArea.back_shower
+        AnswerArea.request_shower
+        GuidePanel.rows_drawer
+        GuideState.card_teller
+        GuideState.row_lister
+        """
+
+        self._guide_panel.rows_drawer(self._guide.row_lister())
+        card = self._guide.card_teller()
+        if card['note']:
+            self._guide_note.configure(text=f"{card['note']}\n\n{card['help']}")
+            self._guide_note.pack(side='top',
+                                  fill='x',
+                                  padx=10,
+                                  pady=(8, 0),
+                                  before=self._text_box,
+                                  )
+            # the trim step opened again keeps its Export csv button
+            extra = ((card['extra'],
+                      lambda: self._strip_change_teller({EXPORT_CSV_CHANGE: True}),
+                      )
+                     if card['extra']
+                     else None
+                     )
+            # a table opened from the View box (Edit ODs) keeps its Confirm
+            is_table = bool(self._request) and self._request.get('kind') == 'confirm'
+            self._area.back_shower(card['back'], self._back_taker, extra, is_table)
+            self._is_back_shown = True
+        else:
+            self._guide_note.pack_forget()
+            if self._is_back_shown:
+                self._area.request_shower(self._request)
+                if self._is_waiting:
+                    self._area.focuser()
+            self._is_back_shown = False
+        self._text.see('end')
+
+    # ---- _guide_line_clicker ---------------------------------------------------------
+    def _guide_line_clicker(self, index: int) -> None:
+        """
+        ---- Summary ----
+        Method to open the step whose line in the guide was clicked: one already
+        asked, or the one the program waits at.
+
+        ---- Inputs ----
+        index : int
+            Index of the step in the guide.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the guide (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _guide_drawer
+        GuideState.line_opener
+        """
+
+        if self._guide.line_opener(index):
+            self._guide_drawer()
+
+    # ---- _hint_refresher -------------------------------------------------------------
+    def _hint_refresher(self) -> None:
+        """
+        ---- Summary ----
+        Method to show, under the answers, what to do for the question waiting.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the hint (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _hint_chooser
+        """
+
+        kind = self._request['kind'] if self._request else None
+        self._hint.configure(text=_hint_chooser(kind,
+                                                self._time_kind,
+                                                self._edges.is_on,
+                                                ),
+                             )
 
     # ---- _history_stepper ------------------------------------------------------------
     def _history_stepper(self, step: int) -> None:
@@ -1365,6 +1880,7 @@ class ViewerGui:
 
         if version != self._version:
             return
+        self._is_arrow_waiting = False  # the plots are drawn with the new order
         if png is None:
             self._failures[name] = notes
         else:
@@ -1373,6 +1889,39 @@ class ViewerGui:
             self._axes[name] = time_axis
         if self._names and name == self._names[self._index]:
             self._picture_shower()
+
+    # ---- _keys_shower ----------------------------------------------------------------
+    def _keys_shower(self) -> None:
+        """
+        ---- Summary ----
+        Method to show the row of symbols (µ, ⁻¹, ...) only where text is typed: a
+        name in the typing box, or a table.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Shows or hides the row (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        kind = self._request['kind'] if self._request else None
+        if self._is_table_shown or kind == 'text':
+            self._keys.pack(fill='x', pady=(4, 0), before=self._hint)
+        else:
+            self._keys.pack_forget()
 
     # ---- _lock_drawer ----------------------------------------------------------------
     def _lock_drawer(self) -> None:
@@ -1586,7 +2135,7 @@ class ViewerGui:
         if self._edges.is_on:
             self._edges_refresher()
         if is_from_user and self._is_waiting and not self._is_table_shown:
-            self._entry.focus_set()
+            self._area.focuser()
 
     # ---- _opened_teller --------------------------------------------------------------
     def _opened_teller(self) -> None:
@@ -1629,7 +2178,9 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to add text to the terminal, with its colours, overwriting the line when
-        the text starts with a carriage return (progress messages).
+        the text starts with a carriage return (progress messages). The explanations
+        are written in a lighter grey than in a terminal, and a section heading (the
+        stage, shown by the guide) is left out with the dashes under it.
 
         ---- Inputs ----
         text : str
@@ -1638,7 +2189,8 @@ class ViewerGui:
             'out' (normal), 'err' (error text) or 'answer' (what the user typed).
 
         ---- Globals read ----
-        ANSWER_COLOUR, ERROR_COLOUR (module constants).
+        ANSWER_COLOUR, ERROR_COLOUR, INFO_COLOUR, QUESTION_EXTRA_POINTS,
+        QUESTION_FOREGROUND, QUIET_FOREGROUND, SECTION_FOREGROUND (module constants).
 
         ---- Outputs ----
         None
@@ -1666,6 +2218,15 @@ class ViewerGui:
             if part_kind == 'return':
                 self._is_carriage = True
                 continue
+            # a section heading and the dashes under it are left out: the guide shows
+            # the stage above the step
+            if kind == 'out' and self._style['fg'] == SECTION_FOREGROUND:
+                self._is_heading = True
+                continue
+            if self._is_heading:
+                if not value.strip('\n-'):
+                    continue
+                self._is_heading = False
             if self._is_carriage:
                 widget.delete('end-1c linestart', 'end-1c')
                 self._is_carriage = False
@@ -1674,11 +2235,18 @@ class ViewerGui:
                 kind,
                 self._style['fg'],
                 )
+            if colour == QUIET_FOREGROUND:
+                colour = INFO_COLOUR
             bold = self._style['bold'] or kind == 'answer'
+            # the question is written larger than the messages around it
+            size = self._size + (QUESTION_EXTRA_POINTS
+                                 if colour == QUESTION_FOREGROUND
+                                 else 0
+                                 )
             tag = f"{colour}|{bold}|{self._style['italic']}"
             if tag not in self._fonts:
                 self._fonts[tag] = tkfont.Font(family=self._family,
-                                               size=self._size,
+                                               size=size,
                                                weight='bold' if bold else 'normal',
                                                slant=('italic'
                                                       if self._style['italic']
@@ -1703,9 +2271,9 @@ class ViewerGui:
         above the picture for their handles, and the overlay shades the picture and
         draws them. While the picture for the latest settings is still being made, or
         the program is making pictures of its own (drawing_sign_shower), the
-        "Drawing ..." sign is on the plot (over the previous picture when there is
-        one). Once the questions about each file are over, a file not drawn with the
-        last settings says so instead.
+        "Plotting data …" sign is on the plot (over the previous picture when there is
+        one). Once the questions about each file are over, a file whose plot was not
+        saved with the last settings says so instead.
 
         ---- Inputs ----
         None.
@@ -1721,13 +2289,16 @@ class ViewerGui:
         None. Redraws the plot area and the status line (side effect).
 
         ---- Equations ----
-        scale = min(width / picture width, (height - handle band) / picture height),
-        at most 1.5.
+        scale = min((width - arrow band) / picture width,
+        (height - handle band) / picture height), at most 1.5; the arrow band is kept
+        left of the picture only while the panels can be moved.
 
         ---- Helpers ----
         _drawing_sign_drawer
+        _panel_arrow_checker
         _lock_drawer
         _message_shower
+        _panel_arrows_drawer
         _time_line_drawer
         """
 
@@ -1745,9 +2316,10 @@ class ViewerGui:
             self._status.configure(text='')
             self._picture_box = None
             self._shown_axis = None
+            self._arrows = []
             if failure is None and self._is_browsing_over:
                 failure = NOT_DRAWN_TEXT.format(name=name)
-            self._message_shower(failure or f'Drawing {name} ...')
+            self._message_shower(failure or '')
             if failure is None:
                 self._drawing_sign_drawer()
             return
@@ -1757,20 +2329,23 @@ class ViewerGui:
         picture = self._decoded[1]
 
         # ---- 1 Fit the picture in the plot area, under the handles of any edges ------
+        # and right of the arrows of its panels, while they can be moved
         is_edged = self._edges.is_on and self._index < self._file_count
+        self._shown_axis = (self._previous_axes if is_stale else self._axes).get(name)
+        self._is_shown_stale = is_stale
         band = HANDLE_BAND_PX if is_edged else 0
+        gutter = PANEL_ARROW_BAND_PX if self._panel_arrow_checker() else 0
         room_width = self._canvas.winfo_width()
         room_height = self._canvas.winfo_height()
-        width = max(room_width - 4, 50)
+        width = max(room_width - 4 - gutter, 50)
         height = max(room_height - 4 - band, 50)
         scale = min(width / picture.width, height / picture.height, 1.5)
         size = (max(int(picture.width * scale), 1), max(int(picture.height * scale), 1))
         resampling = getattr(Image, 'Resampling', Image)
         shown = picture.resize(size, resampling.LANCZOS)
-        left = (room_width - size[0]) // 2
+        left = gutter + (room_width - gutter - size[0]) // 2
         top = band + (room_height - band - size[1]) // 2
         self._picture_box = (left, top, size[0], size[1])
-        self._shown_axis = (self._previous_axes if is_stale else self._axes).get(name)
 
         # ---- 2 Show it, shaded with its edges while they are dragged -----------------
         self._canvas.delete('all')
@@ -1793,6 +2368,7 @@ class ViewerGui:
             self._canvas.create_image(left, top, image=self._photo, anchor='nw')
         if self._is_pictures and self._index < self._file_count:
             self._lock_drawer()
+        self._panel_arrows_drawer()
         if is_stale or self._is_busy:
             self._drawing_sign_drawer()
 
@@ -1805,6 +2381,158 @@ class ViewerGui:
         self._status.configure(text=note)
         self._help.configure(text='\n'.join([self._help_base] + key))
         self._time_line_drawer()
+
+    # ---- _panel_arrow_checker --------------------------------------------------------
+    def _panel_arrow_checker(self) -> bool:
+        """
+        ---- Summary ----
+        Method to tell whether the panels of the picture shown can be moved up and
+        down: it is the plot of a file with two panels or more, the settings strip is
+        in use, no edges are dragged on it and it is not locked.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        bool
+            True when the arrows of the panels have their place beside the picture.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return (self._is_strip_on
+                and not self._is_pictures
+                and not self._edges.is_on
+                and self._index < self._file_count
+                and self._shown_axis is not None
+                and len(self._shown_axis.panels) > 1
+                )
+
+    # ---- _panel_arrow_clicker --------------------------------------------------------
+    def _panel_arrow_clicker(self, event: Any) -> bool:
+        """
+        ---- Summary ----
+        Method to act on a click on an arrow beside a panel: the panel moves one place
+        up or down, told to the program as a change of the settings strip, which draws
+        the plots again. The arrows are hidden until they are.
+
+        ---- Inputs ----
+        event : Any
+            The Tk click event.
+
+        ---- Globals read ----
+        PANEL_ORDER_CHANGE.
+
+        ---- Outputs ----
+        bool
+            True when the click was on an arrow, used or not.
+
+        ---- Globals mutated ----
+        None. Queues the change and hides the arrows (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _panel_arrows_drawer
+        _strip_change_teller
+        panel_arrow_finder
+        panel_order_mover
+        """
+
+        arrow = panel_arrow_finder(event.x, event.y, self._arrows)
+        if arrow is None or self._shown_axis is None:
+            return False
+        key, step, is_usable = arrow
+        order = panel_order_mover([panel[0] for panel in self._shown_axis.panels],
+                                  key,
+                                  step,
+                                  )
+        if is_usable and order is not None:
+            self._is_arrow_waiting = True
+            self._strip_change_teller({PANEL_ORDER_CHANGE: order})
+            self._panel_arrows_drawer()
+        return True
+
+    # ---- _panel_arrows_drawer --------------------------------------------------------
+    def _panel_arrows_drawer(self) -> None:
+        """
+        ---- Summary ----
+        Method to draw an up and a down arrow left of each panel of the plot of a
+        file, while its panels can be moved. They are left out while the plot is being
+        drawn again, so a click always moves a panel of the order on screen.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        PANEL_ARROW_BAND_PX and the PANEL_ARROW colours (module constants).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Draws on the plot area and keeps where the arrows are (side effects).
+
+        ---- Equations ----
+        The triangle of an arrow fills the middle half of its square.
+
+        ---- Helpers ----
+        _panel_arrow_checker
+        panel_arrow_placer
+        """
+
+        self._canvas.delete('panel_arrow')
+        self._arrows = []
+        if (not self._panel_arrow_checker()
+            or self._picture_box is None
+            or self._is_shown_stale
+            or self._is_busy
+            or self._is_arrow_waiting
+            ):
+            return
+        self._arrows = panel_arrow_placer(self._picture_box,
+                                          self._shown_axis,
+                                          PANEL_ARROW_BAND_PX,
+                                          )
+        for _, step, x0, y0, x1, y1, is_usable in self._arrows:
+            self._canvas.create_rectangle(x0,
+                                          y0,
+                                          x1,
+                                          y1,
+                                          fill=PANEL_ARROW_FILL,
+                                          outline=PANEL_ARROW_EDGE,
+                                          tags='panel_arrow',
+                                          )
+            middle = (x0 + x1) / 2.0
+            quarter = (x1 - x0) / 4.0
+            tip, base = ((y0 + quarter, y1 - quarter)
+                         if step < 0
+                         else (y1 - quarter, y0 + quarter)
+                         )
+            self._canvas.create_polygon(middle,
+                                        tip,
+                                        x0 + quarter,
+                                        base,
+                                        x1 - quarter,
+                                        base,
+                                        fill=(PANEL_ARROW_COLOUR
+                                              if is_usable
+                                              else PANEL_ARROW_OFF_COLOUR
+                                              ),
+                                        tags='panel_arrow',
+                                        )
 
     # ---- _pointer_mover --------------------------------------------------------------
     def _pointer_mover(self, event: Any = None) -> None:
@@ -1838,6 +2566,20 @@ class ViewerGui:
         self._pointer = None if event is None else (event.x, event.y)
         if event is not None:
             self._edges.hover_handler(event)
+        # a hand over an arrow of a panel that can be used
+        arrow = (None
+                 if event is None
+                 else panel_arrow_finder(event.x, event.y, self._arrows)
+                 )
+        is_over_arrow = arrow is not None and arrow[2]
+        if is_over_arrow != self._is_over_arrow:
+            self._is_over_arrow = is_over_arrow
+            self._canvas.configure(cursor='hand2'
+                                   if is_over_arrow
+                                   else 'crosshair'
+                                   if self._time_kind
+                                   else '',
+                                   )
         self._time_line_drawer()
 
     # ---- _resizer --------------------------------------------------------------------
@@ -1956,9 +2698,12 @@ class ViewerGui:
     def _strip_change_runner(self, changes: Dict[str, Any], prompt: Any) -> None:
         """
         ---- Summary ----
-        Method to hand a change made in the settings strip to the function the program
-        registered, on the program thread while a question waits. What it prints goes
-        on lines of its own, and the answer prompt is shown again under it.
+        Method to hand a change made in the boxes above the plot to the function the
+        program registered, on the program thread while a question waits. What it
+        prints goes on lines of its own, and the answer prompt is shown again under it.
+        A click that asks questions of its own (Edit ODs, Edit labels, Export csv) is
+        not held back, so its questions show as they are asked; afterwards the answers
+        of the question that waits come back, and the guide goes back to its step.
 
         ---- Inputs ----
         changes : Dict[str, Any]
@@ -1987,6 +2732,13 @@ class ViewerGui:
         listener = self._strip_listener
         if listener is None:
             return
+        if any(changes.get(name) for name in ASKING_CHANGES):
+            waiting = self._request
+            print()
+            listener(changes)
+            self._events.put(('ask_again', waiting))
+            self._events.put(('prompt', str(prompt)))
+            return
         with output_capturer() as printed:
             listener(changes)
         text = printed.getvalue()
@@ -2000,7 +2752,8 @@ class ViewerGui:
         ---- Summary ----
         Method to pass a change the user made in the settings strip to the program
         thread: it joins the typed answers, so a question that waits takes it at once
-        (input_reader).
+        (input_reader). A change that belongs to an earlier step (the fit while at Δψ)
+        opens that step in the guide.
 
         ---- Inputs ----
         changes : Dict[str, Any]
@@ -2014,16 +2767,19 @@ class ViewerGui:
             Nothing.
 
         ---- Globals mutated ----
-        None. Queues the change (side effect).
+        None. Queues the change and may change the guide (side effects).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
-        None.
+        _guide_drawer
+        GuideState.change_opener
         """
 
         self._answers.put(('strip', dict(changes)))
+        if self._guide.change_opener(changes):
+            self._guide_drawer()
 
     # ---- _symbol_inserter ------------------------------------------------------------
     def _symbol_inserter(self, symbol: str) -> None:
@@ -2065,68 +2821,60 @@ class ViewerGui:
     def _table_layout_setter(self, is_shown: bool) -> None:
         """
         ---- Summary ----
-        Method to open or close the table on the terminal side. Open, it fills the
-        terminal side under a few lines of terminal text, which keep the newest lines
-        in sight and scroll, and Confirm takes the place of the answer box; closed, the
-        terminal and the answer box are as before.
+        Method to open or close the table in the open step. Open, it fills the step
+        under a few lines of its messages, which keep the newest lines in sight and
+        scroll, and the question's Confirm button sits under it; closed, the messages
+        take the room again.
 
         ---- Inputs ----
         is_shown : bool
             True to open the table, False to close it.
 
         ---- Globals read ----
-        TABLE_HINT, TABLE_TERMINAL_LINES (module constants).
+        TABLE_HINT, TABLE_TERMINAL_LINES, TERMINAL_LINES (module constants).
 
         ---- Outputs ----
         None
             Nothing.
 
         ---- Globals mutated ----
-        None. Changes the layout of the terminal side (side effect).
+        None. Changes the layout of the open step (side effect).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
-        None.
+        _keys_shower
         """
 
         if is_shown == self._is_table_shown:
             return
         self._is_table_shown = is_shown
         if is_shown:
-            # Packed after the answer area, the table takes the room the few lines of
-            # text leave.
+            # Packed after the answers, the table takes the room the few lines of text
+            # leave.
             self._text.configure(height=TABLE_TERMINAL_LINES)
+            self._text_box.pack_configure(expand=False)
             self._table.frame.pack(side='bottom',
                                    fill='both',
                                    expand=True,
                                    after=self._bottom,
                                    )
-            self._prompt_mark.pack_forget()
-            self._entry.pack_forget()
-            self._confirm.pack(side='left', fill='x', expand=True, padx=(10, 6))
             if self._is_waiting:
                 self._hint.configure(text=TABLE_HINT)
         else:
             self._table.frame.pack_forget()
-            self._text.configure(height=self._terminal_lines)
-            self._confirm.pack_forget()
-            self._prompt_mark.pack(side='left', padx=(10, 4))
-            self._entry.pack(side='left',
-                             fill='x',
-                             expand=True,
-                             padx=(0, 6),
-                             ipady=5,
-                             )
+            self._text.configure(height=TERMINAL_LINES)
+            self._text_box.pack_configure(expand=True)
+        self._keys_shower()
         self._text.see('end')
 
     # ---- _time_clicker ---------------------------------------------------------------
     def _time_clicker(self, event: Any) -> None:
         """
         ---- Summary ----
-        Method to act on a click on the plot of a file: an edge under the mouse is
-        taken, to be dragged; otherwise, while the question waiting can be answered
+        Method to act on a click on the plot of a file: an arrow beside a panel moves
+        the panel; an edge under the mouse is taken, to be dragged; otherwise, while the question waiting can be answered
         with a drag, the drag starts here. Its answer replaces what was in the answer
         box, can still be edited, and is accepted with Enter.
 
@@ -2149,10 +2897,13 @@ class ViewerGui:
 
         ---- Helpers ----
         _band_drawer
+        _panel_arrow_clicker
         pointed_time_finder
         """
 
         self._drag_start = None
+        if self._panel_arrow_clicker(event):
+            return
         if self._edges.press_handler(event):
             return
         if not (self._time_kind and self._is_waiting):
@@ -2249,7 +3000,7 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to take a number typed in the edges row: the edge moves there (on every
-        file when "Every file" is ticked), within the limits of each file, and the row
+        file when "Apply to every experiment" is ticked), within the limits of each file, and the row
         shows where it went.
 
         ---- Inputs ----
@@ -2278,21 +3029,71 @@ class ViewerGui:
         self._edges.field_setter(key, value)
         self._edges_refresher()
 
+    # ---- _wheel_turner ---------------------------------------------------------------
+    def _wheel_turner(self, step: int) -> None:
+        """
+        ---- Summary ----
+        Method to turn the wheel of the "Plotting data …" sign one spoke on: the leading
+        spoke dark, the ones behind it fading. It calls itself again while the sign is
+        on the plot, and stops once the plot area was drawn again without it.
+
+        ---- Inputs ----
+        step : int
+            The spoke that leads, from 0.
+
+        ---- Globals read ----
+        SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT, WHEEL_SPOKES, WHEEL_STEP_MS (module
+        constants).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Recolours the spokes and asks Tk to call it again (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        canvas = self._canvas
+        try:
+            if not canvas.find_withtag('drawing_sign'):
+                self._is_wheel_turning = False
+                return
+            for index in range(WHEEL_SPOKES):
+                behind = (step - index) % WHEEL_SPOKES
+                colour = (SIGN_TEXT
+                          if behind == 0
+                          else SIGN_EDGE if behind < WHEEL_SPOKES // 3 else SIGN_BACKGROUND
+                          )
+                canvas.itemconfigure(f'wheel_spoke_{index}', fill=colour)
+            self._root.after(WHEEL_STEP_MS,
+                             self._wheel_turner,
+                             (step + 1) % WHEEL_SPOKES,
+                             )
+        except self._tk.TclError:  # the window was closed while the wheel turned
+            self._is_wheel_turning = False
+
     # ---- _widgets_builder ------------------------------------------------------------
     def _widgets_builder(self) -> None:
         """
         ---- Summary ----
-        Method to build the terminal, the answer box with its Help button (greyed out
-        until the Help box is made), Confirm and the table (both hidden until a table
-        is asked for) on the left, and the plot with the overlay of its edges, its file
-        controls, the settings strip and the edges row (hidden until edges are dragged)
-        on the right.
+        Method to build the guide on the left: the lines of the steps and the card of
+        the open step, with its messages, the table (hidden until a table is asked
+        for), the answers, the symbols (shown where text is typed), the hint and the
+        Help button (greyed out until the Help box is made); and on the right the file
+        controls, under them the plot with the overlay of its edges, then the settings
+        strip and the edges row (hidden until edges are dragged).
 
         ---- Inputs ----
         None.
 
         ---- Globals read ----
-        MONO_FONTS and the colour constants (module constants).
+        MONO_FONTS, SANS_FONTS and the colour constants (module constants).
 
         ---- Outputs ----
         None
@@ -2306,11 +3107,13 @@ class ViewerGui:
 
         ---- Helpers ----
         _answer_sender
+        _clicked_answer_sender
         _closing_handler
         _confirm_sender
         _edges_refresher
         _every_file_taker
         _file_follower
+        _guide_line_clicker
         _history_stepper
         _message_shower
         _nav_state_setter
@@ -2323,9 +3126,11 @@ class ViewerGui:
         _symbol_inserter
         _time_clicker
         _typed_edge_taker
+        AnswerArea
         AnswerTable
         EdgeOverlay
         EdgeRow
+        GuidePanel
         SettingsStrip
         """
 
@@ -2335,14 +3140,40 @@ class ViewerGui:
         self._screen_filler()
         families = set(tkfont.families(root))
         self._family = next((f for f in MONO_FONTS if f in families), 'Courier')
-        self._size = 11
+        # the stage names and the sign over the plot in a plain font
+        self._sign_family = next((f for f in SANS_FONTS if f in families),
+                                 self._family,
+                                 )
+        self._size = GUIDE_FONT_POINTS
         panes = ttk.PanedWindow(root, orient='horizontal')
         panes.pack(fill='both', expand=True)
 
-        # ---- 1 The terminal on the left ----------------------------------------------
+        # ---- 1 The guide on the left -------------------------------------------------
+        # The lines of the steps, with the card of the open step under its line: the
+        # step's note (an earlier step), its messages and question, a table when one
+        # is asked for, then the answers, the symbols, the hint and Help.
         left = tk.Frame(panes, bg=TERMINAL_BACKGROUND)
-        self._text = tk.Text(left,
-                             bg=TERMINAL_BACKGROUND,
+        self._guide_panel = GuidePanel(tk,
+                                       left,
+                                       self._family,
+                                       self._size,
+                                       self._guide_line_clicker,
+                                       self._sign_family,
+                                       )
+        self._guide_panel.frame.pack(fill='both', expand=True)
+        card = self._guide_panel.card
+        self._guide_note = tk.Label(card,
+                                    text='',
+                                    wraplength=520,
+                                    justify='left',
+                                    bg=CARD_BACKGROUND,
+                                    fg=ANSWER_COLOUR,
+                                    anchor='w',
+                                    font=(self._family, self._size - 1),
+                                    )
+        self._text_box = tk.Frame(card, bg=CARD_BACKGROUND)
+        self._text = tk.Text(self._text_box,
+                             bg=CARD_BACKGROUND,
                              fg=TERMINAL_TEXT,
                              insertbackground=TERMINAL_TEXT,
                              font=(self._family, self._size),
@@ -2353,25 +3184,45 @@ class ViewerGui:
                              padx=10,
                              pady=8,
                              width=70,
+                             height=TERMINAL_LINES,
                              )
-        scroll = ttk.Scrollbar(left, command=self._text.yview)
+        # what was said before the last answer folds away at the next question
+        self._text.tag_configure('folded', elide=True)
+        self._text.mark_set('since', '1.0')
+        self._text.mark_gravity('since', 'left')
+        scroll = ttk.Scrollbar(self._text_box, command=self._text.yview)
         self._text.configure(yscrollcommand=scroll.set)
-        bottom = tk.Frame(left, bg=TERMINAL_BACKGROUND)
+        bottom = tk.Frame(card, bg=CARD_BACKGROUND)
+        self._area = AnswerArea(tk,
+                                bottom,
+                                self._family,
+                                self._size,
+                                {'background': CARD_BACKGROUND,
+                                 'text': TERMINAL_TEXT,
+                                 'cell': ENTRY_BACKGROUND,
+                                 },
+                                self._clicked_answer_sender,
+                                self._answer_sender,
+                                self._confirm_sender,
+                                )
+        self._area.frame.pack(fill='x', padx=10, pady=(4, 0))
+        self._entry = self._area.entry
+        self._confirm = self._area.confirm
         self._hint = tk.Label(bottom,
                               text='Starting ...',
-                              wraplength=600,
+                              wraplength=520,
                               justify='left',
-                              bg=TERMINAL_BACKGROUND,
-                              fg='#808080',
+                              bg=CARD_BACKGROUND,
+                              fg='#a0a0a0',
                               anchor='w',
-                              font=(self._family, 9),
+                              font=(self._family, 10),
                               )
-        self._hint.pack(fill='x', padx=10)
         symbol_family = next((f for f in SYMBOL_FONTS if f in families), self._family)
-        keys = tk.Frame(bottom, bg=TERMINAL_BACKGROUND)
+        keys = tk.Frame(bottom, bg=CARD_BACKGROUND)
+        self._keys = keys  # shown only where text is typed (_keys_shower)
         tk.Label(keys,
                  text='Symbols:',
-                 bg=TERMINAL_BACKGROUND,
+                 bg=CARD_BACKGROUND,
                  fg='#808080',
                  font=(self._family, 9),
                  ).pack(side='left', padx=(10, 6))
@@ -2388,72 +3239,31 @@ class ViewerGui:
             key.bind('<Button-1>', lambda e, text=symbol: self._symbol_inserter(text))
             key.bind('<Enter>', lambda e, widget=key: widget.configure(bg='#4a4a4a'))
             key.bind('<Leave>', lambda e, widget=key: widget.configure(bg='#333333'))
-        keys.pack(fill='x', pady=(4, 0))
-        row = tk.Frame(bottom, bg=TERMINAL_BACKGROUND)
+        self._hint.pack(fill='x', padx=10, pady=(4, 0))
+        row = tk.Frame(bottom, bg=CARD_BACKGROUND)
         # greyed out until the Help box is made
         self._help_button = ttk.Button(row, text='Help', width=6, state='disabled')
         self._help_button.pack(side='right', padx=(0, 10))
-        self._prompt_mark = tk.Label(row,
-                                     text='>',
-                                     bg=TERMINAL_BACKGROUND,
-                                     fg=ANSWER_COLOUR,
-                                     font=(self._family, self._size, 'bold'),
-                                     )
-        self._prompt_mark.pack(side='left', padx=(10, 4))
-        self._entry = tk.Entry(row,
-                               bg=ENTRY_BACKGROUND,
-                               fg=TERMINAL_TEXT,
-                               insertbackground=TERMINAL_TEXT,
-                               disabledbackground=TERMINAL_BACKGROUND,
-                               disabledforeground='#606060',
-                               font=(self._family, self._size),
-                               relief='flat',
-                               highlightthickness=1,
-                               highlightbackground='#3c3c3c',
-                               highlightcolor=ANSWER_COLOUR,
-                               state='disabled',
-                               )
-        self._entry.pack(side='left', fill='x', expand=True, padx=(0, 6), ipady=5)
-        # Confirm takes the answer box's place while a table is open; a label rather
-        # than a button, so it looks the same on Windows, the Mac and Linux.
-        self._confirm = tk.Label(row,
-                                 text='Confirm',
-                                 bg=CONFIRM_BACKGROUND,
-                                 fg=CONFIRM_TEXT,
-                                 font=(self._family, self._size, 'bold'),
-                                 pady=5,
-                                 cursor='hand2',
-                                 takefocus=1,
-                                 highlightthickness=1,
-                                 highlightbackground=TERMINAL_BACKGROUND,
-                                 highlightcolor=ANSWER_COLOUR,
-                                 )
-        for sequence in ('<Button-1>', '<Return>', '<KP_Enter>', '<space>'):
-            self._confirm.bind(sequence, self._confirm_sender)
-        self._confirm.bind('<Enter>',
-                           lambda e: self._confirm.configure(bg=CONFIRM_HOVER),
-                           )
-        self._confirm.bind('<Leave>',
-                           lambda e: self._confirm.configure(bg=CONFIRM_BACKGROUND),
-                           )
-        row.pack(fill='x', pady=(2, 10))
+        row.pack(fill='x', pady=(2, 8))
         bottom.pack(side='bottom', fill='x')
         self._bottom = bottom
         self._table = AnswerTable(tk,
                                   ttk,
-                                  left,
+                                  card,
                                   (self._family, self._size),
-                                  {'background': TERMINAL_BACKGROUND,
+                                  {'background': CARD_BACKGROUND,
                                    'text': TERMINAL_TEXT,
                                    'cell': ENTRY_BACKGROUND,
                                    'edge': ANSWER_COLOUR,
                                    },
                                   self._confirm.focus_set,
                                   self._file_follower,
+                                  next((f for f in SANS_FONTS if f in families), None),
                                   )
         scroll.pack(side='right', fill='y')
         self._text.pack(side='left', fill='both', expand=True)
-        self._terminal_lines = int(self._text.cget('height'))
+        self._text_box.pack(side='top', fill='both', expand=True)
+        self._guide_panel.rows_drawer(self._guide.row_lister())
         panes.add(left, weight=1)
         self._entry.bind('<Return>', self._answer_sender)
         self._entry.bind('<Up>', lambda e: self._history_stepper(-1))
@@ -2461,31 +3271,49 @@ class ViewerGui:
 
         # ---- 2 The plot on the right -------------------------------------------------
         right = tk.Frame(panes, bg=PLOT_BACKGROUND)
+        controls = tk.Frame(right,
+                            bg=PLOT_BACKGROUND,
+                            )  # the file arrows, above the boxes and the plot
+        controls.pack(side='top', pady=(8, 0))
         self._strip = SettingsStrip(tk,
                                     ttk,
                                     right,
                                     PLOT_BACKGROUND,
                                     self._strip_change_teller,
                                     )
-        self._strip.frame.pack(side='bottom', pady=(2, 8))
-        self._edge_row = EdgeRow(tk,  # placed only while edges are dragged
-                                 right,
+        self._strip.frame.pack(side='top', pady=(6, 0))
+        # the rows of the edges sit in the Time regions box, only while edges are
+        # dragged; the second for a step with two rows of edges
+        self._edge_row = EdgeRow(tk,
+                                 self._strip.time_box,
                                  PLOT_BACKGROUND,
                                  self._typed_edge_taker,
                                  self._every_file_taker,
-                                 self._entry.focus_set,
+                                 self._area.focuser,
+                                 on_tick=self._edge_tick_taker,
                                  )
-        self._second_row = EdgeRow(tk,  # for a step with two rows of edges
-                                   right,
+        self._second_row = EdgeRow(tk,
+                                   self._strip.time_box,
                                    PLOT_BACKGROUND,
                                    self._typed_edge_taker,
                                    lambda is_ticked: self._every_file_taker(is_ticked,
-                                                                            True,
+                                                                            'second',
                                                                             ),
-                                   self._entry.focus_set,
+                                   self._area.focuser,
+                                   on_tick=self._edge_tick_taker,
                                    )
-        controls = tk.Frame(right, bg=PLOT_BACKGROUND)
-        controls.pack(side='bottom', pady=(4, 6))
+        # the "Apply to every experiment" line of a step whose rows have switches of
+        # their own, with the step's toggles
+        self._options_row = EdgeRow(tk,
+                                    self._strip.time_box,
+                                    PLOT_BACKGROUND,
+                                    self._typed_edge_taker,
+                                    lambda is_ticked: self._every_file_taker(is_ticked,
+                                                                             'options',
+                                                                             ),
+                                    self._area.focuser,
+                                    on_toggle=self._edge_toggle_taker,
+                                    )
         self._help = tk.Label(right,
                               text='',
                               bg=PLOT_BACKGROUND,
@@ -2577,17 +3405,47 @@ class ViewerGui:
             self._root.attributes('-topmost', True)
             self._root.after(500, lambda: self._root.attributes('-topmost', False))
             self._root.focus_force()
-            self._entry.focus_set()
+            self._area.focuser()
         except Exception:  # a window that stays behind still works
             pass
 
     # ---- MAIN METHODS ----------------------------------------------------------------
 
+    # ---- answer_requester ------------------------------------------------------------
+    def answer_requester(self, request: Dict[str, Any]) -> None:
+        """
+        ---- Summary ----
+        Method to say how the question just asked is answered, so the open step shows
+        its answers as buttons. It is called from the question thread.
+
+        ---- Inputs ----
+        request : Dict[str, Any]
+            {'kind', 'options', 'default', 'value'} (AnswerArea.request_shower).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the request for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('ask', dict(request)))
+
     # ---- drawing_sign_shower ---------------------------------------------------------
     def drawing_sign_shower(self) -> None:
         """
         ---- Summary ----
-        Method to put the "Drawing ..." sign on the plot while the program makes
+        Method to put the "Plotting data …" sign on the plot while the program makes
         pictures of its own (the combined figures, the components found from the
         data). The sign goes when the next picture or preview is shown, or the next
         question is asked.
@@ -2780,6 +3638,8 @@ class ViewerGui:
             if answer is _CLOSED:
                 raise EOFError
             if isinstance(answer, str):
+                if self._answer_listener is not None:
+                    self._answer_listener()
                 return answer
             self._strip_change_runner(answer[1], prompt)
 
@@ -2864,8 +3724,9 @@ class ViewerGui:
 
         ---- Globals mutated ----
         None. Replaces sys.stdout, sys.stderr and the built-in input while the window
-        runs, registers the window with the questions that want a time, and restores
-        them all afterwards (side effects).
+        runs, registers the window with the questions (for a time, for how each is
+        answered and for the steps of the guide), and restores them all afterwards
+        (side effects).
 
         ---- Equations ----
         None.
@@ -2888,6 +3749,8 @@ class ViewerGui:
         sys.stderr = OutputRouter(original[1], self.text_sender, 'err', owner)
         builtins.input = self.input_reader
         time_request_setter(self.time_reader_setter)
+        answer_request_setter(self.answer_requester)
+        guide_step_setter(self.step_teller)
         _active_gui = self
         self.logic_thread = threading.Thread(target=self._logic_runner,
                                              name='program',
@@ -2908,8 +3771,44 @@ class ViewerGui:
             sys.stdout, sys.stderr = original
             builtins.input = self._real_input
             time_request_setter(None)
+            answer_request_setter(None)
+            guide_step_setter(None)
             _active_gui = None
         return self.exit_code
+
+    # ---- saved_plot_publisher --------------------------------------------------------
+    def saved_plot_publisher(self, name: str, png: bytes) -> None:
+        """
+        ---- Summary ----
+        Method to show the plot saved for a file, once the questions about each file
+        are over: it takes the place of the file's preview, so the file shows its saved
+        plot in the later steps. It is called from the question thread, after
+        window_closer.
+
+        ---- Inputs ----
+        name : str
+            Name of the file.
+        png : bytes
+            Picture of the saved plot.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the picture for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('saved', name, png))
 
     # ---- session_attacher ------------------------------------------------------------
     def session_attacher(self, session: ViewerSession) -> None:
@@ -2972,17 +3871,51 @@ class ViewerGui:
 
         self._events.put(('spec', spec, name))
 
+    # ---- step_teller -----------------------------------------------------------------
+    def step_teller(self, key: str) -> None:
+        """
+        ---- Summary ----
+        Method to say which step of the guide starts, so the guide opens it. It is
+        called from the question thread.
+
+        ---- Inputs ----
+        key : str
+            Key of the step (viewer_guide.GUIDE_KEYS).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the step for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('step', key))
+
     # ---- strip_choices_setter --------------------------------------------------------
     def strip_choices_setter(self,
                              spectra: List[str],
                              has_percent: bool,
                              has_od: bool,
+                             has_baseline: bool = False,
+                             has_psi: bool = False,
+                             can_edit_od: Optional[bool] = None,
                              ) -> None:
         """
         ---- Summary ----
-        Method to tell the settings strip what it offers: the spectrometers of its
-        "Spectra" drop-down, whether % oxidised is in "Haems as", and whether the per
-        OD boxes are shown.
+        Method to tell the boxes above the plot what they offer: the spectrometers of
+        the "Spectra" drop-down, whether % oxidised is in "Haems as", whether per OD is
+        offered, whether Edit ODs is shown, whether % of baseline is in "OCR as", and
+        whether Δψ can be ticked.
 
         ---- Inputs ----
         spectra : List[str]
@@ -2991,6 +3924,13 @@ class ViewerGui:
             True when at least one file has both regions.
         has_od : bool
             True when OD values were entered.
+        has_baseline : bool
+            True when the averaging windows are set up.
+        has_psi : bool
+            True when Δψ can be worked out.
+        can_edit_od : Optional[bool]
+            True when scaling by OD was chosen, so Edit ODs is shown even while some
+            OD values are missing; None follows has_od.
 
         ---- Globals read ----
         None.
@@ -3009,9 +3949,15 @@ class ViewerGui:
         None.
         """
 
-        self._events.put(
-            ('strip_choices', list(spectra), bool(has_percent), bool(has_od)),
-            )
+        self._events.put(('strip_choices',
+                          list(spectra),
+                          bool(has_percent),
+                          bool(has_od),
+                          bool(has_baseline),
+                          bool(has_psi),
+                          can_edit_od,
+                          ),
+                         )
 
     # ---- strip_fits_setter -----------------------------------------------------------
     def strip_fits_setter(self, names: List[str]) -> None:
@@ -3106,6 +4052,38 @@ class ViewerGui:
         """
 
         self._strip_listener = listener
+
+    # ---- answer_listener_setter ------------------------------------------------------
+    def answer_listener_setter(self, listener: Optional[Callable[[], None]]) -> None:
+        """
+        ---- Summary ----
+        Method to register the function run just before an answer is handed to the
+        question that waits (a tab of the Time regions box left open is used then), or
+        None for none.
+
+        ---- Inputs ----
+        listener : Optional[Callable[[], None]]
+            Called on the program thread with no arguments; what it prints shows above
+            the answer.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the function on the instance (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._answer_listener = listener
 
     # ---- strip_reader ----------------------------------------------------------------
     def strip_reader(self) -> Dict[str, Any]:
@@ -3362,8 +4340,9 @@ class ViewerGui:
         ---- Summary ----
         Method to end the previews when the browser steps are over: the preview thread
         is stopped (so it cannot clash with the processing that follows) and the file
-        controls are switched off. The pictures drawn with the last settings stay; a
-        file without one says it was not drawn with them.
+        controls are switched off. The pictures drawn with the last settings stay
+        until the saved plot of each file takes their place (saved_plot_publisher); a
+        file without one says its plot was not saved with them.
 
         ---- Inputs ----
         None.
@@ -3394,20 +4373,27 @@ class ViewerGui:
 
 
 # ---- _hint_chooser -------------------------------------------------------------------
-def _hint_chooser(time_kind: Optional[str], is_edged: bool = False) -> str:
+def _hint_chooser(kind: Optional[str],
+                  time_kind: Optional[str],
+                  is_edged: bool = False,
+                  ) -> str:
     """
     ---- Summary ----
-    Helper function to choose the hint shown under the answer box: what the mouse can
-    do for the question waiting, if anything.
+    Helper function to choose the hint shown under the answers: what to do for the
+    question waiting, with the mouse or the keyboard.
 
     ---- Inputs ----
+    kind : Optional[str]
+        How the question is answered ('continue', 'yesno', 'choice', 'multi',
+        'number', 'text', 'confirm'), or None before the first question.
     time_kind : Optional[str]
         'span' (a drag gives the answer) or None.
     is_edged : bool
         True while edges are dragged on the plot.
 
     ---- Globals read ----
-    ANSWER_HINT, EDGES_HINT, SPAN_HINT (module constants).
+    CLICK_HINT, EDGES_HINT, NAME_HINT, NUMBER_HINT, SPAN_HINT, TABLE_HINT (module
+    constants).
 
     ---- Outputs ----
     str
@@ -3427,7 +4413,13 @@ def _hint_chooser(time_kind: Optional[str], is_edged: bool = False) -> str:
         return EDGES_HINT
     if time_kind == 'span':
         return SPAN_HINT
-    return ANSWER_HINT
+    if kind == 'number':
+        return NUMBER_HINT
+    if kind == 'text':
+        return NAME_HINT
+    if kind == 'confirm':
+        return TABLE_HINT
+    return CLICK_HINT
 
 
 # ---- active_gui_getter ---------------------------------------------------------------
@@ -3545,6 +4537,110 @@ def pointed_time_finder(x: float,
         return None
     share = (across - time_axis.left) / (time_axis.right - time_axis.left)
     return time_axis.start_min + share * (time_axis.end_min - time_axis.start_min)
+
+
+# ---- panel_arrow_finder --------------------------------------------------------------
+def panel_arrow_finder(x: float,
+                       y: float,
+                       arrows: List[Tuple[str, int, float, float, float, float, bool]],
+                       ) -> Optional[Tuple[str, int, bool]]:
+    """
+    ---- Summary ----
+    Main function to find the arrow of a panel under a point of the plot area.
+
+    ---- Inputs ----
+    x : float
+        Distance from the left edge of the plot area, in pixels.
+    y : float
+        Distance from the top edge of the plot area, in pixels.
+    arrows : List[Tuple[str, int, float, float, float, float, bool]]
+        The arrows, as panel_arrow_placer gives them.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[Tuple[str, int, bool]]
+        (key of the panel, -1 for up or 1 for down, whether the arrow can be used),
+        or None when the point is on no arrow.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    On an arrow: left <= x <= right and top <= y <= bottom of its square.
+
+    ---- Helpers ----
+    None.
+    """
+
+    for key, step, x0, y0, x1, y1, is_usable in arrows:
+        if x0 <= x <= x1 and y0 <= y <= y1:
+            return key, step, is_usable
+    return None
+
+
+# ---- panel_arrow_placer --------------------------------------------------------------
+def panel_arrow_placer(picture_box: Tuple[float, float, float, float],
+                       time_axis: TimeAxis,
+                       band_px: float,
+                       ) -> List[Tuple[str, int, float, float, float, float, bool]]:
+    """
+    ---- Summary ----
+    Main function to place an up and a down arrow left of each panel of a picture, in
+    the room kept beside it: the up arrow just above the middle of the panel, the down
+    arrow just under it. The up arrow of the top panel and the down arrow of the
+    bottom one cannot be used.
+
+    ---- Inputs ----
+    picture_box : Tuple[float, float, float, float]
+        (left, top, width, height) of the picture in the plot area, in pixels.
+    time_axis : TimeAxis
+        Where the panels sit in the picture (its panels, top first).
+    band_px : float
+        Width of the room kept left of the picture, in pixels.
+
+    ---- Globals read ----
+    PANEL_ARROW_SIZE_PX (module constant).
+
+    ---- Outputs ----
+    List[Tuple[str, int, float, float, float, float, bool]]
+        For each arrow: the key of its panel, -1 for up or 1 for down, the left, top,
+        right and bottom of its square in pixels, and whether it can be used.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    middle y = picture top + (1 - (panel bottom + panel top) / 2) x picture height;
+    side = PANEL_ARROW_SIZE_PX, or half the height of the panel less 1 px when that is
+    smaller; the squares are centred on picture left - band / 2, the up one from
+    middle - 1 - side to middle - 1, the down one from middle + 1 to middle + 1 + side.
+
+    ---- Helpers ----
+    None.
+    """
+
+    left, top, _, height = picture_box
+    centre = left - band_px / 2.0
+    arrows = []
+    for place, (key, bottom, panel_top) in enumerate(time_axis.panels):
+        middle = top + (1.0 - (bottom + panel_top) / 2.0) * height
+        side = min(float(PANEL_ARROW_SIZE_PX),
+                   max((panel_top - bottom) * height / 2.0 - 1.0, 1.0),
+                   )
+        x0, x1 = centre - side / 2.0, centre + side / 2.0
+        arrows.append((key, -1, x0, middle - 1.0 - side, x1, middle - 1.0, place > 0))
+        arrows.append((key,
+                       1,
+                       x0,
+                       middle + 1.0,
+                       x1,
+                       middle + 1.0 + side,
+                       place < len(time_axis.panels) - 1,
+                       ),
+                      )
+    return arrows
 
 
 # ---- window_opener -------------------------------------------------------------------

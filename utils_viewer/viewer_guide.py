@@ -1,0 +1,1289 @@
+"""
+The guide on the left of the window: the steps under their stage names, the step open and the answer buttons.
+"""
+
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+
+# ---- CONSTANTS -----------------------------------------------------------------------
+# The stages, in order, and the steps of each: (key, stage, name, help). The program
+# says which step starts with guide_step_starter(key); the help is shown when the step
+# is opened again after it was done.
+GO_BACK_HELP = ('To change it, go back to its stage at Go back or save (step 15), once '
+                'the figure is accepted.')
+GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
+    (
+        'data_folder',
+        'Import',
+        'Data folder',
+        'The folder of .paf files is chosen when Portimao opens: to use another, close '
+        'Portimao and open it again.',
+        ),
+    (
+        'results_folder',
+        'Import',
+        'Results folder',
+        'The results folder is chosen when Portimao opens: to use another, close Portimao '
+        'and open it again.',
+        ),
+    ('previous', 'Import', 'Previous processing', 'Whether the previous processing is loaded is chosen when Portimao opens.'),
+    ('trim',
+     'Set-up',
+     'Trim and ignore',
+     'Drag the trim and ignore edges on the plot, or type them in the Time regions box '
+     'above it. Click Export csv to write the csv files with the edges as they are.',
+     ),
+    ('od_scaling', 'Set-up', 'Scale by OD', f'Whether the OCR and the haems can be shown per OD was set here. {GO_BACK_HELP}'),
+    ('od_values',
+     'Set-up',
+     'OD values',
+     'The OD, volume and dilution of each file were typed here. Click Edit ODs in the '
+     'View box to change them.',
+     ),
+    ('ocr_view',
+     'Set-up',
+     'OCR view',
+     'How the OCR is shown was chosen here. Change it under OCR as in the View box.',
+     ),
+    ('temperature',
+     'Set-up',
+     'Temperature',
+     'The temperature of the runs was typed here. It can also be changed in the Δψ box, '
+     'under More.',
+     ),
+    ('labels',
+     'Set-up',
+     'Event labels',
+     'The event labels were typed here. Click Edit labels in the View box to change '
+     'them.',
+     ),
+    ('haems',
+     'Experiment processing',
+     'Haems',
+     'Change the fit, the background, the spectra and the haems shown in the Haem '
+     'decomposition box above the plot: the plot is redrawn after each change. To '
+     'compare two, click Keep to compare first.',
+     ),
+    ('regions',
+     'Experiment processing',
+     'Oxidised and reduced',
+     'Pull the oxidised and reduced regions out on the plot, or type them under Ox / '
+     'Red in the Time regions box above it.',
+     ),
+    ('delta_psi',
+     'Experiment processing',
+     'Δψ',
+     'Tick Δψ in its box above the plot to work it out, and change its numbers there: '
+     'the Δψ panel is redrawn at once.',
+     ),
+    ('windows',
+     'Experiment processing',
+     'Averaging windows',
+     'Drag the averaging windows on the plot, or type them under Averaging in the Time '
+     'regions box above it.',
+     ),
+    ('figure',
+     'Experiment export',
+     'Figure',
+     'Change the journal, the width and the height in the Figure box above the plot: '
+     'the figure of each file is redrawn at its size.',
+     ),
+    ('go_back', 'Experiment export', 'Go back or save', 'Going back to a stage, or saving the plot of each file, was chosen here.'),
+    ('workbooks',
+     'Experiment export',
+     'Workbooks',
+     'The workbook and the plot of each file were written here, with the spectra as '
+     'csv files when you chose them.',
+     ),
+    ('side_by_side', 'Dataset figures', 'Side by side', 'The figure of two experiments side by side was chosen here.'),
+    ('grid', 'Dataset figures', '2x2 grid', 'The 2x2 grid of four experiments was chosen here.'),
+    ('time_response', 'Dataset figures', 'Time response', 'The time response figure was chosen here.'),
+    ('haem_ocr', 'Dataset figures', 'Haem and OCR response', 'The haem and OCR response figure was chosen here.'),
+    ('start', 'Dataset export', 'Summary and start', 'The summary of your answers is shown here, before the run starts.'),
+    )
+GUIDE_STAGES = tuple(dict.fromkeys(stage for _, stage, _, _ in GUIDE_STEPS))
+GUIDE_KEYS = tuple(key for key, _, _, _ in GUIDE_STEPS)
+# The step a change in the boxes above the plot belongs to, by the name of the value
+# changed; a value not listed (how the haems, the OCR and the labels are shown, the
+# order of the panels) belongs to every step, and opens none. The Time regions box
+# belongs to the step of the tab pressed (TAB_STEPS).
+TIME_TAB_CHANGE = 'time_tab'
+TAB_STEPS = {'trim': 'trim', 'regions': 'regions', 'windows': 'windows'}
+CHANGE_STEPS = {'edit_ods': 'od_values',
+                'edit_labels': 'labels',
+                'plot_haems': 'haems',
+                'fit_file': 'haems',
+                'haem_background': 'haems',
+                'haem_files': 'haems',
+                'compare': 'haems',
+                'kept': 'haems',
+                'spectra': 'haems',
+                'go_back': 'haems',
+                'save_fit': 'haems',
+                'delta_psi': 'delta_psi',
+                'psi_bH_mV': 'delta_psi',
+                'psi_bL_mV': 'delta_psi',
+                'psi_fall_mV': 'delta_psi',
+                'psi_share': 'delta_psi',
+                'temperature_c': 'delta_psi',
+                'psi_lowest_percent': 'delta_psi',
+                'psi_highest_percent': 'delta_psi',
+                'journal': 'figure',
+                'columns': 'figure',
+                'height': 'figure',
+                'export_master': 'figure',
+                }
+# The button a step keeps when it is opened again from a later one: its words. A click
+# is told as {EXPORT_CSV_CHANGE: True}, as a change in the boxes is.
+EXPORT_CSV_TEXT = 'Export csv'
+EXPORT_CSV_CHANGE = 'export_csv'
+STEP_EXTRAS = {'trim': EXPORT_CSV_TEXT}
+MARKS = {'open': '▸', 'here': '→', 'done': '✓', 'skipped': ' ', 'later': ' '}
+HERE_TAG = 'you were here'
+# beside a step passed without being asked, so the numbers do not seem to jump
+SKIPPED_TAG = 'not needed this run'
+GUIDE_BACKGROUND = '#1e1e1e'
+CARD_BACKGROUND = '#252526'
+CARD_EDGE = '#3c6e9f'
+# The four levels of the guide: the stage (largest), the step, then in the card the
+# explanations and the question (the window sizes those two). Points added to the
+# size of the messages.
+STAGE_OPEN_POINTS = 7
+STAGE_SHUT_POINTS = 4
+STEP_POINTS = 2
+STAGE_OPEN_COLOUR = '#ffffff'
+LINE_COLOURS = {'stage': '#9a9a9a',
+                'open': '#ffffff',
+                'here': '#9cdcfe',
+                'done': '#c0c0c0',
+                'skipped': '#6a6a6a',
+                'later': '#8c8c8c',
+                }
+OPEN_BACKGROUND = '#2a3a4c'
+MAIN_BACKGROUND = '#264f78'
+MAIN_HOVER = '#2f6396'
+OTHER_BACKGROUND = '#2d2d30'
+OTHER_HOVER = '#3e3e42'
+OFF_TEXT = '#707070'
+BUTTON_TEXT = '#ffffff'
+FOCUS_COLOUR = '#9cdcfe'
+# a list of choices longer than this is laid out in two columns
+ONE_COLUMN_MOST = 6
+TICKED = '☑'
+UNTICKED = '☐'
+
+
+# ---- GuideState ----------------------------------------------------------------------
+class GuideState:
+    """
+    ---- Summary ----
+    Where the guide is: the step the program waits at, the step open in the guide (an
+    earlier one, after a change in the strip that belongs to it or a click on its line)
+    and the steps asked so far. It holds no window, so it can be tested without one.
+
+    ---- Attributes ----
+    current : Optional[int]
+        Index in GUIDE_STEPS of the step the program waits at; None before the first.
+    shown : Optional[int]
+        Index of the step open in the guide.
+    reached : int
+        Index of the furthest step asked (-1 before the first).
+    asked : Set[int]
+        Indexes of the steps asked so far.
+
+    ---- Globals read ----
+    GUIDE_STEPS, GUIDE_KEYS, GUIDE_STAGES, CHANGE_STEPS, MARKS, HERE_TAG.
+
+    ---- Methods ----
+    __init__
+    back_taker
+    card_teller
+    change_opener
+    is_back
+    line_opener
+    row_lister
+    step_starter
+    """
+
+    # ---- __init__ --------------------------------------------------------------------
+    def __init__(self) -> None:
+        """
+        ---- Summary ----
+        Method to start before the first step.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Sets the attributes on the instance.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self.current: Optional[int] = None
+        self.shown: Optional[int] = None
+        self.reached = -1
+        self.asked: Set[int] = set()
+
+    # ---- back_taker ------------------------------------------------------------------
+    def back_taker(self) -> None:
+        """
+        ---- Summary ----
+        Method to open the step the program waits at again ("Back to <step>").
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the step shown.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self.shown = self.current
+
+    # ---- card_teller -----------------------------------------------------------------
+    def card_teller(self) -> Dict[str, str]:
+        """
+        ---- Summary ----
+        Method to give what the open step says above its messages when it is an
+        earlier step: the note on where you were, the step's help, the words of the
+        button that goes back and those of the step's own button (Export csv of the
+        trim step), if it has one.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        GUIDE_STEPS.
+
+        ---- Outputs ----
+        Dict[str, str]
+            {'note', 'help', 'back', 'extra'}; each empty while the step open is the
+            one the program waits at, and 'extra' empty for a step without a button
+            of its own.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        is_back
+        """
+
+        if not self.is_back():
+            return {'note': '', 'help': '', 'back': '', 'extra': ''}
+        key, _, name, help_text = GUIDE_STEPS[self.shown]
+        _, _, here, _ = GUIDE_STEPS[self.current]
+        return {'note': (f'This is step {self.shown + 1}, {name}. When you are done '
+                         f'here, go back to step {self.current + 1}, {here}, where you '
+                         f'were.'
+                         ),
+                'help': help_text,
+                'back': f'Back to {here}',
+                'extra': STEP_EXTRAS.get(key, ''),
+                }
+
+    # ---- change_opener ---------------------------------------------------------------
+    def change_opener(self, changes: Dict[str, Any]) -> bool:
+        """
+        ---- Summary ----
+        Method to open the earlier step that a change in the boxes above the plot
+        belongs to (the fit while at Δψ opens the haems). A change that belongs to a
+        later step ticks that step, as done out of order; one that belongs to the step
+        the program waits at, or to no step, opens nothing.
+
+        ---- Inputs ----
+        changes : Dict[str, Any]
+            {name: new value} of the strip values that changed.
+
+        ---- Globals read ----
+        GUIDE_KEYS.
+
+        ---- Outputs ----
+        bool
+            True when the guide changed: another step opened, or a later one ticked.
+
+        ---- Globals mutated ----
+        None. Changes the step shown and the steps done.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        step_of_change_finder
+        """
+
+        key = step_of_change_finder(changes)
+        if key is None or self.current is None:
+            return False
+        index = GUIDE_KEYS.index(key)
+        if index > self.current:
+            is_new = index not in self.asked
+            self.asked.add(index)
+            return is_new
+        if index == self.current or index not in self.asked or index == self.shown:
+            return False
+        self.shown = index
+        return True
+
+    # ---- is_back ---------------------------------------------------------------------
+    def is_back(self) -> bool:
+        """
+        ---- Summary ----
+        Method to say whether the step open is an earlier one than the step the program
+        waits at.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        bool
+            True while an earlier step is open.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return self.shown is not None and self.shown != self.current
+
+    # ---- line_opener -----------------------------------------------------------------
+    def line_opener(self, index: int) -> bool:
+        """
+        ---- Summary ----
+        Method to open a step whose line was clicked: one already asked, or the one the
+        program waits at. A step not asked yet stays shut.
+
+        ---- Inputs ----
+        index : int
+            Index in GUIDE_STEPS of the line clicked.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        bool
+            True when the step open changed.
+
+        ---- Globals mutated ----
+        None. Changes the step shown.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if index not in self.asked or index == self.shown:
+            return False
+        self.shown = index
+        return True
+
+    # ---- row_lister ------------------------------------------------------------------
+    def row_lister(self) -> List[Dict[str, Any]]:
+        """
+        ---- Summary ----
+        Method to list the lines of the guide, top first: every stage name, and under
+        the stage of the step open (and that of the step the program waits at) one line
+        per step. The other stages show their name only, with the numbers of their
+        steps, so the open step keeps the room.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        GUIDE_STAGES, GUIDE_STEPS, HERE_TAG, MARKS, SKIPPED_TAG.
+
+        ---- Outputs ----
+        List[Dict[str, Any]]
+            One dict per line: {'kind': 'stage', 'text', 'status', 'is_open'} with
+            status 'stage' and is_open True for a stage that lists its steps, or
+            {'kind': 'step', 'index', 'text', 'status', 'mark', 'tag'} with status
+            'open' (the card is under it), 'here' (the program waits there while an
+            earlier step is open; tag HERE_TAG), 'done', 'skipped' (passed without
+            being asked; tag SKIPPED_TAG) or 'later'.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        open_stages = {GUIDE_STEPS[i][1]
+                       for i in (self.shown, self.current)
+                       if i is not None
+                       }
+        rows: List[Dict[str, Any]] = []
+        for stage in GUIDE_STAGES:
+            indexes = [i
+                       for i, (_, step_stage, _, _) in enumerate(GUIDE_STEPS)
+                       if step_stage == stage
+                       ]
+            if stage in open_stages:
+                rows.append({'kind': 'stage',
+                             'text': stage,
+                             'status': 'stage',
+                             'is_open': True,
+                             },
+                            )
+            else:
+                is_done = indexes[-1] <= self.reached
+                numbers = (f'step {indexes[0] + 1}'
+                           if len(indexes) == 1
+                           else f'steps {indexes[0] + 1}–{indexes[-1] + 1}'
+                           )
+                rows.append({'kind': 'stage',
+                             'text': (f"{stage}  ·  {numbers}"
+                                      f"{'  ✓' if is_done else ''}"
+                                      ),
+                             'status': 'stage',
+                             'is_open': False,
+                             },
+                            )
+                continue
+            for i in indexes:
+                if i == self.shown:
+                    status = 'open'
+                elif i == self.current:
+                    status = 'here'
+                elif i in self.asked:
+                    status = 'done'
+                elif i < self.reached:
+                    status = 'skipped'
+                else:
+                    status = 'later'
+                rows.append({'kind': 'step',
+                             'index': i,
+                             'text': f'{i + 1:>2}  {GUIDE_STEPS[i][2]}',
+                             'status': status,
+                             'mark': MARKS[status],
+                             'tag': {'here': HERE_TAG,
+                                     'skipped': SKIPPED_TAG,
+                                     }.get(status, ''),
+                             },
+                            )
+        return rows
+
+    # ---- step_starter ----------------------------------------------------------------
+    def step_starter(self, key: str) -> None:
+        """
+        ---- Summary ----
+        Method to take the step the program has started: it becomes the step open and
+        the one waited at, also when the program asks an earlier step again (going
+        back), and the furthest step reached is kept.
+
+        ---- Inputs ----
+        key : str
+            Key of the step, one of GUIDE_KEYS.
+
+        ---- Globals read ----
+        GUIDE_KEYS.
+
+        ---- Outputs ----
+        None
+            Nothing. Raises ValueError for a key that is not a step.
+
+        ---- Globals mutated ----
+        None. Changes the attributes.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if key not in GUIDE_KEYS:
+            raise ValueError(f"'{key}' is not a step of the guide.")
+        index = GUIDE_KEYS.index(key)
+        self.current = self.shown = index
+        self.reached = max(self.reached, index)
+        self.asked.add(index)
+
+
+# ---- GuidePanel ----------------------------------------------------------------------
+class GuidePanel:
+    """
+    ---- Summary ----
+    The guide on the left of the window: one line per stage and per step, with the
+    card of the open step (its messages, its question and its answers) under the line
+    of that step. The card is built by the window; this class places it. Every method
+    runs on the window thread.
+
+    ---- Attributes ----
+    frame : Any
+        The Tk frame holding the guide, for the window to place.
+    card : Any
+        The Tk frame of the open step, for the window to fill.
+
+    ---- Globals read ----
+    CARD_BACKGROUND, CARD_EDGE, GUIDE_BACKGROUND, HERE_TAG, LINE_COLOURS,
+    OPEN_BACKGROUND, STAGE_OPEN_COLOUR, STAGE_OPEN_POINTS, STAGE_SHUT_POINTS,
+    STEP_POINTS.
+
+    ---- Methods ----
+    __init__
+    rows_drawer
+    """
+
+    # ---- __init__ --------------------------------------------------------------------
+    def __init__(self,
+                 tk: Any,
+                 parent: Any,
+                 family: str,
+                 size: int,
+                 on_line: Callable[[int], None],
+                 stage_family: Optional[str] = None,
+                 ) -> None:
+        """
+        ---- Summary ----
+        Method to build the empty guide and its card.
+
+        ---- Inputs ----
+        tk : Any
+            The tkinter module.
+        parent : Any
+            The frame of the left side of the window.
+        family : str
+            Font family of the window.
+        size : int
+            Font size of the messages (points).
+        stage_family : Optional[str]
+            Font family of the stage names (a plain one); None for the window's.
+        on_line : Callable[[int], None]
+            Called with the index of a step whose line is clicked.
+
+        ---- Globals read ----
+        CARD_BACKGROUND, CARD_EDGE, GUIDE_BACKGROUND.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Creates the widgets.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._tk = tk
+        self._family = family
+        self._stage_family = stage_family or family
+        self._size = size
+        self._on_line = on_line
+        self._lines: List[Any] = []
+        self.frame = tk.Frame(parent, bg=GUIDE_BACKGROUND)
+        self.card = tk.Frame(self.frame,
+                             bg=CARD_BACKGROUND,
+                             highlightthickness=1,
+                             highlightbackground=CARD_EDGE,
+                             )
+
+    # ---- rows_drawer -----------------------------------------------------------------
+    def rows_drawer(self, rows: List[Dict[str, Any]]) -> None:
+        """
+        ---- Summary ----
+        Method to draw the lines of the guide again, with the card under the line of
+        the open step (at the bottom before the first step): the stage that lists its
+        steps large and bold, the other stages a little smaller and paler, the steps
+        under it larger than the messages. A step already asked can be clicked to open
+        it.
+
+        ---- Inputs ----
+        rows : List[Dict[str, Any]]
+            The lines, as GuideState.row_lister gives them.
+
+        ---- Globals read ----
+        GUIDE_BACKGROUND, HERE_TAG, LINE_COLOURS, OPEN_BACKGROUND, STAGE_OPEN_COLOUR,
+        STAGE_OPEN_POINTS, STAGE_SHUT_POINTS, STEP_POINTS.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Replaces the line widgets and places the card (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        tk = self._tk
+        for line in self._lines:
+            line.destroy()
+        self._lines = []
+        self.card.pack_forget()
+        is_card_placed = False
+        for row in rows:
+            status = row['status']
+            if row['kind'] == 'stage':
+                is_open = row.get('is_open', False)
+                line = tk.Label(
+                    self.frame,
+                    text=row['text'],
+                    bg=GUIDE_BACKGROUND,
+                    fg=STAGE_OPEN_COLOUR if is_open else LINE_COLOURS['stage'],
+                    font=(self._stage_family,
+                          self._size + (STAGE_OPEN_POINTS
+                                        if is_open
+                                        else STAGE_SHUT_POINTS
+                                        ),
+                          'bold',
+                          ),
+                    anchor='w',
+                    )
+                line.pack(side='top', fill='x', padx=12, pady=(10, 2))
+                self._lines.append(line)
+                continue
+            text = f"{row['mark']} {row['text']}"
+            if row['tag'] == HERE_TAG:
+                text += f"   ← {row['tag']}"
+            elif row['tag']:
+                text += f"   · {row['tag']}"
+            is_clickable = status in ('done', 'here')
+            line = tk.Label(
+                self.frame,
+                text=text,
+                bg=OPEN_BACKGROUND if status == 'open' else GUIDE_BACKGROUND,
+                fg=LINE_COLOURS[status],
+                font=(self._family,
+                      self._size + STEP_POINTS,
+                      'bold' if status in ('open', 'here') else 'normal',
+                      ),
+                pady=2,
+                anchor='w',
+                padx=6,
+                cursor='hand2' if is_clickable else '',
+                )
+            line.pack(side='top', fill='x', padx=10)
+            if is_clickable:
+                line.bind('<Button-1>', lambda e, i=row['index']: self._on_line(i))
+            self._lines.append(line)
+            if status == 'open':
+                self.card.pack(side='top',
+                               fill='both',
+                               expand=True,
+                               padx=(22, 10),
+                               pady=(2, 6),
+                               )
+                is_card_placed = True
+        if not is_card_placed:
+            self.card.pack(side='top', fill='both', expand=True, padx=10, pady=(6, 6))
+
+
+# ---- AnswerArea ----------------------------------------------------------------------
+class AnswerArea:
+    """
+    ---- Summary ----
+    The answers of the question waiting, under its card: one big Continue button for
+    something done on the plot or in the strip; Yes and No one above the other; a
+    button for each choice; tick buttons and Continue for several choices; a box with
+    Continue only for a number or a name to type; Confirm for a table; or, while an
+    earlier step is open, the button back to the step waited at. The answer the program
+    gives with Enter is the highlighted button, which holds the keyboard. Every method
+    runs on the window thread.
+
+    ---- Attributes ----
+    frame : Any
+        The Tk frame holding the answers, for the window to place.
+    entry : Any
+        The typing box, shown for a number or a name.
+    confirm : Any
+        The Confirm button of a table.
+
+    ---- Globals read ----
+    BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OFF_TEXT,
+    ONE_COLUMN_MOST, OTHER_BACKGROUND, OTHER_HOVER, TICKED, UNTICKED.
+
+    ---- Methods ----
+    __init__
+    _button_maker
+    _choices_placer
+    _clearer
+    _multi_sender
+    _ticker
+    back_shower
+    focuser
+    request_shower
+    """
+
+    # ---- __init__ --------------------------------------------------------------------
+    def __init__(self,
+                 tk: Any,
+                 parent: Any,
+                 family: str,
+                 size: int,
+                 colours: Dict[str, str],
+                 on_click: Callable[[str, str], None],
+                 on_typed: Callable[[], None],
+                 on_confirm: Callable[[], Any],
+                 ) -> None:
+        """
+        ---- Summary ----
+        Method to build the empty area, its typing box and its Confirm button.
+
+        ---- Inputs ----
+        tk : Any
+            The tkinter module.
+        parent : Any
+            The frame the area sits in.
+        family : str
+            Font family of the window.
+        size : int
+            Font size of the messages (points).
+        colours : Dict[str, str]
+            {'background', 'text', 'cell'}: the card, its text and the typing box.
+        on_click : Callable[[str, str], None]
+            Called with (answer, words shown) when a button gives the answer.
+        on_typed : Callable[[], None]
+            Called when the answer typed in the box is sent (Continue or Enter).
+        on_confirm : Callable[[], Any]
+            Called when Confirm is clicked.
+
+        ---- Globals read ----
+        FOCUS_COLOUR, MAIN_BACKGROUND.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Creates the widgets.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _button_maker
+        """
+
+        self._tk = tk
+        self._family = family
+        self._size = size
+        self._colours = colours
+        self._on_click = on_click
+        self._on_typed = on_typed
+        self._widgets: List[Any] = []
+        self._default: Any = None
+        self._ticked: List[int] = []
+        self._ticks: List[Any] = []
+        self._multi_go: Any = None
+        self.frame = tk.Frame(parent, bg=colours['background'])
+        self.entry = tk.Entry(self.frame,
+                              bg=colours['cell'],
+                              fg=colours['text'],
+                              insertbackground=colours['text'],
+                              font=(family, size + 1),
+                              relief='flat',
+                              highlightthickness=1,
+                              highlightbackground='#3c3c3c',
+                              highlightcolor=FOCUS_COLOUR,
+                              )
+        self.confirm = self._button_maker('Confirm', lambda: on_confirm(), True)
+
+    # ---- _button_maker ---------------------------------------------------------------
+    def _button_maker(self,
+                      text: str,
+                      command: Callable[[], Any],
+                      is_main: bool,
+                      ) -> Any:
+        """
+        ---- Summary ----
+        Helper method to make one answer button: a label rather than a button, so it
+        looks the same on Windows, the Mac and Linux. A click, Enter or the space bar
+        on it carries out the command.
+
+        ---- Inputs ----
+        text : str
+            The words on the button.
+        command : Callable[[], Any]
+            What a click does.
+        is_main : bool
+            True for the highlighted button (the answer Enter gives).
+
+        ---- Globals read ----
+        BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OTHER_BACKGROUND,
+        OTHER_HOVER.
+
+        ---- Outputs ----
+        Any
+            The Tk label, not placed.
+
+        ---- Globals mutated ----
+        None. Creates the widget.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        background = MAIN_BACKGROUND if is_main else OTHER_BACKGROUND
+        hover = MAIN_HOVER if is_main else OTHER_HOVER
+        button = self._tk.Label(self.frame,
+                                text=text,
+                                bg=background,
+                                fg=BUTTON_TEXT if is_main else self._colours['text'],
+                                font=(self._family,
+                                      self._size + (1 if is_main else 0),
+                                      'bold' if is_main else 'normal',
+                                      ),
+                                anchor='center' if is_main else 'w',
+                                justify='left',
+                                padx=10,
+                                pady=7 if is_main else 5,
+                                cursor='hand2',
+                                takefocus=1,
+                                highlightthickness=1,
+                                highlightbackground=self._colours['background'],
+                                highlightcolor=FOCUS_COLOUR,
+                                wraplength=520,
+                                )
+        def run(event: Any = None) -> str:
+            command()
+            return 'break'
+        for sequence in ('<Button-1>', '<Return>', '<KP_Enter>', '<space>'):
+            button.bind(sequence, run)
+        button.bind('<Enter>', lambda e: button.configure(bg=hover))
+        button.bind('<Leave>', lambda e: button.configure(bg=background))
+        return button
+
+    # ---- _choices_placer -------------------------------------------------------------
+    def _choices_placer(self, buttons: List[Any]) -> None:
+        """
+        ---- Summary ----
+        Helper method to place the buttons of the choices: one above the other, or in
+        two columns for a long list.
+
+        ---- Inputs ----
+        buttons : List[Any]
+            The buttons, in the order of the choices.
+
+        ---- Globals read ----
+        ONE_COLUMN_MOST.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Places the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if len(buttons) <= ONE_COLUMN_MOST:
+            for button in buttons:
+                button.pack(side='top', fill='x', pady=2)
+            return
+        grid = self._tk.Frame(self.frame, bg=self._colours['background'])
+        grid.columnconfigure(0, weight=1, uniform='choice')
+        grid.columnconfigure(1, weight=1, uniform='choice')
+        rows = (len(buttons) + 1) // 2
+        for i, button in enumerate(buttons):  # down the first column, then the second
+            button.lift(grid)
+            button.grid(in_=grid,
+                        row=i % rows,
+                        column=i // rows,
+                        sticky='ew',
+                        padx=2,
+                        pady=2,
+                        )
+        grid.pack(side='top', fill='x')
+        self._widgets.append(grid)
+
+    # ---- _clearer --------------------------------------------------------------------
+    def _clearer(self) -> None:
+        """
+        ---- Summary ----
+        Helper method to take away the answers shown.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Destroys or hides the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        for widget in self._widgets:
+            widget.destroy()
+        self._widgets = []
+        self._ticks = []
+        self._ticked = []
+        self._multi_go = None
+        self._default = None
+        self.entry.pack_forget()
+        self.confirm.pack_forget()
+
+    # ---- _multi_sender ---------------------------------------------------------------
+    def _multi_sender(self) -> None:
+        """
+        ---- Summary ----
+        Helper method to send the choices ticked, in the order they were ticked; with
+        none ticked the button does nothing.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls on_click (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if not self._ticked:
+            return
+        self._on_click(','.join(str(n) for n in self._ticked),
+                       ', '.join(self._ticks[n - 1].cget('text')[2:]
+                                 for n in self._ticked
+                                 ),
+                       )
+
+    # ---- _ticker ---------------------------------------------------------------------
+    def _ticker(self, number: int) -> None:
+        """
+        ---- Summary ----
+        Helper method to tick or untick one choice of several; Continue is greyed
+        while none is ticked.
+
+        ---- Inputs ----
+        number : int
+            Number of the choice, from 1.
+
+        ---- Globals read ----
+        BUTTON_TEXT, OFF_TEXT, TICKED, UNTICKED.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the buttons (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if number in self._ticked:
+            self._ticked.remove(number)
+        else:
+            self._ticked.append(number)
+        button = self._ticks[number - 1]
+        words = button.cget('text')[2:]
+        button.configure(
+            text=f'{TICKED if number in self._ticked else UNTICKED} {words}',
+            )
+        if self._multi_go is not None:
+            self._multi_go.configure(fg=BUTTON_TEXT if self._ticked else OFF_TEXT)
+
+    # ---- back_shower -----------------------------------------------------------------
+    def back_shower(self,
+                    text: str,
+                    on_back: Callable[[], None],
+                    extra: Optional[Tuple[str, Callable[[], None]]] = None,
+                    is_confirm: bool = False,
+                    ) -> None:
+        """
+        ---- Summary ----
+        Method to show only the button that goes back to the step waited at, while an
+        earlier step is open, under the step's own button when it has one. While a
+        table waits (Edit ODs, Edit labels), its Confirm button stays above them, and
+        Enter gives it.
+
+        ---- Inputs ----
+        text : str
+            Its words ("Back to Δψ").
+        on_back : Callable[[], None]
+            What a click does.
+        extra : Optional[Tuple[str, Callable[[], None]]]
+            (words, what a click does) of the step's own button (Export csv), or None.
+        is_confirm : bool
+            True while the question that waits is a table, so Confirm is shown too.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Replaces the answers (side effect).
+
+        ---- Helpers ----
+        _button_maker
+        _clearer
+        """
+
+        self._clearer()
+        if is_confirm:
+            self.confirm.pack(side='top', fill='x', pady=2)
+        if extra is not None:
+            own = self._button_maker(extra[0], extra[1], False)
+            own.pack(side='top', fill='x', pady=2)
+            self._widgets.append(own)
+        button = self._button_maker(text, on_back, not is_confirm)
+        button.pack(side='top', fill='x', pady=2)
+        self._widgets.append(button)
+        self._default = self.confirm if is_confirm else button
+
+    # ---- focuser ---------------------------------------------------------------------
+    def focuser(self) -> None:
+        """
+        ---- Summary ----
+        Method to give the keyboard to the typing box when it is shown, otherwise to
+        the highlighted button, so Enter gives its answer.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Moves the keyboard focus (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self.entry.winfo_manager():
+            self.entry.focus_set()
+            self.entry.icursor('end')
+        elif self._default is not None:
+            self._default.focus_set()
+
+    # ---- request_shower --------------------------------------------------------------
+    def request_shower(self, request: Optional[Dict[str, Any]]) -> None:
+        """
+        ---- Summary ----
+        Method to show the answers of the question asked.
+
+        ---- Inputs ----
+        request : Optional[Dict[str, Any]]
+            {'kind', 'options', 'default', 'value'} as the questions send it
+            (utils_shared.questions._answer_announcer): kind 'continue', 'yesno',
+            'choice', 'multi', 'number', 'text' or 'confirm'; options the words of
+            each choice ('text': (answer, words) pairs offered beside the box);
+            default the answer Enter gives ('y' or 'n'; the number of a choice; the
+            numbers ticked at first); value what the box starts with. None for no
+            question.
+
+        ---- Globals read ----
+        TICKED, UNTICKED, OFF_TEXT.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Replaces the answers (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _button_maker
+        _choices_placer
+        _clearer
+        _multi_sender
+        _ticker
+        """
+
+        # ---- 1 Take away the answers of the last question ----------------------------
+        self._clearer()
+        if request is None:
+            return
+        kind = request['kind']
+        click = self._on_click
+        def made(text: str, answer: str, echo: str, is_main: bool) -> Any:
+            button = self._button_maker(text,
+                                        lambda: click(answer, echo),
+                                        is_main,
+                                        )
+            self._widgets.append(button)
+            if is_main:
+                self._default = button
+            return button
+
+        # ---- 2 Show the answers of this one ------------------------------------------
+        if kind == 'continue':
+            # the extra buttons of the step (Export csv) sit above Continue
+            for answer, words in request['options'] or []:
+                made(words, answer, words, False).pack(side='top', fill='x', pady=2)
+            made('Continue', '', 'Continue', True).pack(side='top', fill='x', pady=2)
+        elif kind == 'yesno':
+            for answer, words in (('y', 'Yes'), ('n', 'No')):
+                made(words, answer, words, request['default'] == answer).pack(
+                    side='top',
+                    fill='x',
+                    pady=2,
+                    )
+        elif kind == 'choice':
+            self._choices_placer([made(words,
+                                       str(number),
+                                       words,
+                                       number == request['default'],
+                                       )
+                                  for number, words in enumerate(request['options'],
+                                                                 start=1,
+                                                                 )
+                                  ],
+                                 )
+        elif kind == 'multi':
+            for number, words in enumerate(request['options'], start=1):
+                button = self._button_maker(f'{UNTICKED} {words}',
+                                            lambda n=number: self._ticker(n),
+                                            False,
+                                            )
+                self._ticks.append(button)
+                self._widgets.append(button)
+            self._choices_placer(self._ticks)
+            for number in request['default'] or []:
+                self._ticker(number)
+            self._multi_go = self._button_maker('Continue', self._multi_sender, True)
+            self._multi_go.configure(fg=BUTTON_TEXT if self._ticked else OFF_TEXT)
+            self._multi_go.pack(side='top', fill='x', pady=(6, 2))
+            self._widgets.append(self._multi_go)
+            self._default = self._multi_go
+        elif kind in ('number', 'text'):
+            buttons = [made(words, answer, words, False)
+                       for answer, words in request['options'] or []
+                       ]
+            if buttons:
+                self._choices_placer(buttons)
+            self.entry.delete(0, 'end')
+            self.entry.insert(0, request['value'] or '')
+            self.entry.pack(side='top', fill='x', pady=(6, 2), ipady=5)
+            go = self._button_maker('Continue', self._on_typed, True)
+            go.pack(side='top', fill='x', pady=2)
+            self._widgets.append(go)
+            self._default = go
+        elif kind == 'confirm':
+            self.confirm.pack(side='top', fill='x', pady=2)
+            self._default = self.confirm
+
+
+# ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- step_of_change_finder -----------------------------------------------------------
+def step_of_change_finder(changes: Dict[str, Any]) -> Optional[str]:
+    """
+    ---- Summary ----
+    Main function to give the earliest step that a change in the strip under the plot
+    belongs to.
+
+    ---- Inputs ----
+    changes : Dict[str, Any]
+        {name: new value} of the strip values that changed.
+
+    ---- Globals read ----
+    CHANGE_STEPS, GUIDE_KEYS, TAB_STEPS, TIME_TAB_CHANGE.
+
+    ---- Outputs ----
+    Optional[str]
+        The key of the step, or None when the change belongs to every step (how the
+        haems, the OCR and the labels are shown).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    keys = [CHANGE_STEPS[name] for name in changes if name in CHANGE_STEPS]
+    if changes.get(TIME_TAB_CHANGE) in TAB_STEPS:
+        keys.append(TAB_STEPS[changes[TIME_TAB_CHANGE]])
+    if not keys:
+        return None
+    return min(keys, key=GUIDE_KEYS.index)

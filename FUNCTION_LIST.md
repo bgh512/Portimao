@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.16
-- **Date:** 23/11/2026
+- **Version:** V2.17
+- **Date:** 24/11/2026
 
 ## Contents
 
@@ -44,9 +44,10 @@
     - [`cancel_sentence_builder`](#cancel_sentence_builder)
     - [`comparison_maker`](#comparison_maker)
     - [`everything_asker`](#everything_asker)
-    - [`experiment_plot_saver`](#experiment_plot_saver)
-    - [`experiment_plots_saver`](#experiment_plots_saver)
+    - [`experiment_file_saver`](#experiment_file_saver)
+    - [`experiment_files_saver`](#experiment_files_saver)
     - [`experiment_processor`](#experiment_processor)
+    - [`experiment_workbook_saver`](#experiment_workbook_saver)
     - [`last_answers_loader`](#last_answers_loader)
     - [`last_answers_saver`](#last_answers_saver)
     - [`main`](#main)
@@ -87,10 +88,25 @@
     - [`test_both_kinds_are_averaged_from_one_baseline`](#test_both_kinds_are_averaged_from_one_baseline)
     - [`test_the_ocr_is_put_on_its_percent_of_baseline`](#test_the_ocr_is_put_on_its_percent_of_baseline)
     - [`test_a_file_without_a_baseline_keeps_its_usual_ocr`](#test_a_file_without_a_baseline_keeps_its_usual_ocr)
-    - [`test_the_ocr_question_offers_the_window_step`](#test_the_ocr_question_offers_the_window_step)
+    - [`test_the_ocr_view_question_sets_ocr_as`](#test_the_ocr_view_question_sets_ocr_as)
     - [`test_every_haem_view_and_delta_psi_are_averaged`](#test_every_haem_view_and_delta_psi_are_averaged)
     - [`test_the_averages_sheet_holds_every_view`](#test_the_averages_sheet_holds_every_view)
     - [`test_the_windows_fall_before_the_additions`](#test_the_windows_fall_before_the_additions)
+    - [`test_each_window_falls_on_its_own`](#test_each_window_falls_on_its_own)
+    - [`test_a_window_left_out_keeps_its_row`](#test_a_window_left_out_keeps_its_row)
+    - [`test_each_file_finds_its_own_windows`](#test_each_file_finds_its_own_windows)
+    - [`test_the_window_step_holds_the_windows`](#test_the_window_step_holds_the_windows)
+    - [`test_a_change_moves_one_window_or_every_window`](#test_a_change_moves_one_window_or_every_window)
+    - [`test_a_pulled_window_on_its_own`](#test_a_pulled_window_on_its_own)
+    - [`test_the_plot_shows_windows_on_their_own`](#test_the_plot_shows_windows_on_their_own)
+    - [`test_the_window_step_keeps_each_file`](#test_the_window_step_keeps_each_file)
+- [`tests/test_compare_layout.py`](#teststest_compare_layoutpy)
+    - [`_experiment_maker`](#_experiment_maker)
+    - [`_preview_drawer`](#_preview_drawer)
+    - [`test_side_by_side_draws_the_kept_plot_on_the_left`](#test_side_by_side_draws_the_kept_plot_on_the_left)
+    - [`test_overlaid_draws_the_kept_haems_dashed`](#test_overlaid_draws_the_kept_haems_dashed)
+    - [`test_the_picture_puts_the_plot_in_use_on_the_right`](#test_the_picture_puts_the_plot_in_use_on_the_right)
+    - [`test_the_switch_keeps_the_layout_and_redraws`](#test_the_switch_keeps_the_layout_and_redraws)
 - [`tests/test_dataset_settings.py`](#teststest_dataset_settingspy)
     - [`_program_folder_maker`](#_program_folder_maker)
     - [`test_broken_settings_file_gives_nothing`](#test_broken_settings_file_gives_nothing)
@@ -127,6 +143,7 @@
     - [`_summaries_builder`](#_summaries_builder)
     - [`test_a_failed_file_does_not_stop_the_others`](#test_a_failed_file_does_not_stop_the_others)
     - [`test_a_file_with_nothing_to_plot_is_not_saved`](#test_a_file_with_nothing_to_plot_is_not_saved)
+    - [`test_a_failed_plot_still_writes_the_workbook`](#test_a_failed_plot_still_writes_the_workbook)
     - [`test_a_saved_plot_is_not_drawn_again`](#test_a_saved_plot_is_not_drawn_again)
     - [`test_every_file_is_saved_once_and_shown`](#test_every_file_is_saved_once_and_shown)
     - [`test_the_cancel_sentence`](#test_the_cancel_sentence)
@@ -163,6 +180,19 @@
     - [`test_dots_and_spaces_at_the_ends_go`](#test_dots_and_spaces_at_the_ends_go)
     - [`test_forbidden_characters_become_underscores`](#test_forbidden_characters_become_underscores)
     - [`test_nothing_left_gives_the_default`](#test_nothing_left_gives_the_default)
+- [`tests/test_guide_steps.py`](#teststest_guide_stepspy)
+    - [`_started_steps_finder`](#_started_steps_finder)
+    - [`_state_maker`](#_state_maker)
+    - [`_status_reader`](#_status_reader)
+    - [`test_steps_and_stages`](#test_steps_and_stages)
+    - [`test_every_step_is_started`](#test_every_step_is_started)
+    - [`test_steps_move_on_and_fold`](#test_steps_move_on_and_fold)
+    - [`test_step_numbers_in_the_words`](#test_step_numbers_in_the_words)
+    - [`test_hints_under_the_answers`](#test_hints_under_the_answers)
+    - [`test_change_opens_earlier_step`](#test_change_opens_earlier_step)
+    - [`test_changes_that_open_nothing`](#test_changes_that_open_nothing)
+    - [`test_previous_processing_question`](#test_previous_processing_question)
+    - [`test_answers_told_to_the_window`](#test_answers_told_to_the_window)
 - [`tests/test_haem_decomposition.py`](#teststest_haem_decompositionpy)
     - [`_background_builder`](#_background_builder)
     - [`_background_shape_builder`](#_background_shape_builder)
@@ -216,6 +246,7 @@
     - [`test_root_file_with_a_preset_name_is_not_offered`](#test_root_file_with_a_preset_name_is_not_offered)
     - [`test_standard_preset_keeps_its_haems`](#test_standard_preset_keeps_its_haems)
     - [`test_own_haems_are_built_from_the_library`](#test_own_haems_are_built_from_the_library)
+    - [`test_built_fit_is_saved_as_a_fit_file`](#test_built_fit_is_saved_as_a_fit_file)
 - [`tests/test_haem_types.py`](#teststest_haem_typespy)
     - [`test_a_fit_file_is_read_in_that_order`](#test_a_fit_file_is_read_in_that_order)
     - [`test_haems_are_ordered_a_then_b_then_c`](#test_haems_are_ordered_a_then_b_then_c)
@@ -392,11 +423,14 @@
     - [`_number_matcher`](#_number_matcher)
     - [`_question_collector`](#_question_collector)
     - [`_question_matcher`](#_question_matcher)
+    - [`_row_reader`](#_row_reader)
+    - [`_rows_finder`](#_rows_finder)
     - [`_text_resolver`](#_text_resolver)
     - [`_tree_reader`](#_tree_reader)
     - [`test_question_texts_can_be_read`](#test_question_texts_can_be_read)
     - [`test_questions_are_in_the_list`](#test_questions_are_in_the_list)
     - [`test_question_numbers_match_the_list`](#test_question_numbers_match_the_list)
+    - [`test_questions_have_their_own_number`](#test_questions_have_their_own_number)
 - [`tests/test_question_format.py`](#teststest_question_formatpy)
     - [`_lines_reader`](#_lines_reader)
     - [`_typist_setter`](#_typist_setter)
@@ -456,6 +490,14 @@
     - [`test_pointed_time_on_a_scaled_picture`](#test_pointed_time_on_a_scaled_picture)
     - [`test_question_wanting_a_time_tells_the_window`](#test_question_wanting_a_time_tells_the_window)
     - [`test_time_axis_of_a_figure`](#test_time_axis_of_a_figure)
+- [`tests/test_time_regions.py`](#teststest_time_regionspy)
+    - [`FakeWindow`](#fakewindow)
+    - [`FakeChoice`](#fakechoice)
+    - [`_kits_maker`](#_kits_maker)
+    - [`test_a_tab_pressed_away_from_its_step`](#test_a_tab_pressed_away_from_its_step)
+    - [`test_a_tab_pressed_while_no_step_has_edges`](#test_a_tab_pressed_while_no_step_has_edges)
+    - [`test_export_csv_in_the_trim_step`](#test_export_csv_in_the_trim_step)
+    - [`test_the_figure_step_asks_only_continue`](#test_the_figure_step_asks_only_continue)
 - [`tests/test_trim_edges.py`](#teststest_trim_edgespy)
     - [`test_edge_under_the_mouse`](#test_edge_under_the_mouse)
     - [`test_every_file_or_one_file`](#test_every_file_or_one_file)
@@ -465,6 +507,7 @@
     - [`test_minutes_typed_in_the_strip`](#test_minutes_typed_in_the_strip)
     - [`test_minutes_to_limits_and_back`](#test_minutes_to_limits_and_back)
     - [`test_pointer_gives_the_minutes_of_each_edge`](#test_pointer_gives_the_minutes_of_each_edge)
+    - [`test_full_times_in_the_boxes`](#test_full_times_in_the_boxes)
     - [`test_shaded_picture`](#test_shaded_picture)
     - [`test_trimmed_edges_stop_at_the_events`](#test_trimmed_edges_stop_at_the_events)
 - [`tests/test_user_notices.py`](#teststest_user_noticespy)
@@ -488,12 +531,15 @@
     - [`test_event_labels_from_the_table`](#test_event_labels_from_the_table)
     - [`test_rows_of_the_labels_table`](#test_rows_of_the_labels_table)
     - [`test_rows_of_the_od_table`](#test_rows_of_the_od_table)
+    - [`test_od_table_confirmed_with_gaps`](#test_od_table_confirmed_with_gaps)
     - [`test_sentence_when_confirmed_too_early`](#test_sentence_when_confirmed_too_early)
     - [`test_height_typed_in_the_strip`](#test_height_typed_in_the_strip)
     - [`test_the_decomposition_kept_to_compare`](#test_the_decomposition_kept_to_compare)
     - [`test_keep_to_compare_keeps_the_regions_in_use`](#test_keep_to_compare_keeps_the_regions_in_use)
     - [`test_go_back_to_kept_puts_the_kept_one_back`](#test_go_back_to_kept_puts_the_kept_one_back)
+    - [`test_save_fit_names_the_fit_in_use`](#test_save_fit_names_the_fit_in_use)
     - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
+    - [`test_ocr_view_and_the_new_box_values`](#test_ocr_view_and_the_new_box_values)
     - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
     - [`test_numbers_of_the_delta_psi_row`](#test_numbers_of_the_delta_psi_row)
     - [`test_haems_and_ocr_shown_from_the_strip`](#test_haems_and_ocr_shown_from_the_strip)
@@ -706,16 +752,28 @@
 - [`utils_shared/averaging.py`](#utils_sharedaveragingpy)
     - [`_baseline_change_adder`](#_baseline_change_adder)
     - [`_delta_psi_statistics_calculator`](#_delta_psi_statistics_calculator)
+    - [`_left_out_finder`](#_left_out_finder)
+    - [`_own_minutes_reader`](#_own_minutes_reader)
+    - [`_edge_key_splitter`](#_edge_key_splitter)
+    - [`_picked_window_namer`](#_picked_window_namer)
+    - [`_step_own_reader`](#_step_own_reader)
+    - [`_window_edge_reader`](#_window_edge_reader)
+    - [`_window_number_finder`](#_window_number_finder)
     - [`baseline_percent_adder`](#baseline_percent_adder)
     - [`experiment_averages_calculator`](#experiment_averages_calculator)
     - [`kind_span_lister`](#kind_span_lister)
     - [`quick_span_lister`](#quick_span_lister)
     - [`window_kind_picker`](#window_kind_picker)
     - [`window_layout_finder`](#window_layout_finder)
+    - [`window_plan_finder`](#window_plan_finder)
+    - [`window_plan_reader`](#window_plan_reader)
     - [`window_pointer_reader`](#window_pointer_reader)
+    - [`window_row_teller`](#window_row_teller)
+    - [`window_shown_maker`](#window_shown_maker)
     - [`window_span_lister`](#window_span_lister)
     - [`window_statistics_calculator`](#window_statistics_calculator)
     - [`window_value_setter`](#window_value_setter)
+    - [`window_values_maker`](#window_values_maker)
 - [`utils_shared/comparison_plotter.py`](#utils_sharedcomparison_plotterpy)
     - [`_overhang_calculator`](#_overhang_calculator)
     - [`_renderer_getter`](#_renderer_getter)
@@ -877,6 +935,7 @@
     - [`pca_figure_builder`](#pca_figure_builder)
 - [`utils_shared/questions.py`](#utils_sharedquestionspy)
     - [`UserQuitError`](#userquiterror)
+    - [`_answer_announcer`](#_answer_announcer)
     - [`_brightener`](#_brightener)
     - [`_input_reader`](#_input_reader)
     - [`_limits_checker`](#_limits_checker)
@@ -890,9 +949,13 @@
     - [`_time_announcer`](#_time_announcer)
     - [`_unit_highlighter`](#_unit_highlighter)
     - [`accept_asker`](#accept_asker)
+    - [`answer_request_setter`](#answer_request_setter)
     - [`choice_asker`](#choice_asker)
     - [`confirm_waiter`](#confirm_waiter)
     - [`enter_waiter`](#enter_waiter)
+    - [`guide_step_getter`](#guide_step_getter)
+    - [`guide_step_setter`](#guide_step_setter)
+    - [`guide_step_starter`](#guide_step_starter)
     - [`heading_printer`](#heading_printer)
     - [`info_printer`](#info_printer)
     - [`multi_asker`](#multi_asker)
@@ -956,6 +1019,7 @@
     - [`answers_fit_loader`](#answers_fit_loader)
     - [`background_builder`](#background_builder)
     - [`basis_solver`](#basis_solver)
+    - [`built_fit_saver`](#built_fit_saver)
     - [`data_filterer`](#data_filterer)
     - [`decomposition_gap_calculator`](#decomposition_gap_calculator)
     - [`delta_abs_calculator`](#delta_abs_calculator)
@@ -998,21 +1062,21 @@
     - [`event_entries_builder`](#event_entries_builder)
     - [`files_asker`](#files_asker)
     - [`free_folder_finder`](#free_folder_finder)
-    - [`haem_choice_asker`](#haem_choice_asker)
     - [`haem_form_option_builder`](#haem_form_option_builder)
     - [`haem_name_formatter`](#haem_name_formatter)
-    - [`label_angle_asker`](#label_angle_asker)
     - [`label_tidier`](#label_tidier)
     - [`multi_experiment_asker`](#multi_experiment_asker)
     - [`ocr_kind_lister`](#ocr_kind_lister)
     - [`ocr_option_builder`](#ocr_option_builder)
+    - [`ocr_view_asker`](#ocr_view_asker)
+    - [`od_gaps_finder`](#od_gaps_finder)
     - [`od_scaling_asker`](#od_scaling_asker)
     - [`paf_finder`](#paf_finder)
+    - [`previous_processing_asker`](#previous_processing_asker)
     - [`results_counter`](#results_counter)
     - [`results_folder_checker`](#results_folder_checker)
     - [`results_folder_resolver`](#results_folder_resolver)
     - [`saved_values_reader`](#saved_values_reader)
-    - [`signal_asker`](#signal_asker)
     - [`size_asker`](#size_asker)
     - [`spectra_export_asker`](#spectra_export_asker)
     - [`temperature_asker`](#temperature_asker)
@@ -1022,6 +1086,7 @@
     - [`trim_minutes_builder`](#trim_minutes_builder)
     - [`trim_minutes_setter`](#trim_minutes_setter)
     - [`trim_pointer_reader`](#trim_pointer_reader)
+    - [`trim_times_finder`](#trim_times_finder)
     - [`window_kind_asker`](#window_kind_asker)
     - [`windows_ensurer`](#windows_ensurer)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
@@ -1060,6 +1125,11 @@
     - [`panel_arrow_finder`](#panel_arrow_finder)
     - [`panel_arrow_placer`](#panel_arrow_placer)
     - [`window_opener`](#window_opener)
+- [`utils_viewer/viewer_guide.py`](#utils_viewerviewer_guidepy)
+    - [`GuideState`](#guidestate)
+    - [`GuidePanel`](#guidepanel)
+    - [`AnswerArea`](#answerarea)
+    - [`step_of_change_finder`](#step_of_change_finder)
 - [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
     - [`_kept_builder`](#_kept_builder)
     - [`_pictures_builder`](#_pictures_builder)
@@ -1070,7 +1140,11 @@
     - [`ViewerSession`](#viewersession)
     - [`_file_exporter`](#_file_exporter)
     - [`_kept_haems_drawer`](#_kept_haems_drawer)
+    - [`_kept_gap_teller`](#_kept_gap_teller)
+    - [`_kept_processor`](#_kept_processor)
     - [`_kept_psi_drawer`](#_kept_psi_drawer)
+    - [`_kept_psi_gap_teller`](#_kept_psi_gap_teller)
+    - [`_kept_side_drawer`](#_kept_side_drawer)
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
     - [`_overlay_drawer`](#_overlay_drawer)
     - [`preview_info_builder`](#preview_info_builder)
@@ -1081,6 +1155,7 @@
     - [`pca_spectra_gatherer`](#pca_spectra_gatherer)
     - [`preview_drawer`](#preview_drawer)
     - [`preview_figure_builder`](#preview_figure_builder)
+    - [`preview_picture_maker`](#preview_picture_maker)
     - [`time_axis_finder`](#time_axis_finder)
     - [`time_title_chooser`](#time_title_chooser)
 - [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
@@ -1095,26 +1170,38 @@
     - [`_answers_previewer`](#_answers_previewer)
     - [`_component_namer`](#_component_namer)
     - [`_decomposition_storer`](#_decomposition_storer)
+    - [`_box_edit_runner`](#_box_edit_runner)
     - [`_export_asker`](#_export_asker)
-    - [`_export_refresher`](#_export_refresher)
     - [`_figure_starter`](#_figure_starter)
     - [`_fit_file_saver`](#_fit_file_saver)
     - [`_kept_restorer`](#_kept_restorer)
     - [`_label_table_filler`](#_label_table_filler)
     - [`_limits_lister`](#_limits_lister)
     - [`_master_page_saver`](#_master_page_saver)
+    - [`_od_gaps_teller`](#_od_gaps_teller)
     - [`_od_lister`](#_od_lister)
     - [`_od_table_filler`](#_od_table_filler)
+    - [`_own_fit_saver`](#_own_fit_saver)
+    - [`_own_windows_teller`](#_own_windows_teller)
     - [`_pca_pictures_publisher`](#_pca_pictures_publisher)
     - [`_region_rules_lister`](#_region_rules_lister)
     - [`_regions_chooser`](#_regions_chooser)
+    - [`_regions_choice_builder`](#_regions_choice_builder)
+    - [`_regions_finisher`](#_regions_finisher)
     - [`_regions_lister`](#_regions_lister)
     - [`_standard_fit_loader`](#_standard_fit_loader)
+    - [`_step_edges_reader`](#_step_edges_reader)
+    - [`_step_edges_shower`](#_step_edges_shower)
+    - [`_tab_kits_builder`](#_tab_kits_builder)
+    - [`_tab_switcher`](#_tab_switcher)
+    - [`_trim_choice_builder`](#_trim_choice_builder)
     - [`_strip_change_applier`](#_strip_change_applier)
     - [`_strip_shower`](#_strip_shower)
     - [`_table_filler`](#_table_filler)
     - [`_unfit_windows_lister`](#_unfit_windows_lister)
     - [`_windows_chooser`](#_windows_chooser)
+    - [`_windows_choice_builder`](#_windows_choice_builder)
+    - [`_windows_keeper`](#_windows_keeper)
     - [`browser_stage_runner`](#browser_stage_runner)
     - [`details_stage_runner`](#details_stage_runner)
     - [`pca_stage_runner`](#pca_stage_runner)
@@ -1134,6 +1221,8 @@
     - [`height_checker`](#height_checker)
     - [`kept_decomposition_builder`](#kept_decomposition_builder)
     - [`ocr_form_choices_lister`](#ocr_form_choices_lister)
+    - [`ocr_mode_builder`](#ocr_mode_builder)
+    - [`ocr_view_reader`](#ocr_view_reader)
     - [`minutes_checker`](#minutes_checker)
     - [`psi_answers_builder`](#psi_answers_builder)
     - [`psi_change_describer`](#psi_change_describer)
@@ -2313,16 +2402,18 @@ Main program: read .paf files, process them and export figures and workbooks.
 ```text
 ---- Summary ----
 Main function to say what a run cancelled during the questions left in the results
-folder: the data exported at the end of the import, the plots of the files saved
-once their questions were accepted, both, or nothing.
+folder: the data exported with Export csv, the plots and the workbooks of the files
+saved once their processing and figure were accepted, any of these, or nothing.
 
 ---- Inputs ----
 exported : List[Path]
-    The results folder, once the export of the import wrote into it; else empty.
+    The results folder, once Export csv wrote into it; else empty.
 saved_plots : List[str]
     Names of the files whose plot was saved; empty when none was.
 export_root : Path
     Results folder.
+saved_workbooks : Optional[List[str]]
+    Names of the files whose workbook was written; empty or None when none was.
 
 ---- Globals read ----
 None.
@@ -2385,8 +2476,9 @@ warning_shower
 ---- Summary ----
 Main function to ask every question of the run after the files, in numbered
 sections (trimming and ignoring, analysis, plots, summary figures, export), and to
-build the per-file information. The plot of every file is saved as soon as the
-questions about each file are accepted, so the later sections show it.
+build the per-file information. The plot and the workbook of every file are saved
+as soon as its processing and figure are accepted, after asking whether the
+spectra are written too, so the later sections show the plot.
 
 ---- Inputs ----
 folder : Path
@@ -2399,11 +2491,14 @@ saved : dict
     Settings saved with the dataset, from files_asker; empty for a dataset never
     run.
 exported : Optional[List[Path]]
-    List the results folder is added to once the export of the import (3.4) writes
-    into it; None when not needed.
+    List the results folder is added to once Export csv of the trimming step
+    (3.4) writes into it; None when not needed.
 saved_plots : Optional[List[str]]
     List that holds the names of the files whose plot is saved in the results
     folder before the run starts; None when not needed.
+saved_workbooks : Optional[List[str]]
+    List that holds the names of the files whose workbook is written before the
+    run starts; None when not needed.
 
 ---- Globals read ----
 PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
@@ -2417,8 +2512,9 @@ Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
 ---- Globals mutated ----
 None. Reads from and prints to the terminal; writes last_answers.json through
 last_answers_saver, the settings file of the dataset through
-dataset_settings_saver, the export of the import when one is chosen, adding to
-``exported``, and the plot of every file, filling ``saved_plots`` (side effects).
+dataset_settings_saver, the export of Export csv when one is chosen, adding to
+``exported``, and the plot and the workbook of every file, filling
+``saved_plots`` and ``saved_workbooks`` (side effects).
 
 ---- Equations ----
 None.
@@ -2427,7 +2523,7 @@ None.
 active_gui_getter
 comparison_maker
 dataset_settings_saver
-experiment_plots_saver
+experiment_files_saver
 file_settings_merger
 haem_name_formatter
 journal_answers_fitter
@@ -2444,17 +2540,19 @@ windows_stage_runner
 yes_no_asker
 ```
 
-#### `experiment_plot_saver`
+#### `experiment_file_saver`
 
 ```text
 ---- Summary ----
-Main function to read and process one .paf file and save its plot as the run does,
-handing back a picture of it for the window.
+Main function to read and process one .paf file once, then save its plot as the run
+does, handing back a picture of it for the window, and write its workbook. A plot
+that cannot be saved is said in one sentence and the workbook is still written.
 
 ---- Inputs ----
 info : dict
     Per-file information: path, name, trim and ignore times, OD values, events and
-    regions (preview_info_builder).
+    regions (preview_info_builder), with write_spectra and has_spectra_csv
+    (experiment_workbook_saver).
 cfg : settings.Config
     Figure style and settings derived from the answers (config.py).
 fit : Optional[dict]
@@ -2467,12 +2565,15 @@ export_root : Path
 settings.PREVIEW_DPI.
 
 ---- Outputs ----
-Optional[bytes]
-    PNG picture of the saved plot, or None when the file has nothing to plot (no
-    oxygen, no OCR and no haems), so nothing was saved.
+Tuple[Optional[bytes], bool]
+    (PNG picture of the saved plot, or None when the file has nothing to plot (no
+    oxygen, no OCR and no haems) or its plot could not be saved; True when the
+    workbook was written). Raises what the reading and processing raise.
 
 ---- Globals mutated ----
-None. Writes the figure files and prints what the processing says (side effects).
+None. Writes the figure files, the workbook and the spectra files; what the
+processing and the plot print is kept from the terminal, as the run says it
+again (side effects).
 
 ---- Equations ----
 None.
@@ -2480,25 +2581,33 @@ None.
 ---- Helpers ----
 experiment_data_processor
 experiment_plotter
+experiment_workbook_saver
+output_capturer
+problem_shower
 ```
 
-#### `experiment_plots_saver`
+#### `experiment_files_saver`
 
 ```text
 ---- Summary ----
-Main function to save the plot of every file with the answers so far, once the
-questions about each file are accepted, and to show each saved plot in the window.
-A file whose plot cannot be saved says so in one sentence and the others carry on;
-its plot is tried again in the run.
+Main function to save the plot and write the workbook of every file with the
+answers so far, once the processing and the figure are accepted, and to show each
+saved plot in the window. The spectra are written as csv files the first time
+only, when they were chosen. A file that cannot be read says so in one sentence and
+the others carry on; what was not saved is tried again in the run.
 
 ---- Inputs ----
 context : dict
-    {answers, fit, summaries, limits, details, regions, export_root} of the run so
-    far (everything_asker).
+    {answers, fit, summaries, limits, details, regions, export_root, has_spectra}
+    of the run so far (everything_asker); has_spectra is True when the spectra
+    csv files are written already, and is set once they are written here.
 saved_plots : List[str]
     List emptied, then filled with the name of each file whose plot was saved.
 window : Any
     The browser window, which is given each saved plot; None shows nothing.
+saved_workbooks : Optional[List[str]]
+    List emptied, then filled with the name of each file whose workbook was
+    written; None keeps no list.
 
 ---- Globals read ----
 plt (matplotlib.pyplot).
@@ -2509,15 +2618,15 @@ None
 
 ---- Globals mutated ----
 None. Sets the matplotlib rcParams of the figure style, writes the figure files,
-prints its progress and fills ``saved_plots`` (side effects).
+the workbooks and the spectra files, prints its progress, fills ``saved_plots``
+and ``saved_workbooks`` and sets has_spectra in ``context`` (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-experiment_plot_saver
+experiment_file_saver
 info_printer
-output_capturer
 preview_info_builder
 problem_shower
 ```
@@ -2533,8 +2642,9 @@ saved does not take the file out of the later figures.
 ---- Inputs ----
 info : dict
     Per-file information from everything_asker: path, name, trim and ignore times,
-    OD values, events, custom and keep flags, and is_plot_saved (True when the
-    plot was saved once its questions were accepted, so it is not drawn again).
+    OD values, events, custom and keep flags, is_plot_saved and is_workbook_saved
+    (True when the plot or the workbook was saved once the figure was accepted, so
+    it is not written again), write_spectra and has_spectra_csv.
 cfg : settings.Config
     Figure style and settings derived from the answers (config.py).
 fit : Optional[dict]
@@ -2565,8 +2675,54 @@ None.
 experiment_data_processor
 experiment_plotter
 experiment_preparer
-experiment_workbook_exporter
+experiment_workbook_saver
 plot_config_builder
+problem_shower
+```
+
+#### `experiment_workbook_saver`
+
+```text
+---- Summary ----
+Main function to write the workbook of one processed file, with the trimming, the
+fit and when it was processed in its metadata, and its spectra as csv files when
+they are to be written. A workbook that cannot be written (open in Excel, a full
+disk) is said in one sentence, with what happens instead.
+
+---- Inputs ----
+experiment : dict
+    The processed experiment (experiment_data_processor); its metadata is added
+    to.
+info : dict
+    Per-file information: name, ignore_start, ignore_end, write_spectra (True to
+    write the spectra as csv files) and has_spectra_csv (True when they were
+    written before, so the workbook lists them).
+cfg : settings.Config
+    Settings derived from the answers (decompose, fit_file, haem_files,
+    haem_background).
+export_root : Path
+    Results folder.
+later : str
+    What happens when the workbook cannot be written, said in brackets after the
+    sentence, such as 'the figures still use this file'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the workbook was written.
+
+---- Globals mutated ----
+None. Writes the workbook and the spectra files and prints to the terminal; the
+details of a problem go to the log (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_workbook_exporter
+fit_describer
 problem_shower
 ```
 
@@ -3604,9 +3760,10 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check what the window step draws for a file: the start of every
-window and the end of all but the last as edges, the first of each kind with its
-words, the baseline as a part of its own kind that says "baseline", the windows
+Main function to check what the window step draws for a file: the start and the
+end of every window as edges named by their window, the end of the last settled
+window as the edge of how long before the end of the file it ends, the first of
+each kind with its words, the baseline as a part of its own kind that says "baseline", the windows
 as blue parts and those that do not fit as red ones, and nothing when the windows
 are unticked or the file has no additions.
 
@@ -3764,14 +3921,15 @@ and 6 in the settled window 17.5 to 19.5 min, so 100 and 60 % of baseline.
 _response_experiment_builder
 ```
 
-#### `test_the_ocr_question_offers_the_window_step`
+#### `test_the_ocr_view_question_sets_ocr_as`
 
 ```text
 ---- Summary ----
-Main function to check the question of which OCR is plotted: % of baseline is its
-last choice; picked with the windows set up nothing more is asked; with none, one
-question offers the window step, and without windows after it the OCR goes back
-to what it was. The questions and the window step are stood in for.
+Main function to check the question of how the OCR is shown, asked once the OD
+values are in (3.1.1.1): it offers µM min⁻¹, per OD and % of the range, never %
+of baseline (no windows yet); per OD is highlighted, unless the dataset was saved
+with another of the three; the answer is kept as the ocr_mode. The figures of
+several files are not offered % of baseline. The question is stood in for.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -3890,6 +4048,453 @@ None.
 so at 0; 19.5 - 12 = 7.5 is before the addition at 10, and 29.5 - 12 = 17.5 is
 before the addition at 20, so neither fits. A first addition at 0.6 min: the
 baseline runs from 0 to 0.1 min, 6 s, less than the 10 s it needs.
+
+---- Helpers ----
+None.
+```
+
+#### `test_each_window_falls_on_its_own`
+
+```text
+---- Summary ----
+Main function to check where the windows set on their own fall: each with its own
+length, gap or start, the others as shared, the last settled window always its set
+time before the end of the run, and a window left out with its tick.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITIONS, RECORDING (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Shared: 2 min long, ending 0.5 min before the next addition; the last ends 1 min
+before the end of the run. The baseline 3 min long: 10 - 0.5 = 9.5, 9.5 - 3 = 6.5.
+average1 ending 1.5 min before the next addition: 20 - 1.5 = 18.5, 18.5 - 2 =
+16.5. average2, the last, 4 min long (its own gap of 5 min is not used): 30 - 1 =
+29, 29 - 4 = 25. Quick, shared 1 min long, starting 0.5 min after the addition:
+quick1 starting 1 min after and 0.5 min long, 10 + 1 = 11 to 11.5; quick2 left out,
+still at 20 + 0.5 = 20.5 to 21.5.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_window_left_out_keeps_its_row`
+
+```text
+---- Summary ----
+Main function to check the averages of a file with one window left out and one
+set on its own: the window left out is not averaged and is not warned of, it keeps
+its row in the Averages sheet with its numbers empty, and the one set on its own is
+averaged where it falls.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VO2_COLUMN (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The experiment of _response_experiment_builder, 2 min windows ending 0.5 min
+before the next addition and the end of the run. Baseline 7.5 to 9.5 min, OCR 10.
+average1 (17.5 to 19.5 min) left out. average2 4 min long: 29.5 - 4 = 25.5 to
+29.5 min, OCR 2: difference 2 - 10 = -8, 2 / 10 x 100 = 20 % of the baseline.
+
+---- Helpers ----
+_response_experiment_builder
+```
+
+#### `test_each_file_finds_its_own_windows`
+
+```text
+---- Summary ----
+Main function to check the windows each file is given: those of the dataset with
+every window set on its own, or, for a file fixed by hand, its own, taking from the
+dataset any value it does not hold; a dataset saved before windows could be set on
+their own has none.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_window_step_holds_the_windows`
+
+```text
+---- Summary ----
+Main function to check that the values the window step starts a file with hold
+its windows, in seconds, each window's own values and ticks under its name, and
+give the same windows back; "Adjust each window" starts on only when a window has
+a length, a gap or a start of its own.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PLAN (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+2 min = 120 s, 0.5 min = 30 s, 1 min = 60 s; average1 3 min = 180 s.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_change_moves_one_window_or_every_window`
+
+```text
+---- Summary ----
+Main function to check what a drag, a typed number and a tick change in the window
+step: with Adjust each window off every window of the kind; with it on only the
+window dragged, which the boxes then show and a typed number then changes; its
+own values kept when it is switched off, until the next change of that field
+puts every window back to one value; a tick per window, never the baseline's; the
+end of the last window; and values that cannot be used.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PLAN (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_pulled_window_on_its_own`
+
+```text
+---- Summary ----
+Main function to check that an edge of a named window pulled to a time gives the
+value of that window, with its own values, in whole steps of 5 s, and that the
+end of the last settled window gives how long before the end of the run it ends.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITIONS, RECORDING, FINAL_GAP_MIN, STEP_S, PLAN (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+average1 ends at 20 - 0.5 = 19.5: its start pulled to 17 gives (19.5 - 17) x 60 =
+150 s; its end pulled to 19 gives (20 - 19) x 60 = 60 s. The baseline's end
+pulled to 9 gives (10 - 9) x 60 = 60 s. average2, 3 min of its own, ends at
+30 - 0.5 = 29.5: its start pulled to 26 gives 210 s. The last end pulled to 29
+gives (30 - 29) x 60 = 60 s, to 30.4 below 0, so 0 s. quick2 starts after 20:
+pulled to 21, 60 s. quick1 starts 1 min after its addition of its own, at 11: its
+end pulled to 12 gives 60 s.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_plot_shows_windows_on_their_own`
+
+```text
+---- Summary ----
+Main function to check what the window step draws with windows set on their own:
+each where its own values put it, with its own length in the words, the windows
+left out grey and without edges, and the numbered ticks and the note of each row.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITIONS, RECORDING, FINAL_GAP_MIN, BASELINE_MINIMUM_S, PLAN (module constants);
+PART_STYLES of the window.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The baseline 7.5 to 9.5. average1 1 min of its own: 19.5 - 1 = 18.5 to 19.5.
+average2 left out, ending 1 min before the end of the run: 29 - 2 = 27 to 29.
+quick1 left out, 10.5 to 11.5; quick2 20.5 to 21.5.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_window_step_keeps_each_file`
+
+```text
+---- Summary ----
+Main function to check what the window step keeps: the windows most files share
+as the dataset's, with their windows set on their own and how long before the end
+of the file the last ends, a file whose windows differ as fixed by hand, and a
+warning naming only the windows that do not fit, not those left out.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the printing of the step.
+
+---- Globals read ----
+ADDITIONS, RECORDING, PLAN (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+File c, 1.5 min windows: average2 from 29 - 1.5 = 27.5 to 29, after its addition
+at 20, so it fits. With 12 min windows: average1 (left out) would start at 7.5;
+average2 starts at 29 - 12 = 17, before its addition at 20, so it does not fit;
+the baseline is cut at the start of the run and fits.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_compare_layout.py`
+
+Tests of how a decomposition kept to compare with is shown: side by side or overlaid.
+
+### TEST HELPERS
+
+#### `_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to make a file worked out with one decomposition: oxygen and OCR
+from 0 to 30 min, and three haems with a value each minute, haem i at
+i + 0.1 t + shift.
+
+---- Inputs ----
+shift : float
+    Added to every haem value (mOD).
+
+---- Globals read ----
+HAEMS, SPECTRUM_INDEX_COLUMN, TIME_COLUMN.
+
+---- Outputs ----
+dict
+    The experiment, with its haems as 'haem_delta_abs'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_preview_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the preview of a made-up file with a decomposition kept, as
+the window does. The reading and the processing are stood in for: the kept fit
+gives haems KEPT_SHIFT above those of the fit in use.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the reading and the processing.
+tmp_path : Path
+    Pytest's folder for this test.
+layout : str
+    The answer compare_layout: 'side' or 'overlaid'.
+
+---- Globals read ----
+HAEMS, KEPT_SHIFT.
+
+---- Outputs ----
+Figure
+    The preview drawn.
+
+---- Globals mutated ----
+None. The stand-ins are undone after the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_experiment_maker
+```
+
+### MAIN FUNCTIONS
+
+#### `test_side_by_side_draws_the_kept_plot_on_the_left`
+
+```text
+---- Summary ----
+Main function to check the preview with a decomposition kept, side by side: the
+kept file drawn as a plot of its own of the same size with the same panels, no
+dashed lines on the plot in use, matching panels with the same y range holding
+both, and the key and the gaps worked out by hand.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the reading and the processing.
+tmp_path : Path
+    Pytest's folder for this test.
+
+---- Globals read ----
+HAEMS, KEPT_SHIFT.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Each haem in use is i + 0.1 t and kept i + 0.1 t + 2 (mOD), so the gap is 2 mOD
+at every spectrum: largest 2, average 2. Haem i then reaches from i (in use, at
+0 min) to i + 3 + 2 = i + 5 (kept, at 30 min), and both panels hold that range.
+
+---- Helpers ----
+_preview_drawer
+```
+
+#### `test_overlaid_draws_the_kept_haems_dashed`
+
+```text
+---- Summary ----
+Main function to check the preview with a decomposition kept, overlaid: one plot,
+each haem panel with the haem in use and the kept one dashed over it, and the key
+of the dashed lines.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the reading and the processing.
+tmp_path : Path
+    Pytest's folder for this test.
+
+---- Globals read ----
+HAEMS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_preview_drawer
+```
+
+#### `test_the_picture_puts_the_plot_in_use_on_the_right`
+
+```text
+---- Summary ----
+Main function to check the picture shown side by side: the kept plot on the left,
+a white gap, the plot in use on the right exactly as it is on its own, and the time
+axis of the plot in use moved into the whole picture, so the edges dragged, the
+arrows and the shading fall on the plot in use.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+SIDE_GAP_PX.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+With the kept plot k pixels wide, the gap g, the plot in use n wide and h high, in
+a picture W = k + g + n wide and H high: x' = (k + g + x n) / W and
+y' = (H - h + y h) / H. The kept plot here is wider and taller, so both change.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_switch_keeps_the_layout_and_redraws`
+
+```text
+---- Summary ----
+Main function to check a click on the switch beside Keep new: the layout is kept in
+the answers (so it is saved with the dataset) and said in the terminal, and the
+plot is redrawn only while a decomposition is kept. Side by side is the standard.
+The showing of the boxes is stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the showing of the boxes.
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. The stand-in is undone after the test.
+
+---- Equations ----
+None.
 
 ---- Helpers ----
 None.
@@ -4668,7 +5273,7 @@ _calculator
 
 ## `tests/test_early_plots.py`
 
-Tests of the plots saved once the questions about each file are accepted: every file saved once and shown in the window, a failed file, the run not drawing a saved plot again, and the sentence when the run is cancelled.
+Tests of the plots and workbooks saved once the processing and figure of each file are accepted: every file saved once and shown in the window, a failed file, the run not writing a saved plot or workbook again, and the sentence when the run is cancelled.
 
 ### CLASSES
 
@@ -4752,7 +5357,7 @@ None.
 ```text
 ---- Summary ----
 Helper function to build the answers so far of a made-up dataset of three files,
-as everything_asker hands them to experiment_plots_saver.
+as everything_asker hands them to experiment_files_saver.
 
 ---- Inputs ----
 export_root : Path
@@ -4763,7 +5368,7 @@ NAMES (module constant); settings.DEFAULT_ANSWERS.
 
 ---- Outputs ----
 dict
-    {answers, fit, summaries, limits, details, regions, export_root}.
+    {answers, fit, summaries, limits, details, regions, export_root, has_spectra}.
 
 ---- Globals mutated ----
 None.
@@ -4780,9 +5385,9 @@ _summaries_builder
 ```text
 ---- Summary ----
 Helper function to stand in for every question of everything_asker, the window and
-the saving of the plots, so only its own steps run: the questions about each file
-give the three made-up files and one fit, and the plots saver names every file as
-saved.
+the saving of the plots and workbooks, so only its own steps run: the questions
+about each file give the three made-up files and one fit, and the saver names
+every file as saved.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -4800,7 +5405,8 @@ NAMES (module constant).
 
 ---- Outputs ----
 List[int]
-    A list that gets one entry each time the plots of the files are saved.
+    A list that gets one entry each time the plots and workbooks of the files are
+    saved.
 
 ---- Globals mutated ----
 None. Replaces names of main.py for the test (side effect).
@@ -4871,10 +5477,10 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check a file whose plot cannot be saved: the files after it are
-still saved and shown, it is left out of the saved plots, and the user is told in
-one sentence, with Python's own words in the log only. The saving of one plot is
-stood in for.
+Main function to check a file that cannot be read: the files after it are still
+saved and shown, it is left out of the saved plots and workbooks, and the user is
+told in one sentence, with Python's own words in the log only. The saving of one
+file is stood in for.
 
 ---- Inputs ----
 tmp_path : Path
@@ -4906,10 +5512,12 @@ _context_builder
 
 ```text
 ---- Summary ----
-Main function to check the saving of one file's plot: with a panel to plot, the
-plot is drawn once into the results folder and a PNG picture of it is handed back;
-with no oxygen, no OCR and no haems, nothing is drawn and None is handed back. The
-reading and the plot are stood in for.
+Main function to check the saving of one file: with a panel to plot, the plot is
+drawn once into the results folder and a PNG picture of it is handed back; with no
+oxygen, no OCR and no haems, nothing is drawn and None is handed back; the
+workbook is written either way, with the spectra only when asked for; a plot that
+fails still lets the workbook be written. The reading, the plot and the workbook
+are stood in for.
 
 ---- Inputs ----
 tmp_path : Path
@@ -4933,13 +5541,49 @@ None.
 None.
 ```
 
+#### `test_a_failed_plot_still_writes_the_workbook`
+
+```text
+---- Summary ----
+Main function to check one file whose plot cannot be drawn: no picture is handed
+back, the user is told in one sentence, and the workbook is still written; and one
+whose workbook cannot be written (open in Excel): False is handed back, with its
+sentence. The reading, the plot and the workbook are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for standing in for the reading, the plot and the workbook.
+capsys : pytest.CaptureFixture
+    Pytest's capture of what is printed.
+_quiet_details : io.StringIO
+    The made-up log.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_a_saved_plot_is_not_drawn_again`
 
 ```text
 ---- Summary ----
-Main function to check the run of one file: a file whose plot was saved once its
-questions were accepted is not drawn a second time, and says so; a file whose plot
-was not is drawn. The reading, the plot and the workbook are stood in for.
+Main function to check the run of one file: a file whose plot and workbook were
+saved once its figure was accepted is not drawn or written a second time, and says
+so; a file whose were not is drawn and written. The reading, the plot and the
+workbook are stood in for.
 
 ---- Inputs ----
 tmp_path : Path
@@ -4969,11 +5613,12 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check the saving of the plots of a dataset of three files: each
-file is saved once, in order, into the results folder; the window is given the
-picture of each; the list of saved plots is emptied first and then names every
-file; a file with nothing to plot is left out; and the terminal counts the files.
-The saving of one plot is stood in for.
+Main function to check the saving of the plots and workbooks of a dataset of three
+files: each file is saved once, in order, into the results folder; the window is
+given the picture of each; the lists of saved plots and workbooks are emptied first
+and then name every file; the spectra are written the first time only; a file with
+nothing to plot is left out of the plots; and the terminal counts the files. The
+saving of one file is stood in for.
 
 ---- Inputs ----
 tmp_path : Path
@@ -5004,7 +5649,7 @@ _context_builder
 ```text
 ---- Summary ----
 Main function to check what a cancelled run says it left in the results folder:
-nothing, the exported data, the saved plots, or both.
+nothing, the exported data, the saved plots, the saved workbooks, or several.
 
 ---- Inputs ----
 tmp_path : Path
@@ -5870,6 +6515,358 @@ None.
 
 ---- Globals mutated ----
 None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_guide_steps.py`
+
+Tests of the guide on the left of the window: its steps, the step open and the previous processing question.
+
+### HELPERS
+
+#### `_started_steps_finder`
+
+```text
+---- Summary ----
+Helper function to list the step keys the program's code starts, from every call
+guide_step_starter('<key>') in main.py and the code folders.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CODE_FOLDERS, ROOT (module constants).
+
+---- Outputs ----
+List[str]
+    The keys, once per call; a call whose key is not written out is listed as
+    '<not a key>'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_state_maker`
+
+```text
+---- Summary ----
+Helper function to make the guide as it is once the given steps have started, in
+order.
+
+---- Inputs ----
+keys : List[str]
+    The steps, in the order the program starts them.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+GuideState
+    The guide.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_status_reader`
+
+```text
+---- Summary ----
+Helper function to give the status of each step line the guide shows.
+
+---- Inputs ----
+state : GuideState
+    The guide.
+
+---- Globals read ----
+GUIDE_KEYS.
+
+---- Outputs ----
+Dict[str, str]
+    {step key: status} of the step lines shown.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_steps_and_stages`
+
+```text
+---- Summary ----
+Main function to check the stages in their order, each step under one stage with
+the steps of a stage together, the steps in the order of their first questions in
+QUESTION_FLOW.md, and every one of those questions in the list.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIRST_QUESTIONS, ROOT (module constants); GUIDE_STAGES, GUIDE_STEPS, GUIDE_KEYS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_every_step_is_started`
+
+```text
+---- Summary ----
+Main function to check that every step the code starts is a step of the guide,
+written out as its key, and that every step of the guide is started somewhere
+(the two summary figures by their keys in custom_questions.py).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+GUIDE_KEYS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_started_steps_finder
+```
+
+#### `test_steps_move_on_and_fold`
+
+```text
+---- Summary ----
+Main function to check the lines of the guide as the steps go by: the step
+started is open, the steps asked are done, a step passed without being asked is
+skipped, with "not needed this run", and the steps to come are later; only the
+stage of the open step lists its steps, the others show their name and step
+numbers, with a tick once passed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_state_maker
+_status_reader
+```
+
+#### `test_step_numbers_in_the_words`
+
+```text
+---- Summary ----
+Main function to check that every step named with its number in QUESTION_FLOW.md
+("step 13 (Averaging windows)") and in the guide's own help has the number it
+has in the guide.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ROOT (module constant); GUIDE_STEPS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_hints_under_the_answers`
+
+```text
+---- Summary ----
+Main function to check the hint under the answers: a box only for a number or a
+name, so no hint asks to type an answer to anything else.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_change_opens_earlier_step`
+
+```text
+---- Summary ----
+Main function to check that changing the fit while at Δψ opens the haem step,
+with an arrow and "you were here" on Δψ and a button back to it, that going back
+opens Δψ again, and that the Trim / Ignore tab opens the trim step with its
+Export csv button.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+GUIDE_KEYS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_state_maker
+_status_reader
+```
+
+#### `test_changes_that_open_nothing`
+
+```text
+---- Summary ----
+Main function to check the changes that leave the guide where it is: how the
+haems, the OCR and the labels are shown (they belong to every step), a change
+that belongs to the step waited at, and any change before the first step; that a
+change of a later step (or its tab of the Time regions box) only ticks it as done;
+and that a click opens only a step already asked.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+GUIDE_KEYS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_state_maker
+```
+
+#### `test_previous_processing_question`
+
+```text
+---- Summary ----
+Main function to check question 1.3: Yes, and Enter, load what was saved with
+the dataset; No starts it fresh, as a dataset never opened.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_answers_told_to_the_window`
+
+```text
+---- Summary ----
+Main function to check what the window is told about each kind of question, to
+show its answers as buttons, and that the question then leaves out what is typed
+(the ending and the numbered options) while the answers still read as before.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+capsys : pytest.CaptureFixture
+    Captures what the questions print.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The window stand-in is taken away at the end.
 
 ---- Equations ----
 None.
@@ -7407,6 +8404,37 @@ None.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+_library_maker
+_preset_writer
+```
+
+#### `test_built_fit_is_saved_as_a_fit_file`
+
+```text
+---- Summary ----
+Main function to check Save fit: the haems ticked are written as a fit file of the
+name typed (with or without .csv) in the fits folder, offered in the fit list and
+loading back as the same haems, in the order a, b, c, with the same values; no
+name, no haem ticked, a preset's name or a name already used is refused with a
+message, and the file already there is left as it was.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+HAEMS (module constant); OWN_HAEMS_NAME, PRESETS_FOLDER_NAME.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+value on the standard scale = value in OD/mM/cm / 1 000 000, read back unchanged.
 
 ---- Helpers ----
 _library_maker
@@ -11994,24 +13022,24 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to say whether a question sits in the row of its own number in the
-list, in the same words. The parts filled in at run time match any words within
-that row's question.
+Helper function to say whether a question sits in a row of its own number in the
+list, in the same words: in the row's question, or in a cell of that row for a
+question asked inside its step (a name for each component, replacing a file).
 
 ---- Inputs ----
 number : str
     The number the code gives the question, such as '3.5'.
 question : str
     Question text from the code, with VARYING for each part filled in at run time.
-list_text : str
-    Text of the list from _list_reader.
+rows : List[Tuple[str, str]]
+    The numbered rows of the list from _row_reader.
 
 ---- Globals read ----
-VARYING (module constant).
+None.
 
 ---- Outputs ----
 bool
-    True when the row of that number holds the question.
+    True when a row of that number holds the question.
 
 ---- Globals mutated ----
 None.
@@ -12020,7 +13048,7 @@ None.
 None.
 
 ---- Helpers ----
-None.
+_rows_finder
 ```
 
 #### `_question_collector`
@@ -12035,14 +13063,14 @@ written in that call, and each 'question' entry of a dictionary.
 None.
 
 ---- Globals read ----
-NUMBER_NAME, QUESTION_NAME (module constants).
+HANDED_ON, NUMBER_NAME, QUESTION_NAME (module constants).
 
 ---- Outputs ----
 Tuple[List[Tuple[str, str, Optional[str]]], List[str]]
     ([(question text, 'file:line', its own number or None)], ['file:line' of each
     question that could not be read]). VARYING stands for each part filled in at
     run time. A number handed on from another input is not one written in the call,
-    so it gives None.
+    so it gives HANDED_ON.
 
 ---- Globals mutated ----
 None.
@@ -12075,6 +13103,65 @@ VARYING (module constant).
 ---- Outputs ----
 bool
     True when the question is in the list.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_row_reader`
+
+```text
+---- Summary ----
+Helper function to read the numbered rows of the question list, each as plain text
+without the marks for italics, bold and code, and with single spaces.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ROOT, LIST_NAME (module constants).
+
+---- Outputs ----
+List[Tuple[str, str]]
+    [(the row's number, such as '4.1.1.7', the text of the whole row)], in the
+    order of the list.
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_rows_finder`
+
+```text
+---- Summary ----
+Helper function to find the numbers of the rows of the list that hold a question in
+the same words, anywhere in the row. The parts filled in at run time match any
+words within one cell.
+
+---- Inputs ----
+question : str
+    Question text from the code, with VARYING for each part filled in at run time.
+rows : List[Tuple[str, str]]
+    The numbered rows of the list from _row_reader.
+
+---- Globals read ----
+VARYING (module constant).
+
+---- Outputs ----
+List[str]
+    The numbers of the rows that hold the question, in the order of the list.
 
 ---- Globals mutated ----
 None.
@@ -12215,7 +13302,7 @@ in the list.
 None.
 
 ---- Globals read ----
-VARYING, LIST_NAME (module constants).
+HANDED_ON, VARYING, LIST_NAME (module constants).
 
 ---- Outputs ----
 None.
@@ -12227,9 +13314,38 @@ None.
 None.
 
 ---- Helpers ----
-_list_reader
 _number_matcher
 _question_collector
+_row_reader
+```
+
+#### `test_questions_have_their_own_number`
+
+```text
+---- Summary ----
+Main function to check that every question of the numbered sections of
+QUESTION_FLOW.md (set-up to experiment export, and the summary) is given its own
+number in the code, so none is shown on screen without it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LIST_NAME, NOT_YET_NUMBERED, NUMBERED_SECTIONS, VARYING (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_question_collector
+_row_reader
+_rows_finder
 ```
 
 ## `tests/test_question_format.py`
@@ -13837,6 +14953,392 @@ of the height, showing 0 to 45 min; a small panel with its own x axis is left ou
 None.
 ```
 
+## `tests/test_time_regions.py`
+
+Tests of the boxes above the plot that the program runs: the tabs of the Time regions box, Export csv of the trim step and the figure step that asks only Continue.
+
+### CLASSES
+
+#### `FakeWindow`
+
+```text
+---- Summary ----
+Stand-in for the browser window that keeps the edges put on the plot and notes
+what the program asks of it.
+
+---- Attributes ----
+shown : List[Any]
+    The edges put on the plot, in order (None when they are taken off).
+edges : Dict[str, Dict[str, float]]
+    What edges_reader gives: the edges on the plot as the user left them.
+tabs : List[str]
+    The tab of the Time regions box shown after each change.
+
+---- Globals read ----
+None.
+
+---- Methods ----
+__init__
+edges_hider
+edges_reader
+edges_shower
+strip_choices_setter
+strip_setter
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to start with no edges on the plot.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `edges_hider`
+
+```text
+---- Summary ----
+Method to note the edges taken off the plot.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the attributes.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `edges_reader`
+
+```text
+---- Summary ----
+Method to give the edges on the plot as the user left them.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Dict[str, float]]
+    A copy of the edges.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `edges_shower`
+
+```text
+---- Summary ----
+Method to note the edges put on the plot; their values become those read.
+
+---- Inputs ----
+choice : Any
+    The edges (an EdgeChoice, or a stand-in with values).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the attributes.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_choices_setter`
+
+```text
+---- Summary ----
+Method to take what the boxes offer, which is not checked here.
+
+---- Inputs ----
+args : Any
+    What the boxes offer.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `strip_setter`
+
+```text
+---- Summary ----
+Method to note the tab of the Time regions box shown.
+
+---- Inputs ----
+values : Dict[str, Any]
+    Some of the values of the boxes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the attributes.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `FakeChoice`
+
+```text
+---- Summary ----
+Stand-in for the edges of a step: only their values.
+
+---- Attributes ----
+values : Dict[str, Dict[str, float]]
+    {file name: {field: value}}.
+
+---- Globals read ----
+None.
+
+---- Methods ----
+__init__
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to keep the values.
+
+---- Inputs ----
+values : Dict[str, Dict[str, float]]
+    {file name: {field: value}}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attribute on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### HELPERS
+
+#### `_kits_maker`
+
+```text
+---- Summary ----
+Helper function to give stand-ins for what each tab does, noting each call.
+
+---- Inputs ----
+log : List[Tuple[str, Any]]
+    Filled with ('open', tab) and ('apply', tab, edges) in order.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Tuple[Any, Any]]
+    {tab: (opener, applier)}; the opener of 'windows' gives no edges.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_a_tab_pressed_away_from_its_step`
+
+```text
+---- Summary ----
+Main function to check the tabs of the Time regions box while the regions step
+waits: Trim / Ignore takes the regions off the plot, kept as the user left them,
+and puts the trim edges on; back to Ox / Red, the trim edges moved are used and
+the regions come back as they were left, with their plot; a tab whose edges cannot
+be shown (no addition for the windows) goes back to the step's tab; and the tab
+already pressed changes nothing.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_kits_maker
+```
+
+#### `test_a_tab_pressed_while_no_step_has_edges`
+
+```text
+---- Summary ----
+Main function to check a tab pressed while a question without edges waits (Δψ,
+say): its edges go on the plot over its own plot, and pressing no tab (the
+question answered) uses them and puts the plot of the question back.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_kits_maker
+```
+
+#### `test_export_csv_in_the_trim_step`
+
+```text
+---- Summary ----
+Main function to check the Export csv button of the trim step: it is offered above
+Continue, writes the files with the edges as they are, and the step waits again;
+Continue then gives the limits of the edges. Without an exporter there is no
+button. The plot, the edges and the questions are stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Puts the stand-ins in place, and takes them away afterwards.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_figure_step_asks_only_continue`
+
+```text
+---- Summary ----
+Main function to check the figure of each file: one Continue (5.1) is asked and
+nothing else; the oxygen and the OCR are plotted whatever the dataset was saved
+with, every haem of the fit is, and the angle of the labels is the one in use. The
+plot and the question are stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Puts the stand-ins in place, and takes them away afterwards.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `tests/test_trim_edges.py`
 
 Tests that the edges of the trimming step move, stop and shade as worked out by hand.
@@ -14069,6 +15571,37 @@ None.
 Trimmed 4 and 5 min of 60. Trim start at 4.04 -> 4.0. Trim end at 55 -> 60 - 55 =
 5. Ignore start at 9.5 -> 9.5 - 4 = 5.5. Ignore end at 50 -> 55 - 50 = 5. Ignore
 start at 2, in the trimmed part: 0. Trim end at 61, past the end: 0.
+
+---- Helpers ----
+None.
+```
+
+#### `test_full_times_in_the_boxes`
+
+```text
+---- Summary ----
+Main function to check that the Trim / Ignore boxes show the four edges as times
+on the whole recording, that a time typed in a box puts the edge at that time, and
+that with "Apply to every experiment" ticked the other files take the same minutes
+from their own start or end. The window is stood in for.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LONG, SHORT, NOTHING (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+60 min trimmed 4 and 5 min, ignored 5 and 2 min: trim before 4, after 60 - 5 = 55,
+ignore before 4 + 5 = 9, after 55 - 2 = 53. Trim after typed as 52: 60 - 52 = 8
+min off the end, so the 40 min file is trimmed after 40 - 8 = 32 min.
 
 ---- Helpers ----
 None.
@@ -14594,7 +16127,9 @@ None.
 ---- Summary ----
 Main function to check the labels as the table is confirmed: a label written
 ignore in any capitals leaves its event out and drops its concentration; a label
-that could be tidier is offered once, and one kept as it is is not offered again.
+that could be tidier is listed by its file, time and tidy form, Yes to continue
+uses the tidy form, and No opens the table again with the label as typed; the
+labels are then said to be saved.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -14659,6 +16194,36 @@ None.
 
 ---- Globals read ----
 None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_od_table_confirmed_with_gaps`
+
+```text
+---- Summary ----
+Main function to check an OD table confirmed with cells left empty: the empty
+cells are not a problem that keeps the table open, the values typed are kept, the
+gaps are named in the order of the files and columns, and the OD scaling stays off
+until every value is in.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the answer to "Do you want to scale by OD?".
+
+---- Globals read ----
+OD_COLUMNS.
 
 ---- Outputs ----
 None
@@ -14768,7 +16333,7 @@ None.
 ---- Summary ----
 Main function to check that a click on Keep to compare keeps the fit, the regions
 and the numbers of delta psi in use at that moment and redraws the plot, and that
-Keep this one drops them. The showing of the strip is stood in for.
+Keep new drops them. The showing of the strip is stood in for.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -14795,13 +16360,13 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check the two ways of choosing after Keep to compare. Go back to
-kept puts the kept fit, background, number of delta psi and regions back in use,
-drops the kept one and redraws the plot; while the regions are being chosen on the
-plot it leaves the regions as they are; with nothing kept it does nothing. Keep
-this one leaves what is in use as it is and drops the kept one. The strip tells
-the click on Go back to kept only while one is kept. The showing of the strip is
-stood in for.
+Main function to check the two ways of choosing after Keep to compare. Keep old
+puts the kept fit, background, number of delta psi and regions back in use, drops
+the kept one and redraws the plot; while the regions are being chosen on the plot
+it leaves the regions as they are; with nothing kept it does nothing. Keep new
+leaves what is in use as it is and drops the kept one. The strip tells the click
+on Keep old only while one is kept, and a click on Keep new as no longer
+comparing. The showing of the strip is stood in for.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -14816,6 +16381,39 @@ None
 
 ---- Globals mutated ----
 None. The stand-in is undone after the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_save_fit_names_the_fit_in_use`
+
+```text
+---- Summary ----
+Main function to check Save fit under Build a fit: the strip tells the name typed
+beside it; the haems ticked are saved under that name, which becomes the fit in
+use and joins the Fit list, with the haems on the plot left as they are; with a
+preset in use nothing is ticked, so nothing is saved and one sentence says why.
+The saving of the file and the showing of the strip are stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the saving and the showing of the strip.
+tmp_path : Path
+    Empty folder from pytest, as the fits folder.
+
+---- Globals read ----
+OWN_HAEMS_NAME, SAVE_FIT_CHANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The stand-ins are undone after the test.
 
 ---- Equations ----
 None.
@@ -14839,6 +16437,35 @@ None.
 
 ---- Globals read ----
 settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_ocr_view_and_the_new_box_values`
+
+```text
+---- Summary ----
+Main function to check the OCR as of the View box, a drop-down and a per OD box,
+both ways: µM min⁻¹ with per OD ticked is the OCR per OD, and the % views have no
+per OD; and that the angle of the labels and the tab of the Time regions box are
+checked and given back as answers.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
 
 ---- Outputs ----
 None
@@ -15744,6 +17371,7 @@ decomposition_asker
 info_printer
 window_kind_asker
 windows_ensurer
+guide_step_starter
 yes_no_asker
 ```
 
@@ -15789,6 +17417,7 @@ experiment_averages_calculator
 source_selector
 warning_shower
 window_kind_picker
+window_plan_finder
 ```
 
 #### `_time_response_preparer`
@@ -15829,6 +17458,7 @@ None. See spectral_difference.py.
 difference_spectrum_calculator
 difference_spectrum_decomposer
 spectral_averager
+window_plan_finder
 ```
 
 ### MAIN FUNCTIONS
@@ -19498,7 +21128,9 @@ spectrum_decomposer
 ```text
 ---- Summary ----
 Main function to average the chosen spectra in each event window: the baseline,
-then the settled or the quick window of each addition.
+then the settled or the quick window of each addition, each with its own length,
+gap or start where it has them. A window the user left out is skipped without a
+warning.
 
 ---- Inputs ----
 experiment : dict
@@ -19523,9 +21155,12 @@ quick_minutes : float
 delay_minutes : float
     How long after its addition each quick window starts, in minutes; used for
     the quick kind.
+each_window : Optional[Dict[str, dict]]
+    The windows of this file set on their own (DATA_FORMAT.md, each_window), as
+    window_plan_finder gives them; None for none.
 
 ---- Globals read ----
-None.
+LEFT_OUT_PROBLEM (imported).
 
 ---- Outputs ----
 dict
@@ -21638,6 +23273,241 @@ value_getter
 window_statistics_calculator
 ```
 
+#### `_left_out_finder`
+
+```text
+---- Summary ----
+Helper function to say whether the user left a window out with its tick.
+
+---- Inputs ----
+each_window : Dict[str, dict]
+    The windows set on their own (DATA_FORMAT.md, each_window).
+name : str
+    The window's name ('average2', 'quick1'); the baseline 'average0' is never
+    left out.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when its 'is_used' is false.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_own_minutes_reader`
+
+```text
+---- Summary ----
+Helper function to give a value of one window: its own when it was set on its own,
+otherwise the value shared by the windows of its kind.
+
+---- Inputs ----
+each_window : Dict[str, dict]
+    The windows set on their own (DATA_FORMAT.md, each_window).
+name : str
+    The window's name ('average0', 'average2', 'quick1').
+field : str
+    'length_min', 'gap_min' or 'delay_min'.
+shared : float
+    The shared value, in minutes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    The value in minutes. Raises ValueError for a length of 0 or less, or a gap
+    or start below 0.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### WINDOW STEP HELPERS
+
+#### `_edge_key_splitter`
+
+```text
+---- Summary ----
+Helper function to split the key of an edge of the window step into its field and
+the window it belongs to.
+
+---- Inputs ----
+key : str
+    'gap_s@average1' for an edge of one window, or a field alone ('window_s',
+    'final_gap_s', 'average2:is_used').
+
+---- Globals read ----
+EDGE_SEPARATOR (module constant).
+
+---- Outputs ----
+Tuple[str, Optional[str]]
+    (field, window name), the window None for a field alone.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_picked_window_namer`
+
+```text
+---- Summary ----
+Helper function to name the window of one kind last dragged with "Adjust each
+window" on.
+
+---- Inputs ----
+values : Dict[str, float]
+    The values of one file in the window step.
+kind : str
+    'settled' or 'quick'.
+
+---- Globals read ----
+NO_PICK (module constant).
+
+---- Outputs ----
+Optional[str]
+    'average0' (the baseline), 'average2', 'quick1' ..., or None when none was
+    dragged.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_step_own_reader`
+
+```text
+---- Summary ----
+Helper function to give the windows of one file set on their own in the window
+step, in the form of each_window (DATA_FORMAT.md).
+
+---- Inputs ----
+values : Dict[str, float]
+    The values of one file in the window step, the own values of a window under
+    '<window>:<field>' in seconds, its tick under '<window>:is_used'.
+
+---- Globals read ----
+OWN_SEPARATOR, STEP_OWN_FIELDS (module constants).
+
+---- Outputs ----
+Dict[str, dict]
+    {window name: {'length_min', 'gap_min' or 'delay_min', 'is_used'}}, sorted by
+    name; a window ticked keeps no 'is_used', and the baseline never has one.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+minutes = seconds / 60.
+
+---- Helpers ----
+None.
+```
+
+#### `_window_edge_reader`
+
+```text
+---- Summary ----
+Helper function to turn where the mouse holds an edge of one named window into
+the value of its field, as window_pointer_reader does for the nearest window, with
+that window's own values.
+
+---- Inputs ----
+values : Dict[str, float]
+    The values of the file in the window step.
+field : str
+    'window_s' or 'gap_s' (the baseline or a settled window), 'delay_s' or
+    'quick_s' (a quick window).
+window : str
+    The window's name ('average0', 'average2', 'quick1').
+time_min : float
+    Time under the mouse on the time axis of the plot (min).
+event_times_min : List[float]
+    Times of the file's additions on that axis (min), in order; at least one.
+recording_span_min : Tuple[float, float]
+    (first, last) time of the data on that axis (min).
+final_window_gap_minutes : float
+    How long before the end of the recording the last window ends, when the
+    values do not hold it, in minutes.
+step_seconds : float
+    The step the result is rounded to, in seconds (> 0).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    The new value in seconds: a length of at least one step, a gap or a start of at
+    least 0; the value as it is for a window the file does not have.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+window_s = end of the window - time; gap_s = the addition after it - time; delay_s
+= time - its addition; quick_s = time - its start; each x 60, rounded to whole
+steps.
+
+---- Helpers ----
+_step_own_reader
+_window_number_finder
+quick_span_lister
+window_span_lister
+```
+
+#### `_window_number_finder`
+
+```text
+---- Summary ----
+Helper function to give the number of a window from its name.
+
+---- Inputs ----
+name : str
+    'average0' (the baseline), 'average2', 'quick1' ...
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    The number at the end of the name: 0, 2, 1 ...
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `baseline_percent_adder`
@@ -21684,9 +23554,10 @@ window_statistics_calculator
 ---- Summary ----
 Main function to calculate event-window statistics for VoO2 and haem data and store
 them in the experiment: the baseline, the settled windows (ending before the next
-addition) and, when asked for, the quick windows (starting after each addition).
-Every view of the haems asked for, and delta psi when the experiment has it, are
-averaged in the same windows.
+addition) and, when asked for, the quick windows (starting after each addition),
+each with its own length, gap or start where it has them. Every view of the haems
+asked for, and delta psi when the experiment has it, are averaged in the same
+windows. A window the user left out is kept among the skipped ones, marked so.
 
 ---- Inputs ----
 experiment : dict
@@ -21715,9 +23586,13 @@ haem_views : Optional[Dict[str, str]]
     {view: haem source} of every way the haems can be shown
     (Config.haem_view_lister); a view whose table the experiment does not have is
     left out. None averages no views.
+each_window : Optional[Dict[str, dict]]
+    The windows of this file set on their own (DATA_FORMAT.md, each_window), as
+    window_plan_finder gives them; None for none.
 
 ---- Globals read ----
-schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES; DELTA_PSI_COLUMN.
+schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES; DELTA_PSI_COLUMN;
+LEFT_OUT_PROBLEM (module constant).
 
 ---- Outputs ----
 dict
@@ -21732,14 +23607,16 @@ experiment: adds experiment["averages"] = {"settings", "windows", "skipped"}
 (layout in DATA_FORMAT.md).
 
 ---- Equations ----
-average0 ends gap_minutes before the first event and starts window_minutes before
-its end, or at the start of the recording when that is later; it is skipped when
-the points inside it span less than baseline_minimum_seconds. averageN ends
-gap_minutes before event N+1 (final_window_gap_minutes before the end of the
-recording for the last event); each window starts window_minutes before its end
-and is skipped when that is before its own event. quickN starts delay_minutes
-after event N and ends quick_minutes later; it is skipped when that is after event
-N+1 (the end of the recording for the last event). change = mean /
+Each window's own length, gap and start stand in for the shared ones below where
+it has them. average0 ends gap_minutes before the first event and starts
+window_minutes before its end, or at the start of the recording when that is
+later; it is skipped when the points inside it span less than
+baseline_minimum_seconds. averageN ends gap_minutes before event N+1
+(final_window_gap_minutes before the end of the recording for the last event);
+each window starts window_minutes before its end and is skipped when that is
+before its own event. quickN starts delay_minutes after event N and ends
+quick_minutes later; it is skipped when that is after event N+1 (the end of the
+recording for the last event). change = mean /
 mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0),
 for the settled and the quick windows alike. The haem views and delta psi have a
 delta only (their change is NaN).
@@ -21761,6 +23638,7 @@ window_statistics_calculator
 Main function to give the windows a figure that uses one kind of window averages
 over: the baseline, then the window of that kind of each addition, all under the
 names of the settled windows, so the figure reads either kind in the same way.
+Each window keeps its own length, gap or start and its tick where it has them.
 
 ---- Inputs ----
 kind : str
@@ -21781,6 +23659,9 @@ quick_minutes : float
     Length of each quick window, in minutes.
 delay_minutes : float
     How long after its addition each quick window starts, in minutes.
+each_window : Optional[Dict[str, dict]]
+    The windows set on their own (DATA_FORMAT.md, each_window), under their own
+    names ('quick1'); None for none.
 
 ---- Globals read ----
 None.
@@ -21807,8 +23688,9 @@ window_span_lister
 ```text
 ---- Summary ----
 Main function to give where the quick windows of one file fall, and which do not
-fit: one window starting a set time after each addition. The averaging and the plot
-of the window step both use it.
+fit or were left out: one window starting a set time after each addition, each
+with its own length and start where it has them. The averaging and the plot of the
+window step both use it.
 
 ---- Inputs ----
 event_times_min : List[float]
@@ -21819,25 +23701,30 @@ quick_minutes : float
     Length of each quick window, in minutes.
 delay_minutes : float
     How long after its addition each quick window starts, in minutes.
+each_window : Optional[Dict[str, dict]]
+    {window name: {'length_min', 'delay_min', 'is_used'}} of the windows set on
+    their own (DATA_FORMAT.md, each_window); a value not given is the shared one.
+    None for none.
 
 ---- Globals read ----
-FIT_TOLERANCE_MIN (module constant).
+FIT_TOLERANCE_MIN and LEFT_OUT_PROBLEM (module constants).
 
 ---- Outputs ----
 List[Tuple[str, float, float, Optional[str]]]
     [(name, start, end, problem)] in minutes, 'quick1' after the first addition and
-    so on. The problem is None for a window that fits, or one sentence saying why
-    it does not.
+    so on. The problem is None for a window that fits, LEFT_OUT_PROBLEM for one
+    left out, or one sentence saying why it does not fit.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-quickN: start = addition N + delay; end = start + length; it does not fit when end
-> addition N + 1 (the end of the recording for the last addition).
+quickN: start = addition N + its delay; end = start + its length; it does not fit
+when end > addition N + 1 (the end of the recording for the last addition).
 
 ---- Helpers ----
-None.
+_left_out_finder
+_own_minutes_reader
 ```
 
 #### `window_kind_picker`
@@ -21879,37 +23766,43 @@ None.
 ```text
 ---- Summary ----
 Main function to give what the window step draws on the plot of one file: the two
-edges of every averaging window, and the windows as parts to shade, those that do
-not fit apart. The first edge of each kind carries its words. The baseline is
-there when either kind of window is switched on.
+edges of every averaging window, each with its own values, and the windows as parts
+to shade, those that do not fit and those left out apart. The first window of each
+kind carries the words. The baseline is there when either kind of window is
+switched on.
 
 ---- Inputs ----
 values : Dict[str, float]
-    The settled and the quick windows of the file (WINDOW_KEYS).
+    The values of the file in the window step: WINDOW_KEYS, and where set
+    final_gap_s and the windows' own values ('average2:window_s',
+    'quick1:is_used').
 event_times_min : List[float]
     Times of the file's additions on the time axis of the plot (min), in order,
     not those marked ignore.
 recording_span_min : Tuple[float, float]
     (first, last) time of the data on that axis (min).
 final_window_gap_minutes : float
-    How long before the end of the recording the last window ends, in minutes.
+    How long before the end of the recording the last window ends, in minutes,
+    when the values hold no final_gap_s.
 baseline_minimum_seconds : float
     Least length of the baseline window, in seconds.
 
 ---- Globals read ----
-None.
+EDGE_SEPARATOR, LEFT_OUT_PROBLEM, OWN_SEPARATOR (module constants).
 
 ---- Outputs ----
 Tuple[List[Tuple[str, float, str, str]], List[Tuple[float, float, str]]]
-    ([(field, time in min, words, kind)], [(start, end, kind)]). The baseline and
-    the settled windows first: the start of each is an edge of the field
-    'window_s' (kind 'baseline' for the baseline, with the words "baseline" and
-    its length, 'average' for a settled window), the end of each but the last
-    settled window an edge of 'gap_s' (kind 'baseline_end' or 'average_end'; the
-    last window ends a fixed time before the end of the recording). Then the
-    quick windows: the start of each is an edge of 'delay_s' (kind 'quick'), its
-    end an edge of 'quick_s' (kind 'quick_end'). A part has the kind 'baseline',
-    'average', 'quick', or 'average_unfit' for a window that does not fit. Both lists are empty when both kinds are switched off
+    ([(key, time in min, words, kind)], [(start, end, kind)]). The key of an edge
+    names its window ('window_s@average1'). The baseline and the settled windows
+    first: the start of each is an edge of 'window_s' (kind 'baseline' for the
+    baseline, with the words "baseline" and its length, 'average' for a settled
+    window), the end of each but the last settled window an edge of 'gap_s' (kind
+    'baseline_end' or 'average_end'), and the end of the last settled window the
+    edge 'final_gap_s' (kind 'average_end'). Then the quick windows: the start of
+    each is an edge of 'delay_s' (kind 'quick'), its end an edge of 'quick_s'
+    (kind 'quick_end'). A part has the kind 'baseline', 'average', 'quick',
+    'average_unfit' for a window that does not fit, or 'left_out' for one left
+    out, which has no edges. Both lists are empty when both kinds are switched off
     or the file has no additions.
 
 ---- Globals mutated ----
@@ -21919,8 +23812,74 @@ None.
 None.
 
 ---- Helpers ----
+_step_own_reader
 quick_span_lister
 window_span_lister
+```
+
+#### `window_plan_finder`
+
+```text
+---- Summary ----
+Main function to give the averaging windows of one file: those of a file fixed by
+hand when it was, otherwise those shared by the dataset, with every window set on
+its own.
+
+---- Inputs ----
+answers : dict
+    The answers of the run: the shared values (SHARED_WINDOW_ANSWERS),
+    'each_window' and 'file_windows' (DATA_FORMAT.md); the last two may be missing
+    (a dataset saved before windows could be set on their own).
+file_name : str
+    The file's name without its ending, as experiment_name.
+
+---- Globals read ----
+SHARED_WINDOW_ANSWERS (module constant).
+
+---- Outputs ----
+dict
+    {'window_minutes', 'gap_minutes', 'final_gap_minutes', 'quick_minutes',
+    'delay_minutes': floats in minutes, 'each_window': {window name: {...}}}, a
+    copy. A file fixed by hand takes from the dataset any value it does not hold.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `window_plan_reader`
+
+```text
+---- Summary ----
+Main function to give the averaging windows of one file as the window step holds
+them, in the form window_plan_finder gives: the inverse of window_values_maker.
+
+---- Inputs ----
+values : Dict[str, float]
+    The values of one file in the window step (WINDOW_KEYS, STEP_EXTRA_KEYS and
+    the windows' own values).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {'window_minutes', 'gap_minutes', 'final_gap_minutes', 'quick_minutes',
+    'delay_minutes': floats in minutes, 'each_window': {window name: {...}}}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+minutes = seconds / 60.
+
+---- Helpers ----
+_step_own_reader
 ```
 
 #### `window_pointer_reader`
@@ -21931,15 +23890,20 @@ Main function to turn where the mouse holds an edge of an averaging window into
 the value of its field, in seconds rounded to whole steps: for a settled window
 its length (a start edge) or how long before the next addition it ends (an end
 edge); for a quick window how long after its addition it starts (a start edge) or
-its length (an end edge). The edge held is the one of its kind nearest the mouse,
-which stays the same edge while it follows the mouse.
+its length (an end edge); for the end of the last settled window how long before
+the end of the recording it ends. An edge whose key names its window is that
+window's, with its own values; otherwise the edge held is the one of its kind
+nearest the mouse, which stays the same edge while it follows the mouse.
 
 ---- Inputs ----
 values : Dict[str, float]
-    The settled and the quick windows of the file now (WINDOW_KEYS).
+    The values of the file in the window step (WINDOW_KEYS, and where set
+    final_gap_s and the windows' own values).
 key : str
     'window_s' for the start and 'gap_s' for the end of a settled window or the
-    baseline, 'delay_s' for the start and 'quick_s' for the end of a quick window.
+    baseline, 'delay_s' for the start and 'quick_s' for the end of a quick window,
+    each with '@' and its window where it names one ('gap_s@average1'), or
+    'final_gap_s'.
 time_min : float
     Time under the mouse on the time axis of the plot (min).
 event_times_min : List[float]
@@ -21969,11 +23933,79 @@ gap_s = round((addition after the window held - time) x 60 / step) x step, with
 the addition after a window = its end + the gap now;
 delay_s = round((time - addition of the quick window held) x 60 / step) x step,
 with the addition of a quick window = its start - the delay now;
-quick_s = round((time - start of the quick window held) x 60 / step) x step.
+quick_s = round((time - start of the quick window held) x 60 / step) x step;
+final_gap_s = round((end of the recording - time) x 60 / step) x step.
 
 ---- Helpers ----
+_edge_key_splitter
+_window_edge_reader
 quick_span_lister
 window_span_lister
+```
+
+#### `window_row_teller`
+
+```text
+---- Summary ----
+Main function to give what each row of the window step shows beside its boxes for
+the file shown: which window the boxes are of, with "Adjust each window" on, and a
+numbered tick for each window of its kind, to leave it out.
+
+---- Inputs ----
+values : Dict[str, float]
+    The values of the file in the window step.
+addition_count : int
+    How many additions the file has (one window of each kind for each).
+
+---- Globals read ----
+OWN_SEPARATOR (module constant).
+
+---- Outputs ----
+List[Tuple[str, List[Tuple[str, str, bool]]]]
+    [(note, [(field, words, is_ticked)])] for the settled row, then the quick row:
+    the note 'every settled window', 'the baseline', 'settled window 2' (empty with
+    "Adjust each window" off), and the ticks ('average1:is_used', '1', True) ...
+    A row whose kind is switched off has neither.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picked_window_namer
+_window_number_finder
+```
+
+#### `window_shown_maker`
+
+```text
+---- Summary ----
+Main function to give the values the boxes of the window step show in place of
+the shared ones: with "Adjust each window" on, those of the window of each kind
+last dragged.
+
+---- Inputs ----
+values : Dict[str, float]
+    The values of the file in the window step.
+
+---- Globals read ----
+OWN_SEPARATOR, STEP_OWN_FIELDS (module constants).
+
+---- Outputs ----
+Dict[str, float]
+    {field: value in seconds} of the fields shown otherwise; empty with "Adjust
+    each window" off or no window dragged.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picked_window_namer
 ```
 
 #### `window_span_lister`
@@ -21981,8 +24013,9 @@ window_span_lister
 ```text
 ---- Summary ----
 Main function to give where the averaging windows of one file fall, and which do
-not fit: the baseline window before the first addition, then one window after each
-addition. The averaging and the plot of the window step both use it.
+not fit or were left out: the baseline window before the first addition, then one
+window after each addition, each with its own length and gap where it has them.
+The averaging and the plot of the window step both use it.
 
 ---- Inputs ----
 event_times_min : List[float]
@@ -21998,27 +24031,34 @@ final_window_gap_minutes : float
 baseline_minimum_seconds : float
     Least length of the baseline window, in seconds; 0 (the standard) never finds
     it too short, for a caller that checks the data inside it itself.
+each_window : Optional[Dict[str, dict]]
+    {window name: {'length_min', 'gap_min', 'is_used'}} of the windows set on
+    their own (DATA_FORMAT.md, each_window); a value not given is the shared one.
+    The gap of the last window is always final_window_gap_minutes. None for none.
 
 ---- Globals read ----
-None.
+LEFT_OUT_PROBLEM (module constant).
 
 ---- Outputs ----
 List[Tuple[str, float, float, Optional[str]]]
     [(name, start, end, problem)] in minutes, 'average0' (the baseline) first, then
     'average1' after the first addition and so on. The problem is None for a
-    window that fits, or one sentence saying why it does not.
+    window that fits, LEFT_OUT_PROBLEM for one left out, or one sentence saying
+    why it does not fit.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-average0: end = first addition - gap; start = end - window, or the start of the
-recording when that is later; too short when end - start < the least length.
-averageN: end = addition N + 1 - gap (the end of the recording - final gap for the
-last addition); start = end - window; it does not fit when start < addition N.
+average0: end = first addition - its gap; start = end - its length, or the start
+of the recording when that is later; too short when end - start < the least
+length. averageN: end = addition N + 1 - its gap (the end of the recording - final
+gap for the last addition); start = end - its length; it does not fit when start <
+addition N.
 
 ---- Helpers ----
-None.
+_left_out_finder
+_own_minutes_reader
 ```
 
 #### `window_statistics_calculator`
@@ -22062,32 +24102,74 @@ value_getter
 ```text
 ---- Summary ----
 Main function to set one value of the settled or the quick windows (a length, how
-long before the next addition or after its own a window ends or starts, or
-whether there are windows of that kind), as dragged, typed or ticked in the window
-step. A value that cannot be used leaves everything as it is.
+long before the next addition or after its own a window ends or starts, how long
+before the end of the file the last settled window ends, whether there are windows
+of a kind, whether a window is used, or whether "Adjust each window" is on), as
+dragged, typed or ticked in the window step. With "Adjust each window" on, a
+dragged edge sets the value of its window only and makes it the window the boxes
+show, and a typed value goes to that window; with it off, or no window dragged,
+the value is set for every window of its kind, which lose their own values of
+that field. A value that cannot be used leaves everything as it is.
 
 ---- Inputs ----
 values : Dict[str, float]
-    The settled and the quick windows now (WINDOW_KEYS); not changed.
+    The values of the file in the window step now; not changed.
 key : str
-    The field set: one of WINDOW_KEYS.
+    The field set: one of WINDOW_KEYS or STEP_EXTRA_KEYS, a field with '@' and the
+    window of the edge dragged ('gap_s@average1'), or the tick of a window
+    ('average2:is_used').
 value : float
-    Its new value: seconds, or for 'is_on' and 'quick_is_on' anything but 0 for
-    windows.
+    Its new value: seconds, or for a switch or a tick anything but 0 for on.
 
 ---- Globals read ----
-None.
+OWN_SEPARATOR, STEP_OWN_FIELDS (module constants).
 
 ---- Outputs ----
 Dict[str, float]
-    The new values. A length of 0 or less, or a gap or a start after the addition
-    below 0, changes nothing.
+    The new values. A length of 0 or less, a gap or a start after the addition
+    below 0, or a tick of the baseline (always used), changes nothing.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+_edge_key_splitter
+_picked_window_namer
+_window_number_finder
+```
+
+#### `window_values_maker`
+
+```text
+---- Summary ----
+Main function to give the values the window step starts one file with, from its
+averaging windows: the inverse of window_plan_reader. "Adjust each window" starts
+on when a window has a length, a gap or a start of its own.
+
+---- Inputs ----
+plan : dict
+    The windows of the file, as window_plan_finder gives them.
+is_settled : bool
+    Whether there are settled windows.
+is_quick : bool
+    Whether there are quick windows.
+
+---- Globals read ----
+NO_PICK, OWN_SEPARATOR, STEP_OWN_FIELDS (module constants).
+
+---- Outputs ----
+Dict[str, float]
+    WINDOW_KEYS and STEP_EXTRA_KEYS, in seconds rounded to 0.01 s, with the own
+    values of each window ('average2:window_s') and its tick ('quick1:is_used').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+seconds = minutes x 60.
 
 ---- Helpers ----
 None.
@@ -23007,6 +25089,7 @@ percent_oxidised_calculator
 source_chooser
 time_getter
 warning_shower
+window_plan_finder
 ```
 
 ## `utils_shared/figure_layout.py`
@@ -24230,14 +26313,18 @@ of delta psi.
 ---- Inputs ----
 averages : dict
     Event-window averages, as added to the experiment by
-    experiment_averages_calculator (DATA_FORMAT.md); uses averages['windows'].
+    experiment_averages_calculator (DATA_FORMAT.md); uses averages['windows'] and
+    the windows of averages['skipped'] the user left out.
 
 ---- Globals read ----
 HAEM_VIEW_TEXTS, HAEM_UNITS, OCR_UNITS, AVERAGE_STATISTICS, DELTA_PSI_TEXT and
-DELTA_PSI_UNIT (module constants).
+DELTA_PSI_UNIT (module constants); WINDOW_KINDS (imported).
 
 ---- Outputs ----
 pd.DataFrame
+    One row per window, the baseline first, then the settled and the quick windows
+    in time; a window left out has the Kind 'settled (left out)' or 'quick (left
+    out)' and its numbers empty.
     Columns Average, Kind (baseline, settled or quick), Start time (min), End time
     (min); then for the OCR its mean, SD, difference from baseline and '(% of
     baseline)'; for each haem in each view (the one averaged view, without a view
@@ -27763,6 +29850,42 @@ None.
 
 ### QUESTIONS HELPERS
 
+#### `_answer_announcer`
+
+```text
+---- Summary ----
+Helper function to tell the window, when there is one, how the question just asked
+is answered, so it shows the answers as buttons.
+
+---- Inputs ----
+kind : str
+    'continue', 'yesno', 'choice', 'multi', 'number', 'text' or 'confirm'.
+options : Sequence
+    The words of each choice ('choice', 'multi'), or the (answer, words) pairs
+    offered beside the typing box ('text'); empty otherwise.
+default : object
+    What Enter gives: 'y' or 'n'; the number of a choice (from 1); the numbers of
+    the choices ticked at first; None for none.
+value : Optional[str]
+    What the typing box starts with ('number', 'text').
+
+---- Globals read ----
+_answer_requester (module state).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the registered function (side effect); nothing happens without one.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_brightener`
 
 ```text
@@ -28032,7 +30155,8 @@ bright : Set[int]
     Numbers (from 1) of the options to show brighter.
 
 ---- Globals read ----
-COLOUR_DEFAULT, INDENT (module constants).
+COLOUR_DEFAULT, INDENT (module constants); _answer_requester (module state): in
+the window the options are buttons, and are not printed.
 
 ---- Outputs ----
 None
@@ -28075,7 +30199,8 @@ number : Optional[str]
     it in the order asked. When given, ``depth`` must be its depth.
 
 ---- Globals read ----
-COLOUR_QUIET, INDENT (module constants); _tight_next (module state).
+COLOUR_QUIET, INDENT (module constants); _tight_next, _answer_requester (module
+state): in the window the answers are buttons, so the ending is left out.
 
 ---- Outputs ----
 str
@@ -28197,6 +30322,37 @@ choice_asker
 yes_no_asker
 ```
 
+#### `answer_request_setter`
+
+```text
+---- Summary ----
+Main function to register what is told how each question is answered: the window
+registers itself while it is open, so it shows the answers as buttons, and the
+questions then leave out what is typed ((y/N), [value], the numbered options).
+
+---- Inputs ----
+requester : Optional[Callable[[dict], None]]
+    Function called with {'kind', 'options', 'default', 'value'} once each question
+    is printed (see _answer_announcer); None to register nothing (when the window
+    closes).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+_answer_requester (module state).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `choice_asker`
 
 ```text
@@ -28234,6 +30390,7 @@ numbering counters when it has no number of its own.
 None.
 
 ---- Helpers ----
+_answer_announcer
 _input_reader
 _list_ending_builder
 _number_depth_finder
@@ -28281,6 +30438,7 @@ numbering counters when it has no number of its own.
 None.
 
 ---- Helpers ----
+_answer_announcer
 _input_reader
 _number_depth_finder
 _question_printer
@@ -28292,9 +30450,9 @@ retry_teller
 ```text
 ---- Summary ----
 Main function to give a numbered instruction that is carried out in the window (on
-the plot or in the strip under it) and wait until Enter is pressed with the answer
-box empty. Anything typed in the box instead is answered with ``nudge`` and the
-instruction goes on waiting.
+the plot or in the boxes above it) and wait until Continue (Enter with the answer
+box empty) or one of the extra buttons is clicked. Anything else typed is answered
+with ``nudge`` and the instruction goes on waiting.
 
 ---- Inputs ----
 question : str
@@ -28306,13 +30464,16 @@ depth : int
 number : Optional[str]
     The instruction's own number from QUESTION_FLOW.md, such as '2.1'; None to
     number it in the order asked.
+extras : Sequence[Tuple[str, str]]
+    (answer, words) of each button shown above Continue, such as ('export',
+    'Export csv'); empty for Continue alone.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-None
-    Nothing.
+str
+    '' for Continue, or the answer of the extra button clicked.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
@@ -28322,10 +30483,96 @@ numbering counters when it has no number of its own.
 None.
 
 ---- Helpers ----
+_answer_announcer
 _input_reader
 _number_depth_finder
 _question_printer
 retry_teller
+```
+
+#### `guide_step_getter`
+
+```text
+---- Summary ----
+Main function to give the step of the guide started last, so a step asked in the
+middle of another (the averaging windows asked for by a figure) can hand the guide
+back to it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+_current_step (module state).
+
+---- Outputs ----
+Optional[str]
+    The key of the step, or None before the first.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `guide_step_setter`
+
+```text
+---- Summary ----
+Main function to register what is told which step of the guide starts: the window
+registers itself while it is open.
+
+---- Inputs ----
+teller : Optional[Callable[[str], None]]
+    Function called with the key of each step as it starts; None to register
+    nothing (when the window closes).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+_step_teller (module state).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `guide_step_starter`
+
+```text
+---- Summary ----
+Main function to say that a step of the guide starts (the keys and their order are
+in utils_viewer/viewer_guide.py, GUIDE_STEPS), so the guide on the left opens it.
+
+---- Inputs ----
+key : str
+    Key of the step, such as 'trim' or 'delta_psi'.
+
+---- Globals read ----
+_step_teller (module state).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+_current_step (module state). Calls the registered function (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `heading_printer`
@@ -28431,6 +30678,7 @@ numbering counters when it has no number of its own.
 None.
 
 ---- Helpers ----
+_answer_announcer
 _input_reader
 _list_ending_builder
 _number_depth_finder
@@ -28492,6 +30740,7 @@ numbering counters when it has no number of its own.
 None.
 
 ---- Helpers ----
+_answer_announcer
 _brightener
 _input_reader
 _limits_checker
@@ -28708,7 +30957,8 @@ text_colourer
 ---- Summary ----
 Main function to ask a question answered with a line of text or a folder. An answer
 the checker refuses gets its one sentence of what to type, and the question waits
-for the next answer.
+for the next answer. In the window, choices offered beside the typing box are
+buttons that give their answer with a click.
 
 ---- Inputs ----
 question : str
@@ -28723,13 +30973,17 @@ checker : Optional[Callable[[Optional[str]], Optional[str]]]
 number : Optional[str]
     The question's own number from QUESTION_FLOW.md, such as '1.2'; None to number
     it in the order asked.
+choices : Optional[Sequence[Tuple[str, str]]]
+    (answer, words) of each button offered beside the typing box, such as ('1',
+    'data_fiazall (6 files)'); None for none.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 Optional[str]
-    The typed text, or the default when Enter is pressed.
+    The typed text (or the answer of a button), or the default when Enter is
+    pressed.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
@@ -28739,6 +30993,7 @@ numbering counters when it has no number of its own.
 None.
 
 ---- Helpers ----
+_answer_announcer
 _brightener
 _input_reader
 _number_depth_finder
@@ -28898,6 +31153,7 @@ numbering counters when it has no number of its own.
 None.
 
 ---- Helpers ----
+_answer_announcer
 _brightener
 _input_reader
 _number_depth_finder
@@ -30489,6 +32745,45 @@ rounding errors.
 None.
 ```
 
+#### `built_fit_saver`
+
+```text
+---- Summary ----
+Main function to save the haems ticked under Build a fit as a fit file of the
+user's own in the fits folder, so it is offered in the Fit list from then on. A
+name already used by a preset or a fit file is refused, so nothing is overwritten.
+
+---- Inputs ----
+fits_folder : Path
+    The fits folder, holding the haems and presets folders and the user's own fit
+    files.
+name : str
+    The name typed beside Save fit, with or without .csv.
+haem_files : Sequence[str]
+    The library file names ticked (the answer 'haem_files').
+
+---- Globals read ----
+FIT_UNITS, HAEMS_FOLDER_NAME, PRESETS_FOLDER_NAME (module constants).
+
+---- Outputs ----
+Path
+    The file written. Raises ValueError, with a message for the user, when no
+    name is typed, no haem is ticked, the name is taken, or the haems cannot be
+    joined (haem_files_combiner).
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None. The values are written in the unit the library files give them in, the
+shapes oxidised minus reduced, as the decomposition uses them.
+
+---- Helpers ----
+file_name_sanitiser
+fit_file_writer
+haem_files_combiner
+```
+
 #### `data_filterer`
 
 ```text
@@ -31544,30 +33839,28 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to list the event labels that could be written more tidily (8 ug
-ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use them
-all. Asks nothing when every label is tidy already or was kept as it is before.
+Helper function to list the event labels that will be written more tidily (8 ug
+ml-1 as 8 µg mL⁻¹), each by its file and time, and to ask whether to continue
+with them (3.2.1). Asks nothing when every label is tidy already.
 
 ---- Inputs ----
 with_events : List[dict]
     File summaries (DATA_FORMAT.md) of the files that have events.
 result : Dict[str, List[dict]]
     {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
-    labels are replaced by their tidy forms when the user agrees.
-kept : Set[str]
-    Labels the user chose to keep as they are; the labels kept this time are
-    added, so they are not offered again.
+    labels are replaced by their tidy forms when the user continues.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-None
-    Nothing.
+bool
+    True to go on (the labels were tidy, or are now); False when the user chose
+    to change them in the table again, the labels being left as typed.
 
 ---- Globals mutated ----
-None. Changes the labels in ``result``, adds to ``kept`` and reads from and prints
-to the terminal (side effects).
+None. Changes the labels in ``result`` and reads from and prints to the terminal
+(side effects).
 
 ---- Equations ----
 None.
@@ -31803,8 +34096,9 @@ Main function to have the label, the stock and the volume added (or the
 concentration in the chamber) of every event filled in in the labels table,
 starting from the saved or file values, an event being left out by writing ignore
 as its label. Labels that could be written more tidily (8 ug ml-1 as 8 µg mL⁻¹) are
-then offered in their tidy forms, once, and the concentrations worked out. Nothing
-is asked when no file has events.
+then listed in their tidy forms: continuing uses them, and otherwise the table
+opens again with the labels as typed. The concentrations are then worked out and
+one line says the labels are saved. Nothing is asked when no file has events.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -31815,9 +34109,6 @@ table_filler : Callable[[Dict[str, List[dict]]], Dict[str, List[dict]]]
     Function that shows the labels table filled in with the given events, waits
     until it is confirmed, and returns the events with the labels and
     concentrations typed.
-kept : Set[str]
-    Labels the user chose to keep as they are; they are not offered in their tidy
-    forms again, and the labels kept this time are added.
 
 ---- Globals read ----
 IGNORE_LABEL; settings.CHAMBER_VOLUME_ML.
@@ -31828,7 +34119,7 @@ Dict[str, List[dict]]
     labelled ignore is left out and has no stock or concentration.
 
 ---- Globals mutated ----
-None. Adds to ``kept`` and reads from and prints to the terminal (side effects).
+None. Reads from and prints to the terminal (side effects).
 
 ---- Equations ----
 See event_concentration_filler.
@@ -31882,7 +34173,9 @@ found in the user's own folder, and the results folder (1.2), and to read a summ
 of every file and the settings saved with the dataset. A results folder named
 without a path is made inside the data folder; one that already holds results of
 these files is taken only once the user agrees to write over them (1.2.1), and
-otherwise asked again with a free name offered.
+otherwise asked again with a free name offered. For a dataset opened before, it
+asks whether its previous processing is loaded (1.3). It starts the first three
+steps of the guide.
 
 ---- Inputs ----
 last : dict
@@ -31900,7 +34193,7 @@ Tuple[Path, List[dict], Path, dict]
     (data folder, summary of each readable file, results folder, settings saved
     with the dataset). Each summary has name, path, duration_min, events and
     datasets; the settings are those of dataset_settings_reader, empty for a
-    dataset never saved (DATA_FORMAT.md).
+    dataset never saved or one started fresh at 1.3 (DATA_FORMAT.md).
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect).
@@ -31914,8 +34207,10 @@ data_folder_resolver
 dataset_settings_reader
 experiment_summary_reader
 free_folder_finder
+guide_step_starter
 info_printer
 paf_finder
+previous_processing_asker
 progress_clearer
 progress_printer
 results_counter
@@ -31951,40 +34246,6 @@ None.
 
 ---- Helpers ----
 None.
-```
-
-#### `haem_choice_asker`
-
-```text
----- Summary ----
-Main function to ask which haems are plotted, when they are plotted (their panels
-are moved with the arrows beside them in the window): whether they are is answered by the Haems box of the window's settings
-strip, in answers['plot_haems'].
-
----- Inputs ----
-answers : dict
-    Answers dictionary the values are stored in.
-defaults : dict
-    Default answers.
-fit : Optional[dict]
-    Fit dictionary (haem_list) used to list the haems, or None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-bool
-    True when the haems are plotted.
-
----- Globals mutated ----
-None. Stores the answers in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-haem_name_formatter
-multi_asker
 ```
 
 #### `haem_form_option_builder`
@@ -32044,35 +34305,6 @@ None.
 
 ---- Helpers ----
 _maths_converter
-```
-
-#### `label_angle_asker`
-
-```text
----- Summary ----
-Main function to ask at what angle the event labels are written.
-
----- Inputs ----
-answers : dict
-    Answers dictionary the values are stored in.
-defaults : dict
-    Default answers.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Stores the answer in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-number_asker
 ```
 
 #### `label_tidier`
@@ -32221,6 +34453,72 @@ None.
 None.
 ```
 
+#### `ocr_view_asker`
+
+```text
+---- Summary ----
+Main function to ask, once the OD values are in, how the OCR is shown: in µM
+min⁻¹, per OD or as % of the range. It sets "OCR as" in the View box, and one line
+says it can be changed there at any time. Per OD is offered first, unless the
+dataset was saved with another of the three.
+
+---- Inputs ----
+answers : dict
+    Answers dictionary the value is stored in (ocr_mode).
+defaults : dict
+    Default answers (ocr_mode).
+
+---- Globals read ----
+OCR_VIEW_KEYS (module constant).
+
+---- Outputs ----
+str
+    The ocr_mode chosen: 'raw', 'od' or 'percent'.
+
+---- Globals mutated ----
+None. Stores ocr_mode in ``answers`` and reads from and prints to the terminal
+(side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+info_printer
+ocr_option_builder
+```
+
+#### `od_gaps_finder`
+
+```text
+---- Summary ----
+Main function to name the OD values still missing, so the OD scaling stays off
+until every file has its OD, volume and dilution.
+
+---- Inputs ----
+details : Dict[str, dict]
+    {file name: {'OD', 'volume', 'dilution_factor', ...}} as od_scaling_asker
+    returns it; a value missing or None is a gap.
+
+---- Globals read ----
+OD_VALUE_NAMES.
+
+---- Outputs ----
+List[str]
+    'file: value' for each gap, in the order of the files and of the columns of
+    the OD table, such as ['run1.paf: OD', 'run2.paf: volume']; empty when every
+    value is in.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `od_scaling_asker`
 
 ```text
@@ -32247,17 +34545,19 @@ None.
 
 ---- Outputs ----
 Dict[str, dict]
-    {file name: {'OD', 'volume', 'dilution_factor'}}; the dictionaries are empty
-    when not scaling by OD.
+    {file name: {'OD', 'volume', 'dilution_factor'}}, a value left empty being
+    None; the dictionaries are empty when not scaling by OD.
 
 ---- Globals mutated ----
-None. Stores normalise_od in ``answers`` and reads from and prints to the terminal
-(side effects).
+None. Stores normalise_od in ``answers``: True only when scaling by OD was chosen
+and every value is in, so the OD scaling stays off while one is missing. Reads
+from and prints to the terminal (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+od_gaps_finder
 yes_no_asker
 ```
 
@@ -32286,6 +34586,38 @@ None.
 
 ---- Helpers ----
 _natural_sorter
+```
+
+#### `previous_processing_asker`
+
+```text
+---- Summary ----
+Main function to ask, for a dataset opened before, whether its previous processing
+is loaded (1.3). Yes offers every answer saved with it as the default; No starts
+the dataset fresh, as one never opened: the standard settings, no OD values and the
+labels as written in the files. The settings file itself is only written again when
+the run starts.
+
+---- Inputs ----
+saved : dict
+    The settings saved with the dataset (dataset_settings_reader), not empty.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    ``saved`` for yes, an empty dict for no.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+yes_no_asker
 ```
 
 #### `results_counter`
@@ -32414,53 +34746,13 @@ None.
 None.
 ```
 
-#### `signal_asker`
-
-```text
----- Summary ----
-Main function to ask whether the oxygen traces and the OCR are plotted, and which
-OCR. The OCR as % of baseline needs the averaging windows: with none set up it
-says so and offers the window step of the processing (4.6); without windows the
-OCR goes back to what it was.
-
----- Inputs ----
-answers : dict
-    Answers dictionary the values are stored in; must hold normalise_od and
-    averaging.
-defaults : dict
-    Default answers.
-windows_adder : Optional[Callable[[], bool]]
-    Function that runs the window step of the processing, stores what is chosen
-    in ``answers`` and returns True when the windows are then set up; None when
-    the step cannot be run.
-
----- Globals read ----
-None.
-
----- Outputs ----
-bool
-    True when the oxygen or the OCR is plotted.
-
----- Globals mutated ----
-None. Stores the answers in ``answers`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-choice_asker
-info_printer
-ocr_kind_lister
-ocr_option_builder
-yes_no_asker
-```
-
 #### `size_asker`
 
 ```text
 ---- Summary ----
 Main function to ask the journal, width and height of one figure. Answering None
-to the journal question uses Nature with the fallback width and height.
+to the journal question uses Nature with the fallback width and height. The width
+and height are asked inside the journal question's step, so they show its number.
 
 ---- Inputs ----
 answers : dict
@@ -32473,6 +34765,9 @@ fallback : Tuple[float, float]
     (columns, height) used when the journal is None.
 depth : int
     Numbering depth of the journal question.
+number : Optional[str]
+    The journal question's own number in QUESTION_FLOW.md, such as '6.1.3'; None
+    shows the questions without one.
 
 ---- Globals read ----
 config.JOURNAL_SPECS.
@@ -32497,13 +34792,14 @@ number_asker
 
 ```text
 ---- Summary ----
-Main function to ask, at the end of the questions, whether the run writes the
-spectra as csv files. It is not asked when the export of the import wrote them
-already: one line says so, and the run does not write them a second time.
+Main function to ask, at the end of the experiment export, whether the workbook
+of each experiment is written with its spectra as csv files (5.9). It is not asked
+when Export csv of the trimming step wrote them already: one line says so, and
+they are not written a second time.
 
 ---- Inputs ----
 has_spectra : bool
-    True when the export of the import (3.4) wrote the spectra as csv files.
+    True when Export csv of the trimming step wrote the spectra as csv files.
 default : bool
     The answer Enter gives.
 
@@ -32512,7 +34808,7 @@ None.
 
 ---- Outputs ----
 bool
-    True when the run is to write the spectra as csv files.
+    True when the spectra are to be written as csv files with the workbooks.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effects).
@@ -32561,8 +34857,7 @@ number_asker
 ```text
 ---- Summary ----
 Main function to find the event labels that could be written more tidily (8 ug
-ml-1 as 8 µg mL⁻¹), leaving out the events left out and the labels the user chose
-to keep as they are.
+ml-1 as 8 µg mL⁻¹), leaving out the events left out.
 
 ---- Inputs ----
 with_events : List[dict]
@@ -32570,8 +34865,6 @@ with_events : List[dict]
 result : Dict[str, List[dict]]
     {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
     per event of the summary, in the same order.
-kept : Set[str]
-    Labels the user chose to keep as they are.
 
 ---- Globals read ----
 None.
@@ -32765,6 +35058,42 @@ Trim start = t. Trim end = duration - t. Ignore start = t - trim start. Ignore e
 
 ---- Helpers ----
 None.
+```
+
+#### `trim_times_finder`
+
+```text
+---- Summary ----
+Main function to give the four edges of one file as times on its whole recording,
+as the Trim / Ignore boxes show them (Trim before ... after, Ignore before ...
+after), so the boxes always show the full times, whatever was trimmed before. A
+time typed in a box is read back by trim_pointer_reader, as a drag to that time.
+
+---- Inputs ----
+summary : dict
+    Experiment summary with duration_min.
+minutes : Dict[str, float]
+    {trim_start, trim_end, ignore_start, ignore_end}: the minutes taken off each
+    edge, as kept by trim_minutes_setter.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, float]
+    {trim_start, trim_end, ignore_start, ignore_end} as times on the whole
+    recording (min).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trim before = trim start; trim after = duration - trim end; ignore before = trim
+start + ignore start; ignore after = duration - trim end - ignore end. A file of 60
+min trimmed 4 and 5 min and ignored 5 and 2 min: 4, 55, 9 and 53 min.
+
+---- Helpers ----
+trim_layout_finder
 ```
 
 #### `window_kind_asker`
@@ -33290,6 +35619,7 @@ _picture_shader
 _update_runner
 _values_changer
 choice_setter
+every_file_field_setter
 field_setter
 hit_layout_finder
 hover_handler
@@ -33299,6 +35629,7 @@ motion_handler
 picture_placer
 press_handler
 release_handler
+shown_values_reader
 values_reader
 ```
 
@@ -33435,6 +35766,8 @@ key : str
     The field set.
 value : float
     Its new value, before the rules of each file are applied.
+is_everywhere : bool
+    True to set it on every file whatever is_every_file says.
 
 ---- Globals read ----
 None.
@@ -33484,12 +35817,44 @@ None.
 None.
 ```
 
+##### `every_file_field_setter`
+
+```text
+---- Summary ----
+Method to set one field on every file, whatever "Apply to every experiment"
+says: for a switch of the whole step (a kind of window, "Adjust each window").
+
+---- Inputs ----
+key : str
+    The field set.
+value : float
+    Its new value.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the values and redraws (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_values_changer
+```
+
 ##### `field_setter`
 
 ```text
 ---- Summary ----
 Method to take a value typed in the strip for one field of the file shown (of
-every file when is_every_file).
+every file when is_every_file). When the boxes show the fields in another form
+(EdgeChoice.typed_reader, the trim step's times on the whole recording), the
+number typed is first turned back into the field's own value.
 
 ---- Inputs ----
 key : str
@@ -33749,6 +36114,35 @@ _edges_drawer
 _update_runner
 ```
 
+##### `shown_values_reader`
+
+```text
+---- Summary ----
+Method to give the values of one file as its boxes in the strip show them: as
+kept, or in the form of EdgeChoice.shown_maker (the trim step's times on the
+whole recording).
+
+---- Inputs ----
+name : str
+    The file name.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Dict[str, float]]
+    {field: value shown}, or None when the file has no values.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `values_reader`
 
 ```text
@@ -33900,11 +36294,13 @@ None.
 ```text
 ---- Summary ----
 Main function to list the files whose values differ from those most files have, so
-the window can mark them.
+the window can mark them. A field one file has and another lacks differs.
 
 ---- Inputs ----
 values : Dict[str, Dict[str, float]]
-    {file name: {field: value}}, every file with the same fields.
+    {file name: {field: value}}.
+unmarked : Tuple[str, ...]
+    Fields that never mark a file (EdgeChoice.unmarked_fields).
 
 ---- Globals read ----
 None.
@@ -34020,7 +36416,7 @@ None.
 
 ## `utils_viewer/viewer_gui.py`
 
-The experiment browser window: question terminal on the left, plots on the right.
+The experiment browser window: the guide with its questions on the left, plots on the right.
 
 ### CLASSES
 
@@ -34066,8 +36462,12 @@ __init__
 _answer_sender
 _answer_writer
 _axis_box_finder
+_back_taker
 _band_drawer
 _callback_error_keeper
+_click_sign_shower
+_click_sign_starter
+_clicked_answer_sender
 _closing_handler
 _confirm_sender
 _display_name_lister
@@ -34079,10 +36479,14 @@ _edges_refresher
 _event_handler
 _every_file_taker
 _file_follower
+_guide_drawer
+_guide_line_clicker
+_hint_refresher
 _history_stepper
 _icon_setter
 _image_deliverer
 _image_receiver
+_keys_shower
 _lock_drawer
 _logic_runner
 _message_shower
@@ -34105,8 +36509,10 @@ _table_layout_setter
 _time_clicker
 _time_line_drawer
 _typed_edge_taker
+_wheel_turner
 _widgets_builder
 _window_raiser
+answer_requester
 drawing_sign_shower
 edges_hider
 edges_reader
@@ -34119,10 +36525,12 @@ run
 saved_plot_publisher
 session_attacher
 spec_publisher
+step_teller
 strip_choices_setter
 strip_fits_setter
 strip_library_setter
 strip_listener_setter
+answer_listener_setter
 strip_reader
 strip_setter
 strip_state_setter
@@ -34178,8 +36586,8 @@ _widgets_builder
 
 ```text
 ---- Summary ----
-Method to pass the typed answer to the question that is waiting for it. While a
-table is open the answer box is hidden and Confirm answers instead.
+Method to pass the answer typed in the box to the question that is waiting for
+it (Continue under the box, or Enter in it).
 
 ---- Inputs ----
 event : Any
@@ -34193,14 +36601,14 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Writes the answer into the terminal, clears and disables the answer box
-and wakes the question thread (side effects).
+None. Writes the answer into the open step and wakes the question thread (side
+effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-_pane_writer
+_clicked_answer_sender
 ```
 
 ##### `_answer_writer`
@@ -34257,6 +36665,34 @@ y = picture top + (1 - fraction up) * picture height.
 
 ---- Helpers ----
 None.
+```
+
+##### `_back_taker`
+
+```text
+---- Summary ----
+Method to open the step the program waits at again, after an earlier step was
+opened ("Back to <step>"), with the answers of its question.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the guide (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_guide_drawer
+GuideState.back_taker
 ```
 
 ##### `_band_drawer`
@@ -34321,6 +36757,96 @@ None.
 None.
 ```
 
+##### `_click_sign_shower`
+
+```text
+---- Summary ----
+Method to put the "Plotting data …" sign on the plot when the program is still
+working on a click: no question has been asked since, and no other click was
+made. The next question, plot or picture takes it away.
+
+---- Inputs ----
+count : int
+    Number of the click it was started for.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Marks the window busy and draws the sign (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_click_sign_starter`
+
+```text
+---- Summary ----
+Method to start the wait after a click that gives an answer: if the program has
+not asked its next question within CLICK_SIGN_DELAY_MS, the "Plotting data …"
+sign goes on the plot, so a redraw never looks like nothing happening.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CLICK_SIGN_DELAY_MS (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Counts the click and starts a timer (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_click_sign_shower
+```
+
+##### `_clicked_answer_sender`
+
+```text
+---- Summary ----
+Method to pass the answer of a button (or of the typing box) to the question
+that is waiting for it. The open step then keeps what is said from here on:
+the messages before this answer fold away when the next question is asked.
+
+---- Inputs ----
+answer : str
+    The answer as the question reads it ('y', '2', '1,3', a typed number ...).
+echo : str
+    The words written under the question for it ('Yes', the choice ...).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the answer into the open step, marks where it ends and wakes the
+question thread (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_click_sign_starter
+_pane_writer
+```
+
 ##### `_closing_handler`
 
 ```text
@@ -34367,13 +36893,14 @@ str
     'break', so Tk does nothing more with the click or key.
 
 ---- Globals mutated ----
-None. Writes "Confirm" into the terminal and wakes the question thread (side
+None. Writes "Confirm" into the open step and wakes the question thread (side
 effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_click_sign_starter
 _pane_writer
 ```
 
@@ -34500,27 +37027,93 @@ _pane_writer
 
 ```text
 ---- Summary ----
-Method to draw the "Drawing ..." sign in the top left corner of the plot area,
-to show that the picture for the latest settings is still being made.
+Method to draw the "Plotting data …" sign in the middle of the plot area, a large
+spinning wheel with the words under it, to show that the picture for the
+latest settings is still being made. The wheel turns until the plot area is
+drawn again, which takes the sign away.
 
 ---- Inputs ----
-None.
+text : str
+    The words under the wheel.
 
 ---- Globals read ----
-SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT (module constants).
+SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT, SIGN_TEXT_POINTS, SIGN_WORDS,
+WHEEL_RADIUS_PX, WHEEL_SPOKES, WHEEL_SPOKE_WIDTH_PX (module constants).
 
 ---- Outputs ----
 None
     Nothing.
 
 ---- Globals mutated ----
-None. Draws on the plot area (side effect).
+None. Draws on the plot area and starts the wheel turning (side effects).
+
+---- Equations ----
+Spoke i points at the angle 2 pi i / WHEEL_SPOKES, from 0.45 to 1 radius out
+of the centre.
+
+---- Helpers ----
+_wheel_turner
+```
+
+##### `_edge_tick_taker`
+
+```text
+---- Summary ----
+Method to take a numbered tick of a row of the edges (an averaging window used
+or left out): on every file when "Apply to every experiment" is ticked,
+otherwise on the file shown.
+
+---- Inputs ----
+field : str
+    The field of the tick.
+is_ticked : bool
+    Its new state.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the overlay and redraws (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+_edges_refresher
+```
+
+##### `_edge_toggle_taker`
+
+```text
+---- Summary ----
+Method to take a toggle of the step ("Adjust each window"), which holds on
+every file.
+
+---- Inputs ----
+field : str
+    The field of the toggle.
+is_on : bool
+    Its new state.
+
+---- Globals read ----
 None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the overlay and redraws (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_edges_refresher
 ```
 
 ##### `_edges_refresher`
@@ -34559,10 +37152,11 @@ Method to carry out one message from the other threads, on the window thread.
 
 ---- Inputs ----
 event : tuple
-    (kind, ...) with kind 'prompt', 'spec', 'session', 'pictures', 'extra',
+    (kind, ...) with kind 'prompt', 'ask' (how the question is answered),
+    'step' (a step of the guide starts), 'spec', 'session', 'pictures', 'extra',
     'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
     'strip_library', 'strip_state', 'busy',
-    'table_show', 'table_hide', 'closed' or 'finished'. The "Drawing ..."
+    'table_show', 'table_hide', 'closed' or 'finished'. The "Plotting data …"
     sign of 'busy' stays until the next question, preview or picture shown.
     With close_after_s, 'finished' also closes the window after that time.
 
@@ -34583,30 +37177,36 @@ None.
 _closing_handler
 _display_name_lister
 _edges_refresher
-_hint_chooser
+_guide_drawer
+_hint_refresher
 _image_deliverer
 _image_receiver
+_keys_shower
 _nav_state_setter
 _navigator
 _pane_writer
 _picture_shower
 _table_layout_setter
+AnswerArea.request_shower
+GuideState.step_starter
 ```
 
 ##### `_every_file_taker`
 
 ```text
 ---- Summary ----
-Method to take the tick box of a row of the edges. As "Every file": ticked, a
-moved or typed edge moves on every file; unticked, on the file shown only. As
-the step's own switch (EdgeChoice.switch, or second_switch for the second
-row), it sets the field of the switch to 1 or 0 on every file.
+Method to take the tick box of a row of the edges. As "Apply to every
+experiment": ticked, a moved or typed edge moves on every file; unticked, on
+the file shown only. As the step's own switch (EdgeChoice.switch, or
+second_switch for the second row), it sets the field of the switch to 1 or 0
+on every file.
 
 ---- Inputs ----
 is_every_file : bool
     The new state of the tick box.
-is_second : bool
-    True for the tick box of the second row.
+row : str
+    'first', 'second' or 'options' (the line of "Apply to every experiment"
+    of a step whose rows have switches).
 
 ---- Globals read ----
 None.
@@ -34651,6 +37251,94 @@ None.
 
 ---- Helpers ----
 _navigator
+```
+
+##### `_guide_drawer`
+
+```text
+---- Summary ----
+Method to draw the guide again: its lines with the open step's card under its
+line and, while an earlier step is open, that step's note and help above its
+messages and the button back to the step waited at in place of the answers.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the left side of the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_back_taker
+AnswerArea.back_shower
+AnswerArea.request_shower
+GuidePanel.rows_drawer
+GuideState.card_teller
+GuideState.row_lister
+```
+
+##### `_guide_line_clicker`
+
+```text
+---- Summary ----
+Method to open the step whose line in the guide was clicked: one already
+asked, or the one the program waits at.
+
+---- Inputs ----
+index : int
+    Index of the step in the guide.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the guide (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_guide_drawer
+GuideState.line_opener
+```
+
+##### `_hint_refresher`
+
+```text
+---- Summary ----
+Method to show, under the answers, what to do for the question waiting.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the hint (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_hint_chooser
 ```
 
 ##### `_history_stepper`
@@ -34776,6 +37464,33 @@ None.
 
 ---- Helpers ----
 _picture_shower
+```
+
+##### `_keys_shower`
+
+```text
+---- Summary ----
+Method to show the row of symbols (µ, ⁻¹, ...) only where text is typed: a
+name in the typing box, or a table.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Shows or hides the row (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_lock_drawer`
@@ -34952,7 +37667,9 @@ None.
 ```text
 ---- Summary ----
 Method to add text to the terminal, with its colours, overwriting the line when
-the text starts with a carriage return (progress messages).
+the text starts with a carriage return (progress messages). The explanations
+are written in a lighter grey than in a terminal, and a section heading (the
+stage, shown by the guide) is left out with the dashes under it.
 
 ---- Inputs ----
 text : str
@@ -34961,7 +37678,8 @@ kind : str
     'out' (normal), 'err' (error text) or 'answer' (what the user typed).
 
 ---- Globals read ----
-ANSWER_COLOUR, ERROR_COLOUR (module constants).
+ANSWER_COLOUR, ERROR_COLOUR, INFO_COLOUR, QUESTION_EXTRA_POINTS,
+QUESTION_FOREGROUND, QUIET_FOREGROUND, SECTION_FOREGROUND (module constants).
 
 ---- Outputs ----
 None
@@ -34987,7 +37705,7 @@ say why there is none yet. While edges are dragged on the plot, room is kept
 above the picture for their handles, and the overlay shades the picture and
 draws them. While the picture for the latest settings is still being made, or
 the program is making pictures of its own (drawing_sign_shower), the
-"Drawing ..." sign is on the plot (over the previous picture when there is
+"Plotting data …" sign is on the plot (over the previous picture when there is
 one). Once the questions about each file are over, a file whose plot was not
 saved with the last settings says so instead.
 
@@ -35223,9 +37941,12 @@ _navigator
 
 ```text
 ---- Summary ----
-Method to hand a change made in the settings strip to the function the program
-registered, on the program thread while a question waits. What it prints goes
-on lines of its own, and the answer prompt is shown again under it.
+Method to hand a change made in the boxes above the plot to the function the
+program registered, on the program thread while a question waits. What it
+prints goes on lines of its own, and the answer prompt is shown again under it.
+A click that asks questions of its own (Edit ODs, Edit labels, Export csv) is
+not held back, so its questions show as they are asked; afterwards the answers
+of the question that waits come back, and the guide goes back to its step.
 
 ---- Inputs ----
 changes : Dict[str, Any]
@@ -35257,7 +37978,8 @@ output_capturer
 ---- Summary ----
 Method to pass a change the user made in the settings strip to the program
 thread: it joins the typed answers, so a question that waits takes it at once
-(input_reader).
+(input_reader). A change that belongs to an earlier step (the fit while at Δψ)
+opens that step in the guide.
 
 ---- Inputs ----
 changes : Dict[str, Any]
@@ -35271,13 +37993,14 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Queues the change (side effect).
+None. Queues the change and may change the guide (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-None.
+_guide_drawer
+GuideState.change_opener
 ```
 
 ##### `_symbol_inserter`
@@ -35313,30 +38036,30 @@ AnswerTable.symbol_inserter
 
 ```text
 ---- Summary ----
-Method to open or close the table on the terminal side. Open, it fills the
-terminal side under a few lines of terminal text, which keep the newest lines
-in sight and scroll, and Confirm takes the place of the answer box; closed, the
-terminal and the answer box are as before.
+Method to open or close the table in the open step. Open, it fills the step
+under a few lines of its messages, which keep the newest lines in sight and
+scroll, and the question's Confirm button sits under it; closed, the messages
+take the room again.
 
 ---- Inputs ----
 is_shown : bool
     True to open the table, False to close it.
 
 ---- Globals read ----
-TABLE_HINT, TABLE_TERMINAL_LINES (module constants).
+TABLE_HINT, TABLE_TERMINAL_LINES, TERMINAL_LINES (module constants).
 
 ---- Outputs ----
 None
     Nothing.
 
 ---- Globals mutated ----
-None. Changes the layout of the terminal side (side effect).
+None. Changes the layout of the open step (side effect).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-None.
+_keys_shower
 ```
 
 ##### `_time_clicker`
@@ -35405,7 +38128,7 @@ pointed_time_finder
 ```text
 ---- Summary ----
 Method to take a number typed in the edges row: the edge moves there (on every
-file when "Every file" is ticked), within the limits of each file, and the row
+file when "Apply to every experiment" is ticked), within the limits of each file, and the row
 shows where it went.
 
 ---- Inputs ----
@@ -35431,21 +38154,52 @@ None.
 _edges_refresher
 ```
 
+##### `_wheel_turner`
+
+```text
+---- Summary ----
+Method to turn the wheel of the "Plotting data …" sign one spoke on: the leading
+spoke dark, the ones behind it fading. It calls itself again while the sign is
+on the plot, and stops once the plot area was drawn again without it.
+
+---- Inputs ----
+step : int
+    The spoke that leads, from 0.
+
+---- Globals read ----
+SIGN_BACKGROUND, SIGN_EDGE, SIGN_TEXT, WHEEL_SPOKES, WHEEL_STEP_MS (module
+constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Recolours the spokes and asks Tk to call it again (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_widgets_builder`
 
 ```text
 ---- Summary ----
-Method to build the terminal, the answer box with its Help button (greyed out
-until the Help box is made), Confirm and the table (both hidden until a table
-is asked for) on the left, and on the right the file controls, under them the
-plot with the overlay of its edges, then the settings strip and the edges row
-(hidden until edges are dragged).
+Method to build the guide on the left: the lines of the steps and the card of
+the open step, with its messages, the table (hidden until a table is asked
+for), the answers, the symbols (shown where text is typed), the hint and the
+Help button (greyed out until the Help box is made); and on the right the file
+controls, under them the plot with the overlay of its edges, then the settings
+strip and the edges row (hidden until edges are dragged).
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-MONO_FONTS and the colour constants (module constants).
+MONO_FONTS, SANS_FONTS and the colour constants (module constants).
 
 ---- Outputs ----
 None
@@ -35459,11 +38213,13 @@ None.
 
 ---- Helpers ----
 _answer_sender
+_clicked_answer_sender
 _closing_handler
 _confirm_sender
 _edges_refresher
 _every_file_taker
 _file_follower
+_guide_line_clicker
 _history_stepper
 _message_shower
 _nav_state_setter
@@ -35476,9 +38232,11 @@ _strip_change_teller
 _symbol_inserter
 _time_clicker
 _typed_edge_taker
+AnswerArea
 AnswerTable
 EdgeOverlay
 EdgeRow
+GuidePanel
 SettingsStrip
 ```
 
@@ -35510,11 +38268,39 @@ None.
 None.
 ```
 
+##### `answer_requester`
+
+```text
+---- Summary ----
+Method to say how the question just asked is answered, so the open step shows
+its answers as buttons. It is called from the question thread.
+
+---- Inputs ----
+request : Dict[str, Any]
+    {'kind', 'options', 'default', 'value'} (AnswerArea.request_shower).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the request for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `drawing_sign_shower`
 
 ```text
 ---- Summary ----
-Method to put the "Drawing ..." sign on the plot while the program makes
+Method to put the "Plotting data …" sign on the plot while the program makes
 pictures of its own (the combined figures, the components found from the
 data). The sign goes when the next picture or preview is shown, or the next
 question is asked.
@@ -35764,8 +38550,9 @@ int
 
 ---- Globals mutated ----
 None. Replaces sys.stdout, sys.stderr and the built-in input while the window
-runs, registers the window with the questions that want a time, and restores
-them all afterwards (side effects).
+runs, registers the window with the questions (for a time, for how each is
+answered and for the steps of the guide), and restores them all afterwards
+(side effects).
 
 ---- Equations ----
 None.
@@ -35868,13 +38655,42 @@ None.
 None.
 ```
 
+##### `step_teller`
+
+```text
+---- Summary ----
+Method to say which step of the guide starts, so the guide opens it. It is
+called from the question thread.
+
+---- Inputs ----
+key : str
+    Key of the step (viewer_guide.GUIDE_KEYS).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the step for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `strip_choices_setter`
 
 ```text
 ---- Summary ----
-Method to tell the settings strip what it offers: the spectrometers of its
-"Spectra" drop-down, whether % oxidised is in "Haems as", whether per OD is
-offered, and whether % of baseline is in "OCR as".
+Method to tell the boxes above the plot what they offer: the spectrometers of
+the "Spectra" drop-down, whether % oxidised is in "Haems as", whether per OD is
+offered, whether Edit ODs is shown, whether % of baseline is in "OCR as", and
+whether Δψ can be ticked.
 
 ---- Inputs ----
 spectra : List[str]
@@ -35885,6 +38701,11 @@ has_od : bool
     True when OD values were entered.
 has_baseline : bool
     True when the averaging windows are set up.
+has_psi : bool
+    True when Δψ can be worked out.
+can_edit_od : Optional[bool]
+    True when scaling by OD was chosen, so Edit ODs is shown even while some
+    OD values are missing; None follows has_od.
 
 ---- Globals read ----
 None.
@@ -35971,6 +38792,36 @@ listener : Optional[Callable[[Dict[str, Any]], None]]
     program thread while a question waits (a change made while the program is
     busy is taken when the next question is asked). What it prints shows under
     the question, which then goes on waiting.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the function on the instance (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `answer_listener_setter`
+
+```text
+---- Summary ----
+Method to register the function run just before an answer is handed to the
+question that waits (a tab of the Time regions box left open is used then), or
+None for none.
+
+---- Inputs ----
+listener : Optional[Callable[[], None]]
+    Called on the program thread with no arguments; what it prints shows above
+    the answer.
 
 ---- Globals read ----
 None.
@@ -36254,17 +39105,21 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to choose the hint shown under the answer box: what the mouse can
-do for the question waiting, if anything.
+Helper function to choose the hint shown under the answers: what to do for the
+question waiting, with the mouse or the keyboard.
 
 ---- Inputs ----
+kind : Optional[str]
+    How the question is answered ('continue', 'yesno', 'choice', 'multi',
+    'number', 'text', 'confirm'), or None before the first question.
 time_kind : Optional[str]
     'span' (a drag gives the answer) or None.
 is_edged : bool
     True while edges are dragged on the plot.
 
 ---- Globals read ----
-ANSWER_HINT, EDGES_HINT, SPAN_HINT (module constants).
+CLICK_HINT, EDGES_HINT, NAME_HINT, NUMBER_HINT, SPAN_HINT, TABLE_HINT (module
+constants).
 
 ---- Outputs ----
 str
@@ -36471,6 +39326,718 @@ None.
 
 ---- Helpers ----
 details_writer
+```
+
+## `utils_viewer/viewer_guide.py`
+
+The guide on the left of the window: the steps under their stage names, the step open and the answer buttons.
+
+### CLASSES
+
+#### `GuideState`
+
+```text
+---- Summary ----
+Where the guide is: the step the program waits at, the step open in the guide (an
+earlier one, after a change in the strip that belongs to it or a click on its line)
+and the steps asked so far. It holds no window, so it can be tested without one.
+
+---- Attributes ----
+current : Optional[int]
+    Index in GUIDE_STEPS of the step the program waits at; None before the first.
+shown : Optional[int]
+    Index of the step open in the guide.
+reached : int
+    Index of the furthest step asked (-1 before the first).
+asked : Set[int]
+    Indexes of the steps asked so far.
+
+---- Globals read ----
+GUIDE_STEPS, GUIDE_KEYS, GUIDE_STAGES, CHANGE_STEPS, MARKS, HERE_TAG.
+
+---- Methods ----
+__init__
+back_taker
+card_teller
+change_opener
+is_back
+line_opener
+row_lister
+step_starter
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to start before the first step.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `back_taker`
+
+```text
+---- Summary ----
+Method to open the step the program waits at again ("Back to <step>").
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the step shown.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `card_teller`
+
+```text
+---- Summary ----
+Method to give what the open step says above its messages when it is an
+earlier step: the note on where you were, the step's help, the words of the
+button that goes back and those of the step's own button (Export csv of the
+trim step), if it has one.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+GUIDE_STEPS.
+
+---- Outputs ----
+Dict[str, str]
+    {'note', 'help', 'back', 'extra'}; each empty while the step open is the
+    one the program waits at, and 'extra' empty for a step without a button
+    of its own.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+is_back
+```
+
+##### `change_opener`
+
+```text
+---- Summary ----
+Method to open the earlier step that a change in the boxes above the plot
+belongs to (the fit while at Δψ opens the haems). A change that belongs to a
+later step ticks that step, as done out of order; one that belongs to the step
+the program waits at, or to no step, opens nothing.
+
+---- Inputs ----
+changes : Dict[str, Any]
+    {name: new value} of the strip values that changed.
+
+---- Globals read ----
+GUIDE_KEYS.
+
+---- Outputs ----
+bool
+    True when the guide changed: another step opened, or a later one ticked.
+
+---- Globals mutated ----
+None. Changes the step shown and the steps done.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+step_of_change_finder
+```
+
+##### `is_back`
+
+```text
+---- Summary ----
+Method to say whether the step open is an earlier one than the step the program
+waits at.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True while an earlier step is open.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `line_opener`
+
+```text
+---- Summary ----
+Method to open a step whose line was clicked: one already asked, or the one the
+program waits at. A step not asked yet stays shut.
+
+---- Inputs ----
+index : int
+    Index in GUIDE_STEPS of the line clicked.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the step open changed.
+
+---- Globals mutated ----
+None. Changes the step shown.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `row_lister`
+
+```text
+---- Summary ----
+Method to list the lines of the guide, top first: every stage name, and under
+the stage of the step open (and that of the step the program waits at) one line
+per step. The other stages show their name only, with the numbers of their
+steps, so the open step keeps the room.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+GUIDE_STAGES, GUIDE_STEPS, HERE_TAG, MARKS, SKIPPED_TAG.
+
+---- Outputs ----
+List[Dict[str, Any]]
+    One dict per line: {'kind': 'stage', 'text', 'status', 'is_open'} with
+    status 'stage' and is_open True for a stage that lists its steps, or
+    {'kind': 'step', 'index', 'text', 'status', 'mark', 'tag'} with status
+    'open' (the card is under it), 'here' (the program waits there while an
+    earlier step is open; tag HERE_TAG), 'done', 'skipped' (passed without
+    being asked; tag SKIPPED_TAG) or 'later'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `step_starter`
+
+```text
+---- Summary ----
+Method to take the step the program has started: it becomes the step open and
+the one waited at, also when the program asks an earlier step again (going
+back), and the furthest step reached is kept.
+
+---- Inputs ----
+key : str
+    Key of the step, one of GUIDE_KEYS.
+
+---- Globals read ----
+GUIDE_KEYS.
+
+---- Outputs ----
+None
+    Nothing. Raises ValueError for a key that is not a step.
+
+---- Globals mutated ----
+None. Changes the attributes.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `GuidePanel`
+
+```text
+---- Summary ----
+The guide on the left of the window: one line per stage and per step, with the
+card of the open step (its messages, its question and its answers) under the line
+of that step. The card is built by the window; this class places it. Every method
+runs on the window thread.
+
+---- Attributes ----
+frame : Any
+    The Tk frame holding the guide, for the window to place.
+card : Any
+    The Tk frame of the open step, for the window to fill.
+
+---- Globals read ----
+CARD_BACKGROUND, CARD_EDGE, GUIDE_BACKGROUND, HERE_TAG, LINE_COLOURS,
+OPEN_BACKGROUND, STAGE_OPEN_COLOUR, STAGE_OPEN_POINTS, STAGE_SHUT_POINTS,
+STEP_POINTS.
+
+---- Methods ----
+__init__
+rows_drawer
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the empty guide and its card.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+parent : Any
+    The frame of the left side of the window.
+family : str
+    Font family of the window.
+size : int
+    Font size of the messages (points).
+stage_family : Optional[str]
+    Font family of the stage names (a plain one); None for the window's.
+on_line : Callable[[int], None]
+    Called with the index of a step whose line is clicked.
+
+---- Globals read ----
+CARD_BACKGROUND, CARD_EDGE, GUIDE_BACKGROUND.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `rows_drawer`
+
+```text
+---- Summary ----
+Method to draw the lines of the guide again, with the card under the line of
+the open step (at the bottom before the first step): the stage that lists its
+steps large and bold, the other stages a little smaller and paler, the steps
+under it larger than the messages. A step already asked can be clicked to open
+it.
+
+---- Inputs ----
+rows : List[Dict[str, Any]]
+    The lines, as GuideState.row_lister gives them.
+
+---- Globals read ----
+GUIDE_BACKGROUND, HERE_TAG, LINE_COLOURS, OPEN_BACKGROUND, STAGE_OPEN_COLOUR,
+STAGE_OPEN_POINTS, STAGE_SHUT_POINTS, STEP_POINTS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces the line widgets and places the card (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `AnswerArea`
+
+```text
+---- Summary ----
+The answers of the question waiting, under its card: one big Continue button for
+something done on the plot or in the strip; Yes and No one above the other; a
+button for each choice; tick buttons and Continue for several choices; a box with
+Continue only for a number or a name to type; Confirm for a table; or, while an
+earlier step is open, the button back to the step waited at. The answer the program
+gives with Enter is the highlighted button, which holds the keyboard. Every method
+runs on the window thread.
+
+---- Attributes ----
+frame : Any
+    The Tk frame holding the answers, for the window to place.
+entry : Any
+    The typing box, shown for a number or a name.
+confirm : Any
+    The Confirm button of a table.
+
+---- Globals read ----
+BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OFF_TEXT,
+ONE_COLUMN_MOST, OTHER_BACKGROUND, OTHER_HOVER, TICKED, UNTICKED.
+
+---- Methods ----
+__init__
+_button_maker
+_choices_placer
+_clearer
+_multi_sender
+_ticker
+back_shower
+focuser
+request_shower
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the empty area, its typing box and its Confirm button.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+parent : Any
+    The frame the area sits in.
+family : str
+    Font family of the window.
+size : int
+    Font size of the messages (points).
+colours : Dict[str, str]
+    {'background', 'text', 'cell'}: the card, its text and the typing box.
+on_click : Callable[[str, str], None]
+    Called with (answer, words shown) when a button gives the answer.
+on_typed : Callable[[], None]
+    Called when the answer typed in the box is sent (Continue or Enter).
+on_confirm : Callable[[], Any]
+    Called when Confirm is clicked.
+
+---- Globals read ----
+FOCUS_COLOUR, MAIN_BACKGROUND.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_button_maker
+```
+
+##### `_button_maker`
+
+```text
+---- Summary ----
+Helper method to make one answer button: a label rather than a button, so it
+looks the same on Windows, the Mac and Linux. A click, Enter or the space bar
+on it carries out the command.
+
+---- Inputs ----
+text : str
+    The words on the button.
+command : Callable[[], Any]
+    What a click does.
+is_main : bool
+    True for the highlighted button (the answer Enter gives).
+
+---- Globals read ----
+BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OTHER_BACKGROUND,
+OTHER_HOVER.
+
+---- Outputs ----
+Any
+    The Tk label, not placed.
+
+---- Globals mutated ----
+None. Creates the widget.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_choices_placer`
+
+```text
+---- Summary ----
+Helper method to place the buttons of the choices: one above the other, or in
+two columns for a long list.
+
+---- Inputs ----
+buttons : List[Any]
+    The buttons, in the order of the choices.
+
+---- Globals read ----
+ONE_COLUMN_MOST.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Places the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_clearer`
+
+```text
+---- Summary ----
+Helper method to take away the answers shown.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Destroys or hides the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_multi_sender`
+
+```text
+---- Summary ----
+Helper method to send the choices ticked, in the order they were ticked; with
+none ticked the button does nothing.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls on_click (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_ticker`
+
+```text
+---- Summary ----
+Helper method to tick or untick one choice of several; Continue is greyed
+while none is ticked.
+
+---- Inputs ----
+number : int
+    Number of the choice, from 1.
+
+---- Globals read ----
+BUTTON_TEXT, OFF_TEXT, TICKED, UNTICKED.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the buttons (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `back_shower`
+
+```text
+---- Summary ----
+Method to show only the button that goes back to the step waited at, while an
+earlier step is open, under the step's own button when it has one. While a
+table waits (Edit ODs, Edit labels), its Confirm button stays above them, and
+Enter gives it.
+
+---- Inputs ----
+text : str
+    Its words ("Back to Δψ").
+on_back : Callable[[], None]
+    What a click does.
+extra : Optional[Tuple[str, Callable[[], None]]]
+    (words, what a click does) of the step's own button (Export csv), or None.
+is_confirm : bool
+    True while the question that waits is a table, so Confirm is shown too.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces the answers (side effect).
+
+---- Helpers ----
+_button_maker
+_clearer
+```
+
+##### `focuser`
+
+```text
+---- Summary ----
+Method to give the keyboard to the typing box when it is shown, otherwise to
+the highlighted button, so Enter gives its answer.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Moves the keyboard focus (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `request_shower`
+
+```text
+---- Summary ----
+Method to show the answers of the question asked.
+
+---- Inputs ----
+request : Optional[Dict[str, Any]]
+    {'kind', 'options', 'default', 'value'} as the questions send it
+    (utils_shared.questions._answer_announcer): kind 'continue', 'yesno',
+    'choice', 'multi', 'number', 'text' or 'confirm'; options the words of
+    each choice ('text': (answer, words) pairs offered beside the box);
+    default the answer Enter gives ('y' or 'n'; the number of a choice; the
+    numbers ticked at first); value what the box starts with. None for no
+    question.
+
+---- Globals read ----
+TICKED, UNTICKED, OFF_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces the answers (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_button_maker
+_choices_placer
+_clearer
+_multi_sender
+_ticker
+```
+
+### MAIN FUNCTIONS
+
+#### `step_of_change_finder`
+
+```text
+---- Summary ----
+Main function to give the earliest step that a change in the strip under the plot
+belongs to.
+
+---- Inputs ----
+changes : Dict[str, Any]
+    {name: new value} of the strip values that changed.
+
+---- Globals read ----
+CHANGE_STEPS, GUIDE_KEYS, TAB_STEPS, TIME_TAB_CHANGE.
+
+---- Outputs ----
+Optional[str]
+    The key of the step, or None when the change belongs to every step (how the
+    haems, the OCR and the labels are shown).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_viewer/viewer_multi.py`
@@ -36737,13 +40304,87 @@ min - pad to max + pad of the kept trace outside the ignored parts, with
 pad = (max - min) x KEPT_MARGIN, and never shrinks.
 
 ---- Helpers ----
+_kept_gap_teller
+_kept_processor
 _kept_psi_drawer
-_loaded_experiment_getter
-decomposition_gap_calculator
-experiment_data_processor
-haem_name_plainer
 name_simplifier
 problem_teller
+```
+
+#### `_kept_gap_teller`
+
+```text
+---- Summary ----
+Helper function to say how the kept decomposition is shown and how far its haems
+are from the haems in use.
+
+---- Inputs ----
+new_table : Any
+    Table of the haems worked out with what is in use (pd.DataFrame).
+kept_table : Any
+    Table of the same haems worked out with the kept decomposition (pd.DataFrame).
+key_words : str
+    What tells the kept decomposition apart on the plot, after KEY_PREFIX.
+
+---- Globals read ----
+KEY_PREFIX.
+
+---- Outputs ----
+List[str]
+    The key line, then a line with the largest and the average gap of each haem in
+    both; the key line alone, saying there is no haem in common, when there is none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The gaps: decomposition_gap_calculator.
+
+---- Helpers ----
+decomposition_gap_calculator
+haem_name_plainer
+```
+
+#### `_kept_processor`
+
+```text
+---- Summary ----
+Helper function to work one file out again with the kept decomposition: its fit,
+background, regions and numbers of delta psi, everything else as in use. Its own
+warnings are left out, as they repeat those of the decomposition in use.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache).
+summary : dict
+    File summary (DATA_FORMAT.md).
+info : dict
+    Per-file information the decomposition in use was worked out with.
+answers : dict
+    Answers the decomposition in use was worked out with.
+kept : dict
+    The kept decomposition (DATA_FORMAT.md, kept decomposition).
+is_averaged : bool
+    True works out the averaging windows as in use (for a plot of its own); False
+    leaves them out (for lines drawn over the plot in use).
+
+---- Globals read ----
+settings.Config.
+
+---- Outputs ----
+Tuple[dict, settings.Config]
+    (what experiment_data_processor gives, the settings it was worked out with).
+    Raises what the processing raises.
+
+---- Globals mutated ----
+None. Updates the cache of the session (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_loaded_experiment_getter
+experiment_data_processor
 ```
 
 #### `_kept_psi_drawer`
@@ -36783,14 +40424,101 @@ str
 None. Draws on the delta psi panel (side effect).
 
 ---- Equations ----
+The gaps: _kept_psi_gap_teller. The widened panel reaches from min - pad to
+max + pad of the kept line outside the ignored parts, with
+pad = (max - min) x KEPT_MARGIN, and never shrinks.
+
+---- Helpers ----
+_kept_psi_gap_teller
+time_getter
+value_getter
+```
+
+#### `_kept_psi_gap_teller`
+
+```text
+---- Summary ----
+Helper function to say how far the delta psi of the kept decomposition is from the
+delta psi in use.
+
+---- Inputs ----
+experiment : dict
+    The experiment worked out with what is in use; it has 'delta_psi'.
+kept_experiment : dict
+    The same file worked out with the kept decomposition.
+
+---- Globals read ----
+DELTA_PSI_COLUMN.
+
+---- Outputs ----
+str
+    The largest and the average gap between the two in mV, or one sentence saying
+    why no kept delta psi is shown on this file, or why no gap is given.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
 The gaps: decomposition_gap_calculator, over the spectra where both have a value.
-The widened panel reaches from min - pad to max + pad of the kept line outside
-the ignored parts, with pad = (max - min) x KEPT_MARGIN, and never shrinks.
 
 ---- Helpers ----
 decomposition_gap_calculator
-time_getter
-value_getter
+```
+
+#### `_kept_side_drawer`
+
+```text
+---- Summary ----
+Helper function to work one file out again with the kept decomposition and draw it
+as a plot of its own, the same size as the plot in use, to be shown on its left.
+Matching panels of the two plots are given the same y range, so they can be
+compared by eye.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache, results folder).
+summary : dict
+    File summary (DATA_FORMAT.md).
+info : dict
+    Per-file information the decomposition in use was worked out with.
+answers : dict
+    Answers the decomposition in use was worked out with.
+kept : dict
+    The kept decomposition (DATA_FORMAT.md, kept decomposition).
+haem_source : Optional[str]
+    Key of HAEM_KEYS the haem panels show.
+experiment : dict
+    The experiment worked out with the decomposition in use.
+axes : list
+    Panels of the plot in use, top to bottom, each with its panel_key.
+plot_extras : dict
+    Plot settings of the plot in use beyond those of the answers (the time axis
+    title, the size and resolution of the preview), given to the kept plot too.
+
+---- Globals read ----
+settings.PREVIEW_DPI, HAEM_KEYS.
+
+---- Outputs ----
+Tuple[Optional[Figure], list, str]
+    (the kept plot, its panels, the notes): the key line, the gaps of the haems
+    and, when delta psi is shown, the gap of delta psi. The plot is None and its
+    panels empty when it could not be drawn, and the notes then say why in one
+    sentence.
+
+---- Globals mutated ----
+None. Sets the y range of matching panels of the plot in use; the details of a
+problem go to the log (side effects).
+
+---- Equations ----
+The y range of two matching panels reaches from the lower of their two bottoms to
+the higher of their two tops.
+
+---- Helpers ----
+_kept_gap_teller
+_kept_processor
+_kept_psi_gap_teller
+experiment_plotter
+problem_teller
 ```
 
 #### `_loaded_experiment_getter`
@@ -37163,7 +40891,10 @@ Tuple[Optional[Figure], str]
     shown while it was drawn (a skipped step, a missing OD), and the gaps to the
     kept decomposition when one is kept, one per line, and may be empty. A line
     starting with KEY_PREFIX explains the shading or the dashed lines and belongs
-    by the controls.
+    by the controls. With a decomposition kept and the answer compare_layout
+    SIDE_BY_SIDE, the figure carries the kept plot as its attribute kept_figure,
+    which preview_picture_maker puts on the left of the picture; otherwise the
+    kept haems are drawn dashed over the haems in use.
 
 ---- Globals mutated ----
 None. Sets the matplotlib rcParams of the figure style; the details of a problem
@@ -37175,6 +40906,7 @@ None.
 
 ---- Helpers ----
 _kept_haems_drawer
+_kept_side_drawer
 _loaded_experiment_getter
 _overlay_drawer
 experiment_data_processor
@@ -37182,6 +40914,41 @@ experiment_plotter
 preview_info_builder
 problem_teller
 time_title_chooser
+```
+
+#### `preview_picture_maker`
+
+```text
+---- Summary ----
+Main function to turn a drawn preview into the picture the window shows, with where
+its time axis sits. A figure carrying a kept plot (kept_figure, side by side) gets
+the kept plot on the left and itself on the right, with a white gap between; the
+time axis is then that of the plot on the right, so the edges, the arrows and the
+shading of the window fall on the plot in use.
+
+---- Inputs ----
+fig : Figure
+    The drawn preview (preview_figure_builder).
+
+---- Globals read ----
+settings.PREVIEW_DPI, SIDE_GAP_PX.
+
+---- Outputs ----
+Tuple[bytes, Optional[TimeAxis]]
+    (PNG bytes, the time axis in fractions of the whole picture, or None when the
+    figure has none).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+With the kept plot k pixels wide, the gap g and the plot in use n pixels wide in a
+picture W = k + g + n wide and H high (the plot in use at its top):
+x' = (k + g + x n) / W and y' = (H - h + y h) / H, with h the height of the plot
+in use and x, y the fractions within it.
+
+---- Helpers ----
+time_axis_finder
 ```
 
 #### `time_axis_finder`
@@ -37269,7 +41036,7 @@ for the older one.
 None public.
 
 ---- Globals read ----
-settings.PREVIEW_DPI, settings.WINDOW_KEPT_FILES.
+settings.WINDOW_KEPT_FILES.
 
 ---- Methods ----
 __init__
@@ -37353,7 +41120,7 @@ name : str
     Name of the file.
 
 ---- Globals read ----
-settings.PREVIEW_DPI.
+None.
 
 ---- Outputs ----
 Tuple[Optional[bytes], str, Optional[TimeAxis]]
@@ -37370,8 +41137,8 @@ None.
 
 ---- Helpers ----
 preview_figure_builder
+preview_picture_maker
 problem_teller
-time_axis_finder
 ```
 
 ##### `request_setter`
@@ -37774,16 +41541,67 @@ None.
 _strip_shower
 ```
 
+#### `_box_edit_runner`
+
+```text
+---- Summary ----
+Helper function to carry out a click on Edit ODs or Edit labels in the View box, or
+on Export csv of the trim step opened again: the OD table or the labels table opens
+while the question waits and the plot is redrawn after Confirm; Export csv writes
+the files with the trim and ignore edges as they are (those on the plot while Trim
+/ Ignore is pressed). Before the values exist, one line says where they are typed.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers so far (normalise_od, changed after Edit ODs).
+state : dict
+    The run so far (viewer_asker): limits and details; the details are changed in
+    place.
+name : str
+    EDIT_ODS_CHANGE, EDIT_LABELS_CHANGE or EXPORT_CSV_CHANGE.
+exporter : Callable[[Dict[str, dict]], None]
+    Asks what to export and writes it, given the limits.
+
+---- Globals read ----
+EDIT_LABELS_CHANGE, EDIT_ODS_CHANGE, EXPORT_CSV_CHANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the details, and after Edit ODs normalise_od in ``answers`` (True
+once every OD value is in) and the session's has_od; reads from and prints to the
+terminal, writes the export and redraws the plot (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_label_table_filler
+_od_gaps_teller
+_od_lister
+_od_table_filler
+_strip_shower
+event_asker
+info_printer
+od_gaps_finder
+trim_limits_builder
+```
+
 #### `_export_asker`
 
 ```text
 ---- Summary ----
-Helper function to ask, at the end of the import, whether to export the files of
-each experiment now so they can be plotted outside the program (nothing; the
-workbook of the trimmed data; that and the whole recording of each trimmed file;
-either of those with the spectra as csv files; each with its size worked out for
-these files), and to do it. Enter gives nothing. The choice and the limits exported
-are kept in the session, so new edges can export again.
+Helper function to ask, from the Export csv button of the trim step, whether to
+export the files of each experiment now so they can be plotted outside the program
+(nothing; the workbook of the trimmed data; that and the whole recording of each
+trimmed file; either of those with the spectra as csv files; each with its size
+worked out for these files), and to do it. Enter gives the last choice, or nothing
+the first time. The choice and the limits exported are kept in the session; the
+guide stays where it is.
 
 ---- Inputs ----
 session : ViewerSession
@@ -37791,7 +41609,7 @@ session : ViewerSession
 limits : Dict[str, dict]
     Trim and ignore limits of every file.
 details : Dict[str, dict]
-    OD values and events of every file, as entered in section 3.
+    OD values and events of every file, as entered so far.
 
 ---- Globals read ----
 WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES,
@@ -37821,46 +41639,6 @@ text_colourer
 workbook_size_estimator
 ```
 
-#### `_export_refresher`
-
-```text
----- Summary ----
-Helper function to export again, with the same choice, the files whose trimmed or
-ignored edges changed since the export of the import, so the results folder holds
-the edges in use. The whole recording of a file is written only when the file has
-just become trimmed, and taken away when it is no longer trimmed. Nothing happens
-when nothing was exported in this run.
-
----- Inputs ----
-session : ViewerSession
-    The browser session, with the export's choice and limits.
-limits : Dict[str, dict]
-    Trim and ignore limits of every file, as just accepted.
-details : Dict[str, dict]
-    OD values and events of every file.
-
----- Globals read ----
-WARNING_COLOUR (module constant).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Prints to the terminal, writes the files and updates session.export_limits
-(side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-import_data_exporter
-info_printer
-progress_clearer
-progress_printer
-text_colourer
-```
-
 #### `_figure_starter`
 
 ```text
@@ -37869,19 +41647,18 @@ Helper function to set the figure of each file from the standard settings or the
 ones last saved for the dataset, keeping only what this run allows: the OCR per OD
 and the haems scaled by OD only when OD values were entered, the OCR as % of
 baseline only when the averaging windows are set up, the haems in %
-oxidised only when a file has both regions (delta D otherwise), and the haems only
-when they are decomposed, limited to those of the fit in use (all of them when none
-of the saved ones is in it). The Haems box of the settings strip says whether the
-haems are worked out and shown, so the figure has them whenever they are decomposed.
-How the haems and the OCR are shown, the journal and the size are left as the
-answers hold them, which the settings strip may have changed.
+oxidised only when a file has both regions (delta D otherwise). The oxygen and the
+OCR are always plotted, and every haem of the fit in use while the Haem
+decomposition box is ticked. How the haems and the OCR are shown, the angle of the
+labels, the journal and the size are left as the answers hold them, which the boxes
+above the plot may have changed.
 
 ---- Inputs ----
 answers : dict
     Answers dictionary the figure settings are stored in; must hold normalise_od,
     decompose, averaging, ocr_mode, haem_mode and haem_per_od.
 defaults : dict
-    The standard or saved answers (plot_o2, plot_ocr, haems, event_label_angle).
+    The standard or saved answers (event_label_angle, when the answers have none).
 fit : Optional[dict]
     Fit dictionary (haem_list), or None when the haems are not decomposed.
 include_percent : bool
@@ -37997,6 +41774,9 @@ session : ViewerSession
 entries : Dict[str, List[dict]]
     {file name: [event entry, ...]} to start from (event_entries_builder,
     event_entries in DATA_FORMAT.md).
+is_step : bool
+    True in the set-up, the labels step of the guide; False from Edit labels,
+    which leaves the guide at the step that waits.
 
 ---- Globals read ----
 IGNORE_LABEL (imported constant); settings.CHAMBER_VOLUME_ML.
@@ -38090,12 +41870,43 @@ problem_shower
 warning_shower
 ```
 
+#### `_od_gaps_teller`
+
+```text
+---- Summary ----
+Helper function to say, once the OD table is confirmed, either that every OD value
+is in, or, as a warning, which are missing and that the OD scaling stays off until
+Edit ODs fills them in.
+
+---- Inputs ----
+details : Dict[str, dict]
+    {file name: {OD, volume, dilution_factor, ...}} as od_scaling_asker returns it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+od_gaps_finder
+warning_shower
+```
+
 #### `_od_lister`
 
 ```text
 ---- Summary ----
 Helper function to print the OD values entered for every file in one list, so they
-can be checked.
+can be checked; a value left empty reads "missing".
 
 ---- Inputs ----
 details : Dict[str, dict]
@@ -38130,6 +41941,9 @@ session : ViewerSession
     The browser session, whose window has the table.
 rows : Dict[str, Dict[str, Optional[float]]]
     The rows to start from (od_rows, DATA_FORMAT.md); None leaves a cell empty.
+is_step : bool
+    True in the set-up, the OD step of the guide; False from Edit ODs, which
+    leaves the guide at the step that waits.
 
 ---- Globals read ----
 settings.OD_RESUSPENDED_ML.
@@ -38149,6 +41963,76 @@ None.
 _table_filler
 od_rows_reader
 od_table_builder
+```
+
+#### `_own_fit_saver`
+
+```text
+---- Summary ----
+Helper function to take a click on Save fit: the haems ticked under Build a fit are
+saved as a fit file of that name in the fits folder, added to the Fit list and
+named as the fit in use, so the dataset is saved with it. The haems on the plot stay
+as they are, as the fit holds the same haems. Why it cannot be saved is said in one
+sentence, and nothing changes.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its window is told the new list of fits.
+answers : dict
+    Answers so far; 'fit_file' and 'haem_files' are read and changed.
+fits_folder : Path
+    Folder holding the fit .csv files.
+name : str
+    The name typed beside Save fit.
+
+---- Globals read ----
+OWN_HAEMS_NAME.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the fit file, changes ``answers`` and prints to the terminal (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+built_fit_saver
+fit_names_lister
+info_printer
+problem_teller
+```
+
+#### `_own_windows_teller`
+
+```text
+---- Summary ----
+Helper function to say in plain words which averaging windows are set on their own
+and which are left out.
+
+---- Inputs ----
+each_window : Dict[str, dict]
+    The windows set on their own (DATA_FORMAT.md, each_window).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'Set on their own: the baseline, settled window 2. Left out: quick window 1.',
+    each part only when it has a window; '' for none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `_pca_pictures_publisher`
@@ -38239,7 +42123,7 @@ None.
 ---- Summary ----
 Helper function to run the regions step on the plot of every file: the oxidised and
 the reduced region are pulled out on the plot or typed in the strip under it, and
-Enter accepts them. With "Every file" ticked, an edge set on the file shown is
+Enter accepts them. With "Apply to every experiment" ticked, an edge set on the file shown is
 copied to every file at the same distance from its nearest addition. Enter with no
 region on any file means no regions; when only some files have both, a question
 names the others and asks whether to continue without them, and No goes back to
@@ -38279,20 +42163,96 @@ effects).
 time on the recording = time on the plot + trim start.
 
 ---- Helpers ----
-_addition_time_lister
-_region_rules_lister
-_regions_lister
+_regions_choice_builder
+_regions_finisher
+_step_edges_reader
+_step_edges_shower
 enter_waiter
 info_printer
+region_span_reader
+short_region_closer
+yes_no_asker
+```
+
+#### `_regions_choice_builder`
+
+```text
+---- Summary ----
+Helper function to build the edges of the oxidised and reduced regions of every
+file, as _regions_chooser describes them, starting where they were left.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers so far; decomposition_dataset names the spectra the haems come from.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file; an edge is copied by the additions not
+    ignored there.
+remembered : Optional[Dict[str, Dict[str, float]]]
+    The regions to start at, as times on the original recording (min); None, or a
+    file missing, for regions not chosen.
+
+---- Globals read ----
+REGION_FIELDS, REGION_KEY_TEXT, REGION_KEYS (module constants).
+
+---- Outputs ----
+Tuple[EdgeChoice, Dict[str, dict], Dict[str, Set[str]]]
+    (the edges, the rules of each file from _region_rules_lister, the edges of each
+    file a copy could not reach, filled in as the user copies).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+time on the plot = time on the recording - trim start.
+
+---- Helpers ----
+_addition_time_lister
+_region_rules_lister
 region_edge_copier
 region_edge_setter
 region_edges_builder
 region_layout_finder
 region_pointer_reader
-region_span_reader
-short_region_closer
-yes_no_asker
 EdgeChoice
+```
+
+#### `_regions_finisher`
+
+```text
+---- Summary ----
+Helper function to list the regions read from the edges, with the files a copy
+could not reach, and give them as times on the original recording.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+values : Dict[str, Dict[str, float]]
+    {file name: region edges on the plot (min)}, short regions already closed.
+rules : Dict[str, dict]
+    The rules of each file (_regions_choice_builder), with its trim shift.
+unreached : Dict[str, Set[str]]
+    The edges of each file a copy could not reach.
+
+---- Globals read ----
+REGION_KEYS (module constant).
+
+---- Outputs ----
+Dict[str, Dict[str, float]]
+    {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+    times on the original recording (min).
+
+---- Globals mutated ----
+None. Prints (side effect).
+
+---- Equations ----
+time on the recording = time on the plot + trim start.
+
+---- Helpers ----
+_regions_lister
 ```
 
 #### `_regions_lister`
@@ -38376,6 +42336,191 @@ info_printer
 problem_teller
 ```
 
+#### `_step_edges_reader`
+
+```text
+---- Summary ----
+Helper function to read the edges of the step that waited, once it is answered,
+and take them off the plot: the Time regions box then has no tab pressed.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session, with the step's edges on the plot.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Dict[str, float]]
+    {file name: {field: value}} as the window gives them (edges_reader).
+
+---- Globals mutated ----
+None. Hides the edges and changes the session (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_step_edges_shower`
+
+```text
+---- Summary ----
+Helper function to put the edges of the step the program now waits at on the plot,
+and press its tab in the Time regions box. Another tab pressed meanwhile takes them
+off and puts them back as they were left (_tab_switcher).
+
+---- Inputs ----
+session : ViewerSession
+    The browser session, with the step's plot drawn and its redraw set.
+tab : str
+    'trim', 'regions' or 'windows'.
+choice : EdgeChoice
+    The edges of the step.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Shows the edges and changes the session (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_tab_kits_builder`
+
+```text
+---- Summary ----
+Helper function to give each tab of the Time regions box what it does when it is
+pressed away from its own step: the plot it draws and its edges, and what is done
+with the edges once another tab is pressed or a question is answered. Trim /
+Ignore draws the whole recording with the edges in use (and those as red dashed
+lines) and keeps the new trim and ignore limits; Ox / Red and Averaging draw the
+processing plot and keep the regions or the averaging windows.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers so far; the windows and the regions' spectrometer are read from them,
+    and the windows stored in them.
+state : dict
+    The run so far (viewer_asker): limits, details and regions.
+keep_limits : Callable[[Dict[str, dict]], Dict[str, dict]]
+    Keeps new trim and ignore limits as the run's limits.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, Tuple[Callable[[], Optional[EdgeChoice]], Callable[[Dict[str, Dict[str, float]]], None]]]
+    {tab: (opener, applier)} for _tab_switcher.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_limits_lister
+_regions_choice_builder
+_regions_finisher
+_strip_shower
+_trim_choice_builder
+_windows_choice_builder
+_windows_keeper
+preview_drawer
+short_region_closer
+trim_limits_builder
+```
+
+#### `_tab_switcher`
+
+```text
+---- Summary ----
+Helper function to put the edges of another tab of the Time regions box on the
+plot. The edges on the plot are taken off first: those of the step that waits are
+kept as they were left, to come back when its tab is pressed again; those of
+another tab are used at once (the trim, the regions or the windows change). An
+empty tab goes back to the step that waits, or to no edges, and its plot.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+kits : Dict[str, Tuple[Callable[[], Optional[EdgeChoice]], Callable[[Dict[str, Dict[str, float]]], None]]]
+    {tab: (opener, applier)}: the opener draws the tab's plot and gives its edges
+    (None when it has none, having said why); the applier uses the edges read.
+tab : str
+    '', 'trim', 'regions' or 'windows'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Shows and hides the edges, redraws the plot and changes the session (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_trim_choice_builder`
+
+```text
+---- Summary ----
+Helper function to build the trimmed and ignored edges of every file, starting
+where they were left, with earlier limits drawn as red dashed lines.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+remembered : Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} the edges start
+    at.
+previous : Optional[Dict[str, dict]]
+    Limits in the same layout drawn as red dashed lines; None for none.
+
+---- Globals read ----
+TRIM_FIELDS, TRIM_KEY_TEXT (module constants).
+
+---- Outputs ----
+EdgeChoice
+    The edges.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+trim_layout_finder
+trim_minutes_builder
+trim_minutes_setter
+trim_pointer_reader
+trim_times_finder
+EdgeChoice
+```
+
 #### `_strip_change_applier`
 
 ```text
@@ -38390,11 +42535,13 @@ button, changes the order kept for the panels of every file, said in the termina
 A number typed in the Δψ row is kept in the answers (the two
 filled-in midpoints with it), said in the terminal and Δψ worked out again. A fit
 that cannot be used is reported and the strip is set back. Keep to compare keeps
-the fit, the background, the regions and the numbers of Δψ in use, drawn dashed
-over the haems and over Δψ until one of the two is chosen (Keep this one carries
-on with what is on the plot, Go back to kept puts the kept one back in use) or
-the haems are left out. A new journal, width or height redraws only the figure of
-each file, the one plot drawn at its size. A click on Export master saves the
+the fit, the background, the regions and the numbers of Δψ in use, shown as a plot
+of its own on the left or drawn dashed over the haems and over Δψ (the switch
+beside Keep new, kept in the answers), until one of the two is chosen (Keep new
+carries on with what is on the plot, Keep old puts the kept one back in use) or
+the haems are left out. A click on Save fit saves the haems ticked under Build a fit as a fit file of
+the name typed beside it. A new journal, width or height redraws only the figure
+of each file, the one plot drawn at its size. A click on Export master saves the
 master page of the file shown while that figure is on the plot, and says when it
 can be saved otherwise.
 
@@ -38410,7 +42557,7 @@ changes : Dict[str, object]
     strip_values).
 
 ---- Globals read ----
-LABEL_CHANGE_TEXTS.
+COMPARE_LAYOUT_WORDS, LABEL_CHANGE_TEXTS.
 
 ---- Outputs ----
 None
@@ -38425,6 +42572,7 @@ None.
 
 ---- Helpers ----
 _kept_restorer
+_own_fit_saver
 _standard_fit_loader
 _strip_shower
 form_answers_builder
@@ -38445,8 +42593,9 @@ Helper function to show in the settings strip what the run uses now: the haems
 ticked when they are worked out, the fit, the decomposition kept to compare with,
 the spectrometer, how the haems and the OCR are shown, the journal and the size.
 It also says what the strip offers: the spectrometers every file has, % oxidised
-when at least one file has both regions, per OD when OD values were entered, and
-the OCR as % of baseline once the averaging windows are set up
+when at least one file has both regions, per OD when every OD value was entered,
+Edit ODs once scaling by OD was chosen, and the OCR as % of baseline once the
+averaging windows are set up
 (session.has_windows). Haems in % oxidised go back to delta D when no file has
 both regions any more.
 
@@ -38522,7 +42671,7 @@ table_problem_teller
 ```text
 ---- Summary ----
 Helper function to name, in plain words, the averaging windows of one file that do
-not fit.
+not fit; those left out with their tick are not named.
 
 ---- Inputs ----
 spans : List[Tuple[str, float, float, Optional[str]]]
@@ -38533,7 +42682,7 @@ quick : List[Tuple[str, float, float, Optional[str]]]
     there are none.
 
 ---- Globals read ----
-None.
+LEFT_OUT_PROBLEM (imported).
 
 ---- Outputs ----
 List[str]
@@ -38557,15 +42706,19 @@ None.
 ---- Summary ----
 Helper function to run the window step on the plot of every file: the averaging
 windows are shaded on the plot, the baseline before the first addition in gold
-with its name. The settled windows (blue) have one length and one
-gap before the next addition for every window of every file: pulling the start of
-any of them changes the length, pulling its end the gap. The quick windows (green)
-have one length and one start after their addition: pulling the start of any of
-them changes how long after the addition they start, pulling its end the length.
-All four are also typed in the two rows of the strip under the plot, where each
-kind has its tick box; with both unticked there are no windows. Enter accepts. The
-windows that do not fit are shaded red and named in a warning after Enter. When no
-file has an addition, nothing is asked and nothing is averaged.
+with its name. The settled windows (blue) have a length and a gap before the next
+addition: pulling the start of any of them changes the length, pulling its end the
+gap, and pulling the end of the last one how long before the end of the file it
+ends. The quick windows (green) have a length and a start after their addition:
+pulling the start of any of them changes how long after the addition they start,
+pulling its end the length. A change moves every window of its kind, or with
+Adjust each window ticked only the window dragged (the boxes then show it), on
+every file or with Apply to every experiment unticked on the file shown. The four
+values are also typed in the two rows of the Time regions box, where each kind has
+its tick box (with both unticked there are no windows) and a numbered tick per
+window to leave it out (grey). Enter accepts. The windows that do not fit are
+shaded red and named in a warning after Enter. When no file has an addition,
+nothing is asked and nothing is averaged.
 
 ---- Inputs ----
 session : ViewerSession
@@ -38593,9 +42746,58 @@ None
 
 ---- Globals mutated ----
 None. Stores averaging (True with either kind ticked), settled_windows,
-window_minutes, gap_minutes, quick_windows, quick_minutes and delay_minutes in
-``answers``, reads from and prints to the terminal and draws on the plot window
-(side effects).
+window_minutes, gap_minutes, final_gap_minutes, quick_windows, quick_minutes,
+delay_minutes, each_window and file_windows in ``answers`` (_windows_keeper),
+reads from and prints to the terminal and draws on the plot window (side effects).
+
+---- Equations ----
+minutes = seconds / 60. The data of a file runs from 0 to (trim end - trim start)
+on the time axis of the plot.
+
+---- Helpers ----
+_step_edges_reader
+_step_edges_shower
+_windows_choice_builder
+_windows_keeper
+enter_waiter
+info_printer
+```
+
+#### `_windows_choice_builder`
+
+```text
+---- Summary ----
+Helper function to build the edges of the averaging windows of every file, as
+_windows_chooser describes them, starting from the defaults. When no file has an
+addition there are none: averaging is switched off and one line says so.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers so far; final_gap_minutes is how long before the end of the recording
+    the last window ends.
+defaults : dict
+    Default answers the windows start with (averaging, settled_windows,
+    window_minutes, gap_minutes, quick_windows, quick_minutes, delay_minutes).
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file; the windows go around the additions not
+    ignored there.
+
+---- Globals read ----
+QUICK_FIELDS, QUICK_SWITCH, WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_OPTIONS,
+WINDOW_SWITCH (module constants); PICKED_KEYS (imported);
+settings.BASELINE_MINIMUM_SECONDS, settings.DRAG_STEP_SECONDS.
+
+---- Outputs ----
+Optional[Tuple[EdgeChoice, dict]]
+    (the edges, {additions, spans, final_gap, minimum_s} for _windows_keeper), or
+    None when no file has an addition.
+
+---- Globals mutated ----
+None. May switch averaging off in ``answers`` and print (side effects).
 
 ---- Equations ----
 minutes = seconds / 60. The data of a file runs from 0 to (trim end - trim start)
@@ -38603,16 +42805,61 @@ on the time axis of the plot.
 
 ---- Helpers ----
 _addition_time_lister
+info_printer
+window_layout_finder
+window_plan_finder
+window_pointer_reader
+window_row_teller
+window_shown_maker
+window_value_setter
+window_values_maker
+EdgeChoice
+```
+
+#### `_windows_keeper`
+
+```text
+---- Summary ----
+Helper function to keep the averaging windows read from the edges, say what they
+are, and name in a warning those that do not fit. The windows most files share
+are the dataset's; a file whose windows differ (fixed by hand with "Apply to every
+experiment" unticked) keeps its own.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary the windows are stored in.
+chosen : Dict[str, Dict[str, float]]
+    {file name: its values in the window step} (WINDOW_KEYS, STEP_EXTRA_KEYS and
+    the windows' own values); the switches of the two kinds are the same in every
+    file.
+context : dict
+    {additions, spans, final_gap, minimum_s} from _windows_choice_builder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores averaging, settled_windows, window_minutes, gap_minutes,
+final_gap_minutes, quick_windows, quick_minutes, delay_minutes, each_window and
+file_windows (DATA_FORMAT.md) in ``answers``, and prints (side effects).
+
+---- Equations ----
+minutes = seconds / 60.
+
+---- Helpers ----
+_own_windows_teller
 _unfit_windows_lister
-enter_waiter
 info_printer
 quick_span_lister
 warning_shower
-window_layout_finder
-window_pointer_reader
+window_plan_reader
 window_span_lister
-window_value_setter
-EdgeChoice
 ```
 
 ### MAIN FUNCTIONS
@@ -38658,10 +42905,12 @@ preview_drawer
 Main function to ask the last questions of the import, on the standard plot cut to
 the limits: the OD values, the temperature of the runs, then the event labels, the
 OD values and the labels each in a table of the window.
-Once OD values are entered, the strip shows its per OD boxes and a line says so.
-The plot is redrawn with the labels once they are entered, and they are accepted or
-typed again; with no events in any file there is nothing to accept. Last, the
-export of what was imported is offered. The haems are those of the session's fit.
+Once the OD table is confirmed, one line says every value is in, or a warning
+names the missing ones, the OD scaling staying off until Edit ODs fills them in.
+Once every OD value is in, the View box shows its per OD boxes, a line says so,
+and how the OCR is shown is asked (3.1.1.1).
+The plot is redrawn with the labels once they are saved; Edit labels changes them
+later. The haems are those of the session's fit.
 
 ---- Inputs ----
 session : ViewerSession
@@ -38685,26 +42934,26 @@ None.
 ---- Outputs ----
 Dict[str, dict]
     {file name: {'OD', 'volume', 'dilution_factor', 'events'}}; the OD entries are
-    only present when scaling by OD.
+    only present when scaling by OD, a value left empty being None.
 
 ---- Globals mutated ----
-None. Stores normalise_od and temperature_c in ``answers`` and whether OD values
-were entered in the
-session, shows the strip and writes the export when one is chosen (side effects).
+None. Stores normalise_od and temperature_c in ``answers`` and whether scaling by
+OD was chosen and every OD value entered in the session, and shows the strip
+(side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _answers_previewer
-_export_asker
 _label_table_filler
+_od_gaps_teller
 _od_lister
 _od_table_filler
 _strip_shower
-accept_asker
 event_asker
 info_printer
+ocr_view_asker
 od_scaling_asker
 preview_drawer
 saved_values_reader
@@ -38780,14 +43029,11 @@ yes_no_asker
 ```text
 ---- Summary ----
 Main function to show the figure saved for each file, drawn as it will be saved
-from the standard settings or the ones last saved for the dataset, and ask whether
-it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
-the angle of the event labels): only that part's questions are asked, with the
-current choices as the defaults, and the figure is drawn and asked about again. The
-settings strip turns the haems on or off and sets how they and the OCR are shown,
-the journal and the size, so 'which haems' asks only which ones in which
-order, and none of those is asked. The OCR asked for as % of baseline with no
-averaging windows set up offers the window step of the processing.
+from the standard settings or the ones last saved for the dataset, with the oxygen,
+the OCR and, while Haem decomposition is ticked, every haem of the fit. The boxes
+above the plot change how the OCR, the haems and the labels are shown, the angle
+of the labels, the journal and the size, each redrawing the figure; Continue
+accepts it.
 
 ---- Inputs ----
 session : ViewerSession
@@ -38819,15 +43065,12 @@ None.
 ---- Helpers ----
 _answers_previewer
 _figure_starter
+_master_page_saver
 _strip_shower
-_windows_chooser
-accept_asker
-haem_choice_asker
+enter_waiter
 info_printer
-label_angle_asker
 preview_drawer
 region_files_lister
-signal_asker
 ```
 
 #### `processing_stage_runner`
@@ -38835,16 +43078,15 @@ signal_asker
 ```text
 ---- Summary ----
 Main function to talk the user through the processing, with the plot redrawn after
-each answer: first the haem fit, then, now that the haems are seen, an offer to
-change the trim and ignore times, then the oxidised and the reduced region of every
+each answer: first the haem fit, then the oxidised and the reduced region of every
 file (when the haems are shown), then whether to work out Δψ (when it can be), and
 last the averaging windows, dragged on the plot (they are drawn in the plot only
-once that step is answered). A line
-points to the strip at the start, and another to its % oxidised once a file has
-both regions. The
-settings strip picks the fit and leaves the haems out, so the decomposition
+once that step is answered). The trim and ignore edges stay movable under Trim /
+Ignore in the Time regions box. A line points to the boxes above the plot at the
+start, and another to % oxidised once a file has both regions. The Haem
+decomposition box picks the fit and leaves the haems out, so the decomposition
 question only offers to find the components from the data instead. While those
-questions are asked the strip is greyed out.
+questions are asked the boxes are greyed out.
 
 ---- Inputs ----
 session : ViewerSession
@@ -38863,9 +43105,6 @@ fits_folder : Path
 details : Dict[str, dict]
     OD values and events of every file (details_stage_runner); the averaging
     windows are drawn around the events not ignored there.
-trim_runner : Callable[[], Dict[str, dict]]
-    Function that asks the trim and ignore questions again with the haems of the
-    session's fit on the plot, and returns the new limits.
 regions : Optional[Dict[str, Dict[str, float]]]
     The regions the step starts with (_regions_chooser), from the last time it
     was answered in this run; None for regions not chosen.
@@ -38948,10 +43187,11 @@ region_span_reader
 ---- Summary ----
 Main function to run the trimming step on the standard plot of the whole recording
 of every file: the trimmed and ignored edges are dragged on the plot or typed in
-the strip under it, and Enter accepts them. When the step is opened again, the
-limits it had stay on the plot as red dashed lines. The limits are then listed and
-the trimmed data is drawn. The haems are those of the session's fit (none when it
-has none).
+the Time regions box above it, and Continue accepts them; Export csv writes the
+files with the edges as they are, and the step waits again. When the step is
+opened again, the limits it had stay on the plot as red dashed lines. The limits
+are then listed and the trimmed data is drawn. The haems are those of the
+session's fit (none when it has none).
 
 ---- Inputs ----
 session : ViewerSession
@@ -38964,9 +43204,12 @@ remembered : Dict[str, dict]
 previous : Optional[Dict[str, dict]]
     Limits in the same layout drawn as red dashed lines while the edges are
     dragged; None for none.
+exporter : Optional[Callable[[Dict[str, dict]], None]]
+    Called with the limits of the edges as they are when Export csv is clicked;
+    None for no Export csv button.
 
 ---- Globals read ----
-TRIM_FIELDS, TRIM_KEY_TEXT, TRIM_NUDGE (module constants).
+EXPORT_CSV_CHANGE, EXPORT_CSV_TEXT, TRIM_NUDGE.
 
 ---- Outputs ----
 Dict[str, dict]
@@ -38982,15 +43225,13 @@ None.
 ---- Helpers ----
 _answers_previewer
 _limits_lister
+_step_edges_reader
+_step_edges_shower
+_trim_choice_builder
 enter_waiter
 info_printer
 preview_drawer
-trim_layout_finder
 trim_limits_builder
-trim_minutes_builder
-trim_minutes_setter
-trim_pointer_reader
-EdgeChoice
 ```
 
 #### `viewer_asker`
@@ -39107,7 +43348,7 @@ preview_drawer
 
 ## `utils_viewer/viewer_strip.py`
 
-The settings strip under the plot: the haems, the fit, the background, the decomposition
+The five boxes above the plot: Time regions, View, Haem decomposition, Δψ and Figure.
 
 ### CLASSES
 
@@ -39116,7 +43357,8 @@ The settings strip under the plot: the haems, the fit, the background, the decom
 ```text
 ---- Summary ----
 The row of the strip shown while edges are dragged on the plot: a typing box for
-each edge, holding its value for the file shown, and the "Every file" tick box. It
+each edge, holding its value for the file shown, and the "Apply to every
+experiment" tick box. It
 follows the drag and passes on what the user types or ticks; it changes nothing by
 itself. Every method runs on the window thread.
 
@@ -39130,8 +43372,11 @@ ERROR_BACKGROUND, ERROR_TEXT, NOTE_TEXT.
 ---- Methods ----
 __init__
 _every_file_handler
+_tick_handler
 _value_handler
 fields_setter
+ticks_setter
+toggles_setter
 values_setter
 ```
 
@@ -39139,7 +43384,8 @@ values_setter
 
 ```text
 ---- Summary ----
-Method to build the row, with no boxes until fields_setter.
+Method to build the row, with no boxes until fields_setter, and no ticks or
+toggles until ticks_setter and toggles_setter.
 
 ---- Inputs ----
 tk : Any
@@ -39155,6 +43401,11 @@ on_every_file : Callable[[bool], None]
 on_return : Callable[[], None]
     Called after Enter in a box has passed its number on (or found it as it
     was), so the keyboard can go back to the answer box.
+on_tick : Optional[Callable[[str, bool], None]]
+    Called with (field, new state) when a numbered tick is clicked.
+on_toggle : Optional[Callable[[str, bool], None]]
+    Called with (field, new state) when a toggle beside the tick box is
+    clicked.
 
 ---- Globals read ----
 NOTE_TEXT.
@@ -39177,7 +43428,7 @@ _every_file_handler
 
 ```text
 ---- Summary ----
-Method to pass on the new state of the "Every file" tick box.
+Method to pass on the new state of the "Apply to every experiment" tick box.
 
 ---- Inputs ----
 None.
@@ -39191,6 +43442,35 @@ None
 
 ---- Globals mutated ----
 None. Calls the function given as on_every_file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_tick_handler`
+
+```text
+---- Summary ----
+Method to pass on the new state of a numbered tick or of a toggle.
+
+---- Inputs ----
+field : str
+    The field of the tick or toggle.
+is_toggle : bool
+    True for a toggle beside the tick box.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the function given as on_tick or on_toggle (side effect).
 
 ---- Equations ----
 None.
@@ -39236,8 +43516,10 @@ minutes_checker
 
 ```text
 ---- Summary ----
-Method to make one typing box for each field, each after its name, followed by
-the unit, and set the tick box and its words.
+Method to make one typing box for each field, each after its name, and set the
+tick box and its words. A name starting with a capital starts a new line (Trim
+before ... after, then Ignore before ... after), and each line ends with the
+unit.
 
 ---- Inputs ----
 fields : List[Tuple[str, str]]
@@ -39247,7 +43529,7 @@ is_every_file : bool
 unit : str
     The unit written after the boxes: 'min' or 's' (a key of UNIT_HELP).
 tick_text : str
-    The words of the tick box: "Every file", or those of the step's own
+    The words of the tick box: "Apply to every experiment", or those of the step's own
     switch.
 
 ---- Globals read ----
@@ -39265,6 +43547,65 @@ None.
 
 ---- Helpers ----
 _value_handler
+```
+
+##### `ticks_setter`
+
+```text
+---- Summary ----
+Method to show the numbered ticks under the boxes ("Use: 1 2 3"), one per
+window of the file shown, and the note of which window the boxes show. The
+ticks are made again only when they change.
+
+---- Inputs ----
+note : str
+    The note beside the ticks ('settled window 2'), or ''.
+ticks : List[Tuple[str, str, bool]]
+    [(field, words, is_ticked)]; empty for none.
+
+---- Globals read ----
+NOTE_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the ticks (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_tick_handler
+```
+
+##### `toggles_setter`
+
+```text
+---- Summary ----
+Method to show the toggles beside the tick box ("Adjust each window"); they
+are made again only when they change.
+
+---- Inputs ----
+toggles : List[Tuple[str, str, bool]]
+    [(field, words, is_on)]; empty for none.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the toggles (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_tick_handler
 ```
 
 ##### `values_setter`
@@ -39298,30 +43639,34 @@ None.
 
 ```text
 ---- Summary ----
-The strip under the plot that always shows the current choices: a tick box for the
-haems, a drop-down of the fits, a drop-down of the backgrounds, a button that folds
-out a tick box for each haem of the library (Build a fit), a button that keeps the
-decomposition in use to compare the next ones with (with a line saying which one is
-kept; while one is kept it reads "Keep this one", and a second button goes back to
-the kept one), a drop-down of the spectrometer whose spectra hold the haems (shown when the
-files share more than one), a drop-down of how the haems are shown with a "per OD"
-box (shown only when OD values were entered), a drop-down of how the OCR is shown
-(per OD only when OD values were entered, % of baseline only when the averaging
-windows are set up), a
-row of the numbers of Δψ (shown only while Δψ is worked out: the midpoint of bH
-and of bL and the fall typed, each midpoint with the other haem reduced filled in,
-a button for the paper's values, and the share, the temperature and the limits as
-text, or as boxes when "More" is ticked), a drop-down of the journal, a drop-down of the widths that journal allows, a typing
-box for the height, a button that exports the master page (a page of the
-journal with the figure of the file shown on it) and a button that puts the panels
-of the plot back in the standard order. It tells the window what the user changed and can be
-set by the program; it changes nothing by itself. It starts greyed out, until the
-program says it is listening. Every method runs on the window thread, except
-values_reader.
+The five boxes above the plot, in one row, that always show the current choices.
+Time regions: a tab each for the trim and ignore edges, the oxidised and reduced
+regions and the averaging windows, the one pressed having its edges on the plot
+(the window places their rows in the box). View: how the OCR is shown with its per
+OD box, how the haems are shown with theirs (the per OD boxes and Edit ODs only
+once OD values were entered), what the event labels show, their angle and Edit
+labels. Haem decomposition, with its tick as title: the fit, the background (the
+scatter), the spectrometer whose spectra hold the haems (shown when the files
+share more than one), a button that folds out a tick box for each haem of the
+library with a name box and Save fit under them (Build a fit), a button that keeps
+the decomposition in use to compare the next ones with (greyed while one is kept,
+with a line saying which one, and Keep old and Keep new under it to choose between
+the two). Δψ, with its tick as title (it can be clicked only while Δψ can be worked
+out): the midpoint of bH and of bL (written as in the figures) and the shift typed,
+each midpoint with the other haem reduced filled in, a button for the paper's
+values, and the share, the temperature and the limits as text, or as boxes when
+"More options" is ticked. Figure: the journal, the widths that journal allows, the
+height, a button that exports the master page and a button that puts the panels of
+the plot back in the standard order. It tells the window what the user changed and
+can be set by the program; it changes nothing by itself. It starts greyed out,
+until the program says it is listening. Every method runs on the window thread,
+except values_reader.
 
 ---- Attributes ----
 frame : Any
-    The Tk frame holding the strip, for the window to place.
+    The Tk frame holding the boxes, for the window to place.
+time_box : Any
+    The Time regions box, where the window places the rows of the edges.
 
 ---- Globals read ----
 settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS, JOURNAL_NAMES,
@@ -39329,12 +43674,15 @@ BACKGROUND_SHORT_NAMES, OWN_HAEMS_NAME and the module constants.
 
 ---- Methods ----
 __init__
+_angle_handler
 _back_handler
 _background_handler
 _build_toggler
 _change_reporter
 _compare_handler
+_edit_handler
 _fit_handler
+_fit_saver
 _form_handler
 _haems_handler
 _height_handler
@@ -39347,9 +43695,11 @@ _order_handler
 _paper_handler
 _per_od_handler
 _psi_handler
+_psi_tick_handler
 _size_refresher
 _spectra_handler
 _tick_handler
+_time_tab_handler
 _width_handler
 choices_setter
 fits_setter
@@ -39394,16 +43744,20 @@ None. Creates the widgets (side effect).
 None.
 
 ---- Helpers ----
+_angle_handler
 _back_handler
 _background_handler
 _build_toggler
 _compare_handler
+_edit_handler
 _fit_handler
+_fit_saver
 _form_handler
 _haems_handler
 _height_handler
 _journal_handler
 _label_mode_handler
+_layout_handler
 _master_handler
 _more_toggler
 _ocr_handler
@@ -39411,10 +43765,44 @@ _order_handler
 _paper_handler
 _per_od_handler
 _psi_handler
+_psi_tick_handler
 _size_refresher
 _spectra_handler
+_time_tab_handler
 _width_handler
 psi_values_builder
+```
+
+##### `_angle_handler`
+
+```text
+---- Summary ----
+Method to take the angle of the event labels typed in the View box, when Enter
+is pressed or the box is left; a box left as it was shown passes nothing on.
+An angle that cannot be used turns the box red, with the reason under it, and
+the angle in use stays.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+ANGLE_HELP, ANGLE_LIMITS, ERROR_BACKGROUND.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+typed_number_reader
 ```
 
 ##### `_background_handler`
@@ -39556,6 +43944,34 @@ _change_reporter
 _size_refresher
 ```
 
+##### `_edit_handler`
+
+```text
+---- Summary ----
+Method to take a click on Edit ODs or Edit labels. The boxes keep nothing: the
+click is told as {name: True}, and the program opens the table.
+
+---- Inputs ----
+name : str
+    EDIT_ODS_CHANGE or EDIT_LABELS_CHANGE.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the function given as on_change (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_fit_handler`
 
 ```text
@@ -39582,6 +43998,34 @@ None.
 ---- Helpers ----
 _change_reporter
 _size_refresher
+```
+
+##### `_fit_saver`
+
+```text
+---- Summary ----
+Method to take a click on Save fit, or Enter in the name box beside it. The
+boxes keep nothing: the click is told as {SAVE_FIT_CHANGE: the name typed},
+and the program saves the haems ticked under that name, or says why it cannot.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+SAVE_FIT_CHANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the function given as on_change (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_form_handler`
@@ -39727,6 +44171,37 @@ None.
 _change_reporter
 ```
 
+##### `_layout_handler`
+
+```text
+---- Summary ----
+Method to take a click on the switch beside Keep new: the kept decomposition
+shown as a plot of its own beside the one in use, or dashed over it. A click on
+the layout already in use changes nothing.
+
+---- Inputs ----
+layout : str
+    A key of COMPARE_LAYOUT_TEXTS: 'side' or 'overlaid'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value, presses the button in and reports the change (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+```
+
 ##### `_master_handler`
 
 ```text
@@ -39759,7 +44234,7 @@ None.
 
 ```text
 ---- Summary ----
-Method to take the "More" box of the Δψ row: ticked, the share, the temperature
+Method to take the "More options" box of the Δψ row: ticked, the share, the temperature
 and the limits are boxes to type in; unticked, they are one line of text.
 
 ---- Inputs ----
@@ -39844,7 +44319,8 @@ psi_values_builder
 
 ```text
 ---- Summary ----
-Method to take the way of showing the OCR picked in the drop-down.
+Method to take the way of showing the OCR picked in the drop-down, or its per
+OD box clicked: together they make the way the OCR is shown.
 
 ---- Inputs ----
 event : Any
@@ -39866,6 +44342,7 @@ None.
 ---- Helpers ----
 _change_reporter
 _size_refresher
+ocr_mode_builder
 ```
 
 ##### `_per_od_handler`
@@ -39928,6 +44405,34 @@ psi_number_checker
 typed_number_reader
 ```
 
+##### `_psi_tick_handler`
+
+```text
+---- Summary ----
+Method to take the tick box of the Δψ box: ticked, Δψ is worked out and its
+numbers show under it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+```
+
 ##### `_size_refresher`
 
 ```text
@@ -39947,9 +44452,9 @@ the fall), and the whole strip is greyed while the program is not listening.
 None.
 
 ---- Globals read ----
-HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX,
-NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
-(BACK_TEXT is set on its button once, when it is built.)
+HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIXES,
+NO_JOURNAL, NOTE_TEXT.
+(BACK_TEXT and STOP_TEXT are set on their buttons once, when they are built.)
 
 ---- Outputs ----
 None
@@ -40030,6 +44535,35 @@ _size_refresher
 haem_ticks_resolver
 ```
 
+##### `_time_tab_handler`
+
+```text
+---- Summary ----
+Method to take a tab of the Time regions box pressed: its edges go on the plot.
+The tab already pressed passes nothing on.
+
+---- Inputs ----
+tab : str
+    A key of TIME_TAB_TEXTS.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+```
+
 ##### `_width_handler`
 
 ```text
@@ -40061,10 +44595,11 @@ _change_reporter
 
 ```text
 ---- Summary ----
-Method to say what the strip offers: the spectrometers of the "Spectra"
+Method to say what the boxes offer: the spectrometers of the "Spectra"
 drop-down (shown only with more than one), whether % oxidised is in the "Haems
-as" drop-down, whether the per OD box of the haems is shown and per OD is in
-the "OCR as" drop-down, and whether % of baseline is in it. The values stay.
+as" drop-down, whether the per OD boxes of the OCR and the haems are shown,
+whether Edit ODs is, whether % of baseline is in the "OCR as" drop-down, and
+whether the tick of the Δψ box can be clicked. The values stay.
 
 ---- Inputs ----
 spectra : List[str]
@@ -40076,6 +44611,12 @@ has_od : bool
 has_baseline : bool
     True when the averaging windows are set up, so the OCR is offered as % of
     baseline.
+has_psi : bool
+    True when Δψ can be worked out (a file with both regions and a fit with bH
+    and bL), so its tick can be clicked.
+can_edit_od : Optional[bool]
+    True when scaling by OD was chosen, so Edit ODs is shown even while some
+    OD values are missing; None follows has_od.
 
 ---- Globals read ----
 None.
@@ -40272,8 +44813,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to turn the spectrometer, the ways of showing the haems and the OCR
-and what the event labels show of the strip into the answers of the run.
+Main function to turn the spectrometer, the ways of showing the haems and the OCR,
+what the event labels show and their angle into the answers of the run.
 
 ---- Inputs ----
 values : Dict[str, Any]
@@ -40286,8 +44827,8 @@ None.
 ---- Outputs ----
 Dict[str, Any]
     The answers to update: decomposition_dataset for the spectrometer, and
-    haem_mode, haem_per_od, ocr_mode and label_mode as given. Empty when the
-    values hold none of them.
+    haem_mode, haem_per_od, ocr_mode, label_mode and event_label_angle as given.
+    Empty when the values hold none of them.
 
 ---- Globals mutated ----
 None.
@@ -40466,6 +45007,68 @@ None.
 None.
 ```
 
+#### `ocr_mode_builder`
+
+```text
+---- Summary ----
+Main function to give the way the OCR is shown from the "OCR as" drop-down of the
+View box and its per OD box: µM min⁻¹ with per OD ticked is the OCR per OD; the %
+views have no per OD, so the box is left out for them.
+
+---- Inputs ----
+shown : str
+    The choice of the drop-down: 'raw', 'percent' or 'baseline'.
+is_per_od : bool
+    True when the per OD box is ticked (and can be).
+
+---- Globals read ----
+OCR_FORM_TEXTS.
+
+---- Outputs ----
+str
+    The ocr_mode of the answers: 'raw', 'od', 'percent' or 'baseline'. Raises
+    ValueError for a choice the drop-down does not have.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `ocr_view_reader`
+
+```text
+---- Summary ----
+Main function to give what the View box shows for a way of showing the OCR: the
+choice of the "OCR as" drop-down and whether its per OD box is ticked. The
+opposite of ocr_mode_builder.
+
+---- Inputs ----
+ocr_mode : str
+    'raw', 'od', 'percent' or 'baseline'.
+
+---- Globals read ----
+OCR_FORM_TEXTS.
+
+---- Outputs ----
+Tuple[str, bool]
+    (choice of the drop-down, True when per OD is ticked). Raises ValueError for
+    an unknown way.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `minutes_checker`
 
 ```text
@@ -40631,7 +45234,7 @@ None.
 ```text
 ---- Summary ----
 Main function to write the share, the temperature and the limits of Δψ as the one
-line of text shown in the Δψ row while "More" is not ticked.
+line of text shown in the Δψ row while "More options" is not ticked.
 
 ---- Inputs ----
 values : Dict[str, Any]
@@ -40727,9 +45330,10 @@ Main function to give the strip values that show the answers of the run.
 ---- Inputs ----
 answers : dict
     The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
-    haem_per_od, ocr_mode, label_mode, delta_psi and the numbers of Δψ, journal,
-    columns, height, size_mode); a fit_file of None shows an empty fit, and a
-    missing label_mode the labels in the chamber.
+    haem_per_od, ocr_mode, label_mode, compare_layout, delta_psi and the numbers
+    of Δψ, journal, columns, height, size_mode); a fit_file of None shows an empty
+    fit, a missing label_mode the labels in the chamber, and a missing
+    compare_layout the standard one.
 has_haems : bool
     True when the haems are worked out and shown, which ticks the box.
 haem_files : Sequence[str]
@@ -40775,8 +45379,8 @@ values : Dict[str, Any]
     Some or all of the strip values (DATA_FORMAT.md).
 
 ---- Globals read ----
-VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS,
-OCR_FORM_TEXTS, LABEL_FORM_TEXTS, PSI_FIELDS.
+VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, COMPARE_LAYOUT_TEXTS,
+HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, PSI_FIELDS.
 
 ---- Outputs ----
 None
@@ -40850,7 +45454,7 @@ frame : Any
 
 ---- Globals read ----
 CELL_WIDTHS, MINIMUM_HEIGHT_PX, ERROR_BACKGROUND, HEADING_TEXT, SKIPPED_BACKGROUND,
-SKIPPED_TEXT, LABEL, PAIR, WORKED_BACKGROUND, WORKED_TEXT.
+SKIPPED_TEXT, LABEL, PAIR, TYPED_TEXT, WORKED_BACKGROUND, WORKED_TEXT.
 
 ---- Methods ----
 __init__
@@ -40895,6 +45499,9 @@ on_finish : Callable[[], None]
 on_file : Callable[[str], None]
     Called with the name of the file a cell belongs to when the cell is
     entered.
+typed_family : Optional[str]
+    Font family of what is typed in the cells, a plain sans-serif one; None
+    uses the family of ``font``.
 
 ---- Globals read ----
 MINIMUM_HEIGHT_PX.
@@ -41305,7 +45912,7 @@ table : dict
     The table to show (table_rows, DATA_FORMAT.md).
 
 ---- Globals read ----
-CELL_WIDTHS, HEADING_TEXT, LABEL, SKIPPED_BACKGROUND, SKIPPED_TEXT.
+CELL_WIDTHS, HEADING_TEXT, LABEL, SKIPPED_BACKGROUND, SKIPPED_TEXT, TYPED_TEXT.
 
 ---- Outputs ----
 None

@@ -4,16 +4,25 @@ The steps of the experiment browser: ask, redraw the plot window, then accept or
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import copy
+import json
+from collections import Counter
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_shared.averaging import (quick_span_lister,
+from utils_shared.averaging import (LEFT_OUT_PROBLEM,
+                                    PICKED_KEYS,
+                                    quick_span_lister,
                                     window_layout_finder,
+                                    window_plan_finder,
+                                    window_plan_reader,
                                     window_pointer_reader,
+                                    window_row_teller,
+                                    window_shown_maker,
                                     window_span_lister,
                                     window_value_setter,
+                                    window_values_maker,
                                     )
 from utils_shared.helpers import (file_name_sanitiser,
                                   panel_name_teller,
@@ -37,6 +46,7 @@ from utils_shared.questions import (accept_asker,
                                     choice_asker,
                                     confirm_waiter,
                                     enter_waiter,
+                                    guide_step_starter,
                                     heading_printer,
                                     info_printer,
                                     number_asker,
@@ -60,6 +70,7 @@ from utils_shared.redox_regions import (REGION_KEYS,
                                         )
 from utils_shared.spectral_decomposer import (answers_fit_loader,
                                               BACKGROUND_SHORT_NAMES,
+                                              built_fit_saver,
                                               fit_describer,
                                               fit_names_lister,
                                               library_haems_lister,
@@ -68,20 +79,21 @@ from utils_shared.spectral_decomposer import (answers_fit_loader,
                                               )
 from utils_shared.survey import (decomposition_asker,
                                  delta_psi_asker,
+                                 delta_psi_offer_checker,
                                  event_asker,
-                                 haem_choice_asker,
                                  IGNORE_LABEL,
-                                 label_angle_asker,
                                  ocr_kind_lister,
+                                 ocr_view_asker,
+                                 od_gaps_finder,
                                  od_scaling_asker,
                                  saved_values_reader,
-                                 signal_asker,
                                  temperature_asker,
                                  trim_layout_finder,
                                  trim_limits_builder,
                                  trim_minutes_builder,
                                  trim_minutes_setter,
                                  trim_pointer_reader,
+                                 trim_times_finder,
                                  )
 from utils_shared.user_notices import problem_shower, problem_teller, warning_shower
 from utils_viewer.viewer_edges import EdgeChoice
@@ -97,7 +109,10 @@ from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
+from utils_viewer.viewer_guide import EXPORT_CSV_CHANGE, EXPORT_CSV_TEXT
 from utils_viewer.viewer_strip import (BACK_CHANGE,
+                                       EDIT_LABELS_CHANGE,
+                                       EDIT_ODS_CHANGE,
                                        form_answers_builder,
                                        HAEM_FORM_TEXTS,
                                        kept_decomposition_builder,
@@ -106,8 +121,10 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        PANEL_ORDER_CHANGE,
                                        psi_answers_builder,
                                        psi_change_describer,
+                                       SAVE_FIT_CHANGE,
                                        size_answers_builder,
                                        strip_values_builder,
+                                       TIME_TAB_CHANGE,
                                        )
 from utils_viewer.viewer_table import (label_entries_reader,
                                        label_table_builder,
@@ -123,34 +140,40 @@ WARNING_COLOUR = '\x1b[1;31m'  # bold red
 LABEL_CHANGE_TEXTS = {'chamber': 'the concentration in the chamber (400 µM KCN)',
                       'added': 'what was added (10 µL of 200 mM KCN)',
                       }
+# how the kept decomposition is shown, as the terminal says it
+COMPARE_LAYOUT_WORDS = {'side': 'the kept one shows as a plot of its own, on the left '
+                                'of the plot in use',
+                        'overlaid': 'the kept lines show dashed over the plot in use',
+                        }
 PCA_COMPONENTS_TITLE = 'PCA components'
 PCA_EXAMPLES_TITLE = 'PCA examples (smallest and largest residual)'
-STAGE_TITLES = {'trim': 'Trimming and ignoring',
-                'details': 'OD values and event labels',
-                'processing': 'Processing',
-                'plots': 'Individual experiment plots',
+STAGE_TITLES = {'trim': 'Set-up: trimming and ignoring',
+                'details': 'Set-up: OD values, temperature and event labels',
+                'processing': 'Experiment processing',
+                'plots': 'Experiment export: the figure of each file',
                 }
-# The boxes of the trimming step in the strip, in the order of survey.TRIM_KEYS.
-TRIM_FIELDS = [('trim_start', 'Trim start'),
-               ('trim_end', 'end'),
-               ('ignore_start', 'Ignore first'),
-               ('ignore_end', 'last'),
+# The boxes of the trimming step, in the order of survey.TRIM_KEYS.
+TRIM_FIELDS = [('trim_start', 'Trim before'),
+               ('trim_end', 'after'),
+               ('ignore_start', 'Ignore before'),
+               ('ignore_end', 'after'),
                ]
 TRIM_KEY_TEXT = 'grey hatched = trimmed away, amber = ignored in calculations'
 # The numbers of the haem fit questions of the processing, from QUESTION_FLOW.md 4.A.
 PROCESSING_FIT_NUMBERS = {'decompose': '4.1', 'fit': '4.1.1', 'spectrometer': '4.1.2'}
-TRIM_NUDGE = ('Type the times in the strip under the plot, or drag the edges; press '
-              'Enter with this box empty when every file looks right.')
-# The boxes of the regions step in the strip, in the order of redox_regions.REGION_KEYS.
+TRIM_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
+              'edges; press Enter with this box empty when every file looks right.')
+# The boxes of the regions step, in the order of redox_regions.REGION_KEYS.
 REGION_FIELDS = [('oxidised_start', 'Oxidised from'),
                  ('oxidised_end', 'to'),
                  ('reduced_start', 'Reduced from'),
                  ('reduced_end', 'to'),
                  ]
 REGION_KEY_TEXT = 'red = oxidised region, blue = reduced region'
-REGION_NUDGE = ('Type the times in the strip under the plot, or pull the regions out on '
-                'the plot; press Enter with this box empty when every file looks right.')
-# The boxes of the window step in the strip, and its tick boxes (averaging.WINDOW_KEYS):
+REGION_NUDGE = ('Type the times in the Time regions box above the plot, or pull the '
+                'regions out on the plot; press Enter with this box empty when every '
+                'file looks right.')
+# The boxes of the window step, and its tick boxes (averaging.WINDOW_KEYS):
 # one row for the settled windows, one for the quick windows.
 WINDOW_FIELDS = [('window_s', 'Settled window'),
                  ('gap_s', 'Gap before the next addition'),
@@ -158,11 +181,16 @@ WINDOW_FIELDS = [('window_s', 'Settled window'),
 WINDOW_SWITCH = ('is_on', 'Settled windows')
 QUICK_FIELDS = [('quick_s', 'Quick window'), ('delay_s', 'Start after the addition')]
 QUICK_SWITCH = ('quick_is_on', 'Quick windows')
+# the toggle beside "Apply to every experiment": a drag or a typed number moves only
+# the window touched
+WINDOW_OPTIONS = [('each_is_on', 'Adjust each window')]
 WINDOW_KEY_TEXT = ('gold = baseline, blue = settled window, green = quick window, red '
-                   'hatched = a window that does not fit')
-WINDOW_NUDGE = ('Type the numbers of the windows in the strip under the plot, or drag '
-                'the edges of a window; press Enter with this box empty when the '
-                'windows look right.')
+                   'hatched = a window that does not fit, grey = a window left out')
+FIGURE_NUDGE = ('Change the figure in the boxes above the plot; press Enter with this box '
+                'empty when it looks right.')
+WINDOW_NUDGE = ('Type the numbers of the windows in the Time regions box above the '
+                'plot, or drag the edges of a window; press Enter with this box empty '
+                'when the windows look right.')
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
@@ -352,6 +380,7 @@ def _component_namer(result: dict, types: List[str], depth: int) -> List[str]:
                               suggestions[i],
                               depth=depth,
                               checker=name_checker,
+                              number='4.1.1.7',
                               ).strip()
     return names
 
@@ -397,6 +426,118 @@ def _decomposition_storer(session: ViewerSession, answers: dict, chosen: tuple) 
     _strip_shower(session, answers)
 
 
+# ---- _box_edit_runner ----------------------------------------------------------------
+def _box_edit_runner(session: ViewerSession,
+                     answers: dict,
+                     state: dict,
+                     name: str,
+                     exporter: Callable[[Dict[str, dict]], None],
+                     ) -> None:
+    """
+    ---- Summary ----
+    Helper function to carry out a click on Edit ODs or Edit labels in the View box, or
+    on Export csv of the trim step opened again: the OD table or the labels table opens
+    while the question waits and the plot is redrawn after Confirm; Export csv writes
+    the files with the trim and ignore edges as they are (those on the plot while Trim
+    / Ignore is pressed). Before the values exist, one line says where they are typed.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    answers : dict
+        Answers so far (normalise_od, changed after Edit ODs).
+    state : dict
+        The run so far (viewer_asker): limits and details; the details are changed in
+        place.
+    name : str
+        EDIT_ODS_CHANGE, EDIT_LABELS_CHANGE or EXPORT_CSV_CHANGE.
+    exporter : Callable[[Dict[str, dict]], None]
+        Asks what to export and writes it, given the limits.
+
+    ---- Globals read ----
+    EDIT_LABELS_CHANGE, EDIT_ODS_CHANGE, EXPORT_CSV_CHANGE.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Changes the details, and after Edit ODs normalise_od in ``answers`` (True
+    once every OD value is in) and the session's has_od; reads from and prints to the
+    terminal, writes the export and redraws the plot (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _label_table_filler
+    _od_gaps_teller
+    _od_lister
+    _od_table_filler
+    _strip_shower
+    event_asker
+    info_printer
+    od_gaps_finder
+    trim_limits_builder
+    """
+
+    # ---- 1 Export csv ----------------------------------------------------------------
+    if name == EXPORT_CSV_CHANGE:
+        if session.time_tab == 'trim':
+            exporter(trim_limits_builder(session.summaries,
+                                         session.window.edges_reader(),
+                                         ),
+                     )
+        elif state.get('limits'):
+            exporter(state['limits'])
+        return
+
+    # ---- 2 The OD table and the labels table -----------------------------------------
+    details = state.get('details')
+    if details is None:
+        info_printer('The OD values and the event labels are typed in the set-up; they '
+                     'can be edited here once they are.',
+                     )
+        return
+    if name == EDIT_ODS_CHANGE:
+        if not session.is_od_chosen:
+            info_printer(
+                'The OD values are typed once you choose to scale by OD in the '
+                'set-up.',
+                )
+            return
+        rows = {summary['name']: {'OD': details[summary['name']].get('OD'),
+                                  'volume': details[summary['name']].get('volume'),
+                                  'dilution_factor': details[summary['name']].get('dilution_factor',
+                                                                                  ) or 1.0,
+                                  }
+                for summary in session.summaries
+                }
+        for file_name, values in _od_table_filler(session, rows, False).items():
+            details[file_name].update(values)
+        _od_lister(details)
+        _od_gaps_teller(details)
+        # the per OD boxes come once every value is in, and go while one is missing
+        answers['normalise_od'] = not od_gaps_finder(details)
+        session.has_od = answers['normalise_od']
+        _strip_shower(session, answers)
+    elif name == EDIT_LABELS_CHANGE:
+        if not any(summary['events'] for summary in session.summaries):
+            info_printer('None of the files has an event, so there are no labels.')
+            return
+        saved = {file_name: {'events': own.get('events', [])}
+                 for file_name, own in details.items()
+                 }
+        filler = lambda entries: _label_table_filler(session, entries, False)
+        for file_name, events in event_asker(session.summaries,
+                                             saved,
+                                             filler,
+                                             ).items():
+            details[file_name]['events'] = events
+    if session.redraw is not None:
+        session.redraw()
+
+
 # ---- _export_asker -------------------------------------------------------------------
 def _export_asker(session: ViewerSession,
                   limits: Dict[str, dict],
@@ -404,12 +545,13 @@ def _export_asker(session: ViewerSession,
                   ) -> None:
     """
     ---- Summary ----
-    Helper function to ask, at the end of the import, whether to export the files of
-    each experiment now so they can be plotted outside the program (nothing; the
-    workbook of the trimmed data; that and the whole recording of each trimmed file;
-    either of those with the spectra as csv files; each with its size worked out for
-    these files), and to do it. Enter gives nothing. The choice and the limits exported
-    are kept in the session, so new edges can export again.
+    Helper function to ask, from the Export csv button of the trim step, whether to
+    export the files of each experiment now so they can be plotted outside the program
+    (nothing; the workbook of the trimmed data; that and the whole recording of each
+    trimmed file; either of those with the spectra as csv files; each with its size
+    worked out for these files), and to do it. Enter gives the last choice, or nothing
+    the first time. The choice and the limits exported are kept in the session; the
+    guide stays where it is.
 
     ---- Inputs ----
     session : ViewerSession
@@ -417,7 +559,7 @@ def _export_asker(session: ViewerSession,
     limits : Dict[str, dict]
         Trim and ignore limits of every file.
     details : Dict[str, dict]
-        OD values and events of every file, as entered in section 3.
+        OD values and events of every file, as entered so far.
 
     ---- Globals read ----
     WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES,
@@ -485,7 +627,7 @@ def _export_asker(session: ViewerSession,
     choice = choice_asker('Would you like to export the individual experiment files '
                           'now?',
                           options,
-                          'none',
+                          session.export_choice or 'none',
                           number='3.4',
                           )
     if choice == 'none':
@@ -517,75 +659,6 @@ def _export_asker(session: ViewerSession,
         )
 
 
-# ---- _export_refresher ---------------------------------------------------------------
-def _export_refresher(session: ViewerSession,
-                      limits: Dict[str, dict],
-                      details: Dict[str, dict],
-                      ) -> None:
-    """
-    ---- Summary ----
-    Helper function to export again, with the same choice, the files whose trimmed or
-    ignored edges changed since the export of the import, so the results folder holds
-    the edges in use. The whole recording of a file is written only when the file has
-    just become trimmed, and taken away when it is no longer trimmed. Nothing happens
-    when nothing was exported in this run.
-
-    ---- Inputs ----
-    session : ViewerSession
-        The browser session, with the export's choice and limits.
-    limits : Dict[str, dict]
-        Trim and ignore limits of every file, as just accepted.
-    details : Dict[str, dict]
-        OD values and events of every file.
-
-    ---- Globals read ----
-    WARNING_COLOUR (module constant).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Prints to the terminal, writes the files and updates session.export_limits
-    (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    import_data_exporter
-    info_printer
-    progress_clearer
-    progress_printer
-    text_colourer
-    """
-
-    if not session.export_choice:
-        return
-    changed = [s['name']
-               for s in session.summaries
-               if limits.get(s['name']) != session.export_limits.get(s['name'])
-               ]
-    if not changed:
-        return
-    info_printer(f'The edges of {len(changed)} file(s) changed since the export, so '
-                 f'their trimmed data is exported again.',
-                 )
-    problems = import_data_exporter(
-        session,
-        limits,
-        details,
-        session.export_choice,
-        names=changed,
-        keep_full=True,
-        progress=lambda n, total: progress_printer(f'Exporting file {n} of {total} ...'),
-    )
-    progress_clearer()
-    for problem in problems:
-        info_printer(text_colourer(f'Not exported: {problem}', WARNING_COLOUR), depth=2)
-    session.export_limits = {name: dict(values) for name, values in limits.items()}
-
-
 # ---- _figure_starter -----------------------------------------------------------------
 def _figure_starter(answers: dict,
                     defaults: dict,
@@ -598,19 +671,18 @@ def _figure_starter(answers: dict,
     ones last saved for the dataset, keeping only what this run allows: the OCR per OD
     and the haems scaled by OD only when OD values were entered, the OCR as % of
     baseline only when the averaging windows are set up, the haems in %
-    oxidised only when a file has both regions (delta D otherwise), and the haems only
-    when they are decomposed, limited to those of the fit in use (all of them when none
-    of the saved ones is in it). The Haems box of the settings strip says whether the
-    haems are worked out and shown, so the figure has them whenever they are decomposed.
-    How the haems and the OCR are shown, the journal and the size are left as the
-    answers hold them, which the settings strip may have changed.
+    oxidised only when a file has both regions (delta D otherwise). The oxygen and the
+    OCR are always plotted, and every haem of the fit in use while the Haem
+    decomposition box is ticked. How the haems and the OCR are shown, the angle of the
+    labels, the journal and the size are left as the answers hold them, which the boxes
+    above the plot may have changed.
 
     ---- Inputs ----
     answers : dict
         Answers dictionary the figure settings are stored in; must hold normalise_od,
         decompose, averaging, ocr_mode, haem_mode and haem_per_od.
     defaults : dict
-        The standard or saved answers (plot_o2, plot_ocr, haems, event_label_angle).
+        The standard or saved answers (event_label_angle, when the answers have none).
     fit : Optional[dict]
         Fit dictionary (haem_list), or None when the haems are not decomposed.
     include_percent : bool
@@ -640,22 +712,25 @@ def _figure_starter(answers: dict,
         haem_mode = 'delta'
     has_haems = bool(answers['decompose'] and fit is not None)
     haem_list = list(fit['haem_list']) if has_haems else []
-    haems = [name for name in defaults['haems'] if name in haem_list]
     # The per OD box of the haems keeps its tick while they are in % oxidised, which
     # has no per OD, so it is as it was when they go back to delta D.
-    answers.update({'plot_o2': defaults['plot_o2'],
-                    'plot_ocr': defaults['plot_ocr'],
+    # The oxygen and the OCR are always in the figure, and every haem of the fit while
+    # the haems are shown; the angle of the labels is the one of the View box.
+    answers.update({'plot_o2': True,
+                    'plot_ocr': True,
                     'ocr_mode': (answers['ocr_mode']
                                  if answers['ocr_mode'] in kinds
                                  else kinds[0]
                                  ),
                     'plot_haems': has_haems,
-                    'haems': haems or haem_list,
+                    'haems': haem_list,
                     'haem_mode': haem_mode,
                     'haem_per_od': bool(answers['haem_per_od'] and
                                         answers['normalise_od'],
                                         ),
-                    'event_label_angle': defaults['event_label_angle'],
+                    'event_label_angle': answers.get('event_label_angle',
+                                                     defaults['event_label_angle'],
+                                                     ),
                     },
                    )
 
@@ -742,6 +817,7 @@ def _fit_file_saver(fit: dict,
                                               f'want to replace it?',
                                               False,
                                               depth=depth,
+                                              number='4.1.1.9',
                                               ):
             continue
         try:
@@ -820,6 +896,7 @@ def _kept_restorer(session: ViewerSession, answers: dict) -> None:
 # ---- _label_table_filler -------------------------------------------------------------
 def _label_table_filler(session: ViewerSession,
                         entries: Dict[str, List[dict]],
+                        is_step: bool = True,
                         ) -> Dict[str, List[dict]]:
     """
     ---- Summary ----
@@ -833,6 +910,9 @@ def _label_table_filler(session: ViewerSession,
     entries : Dict[str, List[dict]]
         {file name: [event entry, ...]} to start from (event_entries_builder,
         event_entries in DATA_FORMAT.md).
+    is_step : bool
+        True in the set-up, the labels step of the guide; False from Edit labels,
+        which leaves the guide at the step that waits.
 
     ---- Globals read ----
     IGNORE_LABEL (imported constant); settings.CHAMBER_VOLUME_ML.
@@ -854,6 +934,8 @@ def _label_table_filler(session: ViewerSession,
     label_table_builder
     """
 
+    if is_step:
+        guide_step_starter('labels')
     table = label_table_builder(session.summaries,
                                 entries,
                                 IGNORE_LABEL,
@@ -997,12 +1079,55 @@ def _master_page_saver(session: ViewerSession,
                  )
 
 
+# ---- _od_gaps_teller -----------------------------------------------------------------
+def _od_gaps_teller(details: Dict[str, dict]) -> None:
+    """
+    ---- Summary ----
+    Helper function to say, once the OD table is confirmed, either that every OD value
+    is in, or, as a warning, which are missing and that the OD scaling stays off until
+    Edit ODs fills them in.
+
+    ---- Inputs ----
+    details : Dict[str, dict]
+        {file name: {OD, volume, dilution_factor, ...}} as od_scaling_asker returns it.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    od_gaps_finder
+    warning_shower
+    """
+
+    gaps = od_gaps_finder(details)
+    if not gaps:
+        info_printer('OD values entered for every file.')
+        return
+    shown = ', '.join(gaps[:5],
+                      ) + (f' and {len(gaps) - 5} more' if len(gaps) > 5 else '')
+    warning_shower(
+        f'OD values are missing for: {shown}. The OD scaling stays off until '
+        f'every file has its values: Edit ODs in the View box fills them in.',
+        )
+
+
 # ---- _od_lister ----------------------------------------------------------------------
 def _od_lister(details: Dict[str, dict]) -> None:
     """
     ---- Summary ----
     Helper function to print the OD values entered for every file in one list, so they
-    can be checked.
+    can be checked; a value left empty reads "missing".
 
     ---- Inputs ----
     details : Dict[str, dict]
@@ -1026,15 +1151,19 @@ def _od_lister(details: Dict[str, dict]) -> None:
     """
 
     info_printer('OD values:')
+    def shown(value: Optional[float]) -> str:
+        return 'missing' if value is None else f'{value:g}'
     for name, values in details.items():
-        info_printer(f"  {name}: OD {values['OD']:g}, volume {values['volume']:g} mL, "
-                     f"dilution factor {values['dilution_factor']:g}",
+        info_printer(f"  {name}: OD {shown(values.get('OD'))}, volume "
+                     f"{shown(values.get('volume'))} mL, dilution factor "
+                     f"{shown(values.get('dilution_factor'))}",
                      )
 
 
 # ---- _od_table_filler ----------------------------------------------------------------
 def _od_table_filler(session: ViewerSession,
                      rows: Dict[str, Dict[str, Optional[float]]],
+                     is_step: bool = True,
                      ) -> Dict[str, Dict[str, Optional[float]]]:
     """
     ---- Summary ----
@@ -1046,6 +1175,9 @@ def _od_table_filler(session: ViewerSession,
         The browser session, whose window has the table.
     rows : Dict[str, Dict[str, Optional[float]]]
         The rows to start from (od_rows, DATA_FORMAT.md); None leaves a cell empty.
+    is_step : bool
+        True in the set-up, the OD step of the guide; False from Edit ODs, which
+        leaves the guide at the step that waits.
 
     ---- Globals read ----
     settings.OD_RESUSPENDED_ML.
@@ -1067,6 +1199,8 @@ def _od_table_filler(session: ViewerSession,
     od_table_builder
     """
 
+    if is_step:
+        guide_step_starter('od_values')
     table = od_table_builder(rows)
     values = _table_filler(session,
                            table,
@@ -1079,6 +1213,118 @@ def _od_table_filler(session: ViewerSession,
                            number='3.1.1',
                            )
     return od_rows_reader(table, values)
+
+
+# ---- _own_fit_saver ------------------------------------------------------------------
+def _own_fit_saver(session: ViewerSession,
+                   answers: dict,
+                   fits_folder: Path,
+                   name: str,
+                   ) -> None:
+    """
+    ---- Summary ----
+    Helper function to take a click on Save fit: the haems ticked under Build a fit are
+    saved as a fit file of that name in the fits folder, added to the Fit list and
+    named as the fit in use, so the dataset is saved with it. The haems on the plot stay
+    as they are, as the fit holds the same haems. Why it cannot be saved is said in one
+    sentence, and nothing changes.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session; its window is told the new list of fits.
+    answers : dict
+        Answers so far; 'fit_file' and 'haem_files' are read and changed.
+    fits_folder : Path
+        Folder holding the fit .csv files.
+    name : str
+        The name typed beside Save fit.
+
+    ---- Globals read ----
+    OWN_HAEMS_NAME.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Writes the fit file, changes ``answers`` and prints to the terminal (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    built_fit_saver
+    fit_names_lister
+    info_printer
+    problem_teller
+    """
+
+    ticked = (list(answers.get('haem_files') or [])
+              if answers.get('fit_file') == OWN_HAEMS_NAME
+              else []
+              )
+    try:
+        path = built_fit_saver(fits_folder, name, ticked)
+    except (ValueError, OSError) as exc:
+        info_printer(problem_teller('The fit was not saved', exc))
+        return
+    answers.update({'fit_file': path.name, 'haem_files': []})
+    session.window.strip_fits_setter(fit_names_lister(fits_folder))
+    info_printer(f'Saved the haems ticked as {path.name} in the fits folder. It is the '
+                 'fit in use now, and in the Fit list from now on.',
+                 )
+
+
+# ---- _own_windows_teller -------------------------------------------------------------
+def _own_windows_teller(each_window: Dict[str, dict]) -> str:
+    """
+    ---- Summary ----
+    Helper function to say in plain words which averaging windows are set on their own
+    and which are left out.
+
+    ---- Inputs ----
+    each_window : Dict[str, dict]
+        The windows set on their own (DATA_FORMAT.md, each_window).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        'Set on their own: the baseline, settled window 2. Left out: quick window 1.',
+        each part only when it has a window; '' for none.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    def namer(name: str) -> str:
+        if name == 'average0':
+            return 'the baseline'
+        if name.startswith('quick'):
+            return f"quick window {name[len('quick'):]}"
+        return f"settled window {name[len('average'):]}"
+    own = [namer(name)
+           for name, values in each_window.items()
+           if any(field != 'is_used' for field in values)
+           ]
+    out = [namer(name)
+           for name, values in each_window.items()
+           if not values.get('is_used', True)
+           ]
+    parts = []
+    if own:
+        parts.append(f"Set on their own: {', '.join(own)}.")
+    if out:
+        parts.append(f"Left out: {', '.join(out)}.")
+    return ' '.join(parts)
 
 
 # ---- _pca_pictures_publisher ---------------------------------------------------------
@@ -1225,7 +1471,7 @@ def _regions_chooser(session: ViewerSession,
     ---- Summary ----
     Helper function to run the regions step on the plot of every file: the oxidised and
     the reduced region are pulled out on the plot or typed in the strip under it, and
-    Enter accepts them. With "Every file" ticked, an edge set on the file shown is
+    Enter accepts them. With "Apply to every experiment" ticked, an edge set on the file shown is
     copied to every file at the same distance from its nearest addition. Enter with no
     region on any file means no regions; when only some files have both, a question
     names the others and asks whether to continue without them, and No goes back to
@@ -1265,19 +1511,138 @@ def _regions_chooser(session: ViewerSession,
     time on the recording = time on the plot + trim start.
 
     ---- Helpers ----
-    _addition_time_lister
-    _region_rules_lister
-    _regions_lister
+    _regions_choice_builder
+    _regions_finisher
+    _step_edges_reader
+    _step_edges_shower
     enter_waiter
     info_printer
+    region_span_reader
+    short_region_closer
+    yes_no_asker
+    """
+
+    # ---- 1 The edges of the regions of every file ------------------------------------
+    choice, rules, unreached = _regions_choice_builder(session,
+                                                       answers,
+                                                       limits,
+                                                       details,
+                                                       remembered,
+                                                       )
+
+    # ---- 2 Pull out or type the regions until Continue -------------------------------
+    guide_step_starter('regions')
+    info_printer('OXIDISED and REDUCED regions = where the haems are fully oxidised '
+                 "and fully reduced. Each haem's level in them gives its % oxidised.",
+                 )
+    info_printer(
+        'Red is oxidised, blue is reduced; with "Apply to every experiment" '
+        'ticked, an edge is copied to every file at the same distance from its '
+        'nearest addition.',
+        tight=True,
+        )
+    info_printer('With no regions the haems cannot be shown in % oxidised; everything '
+                 'else is the same.',
+                 tight=True,
+                 )
+    _step_edges_shower(session, 'regions', choice)
+    # While the edges are on the plot they are the regions being chosen, so a click on
+    # Keep old leaves the regions alone.
+    session.is_choosing_regions = True
+    try:
+        while True:
+            enter_waiter('Pull the oxidised and the reduced region out on the plot, '
+                         'or type their times under Ox / Red in the Time regions box '
+                         'above it. Click Continue when every file looks right, or '
+                         'straight away for no regions.',
+                         REGION_NUDGE,
+                         number='4.4',
+                         )
+            values = {name: short_region_closer(own, rules[name]['minimum_min'])
+                      for name, own in session.window.edges_reader().items()
+                      }
+
+            # ---- 2.1 Ask again when only some files have both regions ----------------
+            # No region anywhere means none are wanted, so nothing is asked.
+            spans = {name: region_span_reader(own, rules[name]['minimum_min'])
+                     for name, own in values.items()
+                     }
+            missing = [summary['name']
+                       for summary in session.summaries
+                       if None in spans[summary['name']].values()
+                       ]
+            is_any_open = any(span is not None
+                              for own in spans.values()
+                              for span in own.values()
+                              )
+            if not missing or not is_any_open:
+                break
+            info_printer(f"Without both an oxidised and a reduced region: "
+                         f"{', '.join(missing)}. A file needs both to be shown in % "
+                         'oxidised.',
+                         )
+            if yes_no_asker('Do you want to continue?',
+                            False,
+                            number='4.4.1',
+                            ):
+                break
+    finally:
+        session.is_choosing_regions = False
+        _step_edges_reader(session)
+
+    # ---- 3 List the regions ----------------------------------------------------------
+    return _regions_finisher(session, values, rules, unreached)
+
+
+# ---- _regions_choice_builder ---------------------------------------------------------
+def _regions_choice_builder(
+    session: ViewerSession,
+    answers: dict,
+    limits: Dict[str, dict],
+    details: Dict[str, dict],
+    remembered: Optional[Dict[str, Dict[str, float]]],
+    ) -> Tuple[EdgeChoice, Dict[str, dict], Dict[str, Set[str]]]:
+    """
+    ---- Summary ----
+    Helper function to build the edges of the oxidised and reduced regions of every
+    file, as _regions_chooser describes them, starting where they were left.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    answers : dict
+        Answers so far; decomposition_dataset names the spectra the haems come from.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    details : Dict[str, dict]
+        OD values and events of every file; an edge is copied by the additions not
+        ignored there.
+    remembered : Optional[Dict[str, Dict[str, float]]]
+        The regions to start at, as times on the original recording (min); None, or a
+        file missing, for regions not chosen.
+
+    ---- Globals read ----
+    REGION_FIELDS, REGION_KEY_TEXT, REGION_KEYS (module constants).
+
+    ---- Outputs ----
+    Tuple[EdgeChoice, Dict[str, dict], Dict[str, Set[str]]]
+        (the edges, the rules of each file from _region_rules_lister, the edges of each
+        file a copy could not reach, filled in as the user copies).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    time on the plot = time on the recording - trim start.
+
+    ---- Helpers ----
+    _addition_time_lister
+    _region_rules_lister
     region_edge_copier
     region_edge_setter
     region_edges_builder
     region_layout_finder
     region_pointer_reader
-    region_span_reader
-    short_region_closer
-    yes_no_asker
     EdgeChoice
     """
 
@@ -1329,65 +1694,48 @@ def _regions_chooser(session: ViewerSession,
                         key_text=REGION_KEY_TEXT,
                         value_copier=copier,
                         )
+    return choice, rules, unreached
 
-    # ---- 3 Pull out or type the regions until Enter ----------------------------------
-    info_printer('OXIDISED and REDUCED regions = where the haems are fully oxidised '
-                 "and fully reduced. Each haem's level in them gives its % oxidised.",
-                 )
-    info_printer('Red is oxidised, blue is reduced; with "Every file" ticked, an edge '
-                 'is copied to every file at the same distance from its nearest '
-                 'addition.',
-                 tight=True,
-                 )
-    info_printer('With no regions the haems cannot be shown in % oxidised; everything '
-                 'else is the same.',
-                 tight=True,
-                 )
-    session.window.edges_shower(choice)
-    # While the edges are on the plot they are the regions being chosen, so a click on
-    # Go back to kept leaves the regions alone.
-    session.is_choosing_regions = True
-    try:
-        while True:
-            enter_waiter('Pull the oxidised and the reduced region out on the plot, '
-                         'or type their times in the strip under it. Press Enter when '
-                         'every file looks right, or straight away for no regions.',
-                         REGION_NUDGE,
-                         number='4.4',
-                         )
-            values = {name: short_region_closer(own, rules[name]['minimum_min'])
-                      for name, own in session.window.edges_reader().items()
-                      }
 
-            # ---- 3.1 Ask again when only some files have both regions ----------------
-            # No region anywhere means none are wanted, so nothing is asked.
-            spans = {name: region_span_reader(own, rules[name]['minimum_min'])
-                     for name, own in values.items()
-                     }
-            missing = [summary['name']
-                       for summary in session.summaries
-                       if None in spans[summary['name']].values()
-                       ]
-            is_any_open = any(span is not None
-                              for own in spans.values()
-                              for span in own.values()
-                              )
-            if not missing or not is_any_open:
-                break
-            info_printer(f"Without both an oxidised and a reduced region: "
-                         f"{', '.join(missing)}. A file needs both to be shown in % "
-                         'oxidised.',
-                         )
-            if yes_no_asker('Do you want to continue without them?',
-                            False,
-                            number='4.4.1',
-                            ):
-                break
-    finally:
-        session.is_choosing_regions = False
-        session.window.edges_hider()
+# ---- _regions_finisher ---------------------------------------------------------------
+def _regions_finisher(session: ViewerSession,
+                      values: Dict[str, Dict[str, float]],
+                      rules: Dict[str, dict],
+                      unreached: Dict[str, Set[str]],
+                      ) -> Dict[str, Dict[str, float]]:
+    """
+    ---- Summary ----
+    Helper function to list the regions read from the edges, with the files a copy
+    could not reach, and give them as times on the original recording.
 
-    # ---- 4 List the regions ----------------------------------------------------------
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    values : Dict[str, Dict[str, float]]
+        {file name: region edges on the plot (min)}, short regions already closed.
+    rules : Dict[str, dict]
+        The rules of each file (_regions_choice_builder), with its trim shift.
+    unreached : Dict[str, Set[str]]
+        The edges of each file a copy could not reach.
+
+    ---- Globals read ----
+    REGION_KEYS (module constant).
+
+    ---- Outputs ----
+    Dict[str, Dict[str, float]]
+        {file name: {oxidised_start, oxidised_end, reduced_start, reduced_end}} as
+        times on the original recording (min).
+
+    ---- Globals mutated ----
+    None. Prints (side effect).
+
+    ---- Equations ----
+    time on the recording = time on the plot + trim start.
+
+    ---- Helpers ----
+    _regions_lister
+    """
+
     _regions_lister(session.summaries,
                     values,
                     rules,
@@ -1457,7 +1805,7 @@ def _regions_lister(summaries: List[dict],
                 )
         warning_shower(f"{', '.join(unreached)}: {kept} when an edge was copied to "
                        'every file. Go back to the processing step to set it on that '
-                       'file alone, with "Every file" unticked.',
+                       'file alone, with "Apply to every experiment" unticked.',
                        )
 
 
@@ -1516,7 +1864,10 @@ def _standard_fit_loader(summaries: List[dict],
             else 'The haems are not shown yet'
             )
     def advice(text: str) -> str:
-        return 'The strip is set back to what is in use.' if is_from_strip else text
+        return ('The Haem decomposition box is set back to what is in use.'
+                if is_from_strip
+                else text
+                )
     name = defaults.get('fit_file')
     if not name or (name != OWN_HAEMS_NAME and name not in fit_names_lister(fits_folder)):
         info_printer(f'{lead}: the fit {name} is not in {fits_folder}. '
@@ -1552,6 +1903,383 @@ def _standard_fit_loader(summaries: List[dict],
         return None, None
 
 
+# ---- _step_edges_reader --------------------------------------------------------------
+def _step_edges_reader(session: ViewerSession) -> Dict[str, Dict[str, float]]:
+    """
+    ---- Summary ----
+    Helper function to read the edges of the step that waited, once it is answered,
+    and take them off the plot: the Time regions box then has no tab pressed.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session, with the step's edges on the plot.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, Dict[str, float]]
+        {file name: {field: value}} as the window gives them (edges_reader).
+
+    ---- Globals mutated ----
+    None. Hides the edges and changes the session (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    try:
+        edges = session.window.edges_reader()
+    finally:
+        session.window.edges_hider()
+        session.step_tab = session.time_tab = ''
+        session.step_choice = session.step_redraw = None
+        session.window.strip_setter({'time_tab': ''})
+    return edges
+
+
+# ---- _step_edges_shower --------------------------------------------------------------
+def _step_edges_shower(session: ViewerSession, tab: str, choice: EdgeChoice) -> None:
+    """
+    ---- Summary ----
+    Helper function to put the edges of the step the program now waits at on the plot,
+    and press its tab in the Time regions box. Another tab pressed meanwhile takes them
+    off and puts them back as they were left (_tab_switcher).
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session, with the step's plot drawn and its redraw set.
+    tab : str
+        'trim', 'regions' or 'windows'.
+    choice : EdgeChoice
+        The edges of the step.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Shows the edges and changes the session (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    session.step_tab = session.time_tab = tab
+    session.step_choice = choice
+    session.step_redraw = session.redraw
+    session.window.edges_shower(choice)
+    session.window.strip_setter({'time_tab': tab})
+
+
+# ---- _tab_kits_builder ---------------------------------------------------------------
+def _tab_kits_builder(session: ViewerSession,
+                      answers: dict,
+                      state: dict,
+                      keep_limits: Callable[[Dict[str, dict]], Dict[str, dict]],
+                      ) -> Dict[str, Tuple[Callable[[], Optional[EdgeChoice]],
+                                           Callable[[Dict[str, Dict[str, float]]],
+                                                    None,
+                                                    ],
+                                           ]]:
+    """
+    ---- Summary ----
+    Helper function to give each tab of the Time regions box what it does when it is
+    pressed away from its own step: the plot it draws and its edges, and what is done
+    with the edges once another tab is pressed or a question is answered. Trim /
+    Ignore draws the whole recording with the edges in use (and those as red dashed
+    lines) and keeps the new trim and ignore limits; Ox / Red and Averaging draw the
+    processing plot and keep the regions or the averaging windows.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    answers : dict
+        Answers so far; the windows and the regions' spectrometer are read from them,
+        and the windows stored in them.
+    state : dict
+        The run so far (viewer_asker): limits, details and regions.
+    keep_limits : Callable[[Dict[str, dict]], Dict[str, dict]]
+        Keeps new trim and ignore limits as the run's limits.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, Tuple[Callable[[], Optional[EdgeChoice]], Callable[[Dict[str, Dict[str, float]]], None]]]
+        {tab: (opener, applier)} for _tab_switcher.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _answers_previewer
+    _limits_lister
+    _regions_choice_builder
+    _regions_finisher
+    _strip_shower
+    _trim_choice_builder
+    _windows_choice_builder
+    _windows_keeper
+    preview_drawer
+    short_region_closer
+    trim_limits_builder
+    """
+
+    kept: dict = {}
+    def processing_plot() -> bool:
+        return preview_drawer(session,
+                              _answers_previewer(dict(answers, averaging=False),
+                                                 session.fit,
+                                                 'analysis',
+                                                 session.has_od,
+                                                 ),
+                              state.get('limits') or {},
+                              session.fit,
+                              state.get('details') or {},
+                              )
+
+    # ---- open_trim -------------------------------------------------------------------
+    def open_trim() -> Optional[EdgeChoice]:
+        def whole() -> bool:
+            return preview_drawer(session,
+                                  _answers_previewer(answers,
+                                                     session.fit,
+                                                     'standard',
+                                                     session.has_od,
+                                                     ),
+                                  {},
+                                  session.fit,
+                                  {},
+                                  show_trim=True,
+                                  )
+        session.redraw = whole
+        whole()
+        limits = state.get('limits') or {}
+        return _trim_choice_builder(session, limits, limits)
+    def apply_trim(edges: Dict[str, Dict[str, float]]) -> None:
+        limits = trim_limits_builder(session.summaries, edges)
+        _limits_lister(session.summaries, limits)
+        keep_limits(limits)
+
+    # ---- open_regions ----------------------------------------------------------------
+    def open_regions() -> Optional[EdgeChoice]:
+        session.redraw = processing_plot
+        processing_plot()
+        choice, rules, unreached = _regions_choice_builder(session,
+                                                           answers,
+                                                           state.get('limits') or {},
+                                                           state.get('details') or {},
+                                                           session.regions,
+                                                           )
+        kept['regions'] = (rules, unreached)
+        session.is_choosing_regions = True
+        return choice
+    def apply_regions(edges: Dict[str, Dict[str, float]]) -> None:
+        session.is_choosing_regions = False
+        rules, unreached = kept['regions']
+        values = {name: short_region_closer(own, rules[name]['minimum_min'])
+                  for name, own in edges.items()
+                  }
+        session.regions = state['regions'] = _regions_finisher(session,
+                                                               values,
+                                                               rules,
+                                                               unreached,
+                                                               )
+        _strip_shower(session, answers)
+
+    # ---- 3 Averaging -----------------------------------------------------------------
+    # With neither kind kept, the settled windows are the ones ticked.
+    def open_windows() -> Optional[EdgeChoice]:
+        is_any = answers['settled_windows'] or answers['quick_windows']
+        built = _windows_choice_builder(session,
+                                        answers,
+                                        dict(answers,
+                                             averaging=True,
+                                             settled_windows=(answers['settled_windows']
+                                                              or not is_any
+                                                              ),
+                                             ),
+                                        state.get('limits') or {},
+                                        state.get('details') or {},
+                                        )
+        if built is None:
+            return None
+        session.redraw = processing_plot
+        processing_plot()
+        kept['windows'] = built[1]
+        return built[0]
+    def apply_windows(edges: Dict[str, Dict[str, float]]) -> None:
+        _windows_keeper(session, answers, edges, kept['windows'])
+        session.has_windows = bool(answers['averaging'])
+        _strip_shower(session, answers)
+
+    return {'trim': (open_trim, apply_trim),
+            'regions': (open_regions, apply_regions),
+            'windows': (open_windows, apply_windows),
+            }
+
+
+# ---- _tab_switcher -------------------------------------------------------------------
+def _tab_switcher(session: ViewerSession,
+                  kits: Dict[str, Tuple[Callable[[], Optional[EdgeChoice]],
+                                        Callable[[Dict[str, Dict[str, float]]], None],
+                                        ]],
+                  tab: str,
+                  ) -> None:
+    """
+    ---- Summary ----
+    Helper function to put the edges of another tab of the Time regions box on the
+    plot. The edges on the plot are taken off first: those of the step that waits are
+    kept as they were left, to come back when its tab is pressed again; those of
+    another tab are used at once (the trim, the regions or the windows change). An
+    empty tab goes back to the step that waits, or to no edges, and its plot.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    kits : Dict[str, Tuple[Callable[[], Optional[EdgeChoice]], Callable[[Dict[str, Dict[str, float]]], None]]]
+        {tab: (opener, applier)}: the opener draws the tab's plot and gives its edges
+        (None when it has none, having said why); the applier uses the edges read.
+    tab : str
+        '', 'trim', 'regions' or 'windows'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Shows and hides the edges, redraws the plot and changes the session (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Take the edges on the plot off --------------------------------------------
+    # The plot of the question that waits without edges comes back after another tab.
+    window = session.window
+    current = session.time_tab
+    if tab == current:
+        return
+    if not current:
+        session.base_redraw = session.redraw
+    if current:
+        edges = window.edges_reader()
+        window.edges_hider()
+        if current == session.step_tab:
+            session.step_choice.values = edges
+        else:
+            kits[current][1](edges)
+
+    # ---- 2 Put the new ones on -------------------------------------------------------
+    if tab and tab == session.step_tab:
+        session.redraw = session.step_redraw
+        if session.redraw is not None:
+            session.redraw()
+        window.edges_shower(session.step_choice)
+    elif tab:
+        choice = kits[tab][0]()
+        if choice is None:
+            tab = ''
+        else:
+            window.edges_shower(choice)
+    if not tab and session.step_tab:
+        # no other tab: the step that waits keeps its edges on the plot
+        tab = session.step_tab
+        session.redraw = session.step_redraw
+        if session.redraw is not None:
+            session.redraw()
+        window.edges_shower(session.step_choice)
+    elif not tab and current:
+        session.redraw = session.base_redraw
+        if session.redraw is not None:
+            session.redraw()
+    session.time_tab = tab
+    window.strip_setter({'time_tab': tab})
+
+
+# ---- _trim_choice_builder ------------------------------------------------------------
+def _trim_choice_builder(session: ViewerSession,
+                         remembered: Dict[str, dict],
+                         previous: Optional[Dict[str, dict]] = None,
+                         ) -> EdgeChoice:
+    """
+    ---- Summary ----
+    Helper function to build the trimmed and ignored edges of every file, starting
+    where they were left, with earlier limits drawn as red dashed lines.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    remembered : Dict[str, dict]
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}} the edges start
+        at.
+    previous : Optional[Dict[str, dict]]
+        Limits in the same layout drawn as red dashed lines; None for none.
+
+    ---- Globals read ----
+    TRIM_FIELDS, TRIM_KEY_TEXT (module constants).
+
+    ---- Outputs ----
+    EdgeChoice
+        The edges.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    trim_layout_finder
+    trim_minutes_builder
+    trim_minutes_setter
+    trim_pointer_reader
+    trim_times_finder
+    EdgeChoice
+    """
+
+    by_name = {s['name']: s for s in session.summaries}
+    return EdgeChoice(fields=list(TRIM_FIELDS),
+                      values=trim_minutes_builder(session.summaries, remembered),
+                      layout_finder=lambda name, minutes: (
+                          trim_layout_finder(by_name[name], minutes)),
+                      pointer_reader=lambda name, minutes, key, time_min: (
+                          trim_pointer_reader(by_name[name], minutes, key, time_min)),
+                      value_setter=lambda name, minutes, key, value: (
+                          trim_minutes_setter(by_name[name], minutes, key, value)),
+                      key_text=TRIM_KEY_TEXT,
+                      previous=(trim_minutes_builder(session.summaries, previous)
+                                if previous
+                                else {}
+                                ),
+                      # the boxes show and take times on the whole recording
+                      shown_maker=lambda name, minutes: (
+                          trim_times_finder(by_name[name], minutes)),
+                      typed_reader=lambda name, minutes, key, time_min: (
+                          trim_pointer_reader(by_name[name], minutes, key, time_min)),
+                      )
+
+
 # ---- _strip_change_applier -----------------------------------------------------------
 def _strip_change_applier(session: ViewerSession,
                           answers: dict,
@@ -1570,11 +2298,13 @@ def _strip_change_applier(session: ViewerSession,
     A number typed in the Δψ row is kept in the answers (the two
     filled-in midpoints with it), said in the terminal and Δψ worked out again. A fit
     that cannot be used is reported and the strip is set back. Keep to compare keeps
-    the fit, the background, the regions and the numbers of Δψ in use, drawn dashed
-    over the haems and over Δψ until one of the two is chosen (Keep this one carries
-    on with what is on the plot, Go back to kept puts the kept one back in use) or
-    the haems are left out. A new journal, width or height redraws only the figure of
-    each file, the one plot drawn at its size. A click on Export master saves the
+    the fit, the background, the regions and the numbers of Δψ in use, shown as a plot
+    of its own on the left or drawn dashed over the haems and over Δψ (the switch
+    beside Keep new, kept in the answers), until one of the two is chosen (Keep new
+    carries on with what is on the plot, Keep old puts the kept one back in use) or
+    the haems are left out. A click on Save fit saves the haems ticked under Build a fit as a fit file of
+    the name typed beside it. A new journal, width or height redraws only the figure
+    of each file, the one plot drawn at its size. A click on Export master saves the
     master page of the file shown while that figure is on the plot, and says when it
     can be saved otherwise.
 
@@ -1590,7 +2320,7 @@ def _strip_change_applier(session: ViewerSession,
         strip_values).
 
     ---- Globals read ----
-    LABEL_CHANGE_TEXTS.
+    COMPARE_LAYOUT_WORDS, LABEL_CHANGE_TEXTS.
 
     ---- Outputs ----
     None
@@ -1605,6 +2335,7 @@ def _strip_change_applier(session: ViewerSession,
 
     ---- Helpers ----
     _kept_restorer
+    _own_fit_saver
     _standard_fit_loader
     _strip_shower
     form_answers_builder
@@ -1617,7 +2348,7 @@ def _strip_change_applier(session: ViewerSession,
     size_answers_builder
     """
 
-    # ---- 0 The master page: a click, which changes nothing ---------------------------
+    # ---- 0 The clicks: the master page, a tab, the tables and Export csv -------------
     if changes.get(MASTER_CHANGE):
         if session.is_figure and session.master_exporter is not None:
             session.master_exporter()
@@ -1626,6 +2357,21 @@ def _strip_change_applier(session: ViewerSession,
                          'journal, so it can be exported once that figure is on the '
                          'plot, in the individual experiment plots.',
                          )
+        return
+    if TIME_TAB_CHANGE in changes:
+        if session.tab_switcher is not None:
+            session.tab_switcher(changes[TIME_TAB_CHANGE])
+        else:
+            session.window.strip_setter({TIME_TAB_CHANGE: session.time_tab})
+        return
+    for name in (EDIT_ODS_CHANGE, EDIT_LABELS_CHANGE, EXPORT_CSV_CHANGE):
+        if changes.get(name):
+            if session.edit_runner is not None:
+                session.edit_runner(name)
+            return
+    if SAVE_FIT_CHANGE in changes:
+        _own_fit_saver(session, answers, fits_folder, str(changes[SAVE_FIT_CHANGE]))
+        _strip_shower(session, answers)
         return
 
     # ---- 1 The journal, the width and the height -------------------------------------
@@ -1636,7 +2382,7 @@ def _strip_change_applier(session: ViewerSession,
     # ---- 2 The background under the haems --------------------------------------------
     if 'haem_background' in changes:
         answers['haem_background'] = changes['haem_background']
-        info_printer('The background under the haems is now '
+        info_printer('The scatter (the background under the haems) is now '
                      f"{BACKGROUND_SHORT_NAMES[answers['haem_background']]}.",
                      )
         is_redrawn = is_redrawn or session.fit is not None
@@ -1661,7 +2407,20 @@ def _strip_change_applier(session: ViewerSession,
         info_printer('The event labels now show '
                      f"{LABEL_CHANGE_TEXTS[changes['label_mode']]}.",
                      )
+    if 'event_label_angle' in changes:
+        info_printer('The event labels are now written at '
+                     f"{changes['event_label_angle']:g}°.",
+                     )
     is_redrawn = is_redrawn or bool(forms)
+
+    # ---- 2.0 Delta psi switched on or off in its box ---------------------------------
+    if 'delta_psi' in changes and changes['delta_psi'] != bool(answers['delta_psi']):
+        answers['delta_psi'] = bool(changes['delta_psi'])
+        info_printer('Δψ is now worked out, in its own panel.'
+                     if answers['delta_psi']
+                     else 'Δψ is left out: tick it in its box to work it out again.',
+                     )
+        is_redrawn = True
 
     # ---- 2.2 The order of the panels -------------------------------------------------
     if PANEL_ORDER_CHANGE in changes:
@@ -1728,11 +2487,14 @@ def _strip_change_applier(session: ViewerSession,
         is_redrawn = True
     elif 'compare' in changes and session.fit is not None:
         in_use = kept_decomposition_builder(answers, session.fit, session.regions)
+        layout = answers.get('compare_layout',
+                             settings.DEFAULT_ANSWERS['compare_layout'],
+                             )
         session.kept = in_use if changes['compare'] else None
         info_printer(f"Kept {in_use['text']} to compare: change the haems, the "
-                     'background, the regions or the Δψ numbers, and the kept lines '
-                     'show dashed on the plot. Then click Keep this one or Go back '
-                     'to kept.'
+                     'scatter, the regions or the Δψ numbers, and '
+                     f"{COMPARE_LAYOUT_WORDS[layout]}. Then click "
+                     'Keep new to carry on with the change, or Keep old to undo it.'
                      if changes['compare']
                      else f"Carrying on with {in_use['text']}. The one kept to "
                           'compare is no longer shown.',
@@ -1742,6 +2504,12 @@ def _strip_change_applier(session: ViewerSession,
         info_printer('There are no haems worked out yet to keep: they are worked out '
                      'in the processing.',
                      )
+
+    # ---- 4.1 The kept decomposition beside the plot or over it -----------------------
+    if 'compare_layout' in changes:
+        answers['compare_layout'] = changes['compare_layout']
+        info_printer(f"Now {COMPARE_LAYOUT_WORDS[answers['compare_layout']]}.")
+        is_redrawn = is_redrawn or session.kept is not None
 
     # ---- 5 Show what is in use and redraw --------------------------------------------
     _strip_shower(session, answers)
@@ -1757,8 +2525,9 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     ticked when they are worked out, the fit, the decomposition kept to compare with,
     the spectrometer, how the haems and the OCR are shown, the journal and the size.
     It also says what the strip offers: the spectrometers every file has, % oxidised
-    when at least one file has both regions, per OD when OD values were entered, and
-    the OCR as % of baseline once the averaging windows are set up
+    when at least one file has both regions, per OD when every OD value was entered,
+    Edit ODs once scaling by OD was chosen, and the OCR as % of baseline once the
+    averaging windows are set up
     (session.has_windows). Haems in % oxidised go back to delta D when no file has
     both regions any more.
 
@@ -1791,18 +2560,23 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     common = set(session.summaries[0]['datasets'])
     for summary in session.summaries[1:]:
         common &= set(summary['datasets'])
-    has_percent = bool(region_files_lister(session.summaries,
-                                           session.limits,
-                                           session.regions,
-                                           answers.get('decomposition_dataset'),
-                                           ),
-                       )
+    region_files = region_files_lister(session.summaries,
+                                       session.limits,
+                                       session.regions,
+                                       answers.get('decomposition_dataset'),
+                                       )
+    has_percent = bool(region_files)
     if answers['haem_mode'] == 'percent' and not has_percent:
         answers['haem_mode'] = 'delta'
+    has_psi = (session.fit is not None and
+               delta_psi_offer_checker(list(session.fit['haem_list']), region_files)
+               )
     session.window.strip_choices_setter(sorted(common),
                                         has_percent,
                                         session.has_od,
                                         session.has_windows,
+                                        has_psi,
+                                        session.is_od_chosen or session.has_od,
                                         )
     fit = session.fit
     session.window.strip_setter(strip_values_builder(answers,
@@ -1881,7 +2655,7 @@ def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
     """
     ---- Summary ----
     Helper function to name, in plain words, the averaging windows of one file that do
-    not fit.
+    not fit; those left out with their tick are not named.
 
     ---- Inputs ----
     spans : List[Tuple[str, float, float, Optional[str]]]
@@ -1892,7 +2666,7 @@ def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
         there are none.
 
     ---- Globals read ----
-    None.
+    LEFT_OUT_PROBLEM (imported).
 
     ---- Outputs ----
     List[str]
@@ -1912,7 +2686,7 @@ def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
 
     names = []
     for index, (_, _, _, problem) in enumerate(spans):
-        if problem is None:
+        if problem is None or problem == LEFT_OUT_PROBLEM:
             continue
         if index == 0:
             names.append('the baseline before addition 1')
@@ -1922,7 +2696,7 @@ def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
             names.append(f'the settled one before addition {index + 1}')
     names += [f'the quick one after addition {index}'
               for index, (_, _, _, problem) in enumerate(quick, start=1)
-              if problem is not None
+              if problem is not None and problem != LEFT_OUT_PROBLEM
               ]
     return names
 
@@ -1938,15 +2712,19 @@ def _windows_chooser(session: ViewerSession,
     ---- Summary ----
     Helper function to run the window step on the plot of every file: the averaging
     windows are shaded on the plot, the baseline before the first addition in gold
-    with its name. The settled windows (blue) have one length and one
-    gap before the next addition for every window of every file: pulling the start of
-    any of them changes the length, pulling its end the gap. The quick windows (green)
-    have one length and one start after their addition: pulling the start of any of
-    them changes how long after the addition they start, pulling its end the length.
-    All four are also typed in the two rows of the strip under the plot, where each
-    kind has its tick box; with both unticked there are no windows. Enter accepts. The
-    windows that do not fit are shaded red and named in a warning after Enter. When no
-    file has an addition, nothing is asked and nothing is averaged.
+    with its name. The settled windows (blue) have a length and a gap before the next
+    addition: pulling the start of any of them changes the length, pulling its end the
+    gap, and pulling the end of the last one how long before the end of the file it
+    ends. The quick windows (green) have a length and a start after their addition:
+    pulling the start of any of them changes how long after the addition they start,
+    pulling its end the length. A change moves every window of its kind, or with
+    Adjust each window ticked only the window dragged (the boxes then show it), on
+    every file or with Apply to every experiment unticked on the file shown. The four
+    values are also typed in the two rows of the Time regions box, where each kind has
+    its tick box (with both unticked there are no windows) and a numbered tick per
+    window to leave it out (grey). Enter accepts. The windows that do not fit are
+    shaded red and named in a warning after Enter. When no file has an addition,
+    nothing is asked and nothing is averaged.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1974,9 +2752,113 @@ def _windows_chooser(session: ViewerSession,
 
     ---- Globals mutated ----
     None. Stores averaging (True with either kind ticked), settled_windows,
-    window_minutes, gap_minutes, quick_windows, quick_minutes and delay_minutes in
-    ``answers``, reads from and prints to the terminal and draws on the plot window
-    (side effects).
+    window_minutes, gap_minutes, final_gap_minutes, quick_windows, quick_minutes,
+    delay_minutes, each_window and file_windows in ``answers`` (_windows_keeper),
+    reads from and prints to the terminal and draws on the plot window (side effects).
+
+    ---- Equations ----
+    minutes = seconds / 60. The data of a file runs from 0 to (trim end - trim start)
+    on the time axis of the plot.
+
+    ---- Helpers ----
+    _step_edges_reader
+    _step_edges_shower
+    _windows_choice_builder
+    _windows_keeper
+    enter_waiter
+    info_printer
+    """
+
+    # ---- 1 The edges of the windows of every file ------------------------------------
+    built = _windows_choice_builder(session, answers, defaults, limits, details)
+    if built is None:
+        return
+    choice, context = built
+    final_gap = context['final_gap']
+
+    # ---- 2 Drag or type the windows until Continue -----------------------------------
+    guide_step_starter('windows')
+    info_printer('AVERAGING WINDOWS = the stretches around each addition that its '
+                 'averages are taken over.',
+                 )
+    info_printer('The baseline (gold) is the window before the first addition, as '
+                 'long as a settled window; every other window is compared with it.',
+                 tight=True,
+                 )
+    info_printer('A settled window (blue) ends a set time before the next addition, '
+                 f'the last one {final_gap * 60.0:g} s before the end of the recording '
+                 '(pull its end to change that); a quick window (green) starts a set '
+                 'time after its addition.',
+                 tight=True,
+                 )
+    info_printer('Pull the start of a settled window to change its length, its end to '
+                 'change the gap before the addition; pull the start of a quick window '
+                 'to change how long after the addition it starts, its end to change '
+                 'its length.',
+                 tight=True,
+                 )
+    info_printer('A change moves every window of its kind; tick Adjust each window to '
+                 'move only the window you drag, and the boxes then show that window. '
+                 'Untick a number under Use to leave that window out (grey). With '
+                 'Apply to every experiment unticked, a change is made on the file '
+                 'shown only.',
+                 tight=True,
+                 )
+    _step_edges_shower(session, 'windows', choice)
+    try:
+        enter_waiter(
+            'Drag an edge of any window on the plot, or type the numbers under '
+            'Averaging in the Time regions box above it, where each kind of '
+            'window has its tick box. Click Continue when the windows look '
+            'right, or untick both kinds for none.',
+            WINDOW_NUDGE,
+            number='4.6',
+            )
+    finally:
+        edges = _step_edges_reader(session)
+    _windows_keeper(session, answers, edges, context)
+
+
+# ---- _windows_choice_builder ---------------------------------------------------------
+def _windows_choice_builder(session: ViewerSession,
+                            answers: dict,
+                            defaults: dict,
+                            limits: Dict[str, dict],
+                            details: Dict[str, dict],
+                            ) -> Optional[Tuple[EdgeChoice, dict]]:
+    """
+    ---- Summary ----
+    Helper function to build the edges of the averaging windows of every file, as
+    _windows_chooser describes them, starting from the defaults. When no file has an
+    addition there are none: averaging is switched off and one line says so.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    answers : dict
+        Answers so far; final_gap_minutes is how long before the end of the recording
+        the last window ends.
+    defaults : dict
+        Default answers the windows start with (averaging, settled_windows,
+        window_minutes, gap_minutes, quick_windows, quick_minutes, delay_minutes).
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    details : Dict[str, dict]
+        OD values and events of every file; the windows go around the additions not
+        ignored there.
+
+    ---- Globals read ----
+    QUICK_FIELDS, QUICK_SWITCH, WINDOW_FIELDS, WINDOW_KEY_TEXT, WINDOW_OPTIONS,
+    WINDOW_SWITCH (module constants); PICKED_KEYS (imported);
+    settings.BASELINE_MINIMUM_SECONDS, settings.DRAG_STEP_SECONDS.
+
+    ---- Outputs ----
+    Optional[Tuple[EdgeChoice, dict]]
+        (the edges, {additions, spans, final_gap, minimum_s} for _windows_keeper), or
+        None when no file has an addition.
+
+    ---- Globals mutated ----
+    None. May switch averaging off in ``answers`` and print (side effects).
 
     ---- Equations ----
     minutes = seconds / 60. The data of a file runs from 0 to (trim end - trim start)
@@ -1984,15 +2866,14 @@ def _windows_chooser(session: ViewerSession,
 
     ---- Helpers ----
     _addition_time_lister
-    _unfit_windows_lister
-    enter_waiter
     info_printer
-    quick_span_lister
-    warning_shower
     window_layout_finder
+    window_plan_finder
     window_pointer_reader
-    window_span_lister
+    window_row_teller
+    window_shown_maker
     window_value_setter
+    window_values_maker
     EdgeChoice
     """
 
@@ -2003,7 +2884,7 @@ def _windows_chooser(session: ViewerSession,
         info_printer('None of the files has an addition, so there are no averaging '
                      'windows.',
                      )
-        return
+        return None
     final_gap = float(answers['final_gap_minutes'])
     minimum_s = float(settings.BASELINE_MINIMUM_SECONDS)
     step_s = float(settings.DRAG_STEP_SECONDS)
@@ -2017,16 +2898,18 @@ def _windows_chooser(session: ViewerSession,
                                   )
 
     # ---- 2 The rules of the edges ----------------------------------------------------
+    # Each file starts from its own windows: those of the dataset, or of the file when
+    # it was fixed by hand.
     is_averaging = bool(defaults['averaging'])
-    start = {'window_s': round(defaults['window_minutes'] * 60.0, 2),
-             'gap_s': round(defaults['gap_minutes'] * 60.0, 2),
-             'is_on': 1.0 if is_averaging and defaults['settled_windows'] else 0.0,
-             'quick_s': round(defaults['quick_minutes'] * 60.0, 2),
-             'delay_s': round(defaults['delay_minutes'] * 60.0, 2),
-             'quick_is_on': 1.0 if is_averaging and defaults['quick_windows'] else 0.0,
-             }
+    known = dict(answers, **defaults)
+    values = {name: window_values_maker(window_plan_finder(known, name),
+                                        is_averaging and defaults['settled_windows'],
+                                        is_averaging and defaults['quick_windows'],
+                                        )
+              for name in additions
+              }
     choice = EdgeChoice(fields=list(WINDOW_FIELDS),
-                        values={name: dict(start) for name in additions},
+                        values=values,
                         layout_finder=lambda name, values: (
                             window_layout_finder(values,
                                                  additions[name],
@@ -2050,84 +2933,144 @@ def _windows_chooser(session: ViewerSession,
                         switch=WINDOW_SWITCH,
                         second_fields=list(QUICK_FIELDS),
                         second_switch=QUICK_SWITCH,
+                        shown_maker=lambda name, values: window_shown_maker(values),
+                        options=list(WINDOW_OPTIONS),
+                        row_teller=lambda name, values: (
+                            window_row_teller(values, len(additions[name]))),
+                        unmarked_fields=PICKED_KEYS,
                         )
+    return choice, {'additions': additions,
+                    'spans': spans,
+                    'final_gap': final_gap,
+                    'minimum_s': minimum_s,
+                    }
 
-    # ---- 3 Drag or type the windows until Enter --------------------------------------
-    info_printer('AVERAGING WINDOWS = the stretches around each addition that its '
-                 'averages are taken over.',
-                 )
-    info_printer('The baseline (gold) is the window before the first addition, as '
-                 'long as a settled window; every other window is compared with it.',
-                 tight=True,
-                 )
-    info_printer('A settled window (blue) ends a set time before the next addition, '
-                 f'the last one {final_gap:g} min before the end of the recording; a '
-                 'quick window (green) starts a set time after its addition. Each '
-                 'kind has one length, in every file.',
-                 tight=True,
-                 )
-    info_printer('Pull the start of a settled window to change its length, its end to '
-                 'change the gap before the addition; pull the start of a quick window '
-                 'to change how long after the addition it starts, its end to change '
-                 'its length.',
-                 tight=True,
-                 )
-    session.window.edges_shower(choice)
-    try:
-        enter_waiter('Drag an edge of any window on the plot, or type the numbers in '
-                     'the strip under it, where each kind of window has its tick box. '
-                     'Press Enter when the windows look right, or untick both kinds '
-                     'for none.',
-                     WINDOW_NUDGE,
-                     number='4.6',
-                     )
-        chosen = next(iter(session.window.edges_reader().values()))
-    finally:
-        session.window.edges_hider()
 
-    # ---- 4 Keep the windows and name those that do not fit ---------------------------
-    answers['settled_windows'] = bool(chosen['is_on'])
-    answers['quick_windows'] = bool(chosen['quick_is_on'])
+# ---- _windows_keeper -----------------------------------------------------------------
+def _windows_keeper(session: ViewerSession,
+                    answers: dict,
+                    chosen: Dict[str, Dict[str, float]],
+                    context: dict,
+                    ) -> None:
+    """
+    ---- Summary ----
+    Helper function to keep the averaging windows read from the edges, say what they
+    are, and name in a warning those that do not fit. The windows most files share
+    are the dataset's; a file whose windows differ (fixed by hand with "Apply to every
+    experiment" unticked) keeps its own.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session.
+    answers : dict
+        Answers dictionary the windows are stored in.
+    chosen : Dict[str, Dict[str, float]]
+        {file name: its values in the window step} (WINDOW_KEYS, STEP_EXTRA_KEYS and
+        the windows' own values); the switches of the two kinds are the same in every
+        file.
+    context : dict
+        {additions, spans, final_gap, minimum_s} from _windows_choice_builder.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Stores averaging, settled_windows, window_minutes, gap_minutes,
+    final_gap_minutes, quick_windows, quick_minutes, delay_minutes, each_window and
+    file_windows (DATA_FORMAT.md) in ``answers``, and prints (side effects).
+
+    ---- Equations ----
+    minutes = seconds / 60.
+
+    ---- Helpers ----
+    _own_windows_teller
+    _unfit_windows_lister
+    info_printer
+    quick_span_lister
+    warning_shower
+    window_plan_reader
+    window_span_lister
+    """
+
+    # ---- 1 The windows of the dataset and of each file -------------------------------
+    additions, spans = context['additions'], context['spans']
+    minimum_s = context['minimum_s']
+    first = next(iter(chosen.values()))
+    plans = {name: window_plan_reader(values) for name, values in chosen.items()}
+    texts = {name: json.dumps(plan, sort_keys=True) for name, plan in plans.items()}
+    shared_text = Counter(texts.values()).most_common(1)[0][0]
+    shared = json.loads(shared_text)
+    answers['settled_windows'] = bool(first['is_on'])
+    answers['quick_windows'] = bool(first['quick_is_on'])
     answers['averaging'] = answers['settled_windows'] or answers['quick_windows']
-    answers['window_minutes'] = chosen['window_s'] / 60.0
-    answers['gap_minutes'] = chosen['gap_s'] / 60.0
-    answers['quick_minutes'] = chosen['quick_s'] / 60.0
-    answers['delay_minutes'] = chosen['delay_s'] / 60.0
+    for key in ('window_minutes',
+                'gap_minutes',
+                'final_gap_minutes',
+                'quick_minutes',
+                'delay_minutes',
+                'each_window',
+                ):
+        answers[key] = shared[key]
+    answers['file_windows'] = {name: plans[name]
+                               for name in chosen
+                               if texts[name] != shared_text
+                               }
+
+    # ---- 2 What they are -------------------------------------------------------------
     if not answers['averaging']:
         info_printer('No averaging windows: nothing is averaged around the additions.')
         return
+    window_s, gap_s = shared['window_minutes'] * 60.0, shared['gap_minutes'] * 60.0
     if answers['settled_windows']:
-        info_printer(f"Settled windows: {round(chosen['window_s'], 2):g} s long, "
-                     f"ending {round(chosen['gap_s'], 2):g} s before the next "
-                     'addition.',
+        info_printer(f'Settled windows: {round(window_s, 2):g} s long, ending '
+                     f'{round(gap_s, 2):g} s before the next addition, the last '
+                     f"{round(shared['final_gap_minutes'] * 60.0, 2):g} s before the "
+                     'end of the recording.',
                      )
     else:
-        info_printer(f"Baseline: {round(chosen['window_s'], 2):g} s long, ending "
-                     f"{round(chosen['gap_s'], 2):g} s before the first addition. No "
-                     'settled windows.',
+        info_printer(f'Baseline: {round(window_s, 2):g} s long, ending '
+                     f'{round(gap_s, 2):g} s before the first addition. No settled '
+                     'windows.',
                      )
     if answers['quick_windows']:
-        info_printer(f"Quick windows: {round(chosen['quick_s'], 2):g} s long, "
-                     f"starting {round(chosen['delay_s'], 2):g} s after their "
-                     'addition.',
+        info_printer(f"Quick windows: {round(shared['quick_minutes'] * 60.0, 2):g} s "
+                     f"long, starting {round(shared['delay_minutes'] * 60.0, 2):g} s "
+                     'after their addition.',
                      tight=True,
                      )
+    told = _own_windows_teller(shared['each_window'])
+    if told:
+        info_printer(told, tight=True)
+    if answers['file_windows']:
+        info_printer('Windows of their own (Apply to every experiment unticked): '
+                     f"{', '.join(answers['file_windows'])}.",
+                     tight=True,
+                     )
+
+    # ---- 3 Those that do not fit -----------------------------------------------------
     unfit = []
     for summary in session.summaries:
         name = summary['name']
-        if not additions[name]:
+        if not additions.get(name) or name not in plans:
             continue
+        plan = plans[name]
         settled = window_span_lister(additions[name],
                                      spans[name],
-                                     answers['window_minutes'],
-                                     answers['gap_minutes'],
-                                     final_gap,
+                                     plan['window_minutes'],
+                                     plan['gap_minutes'],
+                                     plan['final_gap_minutes'],
                                      minimum_s,
+                                     each_window=plan['each_window'],
                                      )
         quick = (quick_span_lister(additions[name],
                                    spans[name],
-                                   answers['quick_minutes'],
-                                   answers['delay_minutes'],
+                                   plan['quick_minutes'],
+                                   plan['delay_minutes'],
+                                   plan['each_window'],
                                    )
                  if answers['quick_windows']
                  else []
@@ -2213,10 +3156,12 @@ def details_stage_runner(session: ViewerSession,
     Main function to ask the last questions of the import, on the standard plot cut to
     the limits: the OD values, the temperature of the runs, then the event labels, the
     OD values and the labels each in a table of the window.
-    Once OD values are entered, the strip shows its per OD boxes and a line says so.
-    The plot is redrawn with the labels once they are entered, and they are accepted or
-    typed again; with no events in any file there is nothing to accept. Last, the
-    export of what was imported is offered. The haems are those of the session's fit.
+    Once the OD table is confirmed, one line says every value is in, or a warning
+    names the missing ones, the OD scaling staying off until Edit ODs fills them in.
+    Once every OD value is in, the View box shows its per OD boxes, a line says so,
+    and how the OCR is shown is asked (3.1.1.1).
+    The plot is redrawn with the labels once they are saved; Edit labels changes them
+    later. The haems are those of the session's fit.
 
     ---- Inputs ----
     session : ViewerSession
@@ -2240,26 +3185,26 @@ def details_stage_runner(session: ViewerSession,
     ---- Outputs ----
     Dict[str, dict]
         {file name: {'OD', 'volume', 'dilution_factor', 'events'}}; the OD entries are
-        only present when scaling by OD.
+        only present when scaling by OD, a value left empty being None.
 
     ---- Globals mutated ----
-    None. Stores normalise_od and temperature_c in ``answers`` and whether OD values
-    were entered in the
-    session, shows the strip and writes the export when one is chosen (side effects).
+    None. Stores normalise_od and temperature_c in ``answers`` and whether scaling by
+    OD was chosen and every OD value entered in the session, and shows the strip
+    (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _answers_previewer
-    _export_asker
     _label_table_filler
+    _od_gaps_teller
     _od_lister
     _od_table_filler
     _strip_shower
-    accept_asker
     event_asker
     info_printer
+    ocr_view_asker
     od_scaling_asker
     preview_drawer
     saved_values_reader
@@ -2292,40 +3237,37 @@ def details_stage_runner(session: ViewerSession,
         return _od_table_filler(session, rows)
     details = od_scaling_asker(summaries, answers, defaults, saved, table_filler)
     session.has_od = bool(answers['normalise_od'])
+    # the OD table was shown, so Edit ODs can fill in what is still missing
+    session.is_od_chosen = any(details.values())
     _strip_shower(session, answers)
-    if answers['normalise_od']:
+    if session.is_od_chosen:
         _od_lister(details)
-        info_printer('The OCR and the haems can now be shown per OD, in the strip '
-                     'under the plot: the per OD box beside Haems as, and per OD '
-                     'under OCR as.',
+        _od_gaps_teller(details)
+    if answers['normalise_od']:
+        info_printer('The OCR and the haems can now be shown per OD: the per OD boxes '
+                     'beside OCR as and Haems as in the View box above the plot.',
                      )
 
-    # ---- 2.1 The temperature of the runs ---------------------------------------------
+        # ---- 2.1 How the OCR is shown, now that it can be per OD ---------------------
+        ocr_view_asker(answers, defaults)
+        _strip_shower(session, answers)
+        redraw()
+
+    # ---- 2.2 The temperature of the runs ---------------------------------------------
     # One value for the dataset, asked of everyone: delta psi is worked out with it.
-    # The delta psi row of the strip holds the same value, so the one in use (the
-    # strip may have changed it) is offered, and the strip shows the answer.
+    # The Δψ box holds the same value, so the one in use (the box may have changed it)
+    # is offered, and the box shows the answer.
     temperature_asker(answers, dict(defaults, temperature_c=answers['temperature_c']))
     _strip_shower(session, answers)
 
     # ---- 3 Event labels --------------------------------------------------------------
-    # The table opens again with the labels as last typed until they are accepted.
+    # Edit labels in the View box changes them later, so they are not accepted here.
     def label_filler(entries: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
         return _label_table_filler(session, entries)
-    has_events = any(s['events'] for s in summaries)
-    kept: Set[str] = set()
-    while True:
-        for name, events in event_asker(summaries, saved, label_filler, kept).items():
-            details[name]['events'] = events
-            saved[name] = dict(saved.get(name) or {}, events=events)
-        redraw()
-        if not has_events or accept_asker('Do you accept these event labels?',
-                                          [('no', 'change the labels again')],
-                                          number='3.3',
-                                          ) == 'yes':
-            break
-
-    # ---- 4 Offer the export of what was imported -------------------------------------
-    _export_asker(session, limits, details)
+    for name, events in event_asker(summaries, saved, label_filler).items():
+        details[name]['events'] = events
+        saved[name] = dict(saved.get(name) or {}, events=events)
+    redraw()
     return details
 
 
@@ -2582,14 +3524,11 @@ def plots_stage_runner(session: ViewerSession,
     """
     ---- Summary ----
     Main function to show the figure saved for each file, drawn as it will be saved
-    from the standard settings or the ones last saved for the dataset, and ask whether
-    it is accepted. Each 'No' answer names one part (the oxygen and OCR, which haems,
-    the angle of the event labels): only that part's questions are asked, with the
-    current choices as the defaults, and the figure is drawn and asked about again. The
-    settings strip turns the haems on or off and sets how they and the OCR are shown,
-    the journal and the size, so 'which haems' asks only which ones in which
-    order, and none of those is asked. The OCR asked for as % of baseline with no
-    averaging windows set up offers the window step of the processing.
+    from the standard settings or the ones last saved for the dataset, with the oxygen,
+    the OCR and, while Haem decomposition is ticked, every haem of the fit. The boxes
+    above the plot change how the OCR, the haems and the labels are shown, the angle
+    of the labels, the journal and the size, each redrawing the figure; Continue
+    accepts it.
 
     ---- Inputs ----
     session : ViewerSession
@@ -2621,24 +3560,23 @@ def plots_stage_runner(session: ViewerSession,
     ---- Helpers ----
     _answers_previewer
     _figure_starter
+    _master_page_saver
     _strip_shower
-    _windows_chooser
-    accept_asker
-    haem_choice_asker
+    enter_waiter
     info_printer
-    label_angle_asker
     preview_drawer
     region_files_lister
-    signal_asker
     """
 
     # ---- 1 Start from the standard or saved settings ---------------------------------
+    guide_step_starter('figure')
     info_printer('The figure saved for each file is drawn with the standard settings, '
                  'or with the ones last saved for this dataset. Change only what you '
                  'want different; you can look at every file before accepting it.',
                  )
-    info_printer('How the haems are shown, the journal and the size are in the strip '
-                 'under the plot; each change redraws the figure.',
+    info_printer('How the OCR, the haems and the labels are shown are in the View box '
+                 'above the plot, the journal and the size in the Figure box; each '
+                 'change redraws the figure.',
                  tight=True,
                  )
     # % oxidised is offered when at least one file has both regions.
@@ -2673,74 +3611,14 @@ def plots_stage_runner(session: ViewerSession,
                          'on a master page.',
                          )
     session.master_exporter = master_exporter
-    # The OCR as % of baseline needs the averaging windows: with none set up, the
-    # window step of the processing is run here, over the processing plot.
-    def windows_adder() -> bool:
-        def processing_redraw() -> bool:
-            return preview_drawer(session,
-                                  _answers_previewer(dict(answers, averaging=False),
-                                                     session.fit,
-                                                     'analysis',
-                                                     session.has_od,
-                                                     ),
-                                  limits,
-                                  session.fit,
-                                  details,
-                                  )
-        session.redraw, session.is_figure = processing_redraw, False
-        session.window.strip_state_setter(False)
-        try:
-            processing_redraw()
-            # with neither kind kept, the settled windows are the ones ticked
-            is_any = answers['settled_windows'] or answers['quick_windows']
-            _windows_chooser(session,
-                             answers,
-                             dict(answers,
-                                  averaging=True,
-                                  settled_windows=(answers['settled_windows']
-                                                   or not is_any
-                                                   ),
-                                  ),
-                             limits,
-                             details,
-                             )
-        finally:
-            session.window.strip_state_setter(True)
-            session.redraw, session.is_figure = redraw, True
-        session.has_windows = bool(answers['averaging'])
-        return session.has_windows
 
-    # ---- 2 Change one part at a time until the figure is accepted --------------------
-    while True:
-        # ---- 2.1 Draw the figure -----------------------------------------------------
-        plotted = is_plotted()
-        redraw()
-        if not plotted:
-            info_printer('Nothing is set to be plotted, so no individual figures will '
-                         'be made.',
-                         )
-
-        # ---- 2.2 Ask whether it is accepted, or which part to change -----------------
-        # The Haems box turns the haems on and off, and the strip holds how they are
-        # shown, the journal and the size.
-        changes = [('signals', 'change the oxygen and OCR')]
-        if answers['plot_haems']:
-            changes.append(('haems', 'change which haems are shown'))
-        if plotted:
-            changes.append(('angle', 'change the angle of the event labels'))
-        choice = accept_asker('Do you accept this figure?', changes)
-        if choice == 'yes':
-            return is_plotted()
-
-        # ---- 2.3 Ask that part's questions -------------------------------------------
-        current = dict(answers)
-        if choice == 'signals':
-            signal_asker(answers, current, windows_adder)
-        elif choice == 'haems':
-            haem_choice_asker(answers, current, session.fit)
-        else:
-            label_angle_asker(answers, current)
-        _strip_shower(session, answers)  # the OCR chosen shows under OCR as
+    # ---- 2 Change the figure in the boxes until Continue -----------------------------
+    redraw()
+    enter_waiter('Change the figure in the boxes above the plot, then click Continue.',
+                 FIGURE_NUDGE,
+                 number='5.1',
+                 )
+    return is_plotted()
 
 
 # ---- processing_stage_runner ---------------------------------------------------------
@@ -2750,22 +3628,20 @@ def processing_stage_runner(session: ViewerSession,
                             limits: Dict[str, dict],
                             fits_folder: Path,
                             details: Dict[str, dict],
-                            trim_runner: Callable[[], Dict[str, dict]],
                             regions: Optional[Dict[str, Dict[str, float]]] = None,
                             ) -> Optional[Dict[str, Dict[str, float]]]:
     """
     ---- Summary ----
     Main function to talk the user through the processing, with the plot redrawn after
-    each answer: first the haem fit, then, now that the haems are seen, an offer to
-    change the trim and ignore times, then the oxidised and the reduced region of every
+    each answer: first the haem fit, then the oxidised and the reduced region of every
     file (when the haems are shown), then whether to work out Δψ (when it can be), and
     last the averaging windows, dragged on the plot (they are drawn in the plot only
-    once that step is answered). A line
-    points to the strip at the start, and another to its % oxidised once a file has
-    both regions. The
-    settings strip picks the fit and leaves the haems out, so the decomposition
+    once that step is answered). The trim and ignore edges stay movable under Trim /
+    Ignore in the Time regions box. A line points to the boxes above the plot at the
+    start, and another to % oxidised once a file has both regions. The Haem
+    decomposition box picks the fit and leaves the haems out, so the decomposition
     question only offers to find the components from the data instead. While those
-    questions are asked the strip is greyed out.
+    questions are asked the boxes are greyed out.
 
     ---- Inputs ----
     session : ViewerSession
@@ -2784,9 +3660,6 @@ def processing_stage_runner(session: ViewerSession,
     details : Dict[str, dict]
         OD values and events of every file (details_stage_runner); the averaging
         windows are drawn around the events not ignored there.
-    trim_runner : Callable[[], Dict[str, dict]]
-        Function that asks the trim and ignore questions again with the haems of the
-        session's fit on the plot, and returns the new limits.
     regions : Optional[Dict[str, Dict[str, float]]]
         The regions the step starts with (_regions_chooser), from the last time it
         was answered in this run; None for regions not chosen.
@@ -2824,6 +3697,7 @@ def processing_stage_runner(session: ViewerSession,
     yes_no_asker
     """
 
+    guide_step_starter('haems')
     summaries = session.summaries
     # The windows are drawn in the plot only once their step is answered: until then
     # they are edges over it, and the steps before it show none. The answers keep the
@@ -2863,10 +3737,11 @@ def processing_stage_runner(session: ViewerSession,
     common = set(summaries[0]['datasets'])
     for summary in summaries[1:]:
         common &= set(summary['datasets'])
-    info_printer('Use the strip under the plot to change the fit, the background'
-                 f"{', the spectrometer (Spectra)' if len(common) > 1 else ''} and how "
-                 'the haems are shown (Haems as); the plot is redrawn after each '
-                 'change.',
+    info_printer('Use the Haem decomposition box above the plot to change the fit, the '
+                 'background'
+                 f"{' and the spectrometer (Spectra)' if len(common) > 1 else ''}, and "
+                 'Haems as in the View box for how the haems are shown; the plot is '
+                 'redrawn after each change.',
                  )
 
     # ---- 1.1 Ask whether to decompose, when no haems are shown yet -------------------
@@ -2911,48 +3786,38 @@ def processing_stage_runner(session: ViewerSession,
         session.fit = None
         _strip_shower(session, answers)
 
-    # ---- 2 Offer to change the trim and ignore times ---------------------------------
-    if (answers['decompose'] and
-        yes_no_asker('Do you want to change the trim and ignore times now that the '
-                     'haems are shown?',
-                     False,
-                     )
-        ):
-        limits = trim_runner()
-        session.redraw = redraw
-        redraw()
-
-    # ---- 3 The oxidised and the reduced region ---------------------------------------
-    # The regions go to the session at once, so the plots that follow and the strip
-    # have their % oxidised.
+    # ---- 2 The oxidised and the reduced region ---------------------------------------
+    # The regions go to the session at once, so the plots that follow and the boxes
+    # have their % oxidised. Ox / Red in the Time regions box may change them later.
     if answers['decompose']:
-        regions = _regions_chooser(session, answers, limits, details, regions)
+        regions = _regions_chooser(session, answers, limits, details, session.regions)
         session.regions = regions or {}
         _strip_shower(session, answers)
         if region_files_lister(summaries,
                                limits,
-                               regions,
+                               session.regions,
                                answers.get('decomposition_dataset'),
                                ):
             info_printer('The haems can now be shown in % oxidised: choose it under '
-                         'Haems as in the strip under the plot.',
+                         'Haems as in the View box above the plot.',
                          )
 
-    # ---- 4 Delta psi -----------------------------------------------------------------
+    # ---- 3 Delta psi -----------------------------------------------------------------
     # Asked only when it can be worked out; the plot then gets or loses its panel.
     if answers['decompose'] and session.fit is not None:
         was_on = bool(answers['delta_psi'])
+        # the Δψ box may have been ticked already: its tick is the default
         is_on = delta_psi_asker(answers,
-                                defaults,
+                                dict(defaults, delta_psi=answers['delta_psi']),
                                 list(session.fit['haem_list']),
                                 region_files_lister(summaries,
                                                     limits,
-                                                    regions,
+                                                    session.regions,
                                                     answers.get('decomposition_dataset',
                                                                 ),
                                                     ),
                                 )
-        _strip_shower(session, answers)  # the delta psi row comes or goes with it
+        _strip_shower(session, answers)  # the Δψ box is ticked or not with it
         if is_on != was_on:
             redraw()
         if is_on:
@@ -2962,12 +3827,11 @@ def processing_stage_runner(session: ViewerSession,
             info_printer('Δψ (mV) has its own panel on the plot, for the files with '
                          'both regions; it has gaps where bH or bL is less than '
                          f'{lowest:g} % or more than {highest:g} % reduced. Change '
-                         'the numbers of the method in the Δψ row of the strip under '
-                         'the plot.',
+                         'the numbers of the method in the Δψ box above the plot, and '
+                         'untick it there to leave Δψ out.',
                          )
             info_printer('To compare fits, click Keep to compare, change the fit or '
-                         'the background, then click Keep this one or Go back to '
-                         'kept.',
+                         'the scatter, then click Keep new or Keep old.',
                          tight=True,
                          )
     else:
@@ -2975,19 +3839,19 @@ def processing_stage_runner(session: ViewerSession,
         answers['delta_psi'] = False
         _strip_shower(session, answers)
 
-    # ---- 5 The averaging windows -----------------------------------------------------
+    # ---- 4 The averaging windows -----------------------------------------------------
     # Without haems nothing has drawn this step's plot yet: it may still show the plot
     # of another step.
     if not answers['decompose']:
         redraw()
     _windows_chooser(session, answers, defaults, limits, details)
     drawn['windows'] = True
-    # the strip now offers the OCR as % of baseline, when there are windows
+    # the View box now offers the OCR as % of baseline, when there are windows
     session.has_windows = bool(answers['averaging'])
     _strip_shower(session, answers)
     if answers['averaging']:
         redraw()
-    # Read now: Go back to kept may have put the kept regions back since they were
+    # Read now: Keep old may have put the kept regions back since they were
     # chosen.
     return session.regions if answers['decompose'] else regions
 
@@ -3059,15 +3923,17 @@ def trim_stage_runner(session: ViewerSession,
                       answers: dict,
                       remembered: Dict[str, dict],
                       previous: Optional[Dict[str, dict]] = None,
+                      exporter: Optional[Callable[[Dict[str, dict]], None]] = None,
                       ) -> Dict[str, dict]:
     """
     ---- Summary ----
     Main function to run the trimming step on the standard plot of the whole recording
     of every file: the trimmed and ignored edges are dragged on the plot or typed in
-    the strip under it, and Enter accepts them. When the step is opened again, the
-    limits it had stay on the plot as red dashed lines. The limits are then listed and
-    the trimmed data is drawn. The haems are those of the session's fit (none when it
-    has none).
+    the Time regions box above it, and Continue accepts them; Export csv writes the
+    files with the edges as they are, and the step waits again. When the step is
+    opened again, the limits it had stay on the plot as red dashed lines. The limits
+    are then listed and the trimmed data is drawn. The haems are those of the
+    session's fit (none when it has none).
 
     ---- Inputs ----
     session : ViewerSession
@@ -3080,9 +3946,12 @@ def trim_stage_runner(session: ViewerSession,
     previous : Optional[Dict[str, dict]]
         Limits in the same layout drawn as red dashed lines while the edges are
         dragged; None for none.
+    exporter : Optional[Callable[[Dict[str, dict]], None]]
+        Called with the limits of the edges as they are when Export csv is clicked;
+        None for no Export csv button.
 
     ---- Globals read ----
-    TRIM_FIELDS, TRIM_KEY_TEXT, TRIM_NUDGE (module constants).
+    EXPORT_CSV_CHANGE, EXPORT_CSV_TEXT, TRIM_NUDGE.
 
     ---- Outputs ----
     Dict[str, dict]
@@ -3098,15 +3967,13 @@ def trim_stage_runner(session: ViewerSession,
     ---- Helpers ----
     _answers_previewer
     _limits_lister
+    _step_edges_reader
+    _step_edges_shower
+    _trim_choice_builder
     enter_waiter
     info_printer
     preview_drawer
-    trim_layout_finder
     trim_limits_builder
-    trim_minutes_builder
-    trim_minutes_setter
-    trim_pointer_reader
-    EdgeChoice
     """
 
     # ---- draw ------------------------------------------------------------------------
@@ -3126,39 +3993,39 @@ def trim_stage_runner(session: ViewerSession,
     session.redraw = draw
     draw()
 
-    # ---- 2 Drag or type the edges until Enter ----------------------------------------
-    by_name = {s['name']: s for s in session.summaries}
-    choice = EdgeChoice(fields=list(TRIM_FIELDS),
-                        values=trim_minutes_builder(session.summaries, remembered),
-                        layout_finder=lambda name, minutes: trim_layout_finder(by_name[name],
-                                                                               minutes,
-                                                                               ),
-                        pointer_reader=lambda name, minutes, key, time_min: (
-                            trim_pointer_reader(by_name[name], minutes, key, time_min)),
-                        value_setter=lambda name, minutes, key, value: (
-                            trim_minutes_setter(by_name[name], minutes, key, value)),
-                        key_text=TRIM_KEY_TEXT,
-                        previous=(trim_minutes_builder(session.summaries, previous)
-                                  if previous
-                                  else {}
-                                  ),
-                        )
+    # ---- 2 Drag or type the edges until Continue -------------------------------------
+    # Export csv writes the files with the edges as they are, and the step waits again.
+    choice = _trim_choice_builder(session, remembered, previous)
+    guide_step_starter('trim')
     info_printer('TRIM = data that is not imported, plotted or used.')
     info_printer('IGNORE = data that is plotted but not used for calculations.')
-    info_printer('Grey edges trim, amber edges ignore; with "Every file" ticked, a '
-                 'change moves every file.',
-                 tight=True,
-                 )
-    session.window.edges_shower(choice)
-    try:
-        enter_waiter('Drag the edges on the plot, or type the times in the strip under '
-                     'it. Press Enter when every file looks right.',
-                     TRIM_NUDGE,
-                     number='2.1',
+    info_printer(
+        'Grey edges trim, amber edges ignore; with "Apply to every experiment" '
+        'ticked, a change moves every file.',
+        tight=True,
+        )
+    if exporter is not None:
+        info_printer('Export csv writes the data of every file with these edges, to '
+                     'plot it outside Portimao.',
+                     tight=True,
                      )
-        minutes = session.window.edges_reader()
+    _step_edges_shower(session, 'trim', choice)
+    try:
+        while enter_waiter('Drag the edges on the plot, or type the times in the Time '
+                           'regions box above it. Click Continue when every file looks '
+                           'right.',
+                           TRIM_NUDGE,
+                           number='2.1',
+                           extras=[(EXPORT_CSV_CHANGE, EXPORT_CSV_TEXT)]
+                           if exporter is not None
+                           else [],
+                           ):
+            exporter(trim_limits_builder(session.summaries,
+                                         session.window.edges_reader(),
+                                         ),
+                     )
     finally:
-        session.window.edges_hider()
+        minutes = _step_edges_reader(session)
 
     # ---- 3 List the limits and draw what they keep -----------------------------------
     limits = trim_limits_builder(session.summaries, minutes)
@@ -3292,10 +4159,16 @@ def viewer_asker(summaries: List[dict],
                                  )
     window.strip_state_setter(True)
 
-    def run_trim() -> Dict[str, dict]:
-        old = state.get('limits') or remembered
-        state['limits'] = trim_stage_runner(session, answers, old, state.get('limits'))
-        # the strip offers % oxidised for the regions that hold under these limits
+    # ---- 2.1 The tabs of the Time regions box, the edit buttons, Export csv ----------
+    # The limits are one record, changed in place, so every step and plot uses the
+    # trim and ignore edges of now.
+    def keep_limits(new: Dict[str, dict]) -> Dict[str, dict]:
+        if state.get('limits') is None:
+            state['limits'] = new
+        else:
+            state['limits'].clear()
+            state['limits'].update(new)
+        # the boxes offer % oxidised for the regions that hold under these limits
         session.limits = state['limits']
         _strip_shower(session, answers)
         answers['ignore_first_minutes'] = max(v['ignore_start']
@@ -3304,10 +4177,32 @@ def viewer_asker(summaries: List[dict],
         answers['ignore_last_minutes'] = max(v['ignore_end']
                                              for v in state['limits'].values()
                                              )
-        # asked again (4.3, or going back): an export already made follows the edges
-        if state.get('details') is not None:
-            _export_refresher(session, state['limits'], state['details'])
         return state['limits']
+    def export_csv(limits: Dict[str, dict]) -> None:
+        _export_asker(session, limits, state.get('details') or {})
+    kits = _tab_kits_builder(session, answers, state, keep_limits)
+    session.tab_switcher = lambda tab: _tab_switcher(session, kits, tab)
+    session.edit_runner = lambda name: _box_edit_runner(session,
+                                                        answers,
+                                                        state,
+                                                        name,
+                                                        export_csv,
+                                                        )
+    # an answer given while another tab is open uses that tab's change first
+    window.answer_listener_setter(lambda: (
+        session.tab_switcher('')
+        if session.time_tab and session.time_tab != session.step_tab
+        else None))
+
+    def run_trim() -> Dict[str, dict]:
+        old = state.get('limits') or remembered
+        return keep_limits(trim_stage_runner(session,
+                                             answers,
+                                             old,
+                                             state.get('limits'),
+                                             export_csv,
+                                             ),
+                           )
     def run_details() -> None:
         old_defaults = dict(answers) if state.get('details') else defaults
         state['details'] = details_stage_runner(session,
@@ -3325,7 +4220,6 @@ def viewer_asker(summaries: List[dict],
                                                    state['limits'],
                                                    fits_folder,
                                                    state['details'],
-                                                   run_trim,
                                                    session.regions,
                                                    ) or {}
         session.regions = state['regions']
@@ -3363,6 +4257,7 @@ def viewer_asker(summaries: List[dict],
         while True:
             numbering_setter(0, last_section)
             numbering_setter(1, last_question)
+            guide_step_starter('go_back')
             chosen = choice_asker('Do you want to go back to any of these steps?',
                                   options,
                                   'done',
@@ -3382,6 +4277,8 @@ def viewer_asker(summaries: List[dict],
                              )
     finally:
         window.strip_listener_setter(None)
+        window.answer_listener_setter(None)
+        session.tab_switcher = session.edit_runner = None
         window.strip_state_setter(False)
         session.redraw = None
         session.window.window_closer()

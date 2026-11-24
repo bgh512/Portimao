@@ -21,6 +21,15 @@ QUESTION_NAME = 'question'  # the input every asker and wrapper takes its questi
 NUMBER_NAME = 'number'  # the input a question's own number is given in
 MINIMUM_QUESTIONS = 50  # fewer found than this means the reading itself has broken
 VARYING = '\x00'  # stands for a part filled in at run time ({name}, {time})
+HANDED_ON = '\x01'  # stands for a number handed on from another input
+NUMBERED_SECTIONS = ('1',
+                     '2',
+                     '3',
+                     '4',
+                     '5',
+                     '9',
+                     )  # every question here shows its number
+NOT_YET_NUMBERED = ('5.8',)  # asked through the going-back list, renumbered with it
 
 
 # ---- HELPERS -------------------------------------------------------------------------
@@ -165,27 +174,30 @@ def _list_reader() -> str:
 
 
 # ---- _number_matcher -----------------------------------------------------------------
-def _number_matcher(number: str, question: str, list_text: str) -> bool:
+def _number_matcher(number: str,
+                    question: str,
+                    rows: List[Tuple[str, str]],
+                    ) -> bool:
     """
     ---- Summary ----
-    Helper function to say whether a question sits in the row of its own number in the
-    list, in the same words. The parts filled in at run time match any words within
-    that row's question.
+    Helper function to say whether a question sits in a row of its own number in the
+    list, in the same words: in the row's question, or in a cell of that row for a
+    question asked inside its step (a name for each component, replacing a file).
 
     ---- Inputs ----
     number : str
         The number the code gives the question, such as '3.5'.
     question : str
         Question text from the code, with VARYING for each part filled in at run time.
-    list_text : str
-        Text of the list from _list_reader.
+    rows : List[Tuple[str, str]]
+        The numbered rows of the list from _row_reader.
 
     ---- Globals read ----
-    VARYING (module constant).
+    None.
 
     ---- Outputs ----
     bool
-        True when the row of that number holds the question.
+        True when a row of that number holds the question.
 
     ---- Globals mutated ----
     None.
@@ -194,14 +206,10 @@ def _number_matcher(number: str, question: str, list_text: str) -> bool:
     None.
 
     ---- Helpers ----
-    None.
+    _rows_finder
     """
 
-    parts = ' '.join(question.split()).split(VARYING)
-    pattern = (r'\| ' + re.escape(number) + r' \|[^|]*?' +
-               '[^|]+?'.join(re.escape(part) for part in parts)
-               )
-    return re.search(pattern, list_text) is not None
+    return number in _rows_finder(question, rows)
 
 
 # ---- _question_collector -------------------------------------------------------------
@@ -216,14 +224,14 @@ def _question_collector() -> Tuple[List[Tuple[str, str, Optional[str]]], List[st
     None.
 
     ---- Globals read ----
-    NUMBER_NAME, QUESTION_NAME (module constants).
+    HANDED_ON, NUMBER_NAME, QUESTION_NAME (module constants).
 
     ---- Outputs ----
     Tuple[List[Tuple[str, str, Optional[str]]], List[str]]
         ([(question text, 'file:line', its own number or None)], ['file:line' of each
         question that could not be read]). VARYING stands for each part filled in at
         run time. A number handed on from another input is not one written in the call,
-        so it gives None.
+        so it gives HANDED_ON.
 
     ---- Globals mutated ----
     None.
@@ -258,6 +266,10 @@ def _question_collector() -> Tuple[List[Tuple[str, str, Optional[str]]], List[st
                     isinstance(given[0].value, str)
                     ):
                     number = given[0].value
+                elif given and not (isinstance(given[0], ast.Constant) and
+                                    given[0].value is None
+                                    ):
+                    number = HANDED_ON
                 keyword = [k.value for k in node.keywords if k.arg == QUESTION_NAME]
                 place = carriers[name]
                 if keyword:
@@ -320,6 +332,79 @@ def _question_matcher(question: str, list_text: str) -> bool:
     return re.search('.+?'.join(re.escape(part) for part in parts),
                      list_text,
                      ) is not None
+
+
+# ---- _row_reader ---------------------------------------------------------------------
+def _row_reader() -> List[Tuple[str, str]]:
+    """
+    ---- Summary ----
+    Helper function to read the numbered rows of the question list, each as plain text
+    without the marks for italics, bold and code, and with single spaces.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    ROOT, LIST_NAME (module constants).
+
+    ---- Outputs ----
+    List[Tuple[str, str]]
+        [(the row's number, such as '4.1.1.7', the text of the whole row)], in the
+        order of the list.
+
+    ---- Globals mutated ----
+    None. Reads the file (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    rows: List[Tuple[str, str]] = []
+    for line in (ROOT / LIST_NAME).read_text(encoding='utf-8').splitlines():
+        text = ' '.join(re.sub(r'[*`]', '', line).split())
+        found = re.match(r'\| (\d+(?:\.\d+)*) \|', text)
+        if found:
+            rows.append((found.group(1), text))
+    return rows
+
+
+# ---- _rows_finder --------------------------------------------------------------------
+def _rows_finder(question: str, rows: List[Tuple[str, str]]) -> List[str]:
+    """
+    ---- Summary ----
+    Helper function to find the numbers of the rows of the list that hold a question in
+    the same words, anywhere in the row. The parts filled in at run time match any
+    words within one cell.
+
+    ---- Inputs ----
+    question : str
+        Question text from the code, with VARYING for each part filled in at run time.
+    rows : List[Tuple[str, str]]
+        The numbered rows of the list from _row_reader.
+
+    ---- Globals read ----
+    VARYING (module constant).
+
+    ---- Outputs ----
+    List[str]
+        The numbers of the rows that hold the question, in the order of the list.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    parts = ' '.join(question.split()).split(VARYING)
+    pattern = '[^|]+?'.join(re.escape(part) for part in parts)
+    return [number for number, text in rows if re.search(pattern, text)]
 
 
 # ---- _text_resolver ------------------------------------------------------------------
@@ -539,7 +624,7 @@ def test_question_numbers_match_the_list() -> None:
     None.
 
     ---- Globals read ----
-    VARYING, LIST_NAME (module constants).
+    HANDED_ON, VARYING, LIST_NAME (module constants).
 
     ---- Outputs ----
     None.
@@ -551,23 +636,75 @@ def test_question_numbers_match_the_list() -> None:
     None.
 
     ---- Helpers ----
-    _list_reader
     _number_matcher
     _question_collector
+    _row_reader
     """
 
-    list_text = _list_reader()
+    rows = _row_reader()
     questions, _ = _question_collector()
-    numbered = [(text, where, number) for text, where, number in questions if number]
+    numbered = [(text, where, number)
+                for text, where, number in questions
+                if number and number != HANDED_ON
+                ]
     assert numbered, (
         'No question in the code is given its own number, so the test is no longer '
         'reading the numbers.'
     )
     wrong = [f"{where}: {number} {' '.join(text.split()).replace(VARYING, '...')}"
              for text, where, number in numbered
-             if not _number_matcher(number, text, list_text)
+             if not _number_matcher(number, text, rows)
              ]
     assert not wrong, (
         f'{len(wrong)} question(s) are not in the row of their number in {LIST_NAME}:\n'
         + '\n'.join(wrong)
+    )
+
+
+# ---- test_questions_have_their_own_number --------------------------------------------
+def test_questions_have_their_own_number() -> None:
+    """
+    ---- Summary ----
+    Main function to check that every question of the numbered sections of
+    QUESTION_FLOW.md (set-up to experiment export, and the summary) is given its own
+    number in the code, so none is shown on screen without it.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    LIST_NAME, NOT_YET_NUMBERED, NUMBERED_SECTIONS, VARYING (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _question_collector
+    _row_reader
+    _rows_finder
+    """
+
+    rows = _row_reader()
+    questions, _ = _question_collector()
+    missing = []
+    for text, where, number in questions:
+        if number:
+            continue
+        found = [n
+                 for n in _rows_finder(text, rows)
+                 if n.split('.')[0] in NUMBERED_SECTIONS and n not in NOT_YET_NUMBERED
+                 ]
+        if found:
+            missing.append(f"{where}: {' '.join(text.split()).replace(VARYING, '...')} "
+                           f"(row {found[0]})",
+                           )
+    assert not missing, (
+        f'{len(missing)} question(s) of the numbered sections of {LIST_NAME} are not '
+        'given their own number in the code:\n' + '\n'.join(missing)
     )

@@ -4,18 +4,20 @@ Main program: read .paf files, process them and export figures and workbooks.
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import gc
+import io
 import json
 import os
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib
 matplotlib.use('Agg')  # figures are saved to files; no window is needed
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
@@ -32,7 +34,15 @@ from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
-from utils_shared.questions import section_starter, UserQuitError, yes_no_asker
+from utils_shared.journal_files import journal_answers_fitter
+from utils_shared.output_capture import output_capturer
+from utils_shared.questions import (guide_step_getter,
+                                    guide_step_starter,
+                                    info_printer,
+                                    section_starter,
+                                    UserQuitError,
+                                    yes_no_asker,
+                                    )
 from utils_shared.helpers import (program_title_builder,
                                   program_version_reader,
                                   update_note_finder,
@@ -47,14 +57,16 @@ from utils_shared.survey import (files_asker,
                                  haem_name_formatter,
                                  JOURNAL_NAMES,
                                  multi_experiment_asker,
+                                 spectra_export_asker,
                                  )
 from utils_shared.user_notices import problem_shower, warning_shower
 from utils_shared.user_places import (app_output_logger,
                                       user_folder_preparer,
                                       user_places_finder,
                                       )
-from utils_viewer.viewer_gui import gui_runner, GuiUnavailableError
+from utils_viewer.viewer_gui import active_gui_getter, gui_runner, GuiUnavailableError
 from utils_viewer.viewer_multi import multi_figure_checker_builder
+from utils_viewer.viewer_preview import preview_info_builder
 from utils_viewer.viewer_stages import (region_files_lister,
                                         viewer_asker,
                                         windows_stage_runner,
@@ -73,6 +85,65 @@ WINDOW_TITLE = PROGRAM_TITLE + (' (does not update itself)' if UPDATE_NOTE else 
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- cancel_sentence_builder ---------------------------------------------------------
+def cancel_sentence_builder(exported: List[Path],
+                            saved_plots: List[str],
+                            export_root: Path,
+                            saved_workbooks: Optional[List[str]] = None,
+                            ) -> str:
+    """
+    ---- Summary ----
+    Main function to say what a run cancelled during the questions left in the results
+    folder: the data exported with Export csv, the plots and the workbooks of the files
+    saved once their processing and figure were accepted, any of these, or nothing.
+
+    ---- Inputs ----
+    exported : List[Path]
+        The results folder, once Export csv wrote into it; else empty.
+    saved_plots : List[str]
+        Names of the files whose plot was saved; empty when none was.
+    export_root : Path
+        Results folder.
+    saved_workbooks : Optional[List[str]]
+        Names of the files whose workbook was written; empty or None when none was.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        The sentence, without its full stop.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    files = ' and '.join(text
+                         for text, is_kept in (('plots', bool(saved_plots)),
+                                               ('workbooks', bool(saved_workbooks)),
+                                               )
+                         if is_kept
+                         )
+    kept = [text
+            for text, is_kept in (('data you exported', bool(exported)),
+                                  (f'{files} of your files', bool(files)),
+                                  )
+            if is_kept
+            ]
+    if not kept:
+        return 'Nothing was changed'
+    verb = 'are' if files else 'is'
+    return (f"The {' and the '.join(kept)} {verb} kept in {export_root}; nothing else "
+            f'was changed'
+            )
 
 
 # ---- comparison_maker ----------------------------------------------------------------
@@ -151,6 +222,7 @@ def comparison_maker(comparison: dict,
                                          export_root,
                                          size,
                                          cfg.SPEC,
+                                         settings.COMPARISON_GAP_PADS,
                                          )
         print(f'  Saved {stem} ({size[0] * 25.4:.0f} x {size[1] * 25.4:.0f}'
               f' mm)',
@@ -166,6 +238,8 @@ def everything_asker(folder: Path,
                      export_root: Path,
                      saved: dict,
                      exported: Optional[List[Path]] = None,
+                     saved_plots: Optional[List[str]] = None,
+                     saved_workbooks: Optional[List[str]] = None,
                      ) -> Tuple[dict,
                                 List[dict],
                                 Optional[dict],
@@ -176,7 +250,9 @@ def everything_asker(folder: Path,
     ---- Summary ----
     Main function to ask every question of the run after the files, in numbered
     sections (trimming and ignoring, analysis, plots, summary figures, export), and to
-    build the per-file information.
+    build the per-file information. The plot and the workbook of every file are saved
+    as soon as its processing and figure are accepted, after asking whether the
+    spectra are written too, so the later sections show the plot.
 
     ---- Inputs ----
     folder : Path
@@ -189,8 +265,14 @@ def everything_asker(folder: Path,
         Settings saved with the dataset, from files_asker; empty for a dataset never
         run.
     exported : Optional[List[Path]]
-        List the results folder is added to once the export of the import (3.4) writes
-        into it; None when not needed.
+        List the results folder is added to once Export csv of the trimming step
+        (3.4) writes into it; None when not needed.
+    saved_plots : Optional[List[str]]
+        List that holds the names of the files whose plot is saved in the results
+        folder before the run starts; None when not needed.
+    saved_workbooks : Optional[List[str]]
+        List that holds the names of the files whose workbook is written before the
+        run starts; None when not needed.
 
     ---- Globals read ----
     PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
@@ -204,23 +286,28 @@ def everything_asker(folder: Path,
     ---- Globals mutated ----
     None. Reads from and prints to the terminal; writes last_answers.json through
     last_answers_saver, the settings file of the dataset through
-    dataset_settings_saver, and the export of the import when one is chosen, adding to
-    ``exported`` (side effects).
+    dataset_settings_saver, the export of Export csv when one is chosen, adding to
+    ``exported``, and the plot and the workbook of every file, filling
+    ``saved_plots`` and ``saved_workbooks`` (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    active_gui_getter
     comparison_maker
     dataset_settings_saver
+    experiment_files_saver
     file_settings_merger
     haem_name_formatter
+    journal_answers_fitter
     last_answers_saver
     multi_experiment_asker
     multi_figure_checker_builder
     region_files_lister
     section_starter
     special_figures_maker
+    spectra_export_asker
     summary_figure_asker
     viewer_asker
     windows_stage_runner
@@ -231,20 +318,34 @@ def everything_asker(folder: Path,
     # A dataset never saved starts from the standard settings (config.py); a dataset
     # saved before starts from the settings kept in its own folder.
     names = [s['name'] for s in summaries]
-    defaults = dict(settings.DEFAULT_ANSWERS, **saved.get('answers', {}))
+    # A journal or a width saved with the dataset that the journals folder no longer
+    # has is moved to one it has, and the user is told.
+    defaults, journal_notes = journal_answers_fitter(dict(settings.DEFAULT_ANSWERS,
+                                                          **saved.get('answers', {}),
+                                                          ),
+                                                     settings.JOURNAL_SPECS,
+                                                     )
+    for note in journal_notes:
+        warning_shower(note)
     answers = dict(defaults)
     remembered = saved.get('files', {})
 
     # ---- 2 Ask the questions ---------------------------------------------------------
     # ---- 2.1 Trimming and ignoring, analysis and individual plots --------------------
-    limits, fit, details, plotted, regions = viewer_asker(summaries,
-                                                          answers,
-                                                          defaults,
-                                                          remembered,
-                                                          PLACES.fits_folder,
-                                                          export_root,
-                                                          exported,
-                                                          )
+    (limits,
+     fit,
+     details,
+     plotted,
+     regions,
+     has_spectra,
+     ) = viewer_asker(summaries,
+                      answers,
+                      defaults,
+                      remembered,
+                      PLACES.fits_folder,
+                      export_root,
+                      exported,
+                      )
     # the files with an oxidised and a reduced region: their haems have a % oxidised
     percent_names = region_files_lister(summaries,
                                         limits,
@@ -252,7 +353,18 @@ def everything_asker(folder: Path,
                                         answers.get('decomposition_dataset'),
                                         )
 
-    # ---- 2.2 Multi-experiment plots --------------------------------------------------
+    # ---- 2.2 Save the plot and the workbook of every file ----------------------------
+    # The processing and the figures are accepted, so they are saved now and the later
+    # sections show each file as it is saved, not as it was last previewed. The
+    # spectra are asked about first, as they are written with the workbooks.
+    guide_step_starter('workbooks')
+    print('  Every experiment gets a workbook with everything worked out for it: the '
+          'measured and set oxygen, the OCR, the haems, Δψ, the averages, the events '
+          'and your OD/volume/dilution entries.',
+          )
+    answers['export_spectra'] = spectra_export_asker(has_spectra,
+                                                     defaults['export_spectra'],
+                                                     )
     context = {'answers': answers,
                'fit': fit,
                'summaries': summaries,
@@ -260,18 +372,36 @@ def everything_asker(folder: Path,
                'details': details,
                'regions': regions,
                'export_root': export_root,
+               'has_spectra': has_spectra,
                }
+    plot_fit = fit  # a fit changed later means the files are saved again in the run
+    saved_plots = [] if saved_plots is None else saved_plots
+    saved_workbooks = [] if saved_workbooks is None else saved_workbooks
+    experiment_files_saver(context, saved_plots, active_gui_getter(), saved_workbooks)
+
+    # ---- 2.3 Multi-experiment plots --------------------------------------------------
     checker = multi_figure_checker_builder(context,
                                            {'comparison': comparison_maker,
                                             'special': special_figures_maker,
                                             },
                                            )
     # A figure that needs the averaging windows when none are set up offers the window
-    # step of the processing; the files processed for a preview are then out of date.
+    # step of the processing; the files processed for a preview are then out of date,
+    # and so are the saved plots and workbooks, which show the windows.
     def windows_adder() -> bool:
         context.pop('_processed', None)
-        return windows_stage_runner(context)
-    section_starter('Multi-experiment plots')
+        asking = guide_step_getter()
+        is_set_up = windows_stage_runner(context)
+        if asking is not None:  # the guide goes back to the figure that asked
+            guide_step_starter(asking)
+        if is_set_up:
+            experiment_files_saver(context,
+                                   saved_plots,
+                                   active_gui_getter(),
+                                   saved_workbooks,
+                                   )
+        return is_set_up
+    section_starter('Dataset figures: several experiments')
     comparison, exemplar_names = multi_experiment_asker(summaries,
                                                         answers,
                                                         defaults,
@@ -280,8 +410,8 @@ def everything_asker(folder: Path,
                                                         windows_adder,
                                                         )
 
-    # ---- 2.3 Experiment summaries ----------------------------------------------------
-    section_starter('Experiment summaries')
+    # ---- 2.4 Experiment summaries ----------------------------------------------------
+    section_starter('Dataset figures: summaries')
     fit, custom = summary_figure_asker(names,
                                        answers,
                                        defaults,
@@ -293,25 +423,14 @@ def everything_asker(folder: Path,
                                        windows_adder,
                                        )
 
-    # ---- 2.4 Data export -------------------------------------------------------------
-    section_starter('Data export')
-    print('  Every experiment always gets a workbook with CcO2, CsO2, VoO2, the events'
-          ' and your OD/volume/dilution entries.',
-          )
-    answers['export_full'] = yes_no_asker('Do you want to put every processed table in'
-                                          ' the workbook (OD-scaled, haems, percent, '
-                                          '...)?',
-                                          defaults['export_full'],
-                                          )
-    answers['export_spectra'] = yes_no_asker('Do you want to export the spectra as csv'
-                                             ' files (large, and it takes a while)?',
-                                             defaults['export_spectra'],
-                                             )
-
     # ---- 3 Read the experiments ------------------------------------------------------
     experiments = []
     for s in summaries:
         name = s['name']
+        # the spectra csv files written by Export csv or with the workbooks stay listed
+        has_spectra_csv = (has_spectra or
+                           (bool(answers['export_spectra']) and name in saved_workbooks)
+                           )
         info = {'path': s['path'],
                 'name': name,
                 'duration': s['duration_min'],
@@ -325,6 +444,12 @@ def everything_asker(folder: Path,
                            'haem_ocr': name in (custom['haem_ocr'] or []),
                            },
                 'exemplar': name in (exemplar_names or []),
+                'has_spectra_csv': has_spectra_csv,
+                'write_spectra': bool(answers['export_spectra'],
+                                      ) and not has_spectra_csv,
+                # a plot or workbook saved with the fit of the run is not written again
+                'is_plot_saved': name in saved_plots and fit is plot_fit,
+                'is_workbook_saved': name in saved_workbooks and fit is plot_fit,
                 }
         info['keep'] = ((bool(comparison) and name in comparison['runs']) or
                         info['exemplar'] or
@@ -335,8 +460,9 @@ def everything_asker(folder: Path,
         experiments.append(info)
 
     # ---- 4 Print the summary ---------------------------------------------------------
-    section_starter('Summary')
-    print(f'  Files:            {len(experiments)} from {folder}')
+    section_starter('Dataset export: summary')
+    guide_step_starter('start')
+    print(f'  Files:           {len(experiments)} from {folder}')
     print(f'  Results to:       {export_root}')
     spans = {}
     for name, v in limits.items():
@@ -388,6 +514,11 @@ def everything_asker(folder: Path,
                             round(answers['delay_minutes'] * 60.0, 2),
                             ),
                          )
+        if answers.get('each_window'):
+            kinds.append('some windows set on their own or left out')
+        if answers.get('file_windows'):
+            count = len(answers['file_windows'])
+            kinds.append(f"fixed by hand in {count} file{'' if count == 1 else 's'}")
         averaging_text = '; '.join(kinds)
     print(f'  Averaging windows: {averaging_text}')
     haem_names = [haem_name_formatter(name) for name in answers['haems']]
@@ -426,13 +557,19 @@ def everything_asker(folder: Path,
               f"{JOURNAL_NAMES[answers['ho_journal']]}, {answers['ho_pub_columns']:g} "
               f"column(s), height {answers['ho_pub_height']:g}",
               )
-    print(f'  Workbooks:        '
-          f"{'all processed data' if answers['export_full'] else 'CcO2, CsO2, VoO2'}"
-          f"{' + spectra csv' if answers['export_spectra'] else ''}",
-          )
+    spectra_text = (' + spectra csv'
+                    if answers['export_spectra']
+                    else (' (the spectra csv are already exported)' if has_spectra else '')
+                    )
+    written = len(saved_workbooks) if fit is plot_fit else 0
+    workbooks_text = (f'written for {written} of {len(names)} file(s), with every table'
+                      if written
+                      else 'every table, written when the run starts'
+                      )
+    print(f'  Workbooks:        {workbooks_text}{spectra_text}')
 
     # ---- 5 Confirm the start ---------------------------------------------------------
-    if not yes_no_asker('Do you want to start?', True):
+    if not yes_no_asker('Do you want to start?', True, number='9.1'):
         raise UserQuitError()
 
     # ---- 6 Remember the answers ------------------------------------------------------
@@ -456,21 +593,23 @@ def everything_asker(folder: Path,
     return answers, experiments, fit, comparison, exemplar_names
 
 
-# ---- experiment_processor ------------------------------------------------------------
-def experiment_processor(info: dict,
-                         cfg: settings.Config,
-                         fit: Optional[dict],
-                         export_root: Path,
-                         ) -> Optional[dict]:
+# ---- experiment_file_saver -----------------------------------------------------------
+def experiment_file_saver(info: dict,
+                          cfg: settings.Config,
+                          fit: Optional[dict],
+                          export_root: Path,
+                          ) -> Tuple[Optional[bytes], bool]:
     """
     ---- Summary ----
-    Main function to read, process, plot and export one .paf file. Each step reports its
-    own problem so the next step still runs.
+    Main function to read and process one .paf file once, then save its plot as the run
+    does, handing back a picture of it for the window, and write its workbook. A plot
+    that cannot be saved is said in one sentence and the workbook is still written.
 
     ---- Inputs ----
     info : dict
-        Per-file information from everything_asker: path, name, trim and ignore times,
-        OD values, events, custom and keep flags.
+        Per-file information: path, name, trim and ignore times, OD values, events and
+        regions (preview_info_builder), with write_spectra and has_spectra_csv
+        (experiment_workbook_saver).
     cfg : settings.Config
         Figure style and settings derived from the answers (config.py).
     fit : Optional[dict]
@@ -478,6 +617,206 @@ def experiment_processor(info: dict,
         not decomposed.
     export_root : Path
         Results folder.
+
+    ---- Globals read ----
+    settings.PREVIEW_DPI.
+
+    ---- Outputs ----
+    Tuple[Optional[bytes], bool]
+        (PNG picture of the saved plot, or None when the file has nothing to plot (no
+        oxygen, no OCR and no haems) or its plot could not be saved; True when the
+        workbook was written). Raises what the reading and processing raise.
+
+    ---- Globals mutated ----
+    None. Writes the figure files, the workbook and the spectra files; what the
+    processing and the plot print is kept from the terminal, as the run says it
+    again (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    experiment_data_processor
+    experiment_plotter
+    experiment_workbook_saver
+    output_capturer
+    problem_shower
+    """
+
+    # ---- 1 Read and process the file -------------------------------------------------
+    a = cfg.answers
+    with output_capturer():
+        processed = experiment_data_processor(info, cfg, fit)
+
+    # ---- 2 Save the plot -------------------------------------------------------------
+    picture = None
+    haem_source = processed['plotted_haem_source']
+    if a['plot_o2'] or a['plot_ocr'] or haem_source is not None:
+        try:
+            with output_capturer():
+                # a figure of its own (not pyplot's), so the picture can be taken after
+                # the save
+                figure = Figure(dpi=cfg.FIGURE_DPI)
+                experiment_plotter(processed['experiment'],
+                                   cfg.plot_config_builder(processed['vo2_source'],
+                                                           haem_source,
+                                                           info['ignore_start'],
+                                                           info['ignore_end'],
+                                                           delta_psi=a['delta_psi'],
+                                                           ),
+                                   export_root,
+                                   figure,
+                                   )
+                buffer = io.BytesIO()
+                figure.savefig(buffer, format='png', dpi=settings.PREVIEW_DPI)
+            picture = buffer.getvalue()
+        except Exception as exc:  # a plot problem must not lose the workbook
+            problem_shower(f"  The plot of {info['name']} was not saved (it is tried "
+                           f'again when the run starts)',
+                           exc,
+                           )
+
+    # ---- 3 Write the workbook --------------------------------------------------------
+    is_written = experiment_workbook_saver(processed['experiment'],
+                                           info,
+                                           cfg,
+                                           export_root,
+                                           'it is tried again when the run starts',
+                                           )
+    return picture, is_written
+
+
+# ---- experiment_files_saver ----------------------------------------------------------
+def experiment_files_saver(context: dict,
+                           saved_plots: List[str],
+                           window: Any,
+                           saved_workbooks: Optional[List[str]] = None,
+                           ) -> None:
+    """
+    ---- Summary ----
+    Main function to save the plot and write the workbook of every file with the
+    answers so far, once the processing and the figure are accepted, and to show each
+    saved plot in the window. The spectra are written as csv files the first time
+    only, when they were chosen. A file that cannot be read says so in one sentence and
+    the others carry on; what was not saved is tried again in the run.
+
+    ---- Inputs ----
+    context : dict
+        {answers, fit, summaries, limits, details, regions, export_root, has_spectra}
+        of the run so far (everything_asker); has_spectra is True when the spectra
+        csv files are written already, and is set once they are written here.
+    saved_plots : List[str]
+        List emptied, then filled with the name of each file whose plot was saved.
+    window : Any
+        The browser window, which is given each saved plot; None shows nothing.
+    saved_workbooks : Optional[List[str]]
+        List emptied, then filled with the name of each file whose workbook was
+        written; None keeps no list.
+
+    ---- Globals read ----
+    plt (matplotlib.pyplot).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Sets the matplotlib rcParams of the figure style, writes the figure files,
+    the workbooks and the spectra files, prints its progress, fills ``saved_plots``
+    and ``saved_workbooks`` and sets has_spectra in ``context`` (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    experiment_file_saver
+    info_printer
+    preview_info_builder
+    problem_shower
+    """
+
+    # ---- 1 Set up the figure style ---------------------------------------------------
+    cfg = settings.Config(context['answers'])
+    plt.rcParams.update(cfg.RC_PARAMS)
+    summaries = context['summaries']
+    has_spectra = bool(context.get('has_spectra'))
+    write_spectra = bool(context['answers'].get('export_spectra')) and not has_spectra
+    saved_workbooks = [] if saved_workbooks is None else saved_workbooks
+    del saved_plots[:]
+    del saved_workbooks[:]
+    info_printer(f"Saving the plot and the workbook of each file in "
+                 f"{context['export_root']} (each file is read again, so this can take "
+                 f'a moment) ...',
+                 )
+
+    # ---- 2 Save the plot and the workbook of each file -------------------------------
+    for number, summary in enumerate(summaries, start=1):
+        name = summary['name']
+        info_printer(f'Saving file {number} of {len(summaries)}: {name}', depth=2)
+        info = preview_info_builder(summary,
+                                    context['limits'],
+                                    context['details'],
+                                    context.get('regions'),
+                                    )
+        info.update(write_spectra=write_spectra, has_spectra_csv=has_spectra)
+        try:
+            picture, is_written = experiment_file_saver(info,
+                                                        cfg,
+                                                        context['fit'],
+                                                        context['export_root'],
+                                                        )
+        except Exception as exc:  # one file must not stop the questions
+            problem_shower(f'  The plot and the workbook of {name} were not saved '
+                           f'(they are tried again when the run starts)',
+                           exc,
+                           )
+            continue
+        finally:
+            plt.close('all')
+            gc.collect()
+        if is_written:
+            saved_workbooks.append(name)
+        if picture is None:
+            continue
+        saved_plots.append(name)
+        if window is not None:
+            window.saved_plot_publisher(name, picture)
+
+    # ---- 3 The spectra are written once ----------------------------------------------
+    # Written again later (new averaging windows), the workbooks list them.
+    if write_spectra:
+        context['has_spectra'] = True
+
+
+# ---- experiment_processor ------------------------------------------------------------
+def experiment_processor(info: dict,
+                         cfg: settings.Config,
+                         fit: Optional[dict],
+                         export_root: Path,
+                         unsaved: Optional[List[str]] = None,
+                         ) -> Optional[dict]:
+    """
+    ---- Summary ----
+    Main function to read, process, plot and export one .paf file. Each step reports its
+    own problem so the next step still runs: a figure or a workbook that could not be
+    saved does not take the file out of the later figures.
+
+    ---- Inputs ----
+    info : dict
+        Per-file information from everything_asker: path, name, trim and ignore times,
+        OD values, events, custom and keep flags, is_plot_saved and is_workbook_saved
+        (True when the plot or the workbook was saved once the figure was accepted, so
+        it is not written again), write_spectra and has_spectra_csv.
+    cfg : settings.Config
+        Figure style and settings derived from the answers (config.py).
+    fit : Optional[dict]
+        Fit dictionary from import_fit ({haem_list, data}), or None when the haems are
+        not decomposed.
+    export_root : Path
+        Results folder.
+    unsaved : Optional[List[str]]
+        List the file's name is added to when its workbook could not be saved (open
+        in Excel, a full disk); None keeps no list.
 
     ---- Globals read ----
     plt (matplotlib.pyplot).
@@ -488,7 +827,8 @@ def experiment_processor(info: dict,
         again for the comparison or special figures (info["keep"]), otherwise None.
 
     ---- Globals mutated ----
-    None. Writes the figure and the workbook files and prints progress (side effects).
+    None. Writes the figure and the workbook files, prints progress and adds to
+    ``unsaved`` (side effects).
 
     ---- Equations ----
     None.
@@ -497,7 +837,7 @@ def experiment_processor(info: dict,
     experiment_data_processor
     experiment_plotter
     experiment_preparer
-    experiment_workbook_exporter
+    experiment_workbook_saver
     plot_config_builder
     problem_shower
     """
@@ -511,21 +851,20 @@ def experiment_processor(info: dict,
     # ---- 2 Read and process the data -------------------------------------------------
     processed = experiment_data_processor(info, cfg, fit)
     experiment = processed['experiment']
-    metadata = experiment['metadata']
     od_available = processed['od_available']
-    vo2_source, haem_source = processed['vo2_source'], processed['haem_source']
+    vo2_source = processed['vo2_source']
+    plotted_haem_source = processed['plotted_haem_source']
 
     # ---- 6 Plot the experiment -------------------------------------------------------
-    # Figure.
-    haem_panels = a['plot_haems'] and 'haem_conc' in experiment
-    if a['plot_o2'] or a['plot_ocr'] or haem_panels:
+    # Figure. A plot saved once its questions were accepted is not drawn again.
+    if info.get('is_plot_saved'):
+        print('  Plot already saved.')
+    elif a['plot_o2'] or a['plot_ocr'] or plotted_haem_source is not None:
         try:
             print('  Plotting ...')
             experiment_plotter(experiment,
                                cfg.plot_config_builder(vo2_source,
-                                                       haem_source
-                                                       if haem_panels
-                                                       else None,
+                                                       plotted_haem_source,
                                                        ignore_first,
                                                        ignore_last,
                                                        delta_psi=a['delta_psi'],
@@ -537,22 +876,19 @@ def experiment_processor(info: dict,
             plt.close('all')
 
     # ---- 7 Export the workbook -------------------------------------------------------
-    # Workbook.
-    metadata.update({'ignore_first_minutes': ignore_first,
-                     'ignore_last_minutes': ignore_last,
-                     'fit_file': (fit_describer(a['fit_file'], a['haem_files'])
-                                  if a['decompose']
-                                  else None
-                                  ),
-                     'processed': datetime.now().strftime('%Y-%m-%d %H:%M'),
-                     },
-                    )
-    print('  Exporting ...')
-    experiment_workbook_exporter(experiment,
-                                 export_root,
-                                 full=a['export_full'],
-                                 spectra=a['export_spectra'],
-                                 )
+    # A workbook saved once the figure was accepted is not written again. One that
+    # cannot be written (open in Excel, a full disk) must not lose the file from the
+    # later figures: its data was worked out all the same.
+    if info.get('is_workbook_saved'):
+        print('  Workbook already saved.')
+    elif not experiment_workbook_saver(experiment,
+                                       info,
+                                       cfg,
+                                       export_root,
+                                       'the figures still use this file',
+                                       ):
+        if unsaved is not None:
+            unsaved.append(name)
 
     # ---- 8 Prepare the special figures -----------------------------------------------
     # the special figures
@@ -564,10 +900,93 @@ def experiment_processor(info: dict,
                 item['raw_spectra'] = {}
         return {'experiment': experiment,
                 'vo2_source': vo2_source,
-                'haem_source': haem_source if haem_panels else None,
+                'haem_source': plotted_haem_source,
                 'prepared': prepared,
                 }
     return None
+
+
+# ---- experiment_workbook_saver -------------------------------------------------------
+def experiment_workbook_saver(experiment: dict,
+                              info: dict,
+                              cfg: settings.Config,
+                              export_root: Path,
+                              later: str,
+                              ) -> bool:
+    """
+    ---- Summary ----
+    Main function to write the workbook of one processed file, with the trimming, the
+    fit and when it was processed in its metadata, and its spectra as csv files when
+    they are to be written. A workbook that cannot be written (open in Excel, a full
+    disk) is said in one sentence, with what happens instead.
+
+    ---- Inputs ----
+    experiment : dict
+        The processed experiment (experiment_data_processor); its metadata is added
+        to.
+    info : dict
+        Per-file information: name, ignore_start, ignore_end, write_spectra (True to
+        write the spectra as csv files) and has_spectra_csv (True when they were
+        written before, so the workbook lists them).
+    cfg : settings.Config
+        Settings derived from the answers (decompose, fit_file, haem_files,
+        haem_background).
+    export_root : Path
+        Results folder.
+    later : str
+        What happens when the workbook cannot be written, said in brackets after the
+        sentence, such as 'the figures still use this file'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when the workbook was written.
+
+    ---- Globals mutated ----
+    None. Writes the workbook and the spectra files and prints to the terminal; the
+    details of a problem go to the log (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    experiment_workbook_exporter
+    fit_describer
+    problem_shower
+    """
+
+    a = cfg.answers
+    experiment['metadata'].update({
+        'ignore_first_minutes': info['ignore_start'],
+        'ignore_last_minutes': info['ignore_end'],
+        'fit_file': (fit_describer(a['fit_file'], a['haem_files'])
+                     if a['decompose']
+                     else None
+                     ),
+        'haem_background': (BACKGROUND_SHORT_NAMES.get(a['haem_background'],
+                                                       a['haem_background'],
+                                                       )
+                            if a['decompose']
+                            else None
+                            ),
+        'processed': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        },
+                                  )
+    print('  Exporting ...')
+    try:
+        experiment_workbook_exporter(experiment,
+                                     export_root,
+                                     spectra=bool(info.get('write_spectra')),
+                                     keeps_spectra_list=bool(
+                                         info.get('has_spectra_csv'),
+                                         ),
+                                     )
+    except OSError as exc:
+        problem_shower(f"  The workbook of {info['name']} was not saved ({later})", exc)
+        return False
+    return True
 
 
 # ---- last_answers_loader -------------------------------------------------------------
@@ -735,7 +1154,8 @@ def program_runner() -> int:
 
     ---- Outputs ----
     int
-        0 when every file finished, 1 when the run was cancelled or a file failed.
+        0 when every file finished, 1 when the run was cancelled, a file failed or a
+        workbook could not be saved.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal, sets the matplotlib rcParams, writes
@@ -746,6 +1166,7 @@ def program_runner() -> int:
     None.
 
     ---- Helpers ----
+    cancel_sentence_builder
     comparison_maker
     everything_asker
     experiment_processor
@@ -772,7 +1193,9 @@ def program_runner() -> int:
     print(PROGRAM_TITLE)
     if UPDATE_NOTE:
         print(UPDATE_NOTE)
-    section_starter('Your files')
+    for problem in settings.JOURNAL_PROBLEMS:  # a journal file that cannot be used
+        warning_shower(problem)
+    section_starter('Import')
     try:
         folder, summaries, export_root, saved = files_asker(last_answers_loader(),
                                                             PLACES.own_folder,
@@ -786,8 +1209,11 @@ def program_runner() -> int:
     # Portimao is closed before the run
     log_session = logging_starter(export_root, PROGRAM_TITLE, folder)
     failed = []
+    unsaved: List[str] = []  # files whose workbook could not be saved
     kept = {}
-    exported: List[Path] = []  # the export of the import adds the results folder
+    exported: List[Path] = []  # Export csv adds the results folder
+    saved_plots: List[str] = []  # the files whose plot is saved before the run
+    saved_workbooks: List[str] = []  # the files whose workbook is written before it
     try:
         try:
             (answers,
@@ -795,13 +1221,20 @@ def program_runner() -> int:
              fit,
              comparison,
              exemplar_names,
-             ) = everything_asker(folder, summaries, export_root, saved, exported)
+             ) = everything_asker(folder,
+                                  summaries,
+                                  export_root,
+                                  saved,
+                                  exported,
+                                  saved_plots,
+                                  saved_workbooks,
+                                  )
         except UserQuitError:
-            changed = (f'The data you exported is kept in {export_root}; nothing else '
-                       f'was changed'
-                       if exported
-                       else 'Nothing was changed'
-                       )
+            changed = cancel_sentence_builder(exported,
+                                              saved_plots,
+                                              export_root,
+                                              saved_workbooks,
+                                              )
             print(f"\nCancelled. {changed}; the questions you answered are in the log "
                   f"{log_session['log_path'].name} in the logs folder of the results "
                   f'folder.',
@@ -816,10 +1249,10 @@ def program_runner() -> int:
 
         # ---- 5 Process every file ----------------------------------------------------
         for warning in cfg.STYLE_WARNINGS:
-            warning_shower(f'Figure style warning: {warning}')
+            warning_shower(warning)
         for info in experiments:
             try:
-                result = experiment_processor(info, cfg, fit, export_root)
+                result = experiment_processor(info, cfg, fit, export_root, unsaved)
                 if result:
                     kept[info['name']] = result
             except Exception as exc:
@@ -839,10 +1272,15 @@ def program_runner() -> int:
             print('Not completed: ' + ', '.join(failed) + ' (the reason for each is '
                   'above)',
                   )
+        if unsaved:
+            warning_shower('Workbook not saved for: ' + ', '.join(unsaved) + '. Close '
+                           'these workbooks in Excel and run Portimao again to write '
+                           'them; the figures were made with these files.',
+                           )
         print(f'Results are in: {export_root}')
     finally:
         logging_stopper(log_session)
-    return 1 if failed else 0
+    return 1 if failed or unsaved else 0
 
 
 # ---- special_figures_maker -----------------------------------------------------------

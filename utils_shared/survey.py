@@ -6,7 +6,7 @@ Numbered terminal questions of the main program (sections 1 to 5) and the trimmi
 import re
 import tempfile
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import pandas as pd
@@ -22,8 +22,8 @@ from utils_shared.event_concentrations import (event_amount_writer,
 from utils_shared.helpers import file_name_sanitiser
 from utils_shared.paf_reader import experiment_summary_reader, PafError
 from utils_shared.questions import (choice_asker,
+                                    guide_step_starter,
                                     info_printer,
-                                    multi_asker,
                                     number_asker,
                                     path_cleaner,
                                     progress_clearer,
@@ -44,6 +44,10 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'percent': 'OCR (% of the range)',
               'baseline': 'OCR (% of baseline)',
               }
+# the ways of showing the OCR offered once the OD values are in (3.1.1.1)
+OCR_VIEW_KEYS = ('raw', 'od', 'percent')
+# The OD values of a file, in the order of the OD table, with their plain names.
+OD_VALUE_NAMES = {'OD': 'OD', 'volume': 'volume', 'dilution_factor': 'dilution'}
 PCA_CHOICE = '__pca__'
 # raised form of the characters of an exponent typed as -1 or ^2
 SUPERSCRIPT_TABLE = str.maketrans('-+0123456789', '⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹')
@@ -435,34 +439,31 @@ def _subscript_stripper(match: 're.Match') -> str:
 # ---- _tidy_labels_offerer ------------------------------------------------------------
 def _tidy_labels_offerer(with_events: List[dict],
                          result: Dict[str, List[dict]],
-                         kept: Set[str],
-                         ) -> None:
+                         ) -> bool:
     """
     ---- Summary ----
-    Helper function to list the event labels that could be written more tidily (8 ug
-    ml-1 as 8 µg mL⁻¹) beside their tidy forms, and to ask once whether to use them
-    all. Asks nothing when every label is tidy already or was kept as it is before.
+    Helper function to list the event labels that will be written more tidily (8 ug
+    ml-1 as 8 µg mL⁻¹), each by its file and time, and to ask whether to continue
+    with them (3.2.1). Asks nothing when every label is tidy already.
 
     ---- Inputs ----
     with_events : List[dict]
         File summaries (DATA_FORMAT.md) of the files that have events.
     result : Dict[str, List[dict]]
         {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
-        labels are replaced by their tidy forms when the user agrees.
-    kept : Set[str]
-        Labels the user chose to keep as they are; the labels kept this time are
-        added, so they are not offered again.
+        labels are replaced by their tidy forms when the user continues.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    None
-        Nothing.
+    bool
+        True to go on (the labels were tidy, or are now); False when the user chose
+        to change them in the table again, the labels being left as typed.
 
     ---- Globals mutated ----
-    None. Changes the labels in ``result``, adds to ``kept`` and reads from and prints
-    to the terminal (side effects).
+    None. Changes the labels in ``result`` and reads from and prints to the terminal
+    (side effects).
 
     ---- Equations ----
     None.
@@ -473,17 +474,21 @@ def _tidy_labels_offerer(with_events: List[dict],
     yes_no_asker
     """
 
-    found = tidy_labels_finder(with_events, result, kept)
+    found = tidy_labels_finder(with_events, result)
     if not found:
-        return
-    info_printer('These labels can be written more tidily:')
-    for name, time, entry, tidy in found:
-        info_printer(f"  {name}, {time:.2f} min: {entry['label']} -> {tidy}", depth=2)
-    if yes_no_asker('Do you want to use these tidy forms?', True, number='3.2.1'):
-        for _, _, entry, tidy in found:
-            entry['label'] = tidy
-    else:
-        kept.update(entry['label'] for _, _, entry, _ in found)
+        return True
+    info_printer('These labels will be written more tidily:')
+    for name, time, _, tidy in found:
+        info_printer(f'  {name}, {time:.2f} min: {tidy}', depth=2)
+    if not yes_no_asker('Do you want to continue?',
+                        False,
+                        note='Click No to change them yourself in the table.',
+                        number='3.2.1',
+                        ):
+        return False
+    for _, _, entry, tidy in found:
+        entry['label'] = tidy
+    return True
 
 
 # ---- _trim_minutes_clamper -----------------------------------------------------------
@@ -819,6 +824,7 @@ def delta_psi_asker(answers: dict,
         return False
 
     # ---- 2 Ask -----------------------------------------------------------------------
+    guide_step_starter('delta_psi')
     answers['delta_psi'] = yes_no_asker(
         'Do you want to work out Δψ?',
         defaults['delta_psi'],
@@ -867,7 +873,6 @@ def delta_psi_offer_checker(haems: List[str], region_files: List[str]) -> bool:
 def event_asker(summaries: List[dict],
                 saved: dict,
                 table_filler: Callable[[Dict[str, List[dict]]], Dict[str, List[dict]]],
-                kept: Set[str],
                 ) -> Dict[str, List[dict]]:
     """
     ---- Summary ----
@@ -875,8 +880,9 @@ def event_asker(summaries: List[dict],
     concentration in the chamber) of every event filled in in the labels table,
     starting from the saved or file values, an event being left out by writing ignore
     as its label. Labels that could be written more tidily (8 ug ml-1 as 8 µg mL⁻¹) are
-    then offered in their tidy forms, once, and the concentrations worked out. Nothing
-    is asked when no file has events.
+    then listed in their tidy forms: continuing uses them, and otherwise the table
+    opens again with the labels as typed. The concentrations are then worked out and
+    one line says the labels are saved. Nothing is asked when no file has events.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -887,9 +893,6 @@ def event_asker(summaries: List[dict],
         Function that shows the labels table filled in with the given events, waits
         until it is confirmed, and returns the events with the labels and
         concentrations typed.
-    kept : Set[str]
-        Labels the user chose to keep as they are; they are not offered in their tidy
-        forms again, and the labels kept this time are added.
 
     ---- Globals read ----
     IGNORE_LABEL; settings.CHAMBER_VOLUME_ML.
@@ -900,7 +903,7 @@ def event_asker(summaries: List[dict],
         labelled ignore is left out and has no stock or concentration.
 
     ---- Globals mutated ----
-    None. Adds to ``kept`` and reads from and prints to the terminal (side effects).
+    None. Reads from and prints to the terminal (side effects).
 
     ---- Equations ----
     See event_concentration_filler.
@@ -919,18 +922,20 @@ def event_asker(summaries: List[dict],
     if not with_events:
         return result
 
-    # ---- 2 Fill in the table ---------------------------------------------------------
-    result = table_filler(result)
-    for events in result.values():
-        for entry in events:
-            entry['ignored'] = entry['label'].strip().lower() == IGNORE_LABEL
-            if entry['ignored']:
-                entry['label'] = IGNORE_LABEL
-
-    # ---- 3 Offer the tidy forms, work out the concentrations and list the labels -----
+    # ---- 2 Fill in the table, until the tidy forms are taken -------------------------
     # The same thing added again is known by its label, so the concentrations are
     # worked out from the labels in their final form.
-    _tidy_labels_offerer(with_events, result, kept)
+    while True:
+        result = table_filler(result)
+        for events in result.values():
+            for entry in events:
+                entry['ignored'] = entry['label'].strip().lower() == IGNORE_LABEL
+                if entry['ignored']:
+                    entry['label'] = IGNORE_LABEL
+        if _tidy_labels_offerer(with_events, result):
+            break
+
+    # ---- 3 Work out the concentrations and list the labels ---------------------------
     result = {name: event_concentration_filler(events, settings.CHAMBER_VOLUME_ML)
               for name, events in result.items()
               }
@@ -939,6 +944,9 @@ def event_asker(summaries: List[dict],
         info_printer(f"{summary['name']}:", depth=2)
         for event, entry in zip(summary['events'], result[summary['name']]):
             info_printer(_event_line_builder(event, entry), depth=2)
+    info_printer('Event labels saved! Edit labels in the View box above the plot '
+                 'changes them at any time.',
+                 )
     return result
 
 
@@ -1008,7 +1016,9 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     of every file and the settings saved with the dataset. A results folder named
     without a path is made inside the data folder; one that already holds results of
     these files is taken only once the user agrees to write over them (1.2.1), and
-    otherwise asked again with a free name offered.
+    otherwise asked again with a free name offered. For a dataset opened before, it
+    asks whether its previous processing is loaded (1.3). It starts the first three
+    steps of the guide.
 
     ---- Inputs ----
     last : dict
@@ -1026,7 +1036,7 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
         (data folder, summary of each readable file, results folder, settings saved
         with the dataset). Each summary has name, path, duration_min, events and
         datasets; the settings are those of dataset_settings_reader, empty for a
-        dataset never saved (DATA_FORMAT.md).
+        dataset never saved or one started fresh at 1.3 (DATA_FORMAT.md).
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect).
@@ -1040,8 +1050,10 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     dataset_settings_reader
     experiment_summary_reader
     free_folder_finder
+    guide_step_starter
     info_printer
     paf_finder
+    previous_processing_asker
     progress_clearer
     progress_printer
     results_counter
@@ -1052,16 +1064,18 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     """
 
     # ---- 1 Ask for the .paf folder ---------------------------------------------------
+    guide_step_starter('data_folder')
     listed = data_folder_lister(own_folder)
+    offered = []
+    for number, found in enumerate(listed, start=1):
+        count = len(paf_finder(found))
+        offered.append((str(number),
+                        f"{found.name} ({count} file{'' if count == 1 else 's'})",
+                        ),
+                       )
     if listed:
-        info_printer(f'Data folders found in {own_folder}:')
-        for number, found in enumerate(listed, start=1):
-            count = len(paf_finder(found))
-            info_printer(f"  {number}) {found.name} ({count} file"
-                         f"{'' if count == 1 else 's'})",
-                         )
-        info_printer('Type a number or a name from this list, or the path of another '
-                     'folder.',
+        info_printer(f'Data folders found in {own_folder}: click one, or type or drag '
+                     f'in the path of another folder.',
                      )
     def folder_checker(text: Optional[str]) -> Optional[str]:
         if not text:
@@ -1076,6 +1090,7 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
                       last.get('data_folder'),
                       checker=folder_checker,
                       number='1.1',
+                      choices=offered,
                       )
     folder = data_folder_resolver(text, listed)
     files = paf_finder(folder)
@@ -1105,10 +1120,11 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
                      )
 
     # ---- 3 Ask for the results folder ------------------------------------------------
+    guide_step_starter('results_folder')
     saved = dataset_settings_reader(folder)
     if saved:
-        info_printer('This dataset was opened before: the settings saved in its folder '
-                     'are offered as the defaults.',
+        info_printer('This dataset was opened before: the results folder it used is '
+                     'offered.',
                      )
     offered = saved.get('export_folder') or folder / settings.RESULTS_FOLDER_NAME
     while True:
@@ -1133,6 +1149,11 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
             'Type another folder, or a new name: a name without a path is made '
             'inside the data folder.',
             )
+
+    # ---- 4 Ask whether the previous processing is loaded -----------------------------
+    if saved:
+        guide_step_starter('previous')
+        saved = previous_processing_asker(saved)
     return folder, summaries, export_root, saved
 
 
@@ -1168,57 +1189,6 @@ def free_folder_finder(folder: Path) -> Path:
     while (folder.parent / f'{folder.name}_{number}').exists():
         number += 1
     return folder.parent / f'{folder.name}_{number}'
-
-
-# ---- haem_choice_asker ---------------------------------------------------------------
-def haem_choice_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
-    """
-    ---- Summary ----
-    Main function to ask which haems are plotted, when they are plotted (their panels
-    are moved with the arrows beside them in the window): whether they are is answered by the Haems box of the window's settings
-    strip, in answers['plot_haems'].
-
-    ---- Inputs ----
-    answers : dict
-        Answers dictionary the values are stored in.
-    defaults : dict
-        Default answers.
-    fit : Optional[dict]
-        Fit dictionary (haem_list) used to list the haems, or None.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    bool
-        True when the haems are plotted.
-
-    ---- Globals mutated ----
-    None. Stores the answers in ``answers`` (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    haem_name_formatter
-    multi_asker
-    """
-
-    if not (answers['decompose'] and fit is not None):
-        answers['plot_haems'] = False
-        return False
-    if answers['plot_haems']:
-        answers['haems'] = multi_asker('Which haems would you like to plot?',
-                                       list(fit['haem_list']),
-                                       default_all=True,
-                                       keep_order=True,
-                                       depth=2,
-                                       default_values=(defaults['haems']
-                                                       or list(fit['haem_list'])
-                                                       ),
-                                       label_formatter=haem_name_formatter,
-                                       )
-    return answers['plot_haems']
 
 
 # ---- haem_form_option_builder --------------------------------------------------------
@@ -1296,44 +1266,6 @@ def haem_name_formatter(name: str) -> str:
 
     # ---- 1 Convert the maths spans ---------------------------------------------------
     return re.sub(r'\$([^$]*)\$', _maths_converter, str(name))
-
-
-# ---- label_angle_asker ---------------------------------------------------------------
-def label_angle_asker(answers: dict, defaults: dict) -> None:
-    """
-    ---- Summary ----
-    Main function to ask at what angle the event labels are written.
-
-    ---- Inputs ----
-    answers : dict
-        Answers dictionary the values are stored in.
-    defaults : dict
-        Default answers.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Stores the answer in ``answers`` (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    number_asker
-    """
-
-    answers['event_label_angle'] = number_asker('At what angle should the event labels '
-                                                'be plotted (0 = horizontal, 90 = '
-                                                'vertical)?',
-                                                defaults['event_label_angle'],
-                                                minimum=0,
-                                                maximum=90,
-                                                )
 
 
 # ---- label_tidier --------------------------------------------------------------------
@@ -1459,6 +1391,8 @@ def multi_experiment_asker(summaries: List[dict],
         return comparison, exemplar_names
 
     # ---- 1 Two experiments side by side ----------------------------------------------
+    if len(summaries) >= 2:
+        guide_step_starter('side_by_side')
     while True:
         comparison = None
         answers['plot_comparison'] = False
@@ -1495,6 +1429,8 @@ def multi_experiment_asker(summaries: List[dict],
         defaults = dict(answers)
 
     # ---- 2 Four experiments in a 2x2 grid --------------------------------------------
+    if len(summaries) >= 4:
+        guide_step_starter('grid')
     while True:
         exemplar_names = None
         answers['plot_exemplar'] = False
@@ -1624,6 +1560,93 @@ def ocr_option_builder(keys: List[str]) -> List[Tuple[str, str]]:
     return [(key, OCR_LABELS[key]) for key in keys]
 
 
+# ---- ocr_view_asker ------------------------------------------------------------------
+def ocr_view_asker(answers: dict, defaults: dict) -> str:
+    """
+    ---- Summary ----
+    Main function to ask, once the OD values are in, how the OCR is shown: in µM
+    min⁻¹, per OD or as % of the range. It sets "OCR as" in the View box, and one line
+    says it can be changed there at any time. Per OD is offered first, unless the
+    dataset was saved with another of the three.
+
+    ---- Inputs ----
+    answers : dict
+        Answers dictionary the value is stored in (ocr_mode).
+    defaults : dict
+        Default answers (ocr_mode).
+
+    ---- Globals read ----
+    OCR_VIEW_KEYS (module constant).
+
+    ---- Outputs ----
+    str
+        The ocr_mode chosen: 'raw', 'od' or 'percent'.
+
+    ---- Globals mutated ----
+    None. Stores ocr_mode in ``answers`` and reads from and prints to the terminal
+    (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    choice_asker
+    info_printer
+    ocr_option_builder
+    """
+
+    guide_step_starter('ocr_view')
+    saved = defaults.get('ocr_mode')
+    info_printer('The OD values are in, so the OCR can be shown per OD.')
+    answers['ocr_mode'] = choice_asker('How would you like the OCR shown?',
+                                       ocr_option_builder(list(OCR_VIEW_KEYS)),
+                                       saved if saved in OCR_VIEW_KEYS else 'od',
+                                       number='3.1.1.1',
+                                       )
+    info_printer('You can change this under OCR as in the View box above the plot at '
+                 'any time.',
+                 )
+    return answers['ocr_mode']
+
+
+# ---- od_gaps_finder ------------------------------------------------------------------
+def od_gaps_finder(details: Dict[str, dict]) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to name the OD values still missing, so the OD scaling stays off
+    until every file has its OD, volume and dilution.
+
+    ---- Inputs ----
+    details : Dict[str, dict]
+        {file name: {'OD', 'volume', 'dilution_factor', ...}} as od_scaling_asker
+        returns it; a value missing or None is a gap.
+
+    ---- Globals read ----
+    OD_VALUE_NAMES.
+
+    ---- Outputs ----
+    List[str]
+        'file: value' for each gap, in the order of the files and of the columns of
+        the OD table, such as ['run1.paf: OD', 'run2.paf: volume']; empty when every
+        value is in.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return [f'{name}: {plain}'
+            for name, values in details.items()
+            for key, plain in OD_VALUE_NAMES.items()
+            if values.get(key) is None
+            ]
+
+
 # ---- od_scaling_asker ----------------------------------------------------------------
 def od_scaling_asker(summaries: List[dict],
                      answers: dict,
@@ -1655,26 +1678,29 @@ def od_scaling_asker(summaries: List[dict],
 
     ---- Outputs ----
     Dict[str, dict]
-        {file name: {'OD', 'volume', 'dilution_factor'}}; the dictionaries are empty
-        when not scaling by OD.
+        {file name: {'OD', 'volume', 'dilution_factor'}}, a value left empty being
+        None; the dictionaries are empty when not scaling by OD.
 
     ---- Globals mutated ----
-    None. Stores normalise_od in ``answers`` and reads from and prints to the terminal
-    (side effects).
+    None. Stores normalise_od in ``answers``: True only when scaling by OD was chosen
+    and every value is in, so the OD scaling stays off while one is missing. Reads
+    from and prints to the terminal (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    od_gaps_finder
     yes_no_asker
     """
 
     # ---- 1 Ask whether to scale ------------------------------------------------------
+    guide_step_starter('od_scaling')
     answers['normalise_od'] = yes_no_asker(
         'Do you want to scale by OD?',
         defaults['normalise_od'],
         note='Scaling by OD divides the OCR and the haems by '
-        'dilution factor × OD × volume; the strip under the '
+        'dilution factor × OD × volume; the View box above the '
         'plot then offers per OD for each.',
         number='3.1',
         )
@@ -1692,6 +1718,7 @@ def od_scaling_asker(summaries: List[dict],
                                  }
     for name, values in table_filler(rows).items():
         details[name].update(values)
+    answers['normalise_od'] = not od_gaps_finder(details)
     return details
 
 
@@ -1727,6 +1754,55 @@ def paf_finder(folder: Path) -> List[Path]:
              if p.is_file() and p.suffix.lower() == '.paf'
              ]
     return sorted(files, key=lambda p: _natural_sorter(p.name))
+
+
+# ---- previous_processing_asker -------------------------------------------------------
+def previous_processing_asker(saved: dict) -> dict:
+    """
+    ---- Summary ----
+    Main function to ask, for a dataset opened before, whether its previous processing
+    is loaded (1.3). Yes offers every answer saved with it as the default; No starts
+    the dataset fresh, as one never opened: the standard settings, no OD values and the
+    labels as written in the files. The settings file itself is only written again when
+    the run starts.
+
+    ---- Inputs ----
+    saved : dict
+        The settings saved with the dataset (dataset_settings_reader), not empty.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    dict
+        ``saved`` for yes, an empty dict for no.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    yes_no_asker
+    """
+
+    info_printer('Its trim and ignore edges, OD values, labels, fit, regions, Δψ, '
+                 'windows and figure were saved with it. No starts it fresh, as a '
+                 'dataset never opened.',
+                 tight=True,
+                 )
+    if yes_no_asker('Do you want to load the previous processing?',
+                    True,
+                    number='1.3',
+                    ):
+        return saved
+    info_printer(
+        'The dataset starts from the standard settings. What was saved with it '
+        'is replaced only when you start the run.',
+        )
+    return {}
 
 
 # ---- results_counter -----------------------------------------------------------------
@@ -1901,99 +1977,19 @@ def saved_values_reader(summaries: List[dict],
     return saved
 
 
-# ---- signal_asker --------------------------------------------------------------------
-def signal_asker(answers: dict,
-                 defaults: dict,
-                 windows_adder: Optional[Callable[[], bool]] = None,
-                 ) -> bool:
-    """
-    ---- Summary ----
-    Main function to ask whether the oxygen traces and the OCR are plotted, and which
-    OCR. The OCR as % of baseline needs the averaging windows: with none set up it
-    says so and offers the window step of the processing (4.6); without windows the
-    OCR goes back to what it was.
-
-    ---- Inputs ----
-    answers : dict
-        Answers dictionary the values are stored in; must hold normalise_od and
-        averaging.
-    defaults : dict
-        Default answers.
-    windows_adder : Optional[Callable[[], bool]]
-        Function that runs the window step of the processing, stores what is chosen
-        in ``answers`` and returns True when the windows are then set up; None when
-        the step cannot be run.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    bool
-        True when the oxygen or the OCR is plotted.
-
-    ---- Globals mutated ----
-    None. Stores the answers in ``answers`` (side effect).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    choice_asker
-    info_printer
-    ocr_kind_lister
-    ocr_option_builder
-    yes_no_asker
-    """
-
-    answers['plot_o2'] = yes_no_asker('Do you want to plot the set and measured [O2] '
-                                      '(CsO2 and CcO2)?',
-                                      defaults['plot_o2'],
-                                      )
-    answers['plot_ocr'] = yes_no_asker('Do you want to plot the OCR?',
-                                       defaults['plot_ocr'],
-                                       )
-    if answers['plot_ocr']:
-        keys = ocr_kind_lister(answers['normalise_od'], has_baseline=True)
-        previous = defaults['ocr_mode'] if defaults['ocr_mode'] in keys else keys[0]
-        answers['ocr_mode'] = choice_asker('Which OCR would you like to plot?',
-                                           ocr_option_builder(keys),
-                                           previous,
-                                           depth=2,
-                                           )
-        # The % of baseline never asks for a window of its own.
-        if answers['ocr_mode'] == 'baseline' and not answers['averaging']:
-            info_printer('No averaging windows are set up, and the % of baseline '
-                         'needs them.',
-                         depth=2,
-                         )
-            is_added = bool(windows_adder is not None
-                            and yes_no_asker('Do you want to add them now?',
-                                             True,
-                                             depth=2,
-                                             number='4.6.1',
-                                             )
-                            and windows_adder(),
-                            )
-            if not is_added:
-                answers['ocr_mode'] = previous if previous != 'baseline' else keys[0]
-                info_printer('Without averaging windows the OCR stays as '
-                             f"{OCR_LABELS[answers['ocr_mode']]}.",
-                             depth=2,
-                             )
-    return answers['plot_o2'] or answers['plot_ocr']
-
-
 # ---- size_asker ----------------------------------------------------------------------
 def size_asker(answers: dict,
                defaults: dict,
                keys: dict,
                fallback: Tuple[float, float],
                depth: int = 1,
+               number: Optional[str] = None,
                ) -> None:
     """
     ---- Summary ----
     Main function to ask the journal, width and height of one figure. Answering None
-    to the journal question uses Nature with the fallback width and height.
+    to the journal question uses Nature with the fallback width and height. The width
+    and height are asked inside the journal question's step, so they show its number.
 
     ---- Inputs ----
     answers : dict
@@ -2006,6 +2002,9 @@ def size_asker(answers: dict,
         (columns, height) used when the journal is None.
     depth : int
         Numbering depth of the journal question.
+    number : Optional[str]
+        The journal question's own number in QUESTION_FLOW.md, such as '6.1.3'; None
+        shows the questions without one.
 
     ---- Globals read ----
     config.JOURNAL_SPECS.
@@ -2045,6 +2044,7 @@ def size_asker(answers: dict,
                            options,
                            remembered if remembered in dict(options) else 'none',
                            depth=depth,
+                           number=number,
                            )
     if journal == 'none':
         answers[keys['mode']] = 'default'
@@ -2067,6 +2067,7 @@ def size_asker(answers: dict,
                                             if old in spec['widths_mm']
                                             else widths[0][0],
                                             depth=depth + 1,
+                                            number=number,
                                             )
 
     # ---- 4 Ask for the height --------------------------------------------------------
@@ -2079,6 +2080,7 @@ def size_asker(answers: dict,
                                            exclusive_minimum=True,
                                            maximum=1,
                                            depth=depth + 1,
+                                           number=number,
                                            )
 
 
@@ -2086,13 +2088,14 @@ def size_asker(answers: dict,
 def spectra_export_asker(has_spectra: bool, default: bool) -> bool:
     """
     ---- Summary ----
-    Main function to ask, at the end of the questions, whether the run writes the
-    spectra as csv files. It is not asked when the export of the import wrote them
-    already: one line says so, and the run does not write them a second time.
+    Main function to ask, at the end of the experiment export, whether the workbook
+    of each experiment is written with its spectra as csv files (5.9). It is not asked
+    when Export csv of the trimming step wrote them already: one line says so, and
+    they are not written a second time.
 
     ---- Inputs ----
     has_spectra : bool
-        True when the export of the import (3.4) wrote the spectra as csv files.
+        True when Export csv of the trimming step wrote the spectra as csv files.
     default : bool
         The answer Enter gives.
 
@@ -2101,7 +2104,7 @@ def spectra_export_asker(has_spectra: bool, default: bool) -> bool:
 
     ---- Outputs ----
     bool
-        True when the run is to write the spectra as csv files.
+        True when the spectra are to be written as csv files with the workbooks.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effects).
@@ -2115,14 +2118,15 @@ def spectra_export_asker(has_spectra: bool, default: bool) -> bool:
     """
 
     if has_spectra:
-        info_printer('The spectra were exported as csv files at the end of the '
-                     'set-up, so they are not written again; the workbook of each '
-                     'experiment lists them.',
+        info_printer('The spectra were exported as csv files with Export csv in the '
+                     'trimming step, so they are not written again; the workbook of '
+                     'each experiment lists them.',
                      )
         return False
-    return yes_no_asker('Do you want to export the spectra as csv files (large, and '
-                        'it takes a while)?',
+    return yes_no_asker('Do you want to export the spectra as csv files too (large, '
+                        'and it takes a while)?',
                         default,
+                        number='5.9',
                         )
 
 
@@ -2157,6 +2161,7 @@ def temperature_asker(answers: dict, defaults: dict) -> None:
     number_asker
     """
 
+    guide_step_starter('temperature')
     answers['temperature_c'] = number_asker('What was the temperature of the runs '
                                             '(°C)?',
                                             defaults['temperature_c'],
@@ -2169,13 +2174,11 @@ def temperature_asker(answers: dict, defaults: dict) -> None:
 # ---- tidy_labels_finder --------------------------------------------------------------
 def tidy_labels_finder(with_events: List[dict],
                        result: Dict[str, List[dict]],
-                       kept: Set[str],
                        ) -> List[Tuple[str, float, dict, str]]:
     """
     ---- Summary ----
     Main function to find the event labels that could be written more tidily (8 ug
-    ml-1 as 8 µg mL⁻¹), leaving out the events left out and the labels the user chose
-    to keep as they are.
+    ml-1 as 8 µg mL⁻¹), leaving out the events left out.
 
     ---- Inputs ----
     with_events : List[dict]
@@ -2183,8 +2186,6 @@ def tidy_labels_finder(with_events: List[dict],
     result : Dict[str, List[dict]]
         {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
         per event of the summary, in the same order.
-    kept : Set[str]
-        Labels the user chose to keep as they are.
 
     ---- Globals read ----
     None.
@@ -2208,8 +2209,7 @@ def tidy_labels_finder(with_events: List[dict],
     for summary in with_events:
         for event, entry in zip(summary['events'], result[summary['name']]):
             tidy = label_tidier(entry['label'])
-            is_left_alone = entry['ignored'] or entry['label'] in kept
-            if tidy != entry['label'] and not is_left_alone:
+            if tidy != entry['label'] and not entry['ignored']:
                 found.append((summary['name'], event['time'], entry, tidy))
     return found
 
@@ -2462,6 +2462,46 @@ def trim_pointer_reader(summary: dict,
              'ignore_end': duration - minutes['trim_end'] - time_min,
              }[key]
     return round(max(float(found), 0.0), 1)
+
+
+# ---- trim_times_finder ---------------------------------------------------------------
+def trim_times_finder(summary: dict, minutes: Dict[str, float]) -> Dict[str, float]:
+    """
+    ---- Summary ----
+    Main function to give the four edges of one file as times on its whole recording,
+    as the Trim / Ignore boxes show them (Trim before ... after, Ignore before ...
+    after), so the boxes always show the full times, whatever was trimmed before. A
+    time typed in a box is read back by trim_pointer_reader, as a drag to that time.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with duration_min.
+    minutes : Dict[str, float]
+        {trim_start, trim_end, ignore_start, ignore_end}: the minutes taken off each
+        edge, as kept by trim_minutes_setter.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, float]
+        {trim_start, trim_end, ignore_start, ignore_end} as times on the whole
+        recording (min).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Trim before = trim start; trim after = duration - trim end; ignore before = trim
+    start + ignore start; ignore after = duration - trim end - ignore end. A file of 60
+    min trimmed 4 and 5 min and ignored 5 and 2 min: 4, 55, 9 and 53 min.
+
+    ---- Helpers ----
+    trim_layout_finder
+    """
+
+    edges, _ = trim_layout_finder(summary, minutes)
+    return {key: float(time_min) for key, time_min, _, _ in edges}
 
 
 # ---- window_kind_asker ---------------------------------------------------------------
