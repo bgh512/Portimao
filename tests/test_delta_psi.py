@@ -779,7 +779,7 @@ def test_the_question_is_asked_only_when_delta_psi_can_be_worked_out(
     ) -> None:
     """
     ---- Summary ----
-    Main function to check when "Do you want to work out Δψ?" is asked: only with both
+    Main function to check when "Do you want to plot Δψ?" is asked: only with both
     regions on at least one file and a fit with one bH and one bL. Otherwise nothing is
     asked and the run has no Δψ.
 
@@ -823,7 +823,7 @@ def test_the_question_is_asked_only_when_delta_psi_can_be_worked_out(
     answers = {}
     assert survey.delta_psi_asker(answers, {'delta_psi': False}, with_both, ['run1'])
     assert answers == {'delta_psi': True}
-    assert asked == [('Do you want to work out Δψ?', False, '4.5')]
+    assert asked == [('Do you want to plot Δψ?', False, '4.5')]
 
     # ---- 3 Not asked otherwise: no delta psi, even for a dataset saved with it -------
     answers = {'delta_psi': True}

@@ -48,6 +48,7 @@ from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          )
 from utils_viewer.viewer_renderer import PreviewRenderer
 from utils_viewer.viewer_strip import (EdgeRow,
+                                       formula_picture_maker,
                                        PANEL_ORDER_CHANGE,
                                        SettingsStrip,
                                        strip_values_checker,
@@ -246,6 +247,7 @@ class ViewerGui:
     _every_file_taker
     _every_file_unticker
     _file_follower
+    _formula_writer
     _guide_drawer
     _guide_line_clicker
     _hint_refresher
@@ -285,6 +287,7 @@ class ViewerGui:
     edges_reader
     edges_shower
     extra_publisher
+    formula_sender
     input_reader
     output_capturer
     pictures_publisher
@@ -1258,7 +1261,8 @@ class ViewerGui:
         ---- Inputs ----
         event : tuple
             (kind, ...) with kind 'prompt', 'ask' (how the question is answered),
-            'step' (a step of the guide starts), 'spec', 'session', 'pictures', 'extra',
+            'step' (a step of the guide starts), 'formula' (a formula for the
+            terminal), 'spec', 'session', 'pictures', 'extra',
             'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
             'strip_library', 'strip_state', 'busy',
             'table_show', 'table_hide', 'closed' or 'finished'. The "Plotting data …"
@@ -1282,6 +1286,7 @@ class ViewerGui:
         _closing_handler
         _display_name_lister
         _edges_refresher
+        _formula_writer
         _guide_drawer
         _hint_refresher
         _image_deliverer
@@ -1335,6 +1340,8 @@ class ViewerGui:
         elif kind == 'step':
             self._guide.step_starter(event[1])
             self._guide_drawer()
+        elif kind == 'formula':
+            self._formula_writer(event[1])
         elif kind == 'edges':
             # The rows of the edges sit in the Time regions box, under its tabs.
             choice = event[1]
@@ -1624,6 +1631,56 @@ class ViewerGui:
         files = self._names[:self._file_count]
         if name in files and files.index(name) != self._index:
             self._navigator(files.index(name))
+
+    # ---- _formula_writer -------------------------------------------------------------
+    def _formula_writer(self, formula: str) -> None:
+        """
+        ---- Summary ----
+        Method to add a formula to the terminal on a line of its own, drawn as a
+        textbook writes it in the colour of the terminal's text and the size of its
+        letters. It folds away with the text around it at the next question.
+
+        ---- Inputs ----
+        formula : str
+            The formula in matplotlib's maths text.
+
+        ---- Globals read ----
+        TERMINAL_TEXT (module constant).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Adds the picture to the terminal and keeps it (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        formula_picture_maker
+        """
+
+        picture = self._tk.PhotoImage(master=self._root,
+                                      data=base64.b64encode(
+                                          formula_picture_maker(formula,
+                                                                TERMINAL_TEXT,
+                                                                self._size,
+                                                                ),
+                                          ),
+                                      )
+        # Tk shows a picture only while something holds it
+        self._formulas = getattr(self, '_formulas', []) + [picture]
+        widget = self._text
+        at_end = widget.yview()[1] > 0.98
+        widget.configure(state='normal')
+        if widget.get('end-2c', 'end-1c') not in ('\n', ''):
+            widget.insert('end', '\n')
+        widget.image_create('end', image=picture, padx=12, pady=6)
+        widget.insert('end', '\n')
+        widget.configure(state='disabled')
+        if at_end:
+            widget.see('end')
 
     # ---- _guide_drawer ---------------------------------------------------------------
     def _guide_drawer(self) -> None:
@@ -3801,6 +3858,36 @@ class ViewerGui:
         """
 
         self._events.put(('extra', title, png, is_shown))
+
+    # ---- formula_sender --------------------------------------------------------------
+    def formula_sender(self, formula: str) -> None:
+        """
+        ---- Summary ----
+        Method to queue a formula from the program thread, drawn as a textbook writes
+        it on a line of its own in the guide, after the text printed before it.
+
+        ---- Inputs ----
+        formula : str
+            The formula in matplotlib's maths text (viewer_strip.PSI_FORMULA).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the formula (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('formula', formula))
 
     # ---- input_reader ----------------------------------------------------------------
     def input_reader(self, prompt: Any = '') -> str:

@@ -46,7 +46,21 @@ PSI_MORE_ANSWERS = {'psi_share': 'psi_share',
 PSI_KEPT_ANSWERS = (tuple(settings.DELTA_PSI_MIDPOINT_ANSWERS.values()) +
                     tuple(PSI_MORE_ANSWERS.values())
                     )
-PAPER_TEXT = "Paper's values"
+# The formula of Δψ as a textbook writes it (MATHS.md section 6), shown in the guide
+# when the Δψ step opens, and the line under it saying what its letters are.
+PSI_FORMULA = (r'$\Delta\psi = \dfrac{E_\mathrm{H} - E_\mathrm{L}}{\beta}$'
+               '\n'
+               r'$E_\mathrm{H} = M_\mathrm{H1} - \dfrac{RT}{F}\,\ln\dfrac{h}{n}'
+               r'\qquad E_\mathrm{L} = M_\mathrm{L1} - \dfrac{RT}{F}\,\ln\dfrac{l}{n}$'
+               )
+PSI_FORMULA_NOTE = ('M_H1, M_L1: the midpoints of bH and bL, in the Δψ box (mV); h, l, '
+                    'n: the share of the pairs of haems with only bH, only bL or '
+                    'neither reduced, from how oxidised each haem is; β: the share of '
+                    'the membrane potential between them (0.5); T: the temperature (K); '
+                    'R, F: the gas and Faraday constants.')
+# The tick boxes of the library haems under Build a fit: at most this many on a line,
+# so the box stays narrow enough for the five boxes to fit across a 1920 px screen.
+LIBRARY_TICKS_PER_LINE = 3
 # The journal shown as "None": the standard size, on the page of the standard journal.
 NO_JOURNAL = 'none'
 NO_JOURNAL_TEXT = 'None (standard size)'
@@ -719,7 +733,6 @@ class SettingsStrip:
     _more_toggler
     _ocr_handler
     _order_handler
-    _paper_handler
     _pca_handler
     _per_od_handler
     _psi_handler
@@ -797,7 +810,6 @@ class SettingsStrip:
         _more_toggler
         _ocr_handler
         _order_handler
-        _paper_handler
         _pca_handler
         _per_od_handler
         _psi_handler
@@ -1113,9 +1125,8 @@ class SettingsStrip:
 
         # ---- 2.4 Δψ: its tick, then the numbers of the method while it is ticked -----
         # Each haem's midpoint, typed, then (after the arrow) its midpoint with the
-        # other haem reduced, filled in and not typed in; the fall; the button of the
-        # paper's values and the box that opens the other numbers, as text or as boxes
-        # when "More options" is ticked.
+        # other haem reduced, filled in and not typed in; the fall; then the box that
+        # opens the other numbers, as text or as boxes when "More options" is ticked.
         self._psi_on = tk.BooleanVar(master=parent, value=False)
         self._psi_tick = tick_maker('Δψ', self._psi_on, self._psi_tick_handler)
         psi_box = frame_maker(3, self._psi_tick)
@@ -1123,9 +1134,13 @@ class SettingsStrip:
         self._psi_boxes: Dict[str, Any] = {}
         self._psi_seconds: Dict[str, Any] = {}
 
-        def entry_maker(parent_line: Any, name: str, gap: Tuple[int, int]) -> None:
+        def entry_maker(parent_line: Any,
+                        name: str,
+                        gap: Tuple[int, int],
+                        width: int = 6,
+                        ) -> None:
             box = tk.Entry(parent_line,
-                           width=6,
+                           width=width,
                            justify='right',
                            bg='white',
                            disabledbackground=background,
@@ -1182,11 +1197,6 @@ class SettingsStrip:
         entry_maker(first, 'psi_fall_mV', (0, 2))
         tk.Label(first, text='mV', bg=background).pack(side='left')
         first = line_maker(self._psi_row)
-        self._paper_button = tk.Button(first,
-                                       text=PAPER_TEXT,
-                                       command=self._paper_handler,
-                                       )
-        self._paper_button.pack(side='left', padx=(0, 8))
         self._more = tk.BooleanVar(master=parent, value=False)
         self._more_box = tk.Checkbutton(first,
                                         text='More options',
@@ -1204,18 +1214,25 @@ class SettingsStrip:
                                      justify='left',
                                      wraplength=220,
                                      )
+        # the share and the temperature on one line, the two limits on the next
         self._psi_more = tk.Frame(self._psi_row, bg=background)
-        for words, name, after in (('Share', 'psi_share', ''),
-                                   ('Temperature', 'temperature_c', '°C'),
-                                   ('Given between', 'psi_lowest_percent', ''),
-                                   ('and', 'psi_highest_percent', '% reduced'),
-                                   ):
+        for line_fields in ((('Share', 'psi_share', ''),
+                             ('Temperature', 'temperature_c', '°C'),
+                             ),
+                            (('Given from', 'psi_lowest_percent', ''),
+                             ('to', 'psi_highest_percent', '% reduced'),
+                             ),
+                            ):
             more_line = line_maker(self._psi_more)
-            tk.Label(more_line, text=words, bg=background).pack(side='left',
-                                                                padx=(0, 4),
-                                                                )
-            entry_maker(more_line, name, (0, 2))
-            tk.Label(more_line, text=after, bg=background).pack(side='left')
+            for words, name, after in line_fields:
+                tk.Label(more_line, text=words, bg=background).pack(side='left',
+                                                                    padx=(0, 2),
+                                                                    )
+                entry_maker(more_line, name, (0, 2), 4)
+                if after:
+                    tk.Label(more_line, text=after, bg=background).pack(side='left',
+                                                                        padx=(0, 4),
+                                                                        )
         self._psi_note = tk.Label(self._psi_row,
                                   text='',
                                   bg=background,
@@ -1948,46 +1965,6 @@ class SettingsStrip:
 
         self._on_change({PANEL_ORDER_CHANGE: []})
 
-    # ---- _paper_handler --------------------------------------------------------------
-    def _paper_handler(self) -> None:
-        """
-        ---- Summary ----
-        Method to take the button that puts the numbers of the paper back in the Δψ
-        row: the midpoints, the fall, the share and the limits. The temperature stays,
-        as it is that of the runs.
-
-        ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        settings.DEFAULT_ANSWERS, PSI_FIELDS.
-
-        ---- Outputs ----
-        None
-            Nothing.
-
-        ---- Globals mutated ----
-        None. Keeps the values and reports the changes (side effects).
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        _change_reporter
-        _size_refresher
-        psi_values_builder
-        """
-
-        before = dict(self._values)
-        paper = psi_values_builder(settings.DEFAULT_ANSWERS, True)
-        self._values.update({name: paper[name]
-                             for name in PSI_FIELDS
-                             if name != 'temperature_c'
-                             },
-                            )
-        self._size_refresher()
-        self._change_reporter(before)
-
     # ---- _pca_handler ----------------------------------------------------------------
     def _pca_handler(self) -> None:
         """
@@ -2245,7 +2222,7 @@ class SettingsStrip:
                 self._formula_pictures[name] = self._tk.PhotoImage(
                     master=self.frame,
                     data=base64.b64encode(
-                        formula_picture_maker(name),
+                        formula_picture_maker(BACKGROUND_FORMULAS[name]),
                         ),
                     )
             self._formula_label.configure(image=self._formula_pictures[name])
@@ -2404,7 +2381,6 @@ class SettingsStrip:
             box.delete(0, 'end')
             box.insert(0, f'{values[name]:g}')
             box.configure(state=button_state)
-        self._paper_button.configure(state=button_state)
         self._more.set(self._is_more_open)
         self._psi_summary.configure(text=psi_summary_writer(values))
         self._psi_note.pack_forget()
@@ -2666,9 +2642,9 @@ class SettingsStrip:
     def library_setter(self, haems: List[Dict[str, str]]) -> None:
         """
         ---- Summary ----
-        Method to build the tick boxes of Build a fit: one line for each type of haem
-        (a, b, c, then any other), with a box for each library file, named by its file
-        without .csv.
+        Method to build the tick boxes of Build a fit: the haems of each type (a, b, c,
+        then any other) together, its type in front, with a box for each library file,
+        named by its file without .csv, at most LIBRARY_TICKS_PER_LINE on a line.
 
         ---- Inputs ----
         haems : List[Dict[str, str]]
@@ -2676,7 +2652,7 @@ class SettingsStrip:
             'haem', 'type'}], in the order to show.
 
         ---- Globals read ----
-        None.
+        LIBRARY_TICKS_PER_LINE.
 
         ---- Outputs ----
         None
@@ -2698,20 +2674,25 @@ class SettingsStrip:
             child.destroy()
         self._haems_by_file = {item['file']: item['haem'] for item in haems}
         self._tick_vars, self._tick_boxes = {}, {}
-        lines: Dict[str, Any] = {}
+        # One grid: the type in the first column, then its boxes, at most
+        # LIBRARY_TICKS_PER_LINE on a line, so the box stays narrow.
+        placed: Dict[str, int] = {}
+        row = -1
         for item in haems:
-            if item['type'] not in lines:
-                lines[item['type']] = tk.Frame(self._library, bg=self._background)
-                lines[item['type']].pack(anchor='w')
-                tk.Label(lines[item['type']],
-                         text=item['type'],
-                         width=6,
+            kind = item['type']
+            if kind not in placed:
+                row += 1
+                placed[kind] = 0
+                tk.Label(self._library,
+                         text=kind,
                          anchor='w',
                          bg=self._background,
-                         ).pack(side='left', padx=(4, 4))
+                         ).grid(row=row, column=0, sticky='nw', padx=(4, 6))
+            elif placed[kind] % LIBRARY_TICKS_PER_LINE == 0:
+                row += 1
             name = item['file']
             self._tick_vars[name] = tk.BooleanVar(master=self._library, value=False)
-            box = tk.Checkbutton(lines[item['type']],
+            box = tk.Checkbutton(self._library,
                                  text=name[:-4] if name.lower().endswith('.csv') else name,
                                  variable=self._tick_vars[name],
                                  command=lambda chosen=name: self._tick_handler(chosen),
@@ -2719,7 +2700,12 @@ class SettingsStrip:
                                  activebackground=self._background,
                                  highlightthickness=0,
                                  )
-            box.pack(side='left', padx=(0, 6))
+            box.grid(row=row,
+                     column=1 + placed[kind] % LIBRARY_TICKS_PER_LINE,
+                     sticky='w',
+                     padx=(0, 4),
+                     )
+            placed[kind] += 1
             self._tick_boxes[name] = box
         self._size_refresher()
 
@@ -2942,21 +2928,27 @@ def formula_note_writer(background: str) -> str:
 
 
 # ---- formula_picture_maker -----------------------------------------------------------
-def formula_picture_maker(background: str, colour: str = 'black') -> bytes:
+def formula_picture_maker(formula: str,
+                          colour: str = 'black',
+                          font_pt: float = FORMULA_FONT_PT,
+                          ) -> bytes:
     """
     ---- Summary ----
-    Main function to draw a scatter's formula as a textbook writes it (fractions with
-    a bar, powers raised, the b with their numbers lowered), as a PNG with a clear
-    background for the Haem decomposition box.
+    Main function to draw a formula as a textbook writes it (fractions with a bar,
+    powers raised, letters with their numbers lowered), as a PNG with a clear
+    background: a scatter's for the Haem decomposition box, Δψ's for the guide.
 
     ---- Inputs ----
-    background : str
-        A key of BACKGROUND_FORMULAS.
+    formula : str
+        The formula in matplotlib's maths text (a value of BACKGROUND_FORMULAS, or
+        PSI_FORMULA); one line per line of the picture.
     colour : str
         Colour of the letters.
+    font_pt : float
+        Size of the letters (pt).
 
     ---- Globals read ----
-    BACKGROUND_FORMULAS, FORMULA_DPI, FORMULA_FONT_PT.
+    FORMULA_DPI, FORMULA_FONT_PT.
 
     ---- Outputs ----
     bytes
@@ -2972,14 +2964,17 @@ def formula_picture_maker(background: str, colour: str = 'black') -> bytes:
     None.
     """
 
-    fig = Figure(figsize=(4.0, 0.6), dpi=FORMULA_DPI)
-    fig.text(0.0,
-             0.5,
-             BACKGROUND_FORMULAS[background],
-             fontsize=FORMULA_FONT_PT,
-             color=colour,
-             va='center',
-             )
+    # each line on its own, so the fractions of one line keep clear of the next
+    lines = formula.split('\n')
+    fig = Figure(figsize=(4.0, 0.6 * len(lines)), dpi=FORMULA_DPI)
+    for number, line in enumerate(lines):
+        fig.text(0.0,
+                 1.0 - (number + 0.5) / len(lines),
+                 line,
+                 fontsize=font_pt,
+                 color=colour,
+                 va='center',
+                 )
     buffer = io.BytesIO()
     fig.savefig(buffer,
                 format='png',

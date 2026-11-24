@@ -125,6 +125,8 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        PCA_CHANGE,
                                        psi_answers_builder,
                                        psi_change_describer,
+                                       PSI_FORMULA,
+                                       PSI_FORMULA_NOTE,
                                        SAVE_FIT_CHANGE,
                                        size_answers_builder,
                                        strip_values_builder,
@@ -176,6 +178,8 @@ OD_KEY_LINES = ('OD          = measured OD of the sample',
                 )
 HAEM_NUDGE = ('Change the fit, the scatter or the spectra in the Haem decomposition '
               'box above the plot; press Continue when the haems look right.')
+PSI_NUDGE = ('Type the numbers in the Δψ box above the plot; press Continue when Δψ '
+             'looks right.')
 TRIM_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
               'bars; press Continue when every experiment looks right.')
 # The boxes of the regions step, in the order of redox_regions.REGION_KEYS.
@@ -3578,8 +3582,9 @@ def processing_stage_runner(session: ViewerSession,
     each answer: first the haem fit, set in the Haem decomposition box until Continue
     (its Do PCA button asks the questions that find the components from the whole
     dataset, with the boxes greyed out meanwhile), then the oxidised and the reduced
-    region of every file (when the haems are shown), then whether to work out Δψ (when
-    it can be), and last the averaging windows, dragged on the plot (they are drawn in
+    region of every file (when the haems are shown), then whether to plot Δψ (when it
+    can be; on Yes, its formula and a wait for Continue while its numbers are set in
+    the Δψ box), and last the averaging windows, dragged on the plot (they are drawn in
     the plot only once that step is answered). The trim and ignore edges stay movable
     under Trim / Ignore in the Time regions box. A line says which fit the haems are
     worked out with at the start, and another points to % oxidised once a file has
@@ -3607,7 +3612,8 @@ def processing_stage_runner(session: ViewerSession,
         was answered in this run; None for regions not chosen.
 
     ---- Globals read ----
-    settings.DELTA_PSI_LIMIT_ANSWERS, HAEM_NUDGE.
+    settings.DELTA_PSI_LIMIT_ANSWERS, HAEM_NUDGE, PSI_NUDGE, PSI_FORMULA,
+    PSI_FORMULA_NOTE.
 
     ---- Outputs ----
     Optional[Dict[str, Dict[str, float]]]
@@ -3760,18 +3766,25 @@ def processing_stage_runner(session: ViewerSession,
         if is_on != was_on:
             redraw()
         if is_on:
+            # Like the haem step: the line with the formula, then Continue while the
+            # numbers are set in the Δψ box.
             lowest, highest = (answers[answer]
                                for answer in settings.DELTA_PSI_LIMIT_ANSWERS
                                )
-            info_printer('Δψ (mV) has its own panel on the plot, for the files with '
-                         'both regions; it has gaps where bH or bL is less than '
-                         f'{lowest:g} % or more than {highest:g} % reduced. Change '
-                         'the numbers of the method in the Δψ box above the plot, and '
-                         'untick it there to leave Δψ out.',
-                         )
-            info_printer('To compare fits, click Keep to compare, change the fit or '
-                         'the scatter, then click Keep new or Keep old.',
+            info_printer('Δψ (mV) is worked out from the bH and bL haems, for the '
+                         'files with both regions, and drawn in its own panel:',
                          tight=True,
+                         )
+            session.window.formula_sender(PSI_FORMULA)
+            info_printer(PSI_FORMULA_NOTE, tight=True)
+            info_printer(f'It has gaps where bH or bL is less than {lowest:g} % or '
+                         f'more than {highest:g} % reduced. To compare two sets of '
+                         'numbers, click Keep to compare first.',
+                         )
+            enter_waiter('Set the midpoints of bH and bL and the shift in the Δψ box, '
+                         'press Continue when ready.',
+                         PSI_NUDGE,
+                         number='4.5.1',
                          )
     else:
         # without haems there is no delta psi, whatever the dataset was saved with

@@ -43,6 +43,7 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        haem_ticks_resolver,
                                        height_checker,
                                        kept_decomposition_builder,
+                                       LIBRARY_TICKS_PER_LINE,
                                        NO_JOURNAL,
                                        ocr_form_choices_lister,
                                        ocr_mode_builder,
@@ -50,6 +51,8 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        PCA_CHANGE,
                                        psi_answers_builder,
                                        psi_change_describer,
+                                       PSI_FORMULA,
+                                       PSI_FORMULA_NOTE,
                                        psi_number_checker,
                                        psi_seconds_filler,
                                        psi_summary_writer,
@@ -1166,6 +1169,153 @@ def test_haem_step_is_one_line_and_continue(monkeypatch: pytest.MonkeyPatch) -> 
     assert session.pca_runner is None
 
 
+# ---- test_delta_psi_step_is_like_the_haem_step ---------------------------------------
+def test_delta_psi_step_is_like_the_haem_step(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    ---- Summary ----
+    Main function to check the Δψ step of the processing: after Yes to 4.5, a line,
+    the formula of Δψ drawn in the guide and the line saying what its letters are,
+    then one instruction, 4.5.1, answered with Continue; after No, no formula and no
+    4.5.1. The plot, the regions, the averaging and the questions are stood in for.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the window, the plot, the terminal and the other steps.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. The stand-ins are undone after the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The stand-ins -------------------------------------------------------------
+    asked: list = []
+    said: list = []
+    wanted = {'delta_psi': True}
+    def asker(answers: dict, *args: object) -> bool:
+        answers['delta_psi'] = wanted['delta_psi']
+        return wanted['delta_psi']
+    for name, value in (
+        ('enter_waiter',
+         lambda question, nudge, **kwargs: asked.append(kwargs.get('number'),
+                                                        ) or '',
+         ),
+        ('guide_step_starter', lambda key: None),
+        ('info_printer', lambda text, **kwargs: said.append(text)),
+        ('_strip_shower', lambda session, answers: None),
+        ('_answers_previewer', lambda *args, **kwargs: None),
+        ('preview_drawer', lambda *args, **kwargs: True),
+        ('_regions_chooser', lambda *args, **kwargs: {}),
+        ('region_files_lister', lambda *args, **kwargs: ['a.paf']),
+        ('delta_psi_asker', asker),
+        ('_windows_chooser', lambda *args, **kwargs: None),
+        ):
+        monkeypatch.setattr(viewer_stages, name, value)
+
+    def runner() -> MagicMock:
+        window = MagicMock()
+        session = ViewerSession(summaries=[{'name': 'a.paf', 'datasets': ['Cyt']}],
+                                export_root=Path('.'),
+                                window=window,
+                                )
+        session.fit = {'haem_list': ['Cyt $b_H$', 'Cyt $b_L$']}
+        answers = dict(settings.DEFAULT_ANSWERS, decompose=True, averaging=False)
+        viewer_stages.processing_stage_runner(session,
+                                              answers,
+                                              dict(answers),
+                                              {},
+                                              Path('.'),
+                                              {},
+                                              )
+        return window
+
+    # ---- 2 Yes: the formula, then 4.5.1 ----------------------------------------------
+    window = runner()
+    assert asked == ['4.1', '4.5.1']
+    window.formula_sender.assert_called_once_with(PSI_FORMULA)
+    assert any(text.startswith('Δψ (mV) is worked out from the bH and bL haems')
+               for text in said
+               )
+    assert PSI_FORMULA_NOTE in said
+
+    # ---- 3 No: neither ---------------------------------------------------------------
+    asked.clear()
+    wanted['delta_psi'] = False
+    window = runner()
+    assert asked == ['4.1']
+    window.formula_sender.assert_not_called()
+
+
+# ---- test_library_ticks_three_on_a_line ----------------------------------------------
+def test_library_ticks_three_on_a_line() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the tick boxes of Build a fit are placed at most
+    LIBRARY_TICKS_PER_LINE on a line, each type starting a line of its own after its
+    name, so the Haem decomposition box stays narrow. The widgets are stood in for.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    LIBRARY_TICKS_PER_LINE.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Five a haems on rows 0 and 1 (3 + 2), four b haems on rows 2 and 3 (3 + 1), one c
+    haem on row 4; columns 1 to 3 after the type in column 0.
+
+    ---- Helpers ----
+    None.
+    """
+
+    tk = MagicMock()
+    strip = SettingsStrip(tk, MagicMock(), MagicMock(), 'white', lambda change: None)
+    tk.Checkbutton.reset_mock()
+    tk.Label.reset_mock()
+    haems = ([{'file': f'a{i}.csv', 'haem': f'a{i}', 'type': 'a'} for i in range(5)] +
+             [{'file': f'b{i}.csv', 'haem': f'b{i}', 'type': 'b'} for i in range(4)] +
+             [{'file': 'c1.csv', 'haem': 'c1', 'type': 'c'}]
+             )
+    strip.library_setter(haems)
+    places = [(call.kwargs['row'], call.kwargs['column'])
+              for call in tk.Checkbutton.return_value.grid.call_args_list
+              ]
+    assert LIBRARY_TICKS_PER_LINE == 3
+    assert places == [(0, 1),
+                      (0, 2),
+                      (0, 3),
+                      (1, 1),
+                      (1, 2),
+                      (2, 1),
+                      (2, 2),
+                      (2, 3),
+                      (3, 1),
+                      (4, 1),
+                      ]
+    types = [(call.kwargs['row'], call.kwargs['column'])
+             for call in tk.Label.return_value.grid.call_args_list
+             ]
+    assert types == [(0, 0), (2, 0), (4, 0)]
+
+
 # ---- test_scatters_have_names_and_textbook_formulas ----------------------------------
 def test_scatters_have_names_and_textbook_formulas() -> None:
     """
@@ -1204,11 +1354,14 @@ def test_scatters_have_names_and_textbook_formulas() -> None:
     assert set(BACKGROUND_FORMULAS) == set(BACKGROUND_SHORT_NAMES)
     assert r'\dfrac{b_1}{w^2}' in BACKGROUND_FORMULAS['palencia']
     for name in BACKGROUND_FORMULAS:
-        picture = formula_picture_maker(name)
+        picture = formula_picture_maker(BACKGROUND_FORMULAS[name])
         assert picture.startswith(b'\x89PNG'), name
         note = formula_note_writer(name)
         assert note.startswith('B: the scatter (OD); w: wavelength (nm)')
         assert ('w_mid' in note) == (name == 'rowan_scatter')
+    # the formula of Δψ, on two lines, drawn for the guide in its colour and size
+    assert PSI_FORMULA.count('\n') == 1 and r'\dfrac' in PSI_FORMULA
+    assert formula_picture_maker(PSI_FORMULA, '#d4d4d4', 12).startswith(b'\x89PNG')
 
 
 # ---- test_answers_shown_in_the_strip -------------------------------------------------
@@ -1608,7 +1761,7 @@ def test_numbers_of_the_delta_psi_row() -> None:
 
     # ---- 7 The row itself, its widgets stood in for ----------------------------------
     # Every widget is the same stand-in, so only what the strip keeps and tells is
-    # checked: a number typed, a number refused, and the paper's values put back.
+    # checked: a number typed and a number refused.
     tk = MagicMock()
     told: list = []
     strip = SettingsStrip(tk, MagicMock(), MagicMock(), 'white', told.append)
@@ -1622,9 +1775,8 @@ def test_numbers_of_the_delta_psi_row() -> None:
     strip._psi_handler('psi_bH_mV')
     assert told == [{'psi_fall_mV': 60.0}]
     assert strip.values_reader()['psi_bH_mV'] == 40.0
-    strip._paper_handler()
-    assert told[1:] == [{'psi_fall_mV': 70.0, 'psi_share': 0.5}]
     assert strip.values_reader()['temperature_c'] == 30.0
+    assert not hasattr(strip, '_paper_button')  # no button puts the paper's values back
 
 
 # ---- test_haems_and_ocr_shown_from_the_strip -----------------------------------------

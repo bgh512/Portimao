@@ -489,8 +489,9 @@ def test_changes_that_open_nothing() -> None:
     """
     ---- Summary ----
     Main function to check the changes that leave the guide where it is: how the
-    haems, the OCR and the labels are shown (they belong to every step), a change
-    that belongs to the step waited at, and any change before the first step; that a
+    haems, the OCR and the labels are shown (they belong to every step), Δψ unticked
+    at a later step (a number of its box opens its step), a change that belongs to the
+    step waited at, and any change before the first step; that a
     change of a later step (or its tab of the Time regions box) only ticks it as done;
     and that a click opens only a step already asked.
 
@@ -517,6 +518,20 @@ def test_changes_that_open_nothing() -> None:
     assert not GuideState().change_opener({'fit_file': 'x.csv'})
     assert step_of_change_finder({'haem_mode': 'percent', 'ocr_mode': 'od'}) is None
     assert step_of_change_finder({'journal': 'cell', 'psi_share': 0.4}) == 'delta_psi'
+    # unticking Δψ only takes its panel away; ticking it, or a number of its box,
+    # opens the Δψ step
+    assert step_of_change_finder({'delta_psi': False}) is None
+    assert step_of_change_finder({'delta_psi': True}) == 'delta_psi'
+    assert step_of_change_finder({'delta_psi': False, 'psi_bH_mV': 50.0}) == 'delta_psi'
+    later = _state_maker(list(GUIDE_KEYS[:9]) + ['haems',
+                                                 'regions',
+                                                 'delta_psi',
+                                                 'windows',
+                                                 ],
+                         )
+    assert not later.change_opener({'delta_psi': False})
+    assert later.change_opener({'psi_fall_mV': 60.0})
+    assert later.shown == GUIDE_KEYS.index('delta_psi')
     state = _state_maker(['data_folder', 'trim', 'haems'])
     assert not state.change_opener({'haem_mode': 'abs', 'label_mode': 'added'})
     assert not state.change_opener({'haem_background': 'flat'})  # the step waited at

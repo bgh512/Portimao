@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.23
+- **Version:** V2.24
 - **Date:** 24/11/2026
 
 ## Contents
@@ -137,6 +137,10 @@
     - [`test_the_processing_keeps_delta_psi_when_switched_on`](#test_the_processing_keeps_delta_psi_when_switched_on)
     - [`test_the_question_is_asked_only_when_delta_psi_can_be_worked_out`](#test_the_question_is_asked_only_when_delta_psi_can_be_worked_out)
     - [`test_unequal_haems_give_173_mV`](#test_unequal_haems_give_173_mv)
+- [`tests/test_delta_psi_example.py`](#teststest_delta_psi_examplepy)
+    - [`example_table_builder`](#example_table_builder)
+    - [`example_numbers_finder`](#example_numbers_finder)
+    - [`test_example_delta_psi_stays_fixed`](#test_example_delta_psi_stays_fixed)
 - [`tests/test_early_plots.py`](#teststest_early_plotspy)
     - [`FakeWindow`](#fakewindow)
     - [`_context_builder`](#_context_builder)
@@ -550,6 +554,8 @@
     - [`test_save_fit_names_the_fit_in_use`](#test_save_fit_names_the_fit_in_use)
     - [`test_do_pca_runs_only_in_the_haem_step`](#test_do_pca_runs_only_in_the_haem_step)
     - [`test_haem_step_is_one_line_and_continue`](#test_haem_step_is_one_line_and_continue)
+    - [`test_delta_psi_step_is_like_the_haem_step`](#test_delta_psi_step_is_like_the_haem_step)
+    - [`test_library_ticks_three_on_a_line`](#test_library_ticks_three_on_a_line)
     - [`test_scatters_have_names_and_textbook_formulas`](#test_scatters_have_names_and_textbook_formulas)
     - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
     - [`test_ocr_view_and_the_new_box_values`](#test_ocr_view_and_the_new_box_values)
@@ -5299,7 +5305,7 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check when "Do you want to work out Δψ?" is asked: only with both
+Main function to check when "Do you want to plot Δψ?" is asked: only with both
 regions on at least one file and a fit with one bH and one bL. Otherwise nothing is
 asked and the run has no Δψ.
 
@@ -5352,6 +5358,100 @@ R_H = 0.243692, R_L = 0.593195. Out of 2 + e + e x k = 2 + 2.718282 + 0.198075 =
 
 ---- Helpers ----
 _calculator
+```
+
+## `tests/test_delta_psi_example.py`
+
+Tests that Δψ of the example run, worked out from the file with one fixed set-up,
+
+### DELTA PSI EXAMPLE HELPERS
+
+#### `example_table_builder`
+
+```text
+---- Summary ----
+Helper function to work out the Δψ table of the example run with the fixed set-up,
+through the program's own processing of a file.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PAF_FILE, FITS_FOLDER, SET_UP, REGIONS; settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+pd.DataFrame
+    The Δψ table (DATA_FORMAT.md): one row per spectrum, Δψ and the potential at
+    bH and bL (mV).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_data_processor
+fit_loader
+```
+
+#### `example_numbers_finder`
+
+```text
+---- Summary ----
+Helper function to give the numbers of a Δψ table that the test holds fixed.
+
+---- Inputs ----
+table : pd.DataFrame
+    The Δψ table of the example run (example_table_builder).
+
+---- Globals read ----
+FIXED_SPECTRA; DELTA_PSI_COLUMN, BH_POTENTIAL_COLUMN, BL_POTENTIAL_COLUMN,
+SPECTRUM_INDEX_COLUMN.
+
+---- Outputs ----
+dict
+    {'spectra_with_value', 'summary' (mean, median, lowest and highest Δψ, mean
+    potential at bH and bL), 'values' (Δψ at FIXED_SPECTRA)}, mV.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The mean, median, lowest and highest over the spectra that have a Δψ.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_example_delta_psi_stays_fixed`
+
+```text
+---- Summary ----
+Main function to check that Δψ of the example run, with the fixed set-up, gives
+the same number of spectra with a value and the same numbers as when they were
+written down.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIXED_SPECTRA_WITH_VALUE, FIXED_SUMMARY, FIXED_VALUES, RELATIVE.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Each number within RELATIVE x its size of the one written down.
+
+---- Helpers ----
+example_numbers_finder
+example_table_builder
 ```
 
 ## `tests/test_early_plots.py`
@@ -6907,8 +7007,9 @@ _status_reader
 ```text
 ---- Summary ----
 Main function to check the changes that leave the guide where it is: how the
-haems, the OCR and the labels are shown (they belong to every step), a change
-that belongs to the step waited at, and any change before the first step; that a
+haems, the OCR and the labels are shown (they belong to every step), Δψ unticked
+at a later step (a number of its box opens its step), a change that belongs to the
+step waited at, and any change before the first step; that a
 change of a later step (or its tab of the Time regions box) only ticks it as done;
 and that a click opens only a step already asked.
 
@@ -16824,6 +16925,65 @@ None. The stand-ins are undone after the test.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_delta_psi_step_is_like_the_haem_step`
+
+```text
+---- Summary ----
+Main function to check the Δψ step of the processing: after Yes to 4.5, a line,
+the formula of Δψ drawn in the guide and the line saying what its letters are,
+then one instruction, 4.5.1, answered with Continue; after No, no formula and no
+4.5.1. The plot, the regions, the averaging and the questions are stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the window, the plot, the terminal and the other steps.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The stand-ins are undone after the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_library_ticks_three_on_a_line`
+
+```text
+---- Summary ----
+Main function to check that the tick boxes of Build a fit are placed at most
+LIBRARY_TICKS_PER_LINE on a line, each type starting a line of its own after its
+name, so the Haem decomposition box stays narrow. The widgets are stood in for.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LIBRARY_TICKS_PER_LINE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Five a haems on rows 0 and 1 (3 + 2), four b haems on rows 2 and 3 (3 + 1), one c
+haem on row 4; columns 1 to 3 after the type in column 0.
 
 ---- Helpers ----
 None.
@@ -37176,6 +37336,7 @@ _event_handler
 _every_file_taker
 _every_file_unticker
 _file_follower
+_formula_writer
 _guide_drawer
 _guide_line_clicker
 _hint_refresher
@@ -37215,6 +37376,7 @@ edges_hider
 edges_reader
 edges_shower
 extra_publisher
+formula_sender
 input_reader
 output_capturer
 pictures_publisher
@@ -37850,7 +38012,8 @@ Method to carry out one message from the other threads, on the window thread.
 ---- Inputs ----
 event : tuple
     (kind, ...) with kind 'prompt', 'ask' (how the question is answered),
-    'step' (a step of the guide starts), 'spec', 'session', 'pictures', 'extra',
+    'step' (a step of the guide starts), 'formula' (a formula for the
+    terminal), 'spec', 'session', 'pictures', 'extra',
     'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
     'strip_library', 'strip_state', 'busy',
     'table_show', 'table_hide', 'closed' or 'finished'. The "Plotting data …"
@@ -37874,6 +38037,7 @@ None.
 _closing_handler
 _display_name_lister
 _edges_refresher
+_formula_writer
 _guide_drawer
 _hint_refresher
 _image_deliverer
@@ -37975,6 +38139,35 @@ None.
 
 ---- Helpers ----
 _navigator
+```
+
+##### `_formula_writer`
+
+```text
+---- Summary ----
+Method to add a formula to the terminal on a line of its own, drawn as a
+textbook writes it in the colour of the terminal's text and the size of its
+letters. It folds away with the text around it at the next question.
+
+---- Inputs ----
+formula : str
+    The formula in matplotlib's maths text.
+
+---- Globals read ----
+TERMINAL_TEXT (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds the picture to the terminal and keeps it (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+formula_picture_maker
 ```
 
 ##### `_guide_drawer`
@@ -39258,6 +39451,34 @@ None
 
 ---- Globals mutated ----
 None. Queues the picture for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `formula_sender`
+
+```text
+---- Summary ----
+Method to queue a formula from the program thread, drawn as a textbook writes
+it on a line of its own in the guide, after the text printed before it.
+
+---- Inputs ----
+formula : str
+    The formula in matplotlib's maths text (viewer_strip.PSI_FORMULA).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the formula (side effect).
 
 ---- Equations ----
 None.
@@ -41087,12 +41308,12 @@ changes : Dict[str, Any]
     {name: new value} of the strip values that changed.
 
 ---- Globals read ----
-CHANGE_STEPS, GUIDE_KEYS, TAB_STEPS, TIME_TAB_CHANGE.
+CHANGE_STEPS, GUIDE_KEYS, PSI_TICK_CHANGE, TAB_STEPS, TIME_TAB_CHANGE.
 
 ---- Outputs ----
 Optional[str]
     The key of the step, or None when the change belongs to every step (how the
-    haems, the OCR and the labels are shown).
+    haems, the OCR and the labels are shown, Δψ unticked).
 
 ---- Globals mutated ----
 None.
@@ -44126,8 +44347,9 @@ Main function to talk the user through the processing, with the plot redrawn aft
 each answer: first the haem fit, set in the Haem decomposition box until Continue
 (its Do PCA button asks the questions that find the components from the whole
 dataset, with the boxes greyed out meanwhile), then the oxidised and the reduced
-region of every file (when the haems are shown), then whether to work out Δψ (when
-it can be), and last the averaging windows, dragged on the plot (they are drawn in
+region of every file (when the haems are shown), then whether to plot Δψ (when it
+can be; on Yes, its formula and a wait for Continue while its numbers are set in
+the Δψ box), and last the averaging windows, dragged on the plot (they are drawn in
 the plot only once that step is answered). The trim and ignore edges stay movable
 under Trim / Ignore in the Time regions box. A line says which fit the haems are
 worked out with at the start, and another points to % oxidised once a file has
@@ -44155,7 +44377,8 @@ regions : Optional[Dict[str, Dict[str, float]]]
     was answered in this run; None for regions not chosen.
 
 ---- Globals read ----
-settings.DELTA_PSI_LIMIT_ANSWERS, HAEM_NUDGE.
+settings.DELTA_PSI_LIMIT_ANSWERS, HAEM_NUDGE, PSI_NUDGE, PSI_FORMULA,
+PSI_FORMULA_NOTE.
 
 ---- Outputs ----
 Optional[Dict[str, Dict[str, float]]]
@@ -44768,7 +44991,6 @@ _master_handler
 _more_toggler
 _ocr_handler
 _order_handler
-_paper_handler
 _pca_handler
 _per_od_handler
 _psi_handler
@@ -44840,7 +45062,6 @@ _master_handler
 _more_toggler
 _ocr_handler
 _order_handler
-_paper_handler
 _pca_handler
 _per_od_handler
 _psi_handler
@@ -45391,36 +45612,6 @@ None.
 None.
 ```
 
-##### `_paper_handler`
-
-```text
----- Summary ----
-Method to take the button that puts the numbers of the paper back in the Δψ
-row: the midpoints, the fall, the share and the limits. The temperature stays,
-as it is that of the runs.
-
----- Inputs ----
-None.
-
----- Globals read ----
-settings.DEFAULT_ANSWERS, PSI_FIELDS.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Keeps the values and reports the changes (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_change_reporter
-_size_refresher
-psi_values_builder
-```
-
 ##### `_pca_handler`
 
 ```text
@@ -45801,9 +45992,9 @@ _size_refresher
 
 ```text
 ---- Summary ----
-Method to build the tick boxes of Build a fit: one line for each type of haem
-(a, b, c, then any other), with a box for each library file, named by its file
-without .csv.
+Method to build the tick boxes of Build a fit: the haems of each type (a, b, c,
+then any other) together, its type in front, with a box for each library file,
+named by its file without .csv, at most LIBRARY_TICKS_PER_LINE on a line.
 
 ---- Inputs ----
 haems : List[Dict[str, str]]
@@ -45811,7 +46002,7 @@ haems : List[Dict[str, str]]
     'haem', 'type'}], in the order to show.
 
 ---- Globals read ----
-None.
+LIBRARY_TICKS_PER_LINE.
 
 ---- Outputs ----
 None
@@ -46006,18 +46197,21 @@ None.
 
 ```text
 ---- Summary ----
-Main function to draw a scatter's formula as a textbook writes it (fractions with
-a bar, powers raised, the b with their numbers lowered), as a PNG with a clear
-background for the Haem decomposition box.
+Main function to draw a formula as a textbook writes it (fractions with a bar,
+powers raised, letters with their numbers lowered), as a PNG with a clear
+background: a scatter's for the Haem decomposition box, Δψ's for the guide.
 
 ---- Inputs ----
-background : str
-    A key of BACKGROUND_FORMULAS.
+formula : str
+    The formula in matplotlib's maths text (a value of BACKGROUND_FORMULAS, or
+    PSI_FORMULA); one line per line of the picture.
 colour : str
     Colour of the letters.
+font_pt : float
+    Size of the letters (pt).
 
 ---- Globals read ----
-BACKGROUND_FORMULAS, FORMULA_DPI, FORMULA_FONT_PT.
+FORMULA_DPI, FORMULA_FONT_PT.
 
 ---- Outputs ----
 bytes

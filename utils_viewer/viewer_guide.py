@@ -42,7 +42,7 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
      'Set-up',
      'Temperature',
      'The temperature of the runs was typed here. It can also be changed in the Δψ box, '
-     'under More.',
+     'under More options.',
      ),
     ('od_scaling',
      'Set-up',
@@ -118,6 +118,8 @@ GUIDE_KEYS = tuple(key for key, _, _, _ in GUIDE_STEPS)
 # order of the panels) belongs to every step, and opens none. The Time regions box
 # belongs to the step of the tab pressed (TAB_STEPS).
 TIME_TAB_CHANGE = 'time_tab'
+# The tick of the Δψ box: ticked it opens the Δψ step, unticked none.
+PSI_TICK_CHANGE = 'delta_psi'
 TAB_STEPS = {'trim': 'trim', 'regions': 'regions', 'windows': 'windows'}
 CHANGE_STEPS = {'edit_ods': 'od_values',
                 'edit_labels': 'labels',
@@ -1624,12 +1626,12 @@ def step_of_change_finder(changes: Dict[str, Any]) -> Optional[str]:
         {name: new value} of the strip values that changed.
 
     ---- Globals read ----
-    CHANGE_STEPS, GUIDE_KEYS, TAB_STEPS, TIME_TAB_CHANGE.
+    CHANGE_STEPS, GUIDE_KEYS, PSI_TICK_CHANGE, TAB_STEPS, TIME_TAB_CHANGE.
 
     ---- Outputs ----
     Optional[str]
         The key of the step, or None when the change belongs to every step (how the
-        haems, the OCR and the labels are shown).
+        haems, the OCR and the labels are shown, Δψ unticked).
 
     ---- Globals mutated ----
     None.
@@ -1641,7 +1643,13 @@ def step_of_change_finder(changes: Dict[str, Any]) -> Optional[str]:
     None.
     """
 
-    keys = [CHANGE_STEPS[name] for name in changes if name in CHANGE_STEPS]
+    # Unticking Δψ only takes its panel away, so it opens no step; ticking it opens the
+    # Δψ step, where its numbers are set.
+    keys = [CHANGE_STEPS[name]
+            for name in changes
+            if name in CHANGE_STEPS
+            and not (name == PSI_TICK_CHANGE and not changes[name])
+            ]
     if changes.get(TIME_TAB_CHANGE) in TAB_STEPS:
         keys.append(TAB_STEPS[changes[TIME_TAB_CHANGE]])
     if not keys:

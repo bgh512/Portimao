@@ -741,7 +741,7 @@ def delta_psi_asker(answers: dict,
     # ---- 2 Ask -----------------------------------------------------------------------
     guide_step_starter('delta_psi')
     answers['delta_psi'] = yes_no_asker(
-        'Do you want to work out Δψ?',
+        'Do you want to plot Δψ?',
         defaults['delta_psi'],
         note='Δψ is the membrane potential, worked out from how reduced bH and bL are.',
         number='4.5',
