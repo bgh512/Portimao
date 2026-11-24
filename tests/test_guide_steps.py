@@ -15,6 +15,7 @@ import pytest
 import utils_shared.questions as questions
 from utils_shared.questions import (answer_request_setter,
                                     choice_asker,
+                                    folder_asker,
                                     multi_asker,
                                     number_asker,
                                     yes_no_asker,
@@ -23,6 +24,9 @@ from utils_shared.survey import previous_processing_asker
 from utils_viewer.viewer_guide import (GUIDE_KEYS,
                                        GUIDE_STAGES,
                                        GUIDE_STEPS,
+                                       folder_default_finder,
+                                       folder_start_finder,
+                                       folder_words_builder,
                                        GuideState,
                                        step_of_change_finder,
                                        )
@@ -407,7 +411,8 @@ def test_hints_under_the_answers() -> None:
     from utils_viewer.viewer_gui import _hint_chooser
     assert _hint_chooser('number', None).startswith('Type a number,')
     assert _hint_chooser('text', None).startswith('Type it in the box,')
-    for kind in ('continue', 'yesno', 'choice', 'multi', 'confirm', None):
+    assert _hint_chooser('folder', None).startswith('Click a folder, then Continue.')
+    for kind in ('continue', 'yesno', 'choice', 'multi', 'folder', 'confirm', None):
         assert 'Type the answer' not in _hint_chooser(kind, None)
         assert not _hint_chooser(kind, None).startswith('Type')
 
@@ -628,3 +633,85 @@ def test_answers_told_to_the_window(monkeypatch: pytest.MonkeyPatch,
     assert '(y/N)' not in printed and '[120]' not in printed
     assert '1) First' not in printed
     assert 'Tick one or more, then click Continue.' in printed
+
+
+# ---- test_folder_question ------------------------------------------------------------
+def test_folder_question(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check a folder question (1.1, 1.2): what the window is told (the
+    folders, the one highlighted, what the box under Other folder… starts with), that
+    a refused folder makes the question wait, and Enter gives the default; and which
+    button is highlighted, the words on each and where Browse… opens.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the reading of the answers.
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. The window stand-in is taken away at the end.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 What the window is told, and the answers ----------------------------------
+    told: List[dict] = []
+    first = str(tmp_path / 'data_a')
+    second = str(tmp_path / 'data_b')
+    folders = [(first, 'data_a', '6 files'), (second, 'data_b', '1 file')]
+    typed = ['nowhere', second, '']
+    monkeypatch.setattr(questions,
+                        '_input_reader',
+                        lambda text, indent='': typed.pop(0),
+                        )
+    def checker(text: str) -> object:
+        return None if text in (first, second) else 'Choose a folder that exists.'
+    answer_request_setter(told.append)
+    try:
+        assert folder_asker('Choose the folder, then press Continue.',
+                            folders,
+                            default=first,
+                            typed=first,
+                            checker=checker,
+                            number='1.1',
+                            ) == second
+        assert folder_asker('Choose the folder, then press Continue.',
+                            folders,
+                            default=first,
+                            number='1.1',
+                            ) == first
+    finally:
+        answer_request_setter(None)
+    assert told[0] == {'kind': 'folder',
+                       'options': folders,
+                       'default': first,
+                       'value': first,
+                       }
+
+    # ---- 2 The button highlighted ----------------------------------------------------
+    answers = [first, second]
+    assert folder_default_finder(answers, second) == 1
+    assert folder_default_finder(answers, f'"{second}"') == 1
+    assert folder_default_finder(answers, str(tmp_path / 'elsewhere')) == -1
+    assert folder_default_finder(answers, None) == 0
+    assert folder_default_finder([], None) == -1
+
+    # ---- 3 The words on a button, and where Browse… opens ----------------------------
+    assert folder_words_builder('data_a', '6 files', True) == '●  data_a  ·  6 files'
+    assert folder_words_builder('Other folder…', '', False) == '○  Other folder…'
+    assert folder_start_finder(str(tmp_path / 'new' / 'results')) == str(tmp_path)
+    assert folder_start_finder(f'"{tmp_path}"') == str(tmp_path)
+    assert folder_start_finder('') == str(Path.home())

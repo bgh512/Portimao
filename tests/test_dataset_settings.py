@@ -22,6 +22,7 @@ from utils_shared.survey import (data_folder_lister,
                                  haem_form_option_builder,
                                  results_counter,
                                  results_folder_checker,
+                                 results_folder_lister,
                                  results_folder_resolver,
                                  saved_values_reader,
                                  )
@@ -378,10 +379,10 @@ def test_results_folder_is_checked(tmp_path: Path) -> None:
 
     a_file = tmp_path / 'notes.txt'
     a_file.write_text('')
-    not_a_file = 'Type or drag in a folder, not a file.'
+    not_a_file = 'Choose a folder, not a file.'
     assert results_folder_checker(str(a_file)) == not_a_file
     assert results_folder_checker(f'"{a_file / "results"}"') == not_a_file
-    assert results_folder_checker('') == 'Type or drag in a folder.'
+    assert results_folder_checker('') == 'Choose a folder.'
     assert results_folder_checker(str(tmp_path)) is None
     assert results_folder_checker(str(tmp_path / 'new' / 'results')) is None
     assert [p.name for p in tmp_path.iterdir()] == ['notes.txt']
@@ -425,8 +426,7 @@ def test_results_folder_names_and_old_results(tmp_path: Path) -> None:
     assert results_folder_resolver(f'"{elsewhere}"', data) == elsewhere
     assert results_folder_checker('quadratic_scatter_results', data) is None
     (data / 'notes.txt').write_text('')
-    assert results_folder_checker('notes.txt', data) == ('Type or drag in a folder, '
-                                                         'not a file.')
+    assert results_folder_checker('notes.txt', data) == 'Choose a folder, not a file.'
 
     # ---- 2 Count the files with results ----------------------------------------------
     results = data / 'results'
@@ -443,6 +443,64 @@ def test_results_folder_names_and_old_results(tmp_path: Path) -> None:
     assert free_folder_finder(results) == data / 'results_2'
     (data / 'results_2').mkdir()
     assert free_folder_finder(results) == data / 'results_3'
+
+
+# ---- test_results_folders_offered ----------------------------------------------------
+def test_results_folders_offered(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check the folders offered as buttons for the results (1.2): every
+    folder inside the data folder in name order, each with what it holds, and the
+    folder offered first only when it does not exist yet or is outside the data folder.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The folders inside the data folder ----------------------------------------
+    data = tmp_path / 'data'
+    (data / 'results' / 'run1').mkdir(parents=True)
+    (data / 'results' / 'run1' / 'run1.xlsx').write_text('')
+    (data / 'old_exports').mkdir()
+    (data / '_hidden').mkdir()
+    (data / 'run1.paf').write_text('')
+    summaries = [{'name': 'run1'}, {'name': 'run2'}]
+    results = str(data / 'results')
+    old = str(data / 'old_exports')
+    assert results_folder_lister(data, data / 'results', summaries) == [
+        (old, 'old_exports', 'no results'),
+        (results, 'results', 'holds results of 1 of 2 files'),
+        ]
+
+    # ---- 2 A free name, and a folder outside, come first -----------------------------
+    free = data / 'results_2'
+    assert results_folder_lister(data, free, summaries)[0] == (str(free),
+                                                               'results_2',
+                                                               'new folder',
+                                                               )
+    outside = tmp_path / 'paper'
+    outside.mkdir()
+    assert results_folder_lister(data, outside, summaries)[0] == (str(outside),
+                                                                  'paper',
+                                                                  'no results',
+                                                                  )
+    assert len(results_folder_lister(data, outside, summaries)) == 3
 
 
 # ---- test_results_folder_outside_is_kept_whole ---------------------------------------

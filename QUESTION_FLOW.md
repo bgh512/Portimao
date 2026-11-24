@@ -1,4 +1,4 @@
-# Portimao question flow (V2.18)
+# Portimao question flow (V2.19)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -55,12 +55,12 @@ Every question in the order it is asked, with where each answer leads. The quest
 
 | # | Question | Answer leads to |
 |---|---|---|
-| 1.1 | What is the directory with the .paf files? | The folders in the program folder (in the Mac app, in the Portimao folder in your home folder) that hold `.paf` files are buttons, each with how many files it holds: click one. Or type (or drag in) the path of another folder in the box under them, which starts with the folder used last time. An empty answer, a folder that does not exist, or one with no `.paf` files, is refused: one line says what to type and the question waits. Otherwise every file is read and listed, then **1.2**. |
-| 1.2 | To which directory would you like the results to be saved? `[the results folder inside the data folder]` If the dataset was opened before, a message says so, and its last results folder is offered here. A name without a path, such as `quadratic_scatter_results`, is made inside the data folder, so a second set of results can sit beside the first. | A file, or a folder that cannot be saved to, is refused: one line says what to type and the question waits. **1.2.1** if the folder already holds results of any of these files; otherwise **1.3** for a dataset opened before, or the standard plot is drawn **(plot)**, then **2.1** |
+| 1.1 | Choose the folder with the .paf files, then press Continue. | The folders in the program folder (in the Mac app, in the Portimao folder in your home folder) that hold `.paf` files are buttons, each with how many files it holds; the folder used last time is highlighted. Click one to highlight it, then **Continue**. **Other folder…** opens a box for the full path of another folder (it starts with the folder used last time; a folder can be dragged in), with **Browse…** beside it, which opens your computer's own folder picker, the one window that pops up. A folder that does not exist, or one with no `.paf` files, is refused: one line says what to choose and the question waits. Otherwise every file is read and listed, then **1.2**. |
+| 1.2 | Choose the folder for the results, then press Continue. | Every folder inside the data folder is a button, with what it holds ("holds results of 12 of 12 files", "no results"); the results folder offered (`results` inside the data folder, or for a dataset opened before, as a message says, the results folder it used) is highlighted, and is first among them, marked "new folder", when it does not exist yet. **Other folder…** and **Browse…** work as at 1.1; a typed name without a path, such as `quadratic_scatter_results`, is made inside the data folder, so a second set of results can sit beside the first. A file, or a folder that cannot be saved to, is refused: one line says what to choose and the question waits. **1.2.1** if the folder already holds results of any of these files; otherwise **1.3** for a dataset opened before, or the standard plot is drawn **(plot)**, then **2.1** |
 
 | # | Question | Yes → | No → |
 |---|---|---|---|
-| 1.2.1 | *(only when the folder already holds results of these files; above it: "results already holds results of 12 of these 12 files.")* Do you want to write over them? `(y/N)` | **1.3** for a dataset opened before, or the standard plot is drawn **(plot)**, then **2.1**; results written later replace those there | **1.2** again, offering a free name beside it (`results_2`), with the line "Type another folder, or a new name: a name without a path is made inside the data folder." |
+| 1.2.1 | *(only when the folder already holds results of these files; above it: "results already holds results of 12 of these 12 files.")* Do you want to write over them? `(y/N)` | **1.3** for a dataset opened before, or the standard plot is drawn **(plot)**, then **2.1**; results written later replace those there | **1.2** again, with a free name (`results_2`) highlighted first among the buttons as a new folder, and the line "Choose another folder, or the new folder results_2." |
 
 | # | Question | Yes → | No → |
 |---|---|---|---|

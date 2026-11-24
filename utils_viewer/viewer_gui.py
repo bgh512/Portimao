@@ -96,6 +96,8 @@ CLICK_HINT = 'Click an answer. Enter gives the highlighted one.'
 # a box is shown only for a number or a name: every other answer is a button
 NUMBER_HINT = 'Type a number, then click Continue or press Enter.'
 NAME_HINT = 'Type it in the box, then click Continue or press Enter.'
+FOLDER_HINT = ('Click a folder, then Continue. Under Other folder…, type a full path '
+               'or click Browse….')
 # The clicks in the boxes that ask questions of their own while a question waits.
 ASKING_CHANGES = ('edit_ods', 'edit_labels', 'export_csv')
 EDGES_HINT = ('Drag the edges on the plot, or type the times in the Time regions box '
@@ -4385,15 +4387,15 @@ def _hint_chooser(kind: Optional[str],
     ---- Inputs ----
     kind : Optional[str]
         How the question is answered ('continue', 'yesno', 'choice', 'multi',
-        'number', 'text', 'confirm'), or None before the first question.
+        'number', 'text', 'folder', 'confirm'), or None before the first question.
     time_kind : Optional[str]
         'span' (a drag gives the answer) or None.
     is_edged : bool
         True while edges are dragged on the plot.
 
     ---- Globals read ----
-    CLICK_HINT, EDGES_HINT, NAME_HINT, NUMBER_HINT, SPAN_HINT, TABLE_HINT (module
-    constants).
+    CLICK_HINT, EDGES_HINT, FOLDER_HINT, NAME_HINT, NUMBER_HINT, SPAN_HINT, TABLE_HINT
+    (module constants).
 
     ---- Outputs ----
     str
@@ -4417,6 +4419,8 @@ def _hint_chooser(kind: Optional[str],
         return NUMBER_HINT
     if kind == 'text':
         return NAME_HINT
+    if kind == 'folder':
+        return FOLDER_HINT
     if kind == 'confirm':
         return TABLE_HINT
     return CLICK_HINT

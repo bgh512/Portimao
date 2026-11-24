@@ -34,6 +34,13 @@ _tight_next = False  # True: the next question follows its heading line directly
 # What is told when a question can be answered with the mouse (the window, which then
 # takes clicks or drags on the plot); None while no window is open.
 _time_requester: Optional[Callable[[Optional[str], Optional[Callable]], None]] = None
+# What is told how each question is answered (the window, which then shows its answers
+# as buttons and leaves out the typed endings); None while no window is open.
+_answer_requester: Optional[Callable[[dict], None]] = None
+# What is told which step of the guide starts; None while no window is open.
+_step_teller: Optional[Callable[[str], None]] = None
+_current_step: Optional[str] = None
+CLICK_MULTI_NOTE = 'Tick one or more, then click Continue.'
 
 
 # ---- UserQuitError -------------------------------------------------------------------
@@ -54,6 +61,57 @@ class UserQuitError(Exception):
 
 
 # ---- QUESTIONS HELPERS ---------------------------------------------------------------
+
+
+# ---- _answer_announcer ---------------------------------------------------------------
+def _answer_announcer(kind: str,
+                      options: Sequence = (),
+                      default: object = None,
+                      value: Optional[str] = None,
+                      ) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the window, when there is one, how the question just asked
+    is answered, so it shows the answers as buttons.
+
+    ---- Inputs ----
+    kind : str
+        'continue', 'yesno', 'choice', 'multi', 'number', 'text', 'folder' or
+        'confirm'.
+    options : Sequence
+        The words of each choice ('choice', 'multi'), the (answer, words) pairs
+        offered beside the typing box ('text'), or the (answer, name, note) of each
+        folder ('folder'); empty otherwise.
+    default : object
+        What Enter gives: 'y' or 'n'; the number of a choice (from 1); the numbers of
+        the choices ticked at first; the folder highlighted at first; None for none.
+    value : Optional[str]
+        What the typing box starts with ('number', 'text', 'folder').
+
+    ---- Globals read ----
+    _answer_requester (module state).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Calls the registered function (side effect); nothing happens without one.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if _answer_requester is not None:
+        _answer_requester({'kind': kind,
+                           'options': list(options),
+                           'default': default,
+                           'value': value,
+                           },
+                          )
 
 
 # ---- _brightener ---------------------------------------------------------------------
@@ -415,7 +473,8 @@ def _options_printer(labels: Sequence[str], indent: str, bright: Set[int]) -> No
         Numbers (from 1) of the options to show brighter.
 
     ---- Globals read ----
-    COLOUR_DEFAULT, INDENT (module constants).
+    COLOUR_DEFAULT, INDENT (module constants); _answer_requester (module state): in
+    the window the options are buttons, and are not printed.
 
     ---- Outputs ----
     None
@@ -431,6 +490,8 @@ def _options_printer(labels: Sequence[str], indent: str, bright: Set[int]) -> No
     text_colourer
     """
 
+    if _answer_requester is not None:
+        return
     for number, label in enumerate(labels, start=1):
         line = f'{number}) {label}'
         if number in bright:
@@ -471,7 +532,8 @@ def _question_printer(question: str,
         it in the order asked. When given, ``depth`` must be its depth.
 
     ---- Globals read ----
-    COLOUR_QUIET, INDENT (module constants); _tight_next (module state).
+    COLOUR_QUIET, INDENT (module constants); _tight_next, _answer_requester (module
+    state): in the window the answers are buttons, so the ending is left out.
 
     ---- Outputs ----
     str
@@ -497,7 +559,7 @@ def _question_printer(question: str,
         gap = ''
     shown = _unit_highlighter(question) if has_unit else question
     line = f'{number or _number_builder(depth)} {shown}'
-    if ending:
+    if ending and _answer_requester is None:
         line += f' {ending}'
     print(f'{gap}{indent}{text_colourer(line)}')
     _tight_next = False
@@ -626,16 +688,52 @@ def accept_asker(question: str,
         raise ValueError(f"The question '{question}' was given no way to change.")
     if len(changes) == 1:
         key, change = changes[0]
+        how = 'Type n' if _answer_requester is None else 'Click No'
         is_accepted = yes_no_asker(question,
                                    True,
                                    depth,
-                                   note=f'Type n to {change}.',
+                                   note=f'{how} to {change}.',
                                    number=number,
                                    )
         return 'yes' if is_accepted else key
     options = [('yes', 'Yes, accept'),
                ] + [(key, f'No, {change}') for key, change in changes]
     return choice_asker(question, options, 'yes', depth, number=number)
+
+
+# ---- answer_request_setter -----------------------------------------------------------
+def answer_request_setter(requester: Optional[Callable[[dict], None]]) -> None:
+    """
+    ---- Summary ----
+    Main function to register what is told how each question is answered: the window
+    registers itself while it is open, so it shows the answers as buttons, and the
+    questions then leave out what is typed ((y/N), [value], the numbered options).
+
+    ---- Inputs ----
+    requester : Optional[Callable[[dict], None]]
+        Function called with {'kind', 'options', 'default', 'value'} once each question
+        is printed (see _answer_announcer); None to register nothing (when the window
+        closes).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    _answer_requester (module state).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    global _answer_requester
+    _answer_requester = requester
 
 
 # ---- choice_asker --------------------------------------------------------------------
@@ -680,6 +778,7 @@ def choice_asker(question: str,
     None.
 
     ---- Helpers ----
+    _answer_announcer
     _input_reader
     _list_ending_builder
     _number_depth_finder
@@ -706,6 +805,7 @@ def choice_asker(question: str,
                                )
     bright = {default_number} if default_number and count > LIST_SPELLED_OUT else set()
     _options_printer([label for _, label in options], indent, bright)
+    _answer_announcer('choice', [label for _, label in options], default_number)
 
     # ---- 3 Read and check the answer -------------------------------------------------
     hint = f'Type a number from 1 to {count}.' if count > 1 else 'Type 1.'
@@ -762,6 +862,7 @@ def confirm_waiter(question: str,
     None.
 
     ---- Helpers ----
+    _answer_announcer
     _input_reader
     _number_depth_finder
     _question_printer
@@ -770,6 +871,7 @@ def confirm_waiter(question: str,
 
     depth = _number_depth_finder(number, depth)
     indent = _question_printer(question, depth, note=note, number=number)
+    _answer_announcer('confirm')
     while True:
         _input_reader(question, indent)
         hint = checker()
@@ -783,13 +885,14 @@ def enter_waiter(question: str,
                  nudge: str,
                  depth: int = 1,
                  number: Optional[str] = None,
-                 ) -> None:
+                 extras: Sequence[Tuple[str, str]] = (),
+                 ) -> str:
     """
     ---- Summary ----
     Main function to give a numbered instruction that is carried out in the window (on
-    the plot or in the strip under it) and wait until Enter is pressed with the answer
-    box empty. Anything typed in the box instead is answered with ``nudge`` and the
-    instruction goes on waiting.
+    the plot or in the boxes above it) and wait until Continue (Enter with the answer
+    box empty) or one of the extra buttons is clicked. Anything else typed is answered
+    with ``nudge`` and the instruction goes on waiting.
 
     ---- Inputs ----
     question : str
@@ -801,13 +904,16 @@ def enter_waiter(question: str,
     number : Optional[str]
         The instruction's own number from QUESTION_FLOW.md, such as '2.1'; None to
         number it in the order asked.
+    extras : Sequence[Tuple[str, str]]
+        (answer, words) of each button shown above Continue, such as ('export',
+        'Export csv'); empty for Continue alone.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    None
-        Nothing.
+    str
+        '' for Continue, or the answer of the extra button clicked.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect); advances the question
@@ -817,6 +923,7 @@ def enter_waiter(question: str,
     None.
 
     ---- Helpers ----
+    _answer_announcer
     _input_reader
     _number_depth_finder
     _question_printer
@@ -825,8 +932,184 @@ def enter_waiter(question: str,
 
     depth = _number_depth_finder(number, depth)
     indent = _question_printer(question, depth, number=number)
-    while _input_reader(question, indent):
+    _answer_announcer('continue', list(extras))
+    answers = {answer for answer, _ in extras}
+    while True:
+        answer = _input_reader(question, indent)
+        if not answer or answer in answers:
+            return answer
         retry_teller(nudge, depth)
+
+
+# ---- folder_asker --------------------------------------------------------------------
+def folder_asker(question: str,
+                 folders: Sequence[Tuple[str, str, str]],
+                 default: Optional[str] = None,
+                 typed: str = '',
+                 depth: int = 1,
+                 checker: Optional[Callable[[Optional[str]], Optional[str]]] = None,
+                 number: Optional[str] = None,
+                 ) -> Optional[str]:
+    """
+    ---- Summary ----
+    Main function to ask for a folder. In the window each folder offered is a button
+    that a click highlights, "Other folder…" opens a box for a full path with Browse…
+    beside it, and Continue gives the folder highlighted; in the terminal the path is
+    typed. An answer the checker refuses gets its one sentence of what to do, and the
+    question waits for the next answer.
+
+    ---- Inputs ----
+    question : str
+        Question text, without its number.
+    folders : Sequence[Tuple[str, str, str]]
+        (answer, name, note) of each folder offered: the answer is its full path, the
+        note what it holds ('6 files', 'new folder').
+    default : Optional[str]
+        Answer used when only Enter is pressed, and the folder highlighted at first;
+        one not offered highlights Other folder…. None for none.
+    typed : str
+        What the box under Other folder… starts with.
+    depth : int
+        Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+    checker : Optional[Callable[[Optional[str]], Optional[str]]]
+        Takes the answer and gives None when it can be used, or the sentence saying
+        what to do instead; None accepts every answer.
+    number : Optional[str]
+        The question's own number from QUESTION_FLOW.md, such as '1.1'; None to number
+        it in the order asked.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[str]
+        The folder given (its path as typed or clicked), or the default when Enter is
+        pressed.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal (side effect); advances the question
+    numbering counters when it has no number of its own.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _answer_announcer
+    _brightener
+    _input_reader
+    _number_depth_finder
+    _question_printer
+    retry_teller
+    """
+
+    depth = _number_depth_finder(number, depth)
+    ending = f'[{_brightener(default)}]' if default else ''
+    indent = _question_printer(question, depth, ending, number=number)
+    _answer_announcer('folder', folders, default=default, value=typed)
+    while True:
+        answer = _input_reader(question, indent) or default
+        hint = checker(answer) if checker is not None else None
+        if hint is None:
+            return answer
+        retry_teller(hint, depth)
+
+
+# ---- guide_step_getter ---------------------------------------------------------------
+def guide_step_getter() -> Optional[str]:
+    """
+    ---- Summary ----
+    Main function to give the step of the guide started last, so a step asked in the
+    middle of another (the averaging windows asked for by a figure) can hand the guide
+    back to it.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    _current_step (module state).
+
+    ---- Outputs ----
+    Optional[str]
+        The key of the step, or None before the first.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return _current_step
+
+
+# ---- guide_step_setter ---------------------------------------------------------------
+def guide_step_setter(teller: Optional[Callable[[str], None]]) -> None:
+    """
+    ---- Summary ----
+    Main function to register what is told which step of the guide starts: the window
+    registers itself while it is open.
+
+    ---- Inputs ----
+    teller : Optional[Callable[[str], None]]
+        Function called with the key of each step as it starts; None to register
+        nothing (when the window closes).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    _step_teller (module state).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    global _step_teller
+    _step_teller = teller
+
+
+# ---- guide_step_starter --------------------------------------------------------------
+def guide_step_starter(key: str) -> None:
+    """
+    ---- Summary ----
+    Main function to say that a step of the guide starts (the keys and their order are
+    in utils_viewer/viewer_guide.py, GUIDE_STEPS), so the guide on the left opens it.
+
+    ---- Inputs ----
+    key : str
+        Key of the step, such as 'trim' or 'delta_psi'.
+
+    ---- Globals read ----
+    _step_teller (module state).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    _current_step (module state). Calls the registered function (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    global _current_step
+    _current_step = key
+    if _step_teller is not None:
+        _step_teller(key)
 
 
 # ---- heading_printer -----------------------------------------------------------------
@@ -948,6 +1231,7 @@ def multi_asker(question: str,
     None.
 
     ---- Helpers ----
+    _answer_announcer
     _input_reader
     _list_ending_builder
     _number_depth_finder
@@ -966,15 +1250,13 @@ def multi_asker(question: str,
     indent = _question_printer(question,
                                depth,
                                _list_ending_builder(len(options), None),
-                               NUMBERS_NOTE,
+                               NUMBERS_NOTE if _answer_requester is None
+                               else CLICK_MULTI_NOTE,
                                number=number,
                                )
-    _options_printer([label_formatter(label) if label_formatter else label
-                      for label in options
-                      ],
-                     indent,
-                     {options.index(v) + 1 for v in fallback},
-                     )
+    shown = [label_formatter(label) if label_formatter else label for label in options]
+    _options_printer(shown, indent, {options.index(v) + 1 for v in fallback})
+    _answer_announcer('multi', shown, [options.index(v) + 1 for v in fallback])
 
     # ---- 3 Read and check the answer -------------------------------------------------
     while True:
@@ -1054,6 +1336,7 @@ def number_asker(question: str,
     None.
 
     ---- Helpers ----
+    _answer_announcer
     _brightener
     _input_reader
     _limits_checker
@@ -1074,6 +1357,9 @@ def number_asker(question: str,
 
     # ---- 2 Print the question --------------------------------------------------------
     indent = _question_printer(question, depth, ending, has_unit=True, number=number)
+    _answer_announcer('number',
+                      value=f'{default:g}' if isinstance(default, (int, float)) else '',
+                      )
 
     # ---- 3 Read and check the answer -------------------------------------------------
     hint = _number_hint_builder(minimum, maximum, exclusive_minimum, is_whole)
@@ -1342,9 +1628,9 @@ def text_asker(question: str,
                ) -> Optional[str]:
     """
     ---- Summary ----
-    Main function to ask a question answered with a line of text or a folder. An answer
-    the checker refuses gets its one sentence of what to type, and the question waits
-    for the next answer.
+    Main function to ask a question answered with a line of text. An answer the checker
+    refuses gets its one sentence of what to type, and the question waits for the next
+    answer. A folder is asked with folder_asker.
 
     ---- Inputs ----
     question : str
@@ -1375,6 +1661,7 @@ def text_asker(question: str,
     None.
 
     ---- Helpers ----
+    _answer_announcer
     _brightener
     _input_reader
     _number_depth_finder
@@ -1385,6 +1672,7 @@ def text_asker(question: str,
     depth = _number_depth_finder(number, depth)
     ending = f'[{_brightener(default)}]' if default not in (None, '') else ''
     indent = _question_printer(question, depth, ending, number=number)
+    _answer_announcer('text', value=default or '')
     while True:
         answer = _input_reader(question, indent) or default
         hint = checker(answer) if checker is not None else None
@@ -1575,6 +1863,7 @@ def yes_no_asker(question: str,
     None.
 
     ---- Helpers ----
+    _answer_announcer
     _brightener
     _input_reader
     _number_depth_finder
@@ -1586,6 +1875,7 @@ def yes_no_asker(question: str,
     depth = _number_depth_finder(number, depth)
     ending = f"({_brightener('Y')}/n)" if default else f"(y/{_brightener('N')})"
     indent = _question_printer(question, depth, ending, note, number=number)
+    _answer_announcer('yesno', default='y' if default else 'n')
 
     # ---- 2 Read and check the answer -------------------------------------------------
     while True:

@@ -3,7 +3,12 @@ The guide on the left of the window: the steps under their stage names, the step
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from pathlib import Path
+from tkinter import filedialog
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
+
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.questions import path_cleaner
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -172,6 +177,12 @@ FOCUS_COLOUR = '#9cdcfe'
 ONE_COLUMN_MOST = 6
 TICKED = '☑'
 UNTICKED = '☐'
+# The folder buttons: the one highlighted is what Continue gives.
+PICKED_BACKGROUND = '#1b3a57'
+PICKED_MARK = '●'
+UNPICKED_MARK = '○'
+OTHER_FOLDER_TEXT = 'Other folder…'
+BROWSE_TEXT = 'Browse…'
 
 
 # ---- GuideState ----------------------------------------------------------------------
@@ -724,28 +735,34 @@ class AnswerArea:
     The answers of the question waiting, under its card: one big Continue button for
     something done on the plot or in the strip; Yes and No one above the other; a
     button for each choice; tick buttons and Continue for several choices; a box with
-    Continue only for a number or a name to type; Confirm for a table; or, while an
-    earlier step is open, the button back to the step waited at. The answer the program
-    gives with Enter is the highlighted button, which holds the keyboard. Every method
-    runs on the window thread.
+    Continue only for a number or a name to type; folder buttons, Other folder… with a
+    box for a full path and Browse…, and Continue for a folder; Confirm for a table;
+    or, while an earlier step is open, the button back to the step waited at. The
+    answer the program gives with Enter is the highlighted button, which holds the
+    keyboard. Every method runs on the window thread.
 
     ---- Attributes ----
     frame : Any
         The Tk frame holding the answers, for the window to place.
     entry : Any
-        The typing box, shown for a number or a name.
+        The typing box, shown for a number, a name or a folder typed in full.
     confirm : Any
         The Confirm button of a table.
 
     ---- Globals read ----
-    BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OFF_TEXT,
-    ONE_COLUMN_MOST, OTHER_BACKGROUND, OTHER_HOVER, TICKED, UNTICKED.
+    BROWSE_TEXT, BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OFF_TEXT,
+    ONE_COLUMN_MOST, OTHER_BACKGROUND, OTHER_FOLDER_TEXT, OTHER_HOVER,
+    PICKED_BACKGROUND, TICKED, UNTICKED.
 
     ---- Methods ----
     __init__
     _button_maker
     _choices_placer
     _clearer
+    _folder_browser
+    _folder_picker
+    _folder_sender
+    _folder_shower
     _multi_sender
     _ticker
     back_shower
@@ -814,6 +831,11 @@ class AnswerArea:
         self._ticked: List[int] = []
         self._ticks: List[Any] = []
         self._multi_go: Any = None
+        # the folder buttons: (button, answer, name, note); -1 picks Other folder…
+        self._folders: List[Tuple[Any, str, str, str]] = []
+        self._other: Any = None
+        self._path_row: Any = None
+        self._picked = 0
         self.frame = tk.Frame(parent, bg=colours['background'])
         self.entry = tk.Entry(self.frame,
                               bg=colours['cell'],
@@ -969,6 +991,9 @@ class AnswerArea:
         None.
         """
 
+        # the box may sit in the row of a folder question, which goes with the widgets
+        self.entry.pack_forget()
+        self.confirm.pack_forget()
         for widget in self._widgets:
             widget.destroy()
         self._widgets = []
@@ -976,8 +1001,211 @@ class AnswerArea:
         self._ticked = []
         self._multi_go = None
         self._default = None
-        self.entry.pack_forget()
-        self.confirm.pack_forget()
+        self._folders = []
+        self._other = None
+        self._path_row = None
+
+    # ---- _folder_browser -------------------------------------------------------------
+    def _folder_browser(self) -> None:
+        """
+        ---- Summary ----
+        Helper method to open the computer's own folder picker (the one window that
+        pops up), starting at the folder in the box, and to put the folder picked in
+        the box; Cancel leaves the box as it was.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Opens the picker and changes the box (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        folder_start_finder
+        """
+
+        picked = filedialog.askdirectory(parent=self.frame.winfo_toplevel(),
+                                         initialdir=folder_start_finder(
+                                             self.entry.get(),
+                                             ),
+                                         mustexist=False,
+                                         title='Choose a folder',
+                                         )
+        if picked:
+            self.entry.delete(0, 'end')
+            self.entry.insert(0, str(Path(picked)))
+        self.entry.focus_set()
+        self.entry.icursor('end')
+
+    # ---- _folder_picker --------------------------------------------------------------
+    def _folder_picker(self, index: int) -> None:
+        """
+        ---- Summary ----
+        Helper method to highlight one folder button, or Other folder… with its box
+        and Browse… under it.
+
+        ---- Inputs ----
+        index : int
+            Place of the folder in the buttons, from 0; -1 for Other folder….
+
+        ---- Globals read ----
+        OTHER_BACKGROUND, OTHER_FOLDER_TEXT, OTHER_HOVER, PICKED_BACKGROUND.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the buttons and shows or hides the box (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        folder_words_builder
+        """
+
+        self._picked = index
+        shown = [(button, name, note, i == index)
+                 for i, (button, _, name, note) in enumerate(self._folders)
+                 ]
+        shown.append((self._other, OTHER_FOLDER_TEXT, '', index == -1))
+        for button, name, note, is_picked in shown:
+            background = PICKED_BACKGROUND if is_picked else OTHER_BACKGROUND
+            button.configure(text=folder_words_builder(name, note, is_picked),
+                             bg=background,
+                             fg=BUTTON_TEXT if is_picked else self._colours['text'],
+                             )
+            button.bind('<Leave>', lambda e, b=button, c=background: b.configure(bg=c))
+            button.bind('<Enter>', lambda e, b=button: b.configure(bg=OTHER_HOVER))
+        if index == -1:
+            self._path_row.pack(side='top', fill='x', pady=2, after=self._other)
+            self.entry.focus_set()
+            self.entry.icursor('end')
+        else:
+            self._path_row.pack_forget()
+            self._default.focus_set()
+
+    # ---- _folder_sender --------------------------------------------------------------
+    def _folder_sender(self) -> None:
+        """
+        ---- Summary ----
+        Helper method to give the folder highlighted (Continue): the path of its
+        button, or the path in the box under Other folder…; an empty box gives nothing.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls on_click (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self._picked == -1:
+            typed = self.entry.get().strip()
+            if typed:
+                self._on_click(typed, typed)
+            return
+        _, answer, name, _ = self._folders[self._picked]
+        self._on_click(answer, name)
+
+    # ---- _folder_shower --------------------------------------------------------------
+    def _folder_shower(self, request: Dict[str, Any]) -> None:
+        """
+        ---- Summary ----
+        Helper method to show the answers of a folder question: a button for each
+        folder offered, Other folder… with its row (the box for a full path and
+        Browse…, shown when it is highlighted), and Continue.
+
+        ---- Inputs ----
+        request : Dict[str, Any]
+            {'kind': 'folder', 'options', 'default', 'value'}: options the (answer,
+            name, note) of each folder, default the answer highlighted at first, value
+            what the box starts with.
+
+        ---- Globals read ----
+        BROWSE_TEXT.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Creates and places the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _button_maker
+        _choices_placer
+        _folder_browser
+        _folder_picker
+        _folder_sender
+        folder_default_finder
+        """
+
+        folders = [tuple(folder) for folder in request['options'] or []]
+        buttons = []
+        for i, (answer, name, note) in enumerate(folders):
+            button = self._button_maker(name,
+                                        lambda i=i: self._folder_picker(i),
+                                        False,
+                                        )
+            self._folders.append((button, answer, name, note))
+            self._widgets.append(button)
+            buttons.append(button)
+        self._other = self._button_maker(OTHER_FOLDER_TEXT,
+                                         lambda: self._folder_picker(-1),
+                                         False,
+                                         )
+        self._widgets.append(self._other)
+        if buttons:
+            self._choices_placer(buttons)
+        self._other.pack(side='top', fill='x', pady=2)
+
+        # ---- 1 The row under Other folder… -------------------------------------------
+        self._path_row = self._tk.Frame(self.frame, bg=self._colours['background'])
+        self._widgets.append(self._path_row)
+        browse = self._button_maker(BROWSE_TEXT, self._folder_browser, False)
+        self._widgets.append(browse)
+        browse.lift(self._path_row)
+        browse.pack(in_=self._path_row, side='right', padx=(4, 0))
+        self.entry.lift(self._path_row)
+        self.entry.pack(in_=self._path_row, side='left', fill='x', expand=True, ipady=5)
+        self.entry.delete(0, 'end')
+        self.entry.insert(0, request['value'] or '')
+
+        # ---- 2 Continue, and the folder highlighted at first -------------------------
+        go = self._button_maker('Continue', self._folder_sender, True)
+        go.pack(side='top', fill='x', pady=(6, 2))
+        self._widgets.append(go)
+        self._default = go
+        self._folder_picker(folder_default_finder([answer for answer, _, _ in folders],
+                                                  request['default'],
+                                                  ),
+                            )
 
     # ---- _multi_sender ---------------------------------------------------------------
     def _multi_sender(self) -> None:
@@ -1132,7 +1360,9 @@ class AnswerArea:
         None.
         """
 
-        if self.entry.winfo_manager():
+        # in a folder question the box is in its row, shown only with Other folder…
+        is_typed = self._path_row is None or self._picked == -1
+        if self.entry.winfo_manager() and is_typed:
             self.entry.focus_set()
             self.entry.icursor('end')
         elif self._default is not None:
@@ -1148,11 +1378,11 @@ class AnswerArea:
         request : Optional[Dict[str, Any]]
             {'kind', 'options', 'default', 'value'} as the questions send it
             (utils_shared.questions._answer_announcer): kind 'continue', 'yesno',
-            'choice', 'multi', 'number', 'text' or 'confirm'; options the words of
-            each choice ('text': (answer, words) pairs offered beside the box);
-            default the answer Enter gives ('y' or 'n'; the number of a choice; the
-            numbers ticked at first); value what the box starts with. None for no
-            question.
+            'choice', 'multi', 'number', 'text', 'folder' or 'confirm'; options the
+            words of each choice ('folder': the (answer, name, note) of each
+            folder); default the answer Enter gives ('y' or 'n'; the number of a
+            choice; the numbers ticked at first; the folder highlighted at first);
+            value what the box starts with. None for no question.
 
         ---- Globals read ----
         TICKED, UNTICKED, OFF_TEXT.
@@ -1171,6 +1401,7 @@ class AnswerArea:
         _button_maker
         _choices_placer
         _clearer
+        _folder_shower
         _multi_sender
         _ticker
         """
@@ -1231,12 +1462,9 @@ class AnswerArea:
             self._multi_go.pack(side='top', fill='x', pady=(6, 2))
             self._widgets.append(self._multi_go)
             self._default = self._multi_go
+        elif kind == 'folder':
+            self._folder_shower(request)
         elif kind in ('number', 'text'):
-            buttons = [made(words, answer, words, False)
-                       for answer, words in request['options'] or []
-                       ]
-            if buttons:
-                self._choices_placer(buttons)
             self.entry.delete(0, 'end')
             self.entry.insert(0, request['value'] or '')
             self.entry.pack(side='top', fill='x', pady=(6, 2), ipady=5)
@@ -1250,6 +1478,125 @@ class AnswerArea:
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- folder_default_finder -----------------------------------------------------------
+def folder_default_finder(answers: Sequence[str], default: Optional[str]) -> int:
+    """
+    ---- Summary ----
+    Main function to choose the folder button highlighted when a folder question is
+    asked: the folder offered as the default, else Other folder… when a default not
+    among the buttons is given, else the first button.
+
+    ---- Inputs ----
+    answers : Sequence[str]
+        The full path of each folder button, in order.
+    default : Optional[str]
+        The folder Enter gives, or None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    int
+        Place of the button, from 0; -1 for Other folder… (also when there is no
+        button).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    path_cleaner
+    """
+
+    def same(text: str) -> str:
+        return str(Path(path_cleaner(text)).expanduser()).lower()
+
+    if default:
+        for i, answer in enumerate(answers):
+            if same(answer) == same(default):
+                return i
+        return -1
+    return 0 if answers else -1
+
+
+# ---- folder_start_finder -------------------------------------------------------------
+def folder_start_finder(text: str) -> str:
+    """
+    ---- Summary ----
+    Main function to find where the folder picker opens: the folder in the box, or the
+    nearest folder above it that exists, else the home folder.
+
+    ---- Inputs ----
+    text : str
+        What the box holds (quotes and a leading ~ allowed); may be empty.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        The folder the picker starts in.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    path_cleaner
+    """
+
+    cleaned = path_cleaner(text or '')
+    if cleaned:
+        path = Path(cleaned).expanduser()
+        while True:
+            if path.is_dir():
+                return str(path)
+            if path.parent == path:
+                break
+            path = path.parent
+    return str(Path.home())
+
+
+# ---- folder_words_builder ------------------------------------------------------------
+def folder_words_builder(name: str, note: str, is_picked: bool) -> str:
+    """
+    ---- Summary ----
+    Main function to write the words of a folder button: the mark of the one
+    highlighted, the folder's name and what it holds.
+
+    ---- Inputs ----
+    name : str
+        The folder's name, or "Other folder…".
+    note : str
+        What it holds ('6 files', 'new folder'); empty for none.
+    is_picked : bool
+        True for the button highlighted.
+
+    ---- Globals read ----
+    PICKED_MARK, UNPICKED_MARK.
+
+    ---- Outputs ----
+    str
+        The words, such as "●  data_OCR_and_haem  ·  12 files".
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    mark = PICKED_MARK if is_picked else UNPICKED_MARK
+    return f'{mark}  {name}  ·  {note}' if note else f'{mark}  {name}'
 
 
 # ---- step_of_change_finder -----------------------------------------------------------

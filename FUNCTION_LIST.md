@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.17
+- **Version:** V2.18
 - **Date:** 24/11/2026
 
 ## Contents
@@ -117,6 +117,7 @@
     - [`test_results_folder_inside_is_kept_relative`](#test_results_folder_inside_is_kept_relative)
     - [`test_results_folder_is_checked`](#test_results_folder_is_checked)
     - [`test_results_folder_names_and_old_results`](#test_results_folder_names_and_old_results)
+    - [`test_results_folders_offered`](#test_results_folders_offered)
     - [`test_results_folder_outside_is_kept_whole`](#test_results_folder_outside_is_kept_whole)
     - [`test_regions_are_kept_with_the_dataset`](#test_regions_are_kept_with_the_dataset)
     - [`test_saved_haem_amounts_open_as_delta_d`](#test_saved_haem_amounts_open_as_delta_d)
@@ -193,6 +194,7 @@
     - [`test_changes_that_open_nothing`](#test_changes_that_open_nothing)
     - [`test_previous_processing_question`](#test_previous_processing_question)
     - [`test_answers_told_to_the_window`](#test_answers_told_to_the_window)
+    - [`test_folder_question`](#test_folder_question)
 - [`tests/test_haem_decomposition.py`](#teststest_haem_decompositionpy)
     - [`_background_builder`](#_background_builder)
     - [`_background_shape_builder`](#_background_shape_builder)
@@ -953,6 +955,7 @@
     - [`choice_asker`](#choice_asker)
     - [`confirm_waiter`](#confirm_waiter)
     - [`enter_waiter`](#enter_waiter)
+    - [`folder_asker`](#folder_asker)
     - [`guide_step_getter`](#guide_step_getter)
     - [`guide_step_setter`](#guide_step_setter)
     - [`guide_step_starter`](#guide_step_starter)
@@ -1075,6 +1078,7 @@
     - [`previous_processing_asker`](#previous_processing_asker)
     - [`results_counter`](#results_counter)
     - [`results_folder_checker`](#results_folder_checker)
+    - [`results_folder_lister`](#results_folder_lister)
     - [`results_folder_resolver`](#results_folder_resolver)
     - [`saved_values_reader`](#saved_values_reader)
     - [`size_asker`](#size_asker)
@@ -1129,6 +1133,9 @@
     - [`GuideState`](#guidestate)
     - [`GuidePanel`](#guidepanel)
     - [`AnswerArea`](#answerarea)
+    - [`folder_default_finder`](#folder_default_finder)
+    - [`folder_start_finder`](#folder_start_finder)
+    - [`folder_words_builder`](#folder_words_builder)
     - [`step_of_change_finder`](#step_of_change_finder)
 - [`utils_viewer/viewer_multi.py`](#utils_viewerviewer_multipy)
     - [`_kept_builder`](#_kept_builder)
@@ -4758,6 +4765,34 @@ None.
 None.
 ```
 
+#### `test_results_folders_offered`
+
+```text
+---- Summary ----
+Main function to check the folders offered as buttons for the results (1.2): every
+folder inside the data folder in name order, each with what it holds, and the
+folder offered first only when it does not exist yet or is outside the data folder.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_results_folder_outside_is_kept_whole`
 
 ```text
@@ -6857,6 +6892,38 @@ monkeypatch : pytest.MonkeyPatch
     Replaces the reading of the answers.
 capsys : pytest.CaptureFixture
     Captures what the questions print.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The window stand-in is taken away at the end.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_folder_question`
+
+```text
+---- Summary ----
+Main function to check a folder question (1.1, 1.2): what the window is told (the
+folders, the one highlighted, what the box under Other folder… starts with), that
+a refused folder makes the question wait, and Enter gives the default; and which
+button is highlighted, the words on each and where Browse… opens.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+tmp_path : Path
+    Empty folder from pytest.
 
 ---- Globals read ----
 None.
@@ -29859,15 +29926,17 @@ is answered, so it shows the answers as buttons.
 
 ---- Inputs ----
 kind : str
-    'continue', 'yesno', 'choice', 'multi', 'number', 'text' or 'confirm'.
+    'continue', 'yesno', 'choice', 'multi', 'number', 'text', 'folder' or
+    'confirm'.
 options : Sequence
-    The words of each choice ('choice', 'multi'), or the (answer, words) pairs
-    offered beside the typing box ('text'); empty otherwise.
+    The words of each choice ('choice', 'multi'), the (answer, words) pairs
+    offered beside the typing box ('text'), or the (answer, name, note) of each
+    folder ('folder'); empty otherwise.
 default : object
     What Enter gives: 'y' or 'n'; the number of a choice (from 1); the numbers of
-    the choices ticked at first; None for none.
+    the choices ticked at first; the folder highlighted at first; None for none.
 value : Optional[str]
-    What the typing box starts with ('number', 'text').
+    What the typing box starts with ('number', 'text', 'folder').
 
 ---- Globals read ----
 _answer_requester (module state).
@@ -30490,6 +30559,60 @@ _question_printer
 retry_teller
 ```
 
+#### `folder_asker`
+
+```text
+---- Summary ----
+Main function to ask for a folder. In the window each folder offered is a button
+that a click highlights, "Other folder…" opens a box for a full path with Browse…
+beside it, and Continue gives the folder highlighted; in the terminal the path is
+typed. An answer the checker refuses gets its one sentence of what to do, and the
+question waits for the next answer.
+
+---- Inputs ----
+question : str
+    Question text, without its number.
+folders : Sequence[Tuple[str, str, str]]
+    (answer, name, note) of each folder offered: the answer is its full path, the
+    note what it holds ('6 files', 'new folder').
+default : Optional[str]
+    Answer used when only Enter is pressed, and the folder highlighted at first;
+    one not offered highlights Other folder…. None for none.
+typed : str
+    What the box under Other folder… starts with.
+depth : int
+    Numbering depth of the question (1 = 3.1, 2 = 3.1.1, ...).
+checker : Optional[Callable[[Optional[str]], Optional[str]]]
+    Takes the answer and gives None when it can be used, or the sentence saying
+    what to do instead; None accepts every answer.
+number : Optional[str]
+    The question's own number from QUESTION_FLOW.md, such as '1.1'; None to number
+    it in the order asked.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    The folder given (its path as typed or clicked), or the default when Enter is
+    pressed.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal (side effect); advances the question
+numbering counters when it has no number of its own.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answer_announcer
+_brightener
+_input_reader
+_number_depth_finder
+_question_printer
+retry_teller
+```
+
 #### `guide_step_getter`
 
 ```text
@@ -30955,10 +31078,9 @@ text_colourer
 
 ```text
 ---- Summary ----
-Main function to ask a question answered with a line of text or a folder. An answer
-the checker refuses gets its one sentence of what to type, and the question waits
-for the next answer. In the window, choices offered beside the typing box are
-buttons that give their answer with a click.
+Main function to ask a question answered with a line of text. An answer the checker
+refuses gets its one sentence of what to type, and the question waits for the next
+answer. A folder is asked with folder_asker.
 
 ---- Inputs ----
 question : str
@@ -30973,17 +31095,13 @@ checker : Optional[Callable[[Optional[str]], Optional[str]]]
 number : Optional[str]
     The question's own number from QUESTION_FLOW.md, such as '1.2'; None to number
     it in the order asked.
-choices : Optional[Sequence[Tuple[str, str]]]
-    (answer, words) of each button offered beside the typing box, such as ('1',
-    'data_fiazall (6 files)'); None for none.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 Optional[str]
-    The typed text (or the answer of a button), or the default when Enter is
-    pressed.
+    The typed text, or the default when Enter is pressed.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
@@ -34169,13 +34287,13 @@ None.
 ```text
 ---- Summary ----
 Main function to ask for the folder of .paf files (1.1), offering the data folders
-found in the user's own folder, and the results folder (1.2), and to read a summary
-of every file and the settings saved with the dataset. A results folder named
-without a path is made inside the data folder; one that already holds results of
-these files is taken only once the user agrees to write over them (1.2.1), and
-otherwise asked again with a free name offered. For a dataset opened before, it
-asks whether its previous processing is loaded (1.3). It starts the first three
-steps of the guide.
+found in the user's own folder as buttons, and the results folder (1.2), offering
+the folders inside the data folder, and to read a summary of every file and the
+settings saved with the dataset. A results folder named without a path is made
+inside the data folder; one that already holds results of these files is taken
+only once the user agrees to write over them (1.2.1), and otherwise asked again
+with a free name offered first. For a dataset opened before, it asks whether its
+previous processing is loaded (1.3). It starts the first three steps of the guide.
 
 ---- Inputs ----
 last : dict
@@ -34206,6 +34324,7 @@ data_folder_lister
 data_folder_resolver
 dataset_settings_reader
 experiment_summary_reader
+folder_asker
 free_folder_finder
 guide_step_starter
 info_printer
@@ -34215,8 +34334,8 @@ progress_clearer
 progress_printer
 results_counter
 results_folder_checker
+results_folder_lister
 results_folder_resolver
-text_asker
 yes_no_asker
 ```
 
@@ -34682,6 +34801,42 @@ None.
 
 ---- Helpers ----
 results_folder_resolver
+```
+
+#### `results_folder_lister`
+
+```text
+---- Summary ----
+Main function to list the folders offered for the results (1.2): the folder
+offered first when it is not inside the data folder or does not exist yet, then
+every folder directly inside the data folder, each with what it holds.
+
+---- Inputs ----
+data_folder : Path
+    The data folder.
+offered : Path
+    The results folder offered (the one used last, or the free name).
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md); uses 'name'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Tuple[str, str, str]]
+    (full path, name, note) of each folder; the note is 'new folder', 'no results'
+    or 'holds results of 12 of 12 files'. Folders whose name starts with a dot or
+    an underscore, and folders that cannot be read, are left out.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_natural_sorter
+results_counter
 ```
 
 #### `results_folder_resolver`
@@ -39111,15 +39266,15 @@ question waiting, with the mouse or the keyboard.
 ---- Inputs ----
 kind : Optional[str]
     How the question is answered ('continue', 'yesno', 'choice', 'multi',
-    'number', 'text', 'confirm'), or None before the first question.
+    'number', 'text', 'folder', 'confirm'), or None before the first question.
 time_kind : Optional[str]
     'span' (a drag gives the answer) or None.
 is_edged : bool
     True while edges are dragged on the plot.
 
 ---- Globals read ----
-CLICK_HINT, EDGES_HINT, NAME_HINT, NUMBER_HINT, SPAN_HINT, TABLE_HINT (module
-constants).
+CLICK_HINT, EDGES_HINT, FOLDER_HINT, NAME_HINT, NUMBER_HINT, SPAN_HINT, TABLE_HINT
+(module constants).
 
 ---- Outputs ----
 str
@@ -39698,28 +39853,34 @@ None.
 The answers of the question waiting, under its card: one big Continue button for
 something done on the plot or in the strip; Yes and No one above the other; a
 button for each choice; tick buttons and Continue for several choices; a box with
-Continue only for a number or a name to type; Confirm for a table; or, while an
-earlier step is open, the button back to the step waited at. The answer the program
-gives with Enter is the highlighted button, which holds the keyboard. Every method
-runs on the window thread.
+Continue only for a number or a name to type; folder buttons, Other folder… with a
+box for a full path and Browse…, and Continue for a folder; Confirm for a table;
+or, while an earlier step is open, the button back to the step waited at. The
+answer the program gives with Enter is the highlighted button, which holds the
+keyboard. Every method runs on the window thread.
 
 ---- Attributes ----
 frame : Any
     The Tk frame holding the answers, for the window to place.
 entry : Any
-    The typing box, shown for a number or a name.
+    The typing box, shown for a number, a name or a folder typed in full.
 confirm : Any
     The Confirm button of a table.
 
 ---- Globals read ----
-BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OFF_TEXT,
-ONE_COLUMN_MOST, OTHER_BACKGROUND, OTHER_HOVER, TICKED, UNTICKED.
+BROWSE_TEXT, BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OFF_TEXT,
+ONE_COLUMN_MOST, OTHER_BACKGROUND, OTHER_FOLDER_TEXT, OTHER_HOVER,
+PICKED_BACKGROUND, TICKED, UNTICKED.
 
 ---- Methods ----
 __init__
 _button_maker
 _choices_placer
 _clearer
+_folder_browser
+_folder_picker
+_folder_sender
+_folder_shower
 _multi_sender
 _ticker
 back_shower
@@ -39856,6 +40017,125 @@ None.
 None.
 ```
 
+##### `_folder_browser`
+
+```text
+---- Summary ----
+Helper method to open the computer's own folder picker (the one window that
+pops up), starting at the folder in the box, and to put the folder picked in
+the box; Cancel leaves the box as it was.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Opens the picker and changes the box (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+folder_start_finder
+```
+
+##### `_folder_picker`
+
+```text
+---- Summary ----
+Helper method to highlight one folder button, or Other folder… with its box
+and Browse… under it.
+
+---- Inputs ----
+index : int
+    Place of the folder in the buttons, from 0; -1 for Other folder….
+
+---- Globals read ----
+OTHER_BACKGROUND, OTHER_FOLDER_TEXT, OTHER_HOVER, PICKED_BACKGROUND.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the buttons and shows or hides the box (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+folder_words_builder
+```
+
+##### `_folder_sender`
+
+```text
+---- Summary ----
+Helper method to give the folder highlighted (Continue): the path of its
+button, or the path in the box under Other folder…; an empty box gives nothing.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls on_click (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_folder_shower`
+
+```text
+---- Summary ----
+Helper method to show the answers of a folder question: a button for each
+folder offered, Other folder… with its row (the box for a full path and
+Browse…, shown when it is highlighted), and Continue.
+
+---- Inputs ----
+request : Dict[str, Any]
+    {'kind': 'folder', 'options', 'default', 'value'}: options the (answer,
+    name, note) of each folder, default the answer highlighted at first, value
+    what the box starts with.
+
+---- Globals read ----
+BROWSE_TEXT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates and places the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_button_maker
+_choices_placer
+_folder_browser
+_folder_picker
+_folder_sender
+folder_default_finder
+```
+
 ##### `_multi_sender`
 
 ```text
@@ -39982,11 +40262,11 @@ Method to show the answers of the question asked.
 request : Optional[Dict[str, Any]]
     {'kind', 'options', 'default', 'value'} as the questions send it
     (utils_shared.questions._answer_announcer): kind 'continue', 'yesno',
-    'choice', 'multi', 'number', 'text' or 'confirm'; options the words of
-    each choice ('text': (answer, words) pairs offered beside the box);
-    default the answer Enter gives ('y' or 'n'; the number of a choice; the
-    numbers ticked at first); value what the box starts with. None for no
-    question.
+    'choice', 'multi', 'number', 'text', 'folder' or 'confirm'; options the
+    words of each choice ('folder': the (answer, name, note) of each
+    folder); default the answer Enter gives ('y' or 'n'; the number of a
+    choice; the numbers ticked at first; the folder highlighted at first);
+    value what the box starts with. None for no question.
 
 ---- Globals read ----
 TICKED, UNTICKED, OFF_TEXT.
@@ -40005,11 +40285,104 @@ None.
 _button_maker
 _choices_placer
 _clearer
+_folder_shower
 _multi_sender
 _ticker
 ```
 
 ### MAIN FUNCTIONS
+
+#### `folder_default_finder`
+
+```text
+---- Summary ----
+Main function to choose the folder button highlighted when a folder question is
+asked: the folder offered as the default, else Other folder… when a default not
+among the buttons is given, else the first button.
+
+---- Inputs ----
+answers : Sequence[str]
+    The full path of each folder button, in order.
+default : Optional[str]
+    The folder Enter gives, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    Place of the button, from 0; -1 for Other folder… (also when there is no
+    button).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+path_cleaner
+```
+
+#### `folder_start_finder`
+
+```text
+---- Summary ----
+Main function to find where the folder picker opens: the folder in the box, or the
+nearest folder above it that exists, else the home folder.
+
+---- Inputs ----
+text : str
+    What the box holds (quotes and a leading ~ allowed); may be empty.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The folder the picker starts in.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+path_cleaner
+```
+
+#### `folder_words_builder`
+
+```text
+---- Summary ----
+Main function to write the words of a folder button: the mark of the one
+highlighted, the folder's name and what it holds.
+
+---- Inputs ----
+name : str
+    The folder's name, or "Other folder…".
+note : str
+    What it holds ('6 files', 'new folder'); empty for none.
+is_picked : bool
+    True for the button highlighted.
+
+---- Globals read ----
+PICKED_MARK, UNPICKED_MARK.
+
+---- Outputs ----
+str
+    The words, such as "●  data_OCR_and_haem  ·  12 files".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
 
 #### `step_of_change_finder`
 

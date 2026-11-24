@@ -22,13 +22,13 @@ from utils_shared.event_concentrations import (event_amount_writer,
 from utils_shared.helpers import file_name_sanitiser
 from utils_shared.paf_reader import experiment_summary_reader, PafError
 from utils_shared.questions import (choice_asker,
+                                    folder_asker,
                                     guide_step_starter,
                                     info_printer,
                                     number_asker,
                                     path_cleaner,
                                     progress_clearer,
                                     progress_printer,
-                                    text_asker,
                                     text_italiser,
                                     yes_no_asker,
                                     )
@@ -1012,13 +1012,13 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     """
     ---- Summary ----
     Main function to ask for the folder of .paf files (1.1), offering the data folders
-    found in the user's own folder, and the results folder (1.2), and to read a summary
-    of every file and the settings saved with the dataset. A results folder named
-    without a path is made inside the data folder; one that already holds results of
-    these files is taken only once the user agrees to write over them (1.2.1), and
-    otherwise asked again with a free name offered. For a dataset opened before, it
-    asks whether its previous processing is loaded (1.3). It starts the first three
-    steps of the guide.
+    found in the user's own folder as buttons, and the results folder (1.2), offering
+    the folders inside the data folder, and to read a summary of every file and the
+    settings saved with the dataset. A results folder named without a path is made
+    inside the data folder; one that already holds results of these files is taken
+    only once the user agrees to write over them (1.2.1), and otherwise asked again
+    with a free name offered first. For a dataset opened before, it asks whether its
+    previous processing is loaded (1.3). It starts the first three steps of the guide.
 
     ---- Inputs ----
     last : dict
@@ -1049,6 +1049,7 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     data_folder_resolver
     dataset_settings_reader
     experiment_summary_reader
+    folder_asker
     free_folder_finder
     guide_step_starter
     info_printer
@@ -1058,8 +1059,8 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     progress_printer
     results_counter
     results_folder_checker
+    results_folder_lister
     results_folder_resolver
-    text_asker
     yes_no_asker
     """
 
@@ -1067,31 +1068,32 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     guide_step_starter('data_folder')
     listed = data_folder_lister(own_folder)
     offered = []
-    for number, found in enumerate(listed, start=1):
+    for found in listed:
         count = len(paf_finder(found))
-        offered.append((str(number),
-                        f"{found.name} ({count} file{'' if count == 1 else 's'})",
+        offered.append((str(found),
+                        found.name,
+                        f"{count} file{'' if count == 1 else 's'}",
                         ),
                        )
     if listed:
-        info_printer(f'Data folders found in {own_folder}: click one, or type or drag '
-                     f'in the path of another folder.',
-                     )
+        info_printer(f'Data folders found in {own_folder}.')
     def folder_checker(text: Optional[str]) -> Optional[str]:
         if not text:
-            return 'Type or drag in a folder.'
+            return 'Choose a folder.'
         found = data_folder_resolver(text, listed)
         if not found.is_dir():
-            return 'Type or drag in a folder that exists.'
+            return 'Choose a folder that exists.'
         if not paf_finder(found):
-            return 'Type or drag in a folder with .paf files directly inside it.'
+            return 'Choose a folder with .paf files directly inside it.'
         return None
-    text = text_asker('What is the directory with the .paf files?',
-                      last.get('data_folder'),
-                      checker=folder_checker,
-                      number='1.1',
-                      choices=offered,
-                      )
+    last_folder = last.get('data_folder')
+    text = folder_asker('Choose the folder with the .paf files, then press Continue.',
+                        offered,
+                        default=last_folder,
+                        typed=last_folder or '',
+                        checker=folder_checker,
+                        number='1.1',
+                        )
     folder = data_folder_resolver(text, listed)
     files = paf_finder(folder)
 
@@ -1124,15 +1126,17 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     saved = dataset_settings_reader(folder)
     if saved:
         info_printer('This dataset was opened before: the results folder it used is '
-                     'offered.',
+                     'highlighted.',
                      )
-    offered = saved.get('export_folder') or folder / settings.RESULTS_FOLDER_NAME
+    offered = Path(saved.get('export_folder') or folder / settings.RESULTS_FOLDER_NAME)
     while True:
-        text = text_asker('To which directory would you like the results to be saved?',
-                          str(offered),
-                          checker=lambda typed: results_folder_checker(typed, folder),
-                          number='1.2',
-                          )
+        text = folder_asker('Choose the folder for the results, then press Continue.',
+                            results_folder_lister(folder, offered, summaries),
+                            default=str(offered),
+                            typed=str(offered),
+                            checker=lambda typed: results_folder_checker(typed, folder),
+                            number='1.2',
+                            )
         export_root = results_folder_resolver(text, folder)
 
         # ---- 3.1 Warn before results already there are written over ------------------
@@ -1145,10 +1149,7 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
         if yes_no_asker('Do you want to write over them?', False, number='1.2.1'):
             break
         offered = free_folder_finder(export_root)
-        info_printer(
-            'Type another folder, or a new name: a name without a path is made '
-            'inside the data folder.',
-            )
+        info_printer(f'Choose another folder, or the new folder {offered.name}.')
 
     # ---- 4 Ask whether the previous processing is loaded -----------------------------
     if saved:
@@ -1881,22 +1882,86 @@ def results_folder_checker(text: Optional[str],
 
     # ---- 1 Find the nearest folder that exists ---------------------------------------
     if not text:
-        return 'Type or drag in a folder.'
+        return 'Choose a folder.'
     nearest = results_folder_resolver(text, data_folder)
     while not nearest.exists():
         if nearest.parent == nearest:  # a drive or root that is not there
-            return 'Type or drag in a folder you can save to.'
+            return 'Choose a folder you can save to.'
         nearest = nearest.parent
     if not nearest.is_dir():
-        return 'Type or drag in a folder, not a file.'
+        return 'Choose a folder, not a file.'
 
     # ---- 2 Try to save in it ---------------------------------------------------------
     try:
         with tempfile.TemporaryFile(dir=nearest):
             pass
     except OSError:  # read-only, or not allowed: the run's log could not start there
-        return 'Type or drag in a folder you can save to.'
+        return 'Choose a folder you can save to.'
     return None
+
+
+# ---- results_folder_lister -----------------------------------------------------------
+def results_folder_lister(data_folder: Path,
+                          offered: Path,
+                          summaries: List[dict],
+                          ) -> List[Tuple[str, str, str]]:
+    """
+    ---- Summary ----
+    Main function to list the folders offered for the results (1.2): the folder
+    offered first when it is not inside the data folder or does not exist yet, then
+    every folder directly inside the data folder, each with what it holds.
+
+    ---- Inputs ----
+    data_folder : Path
+        The data folder.
+    offered : Path
+        The results folder offered (the one used last, or the free name).
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md); uses 'name'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Tuple[str, str, str]]
+        (full path, name, note) of each folder; the note is 'new folder', 'no results'
+        or 'holds results of 12 of 12 files'. Folders whose name starts with a dot or
+        an underscore, and folders that cannot be read, are left out.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _natural_sorter
+    results_counter
+    """
+
+    def noted(folder: Path) -> Tuple[str, str, str]:
+        if not folder.is_dir():
+            return (str(folder), folder.name, 'new folder')
+        count = results_counter(folder, summaries)
+        note = (f'holds results of {count} of {len(summaries)} files'
+                if count
+                else 'no results'
+                )
+        return (str(folder), folder.name, note)
+
+    inside = []
+    for path in Path(data_folder).iterdir():
+        if not path.is_dir() or path.name.startswith(('.', '_')):
+            continue
+        try:
+            inside.append(noted(path))
+        except OSError:  # a folder that cannot be read is not offered
+            continue
+    inside.sort(key=lambda row: _natural_sorter(row[1]))
+    offered = Path(offered)
+    if any(Path(row[0]) == offered for row in inside):
+        return inside
+    return [noted(offered)] + inside
 
 
 # ---- results_folder_resolver ---------------------------------------------------------
