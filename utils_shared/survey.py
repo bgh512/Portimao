@@ -18,6 +18,7 @@ from utils_shared.dataset_settings import dataset_settings_reader, SAVED_VALUE_K
 from utils_shared.delta_psi import b_haem_column_finder
 from utils_shared.event_concentrations import (event_amount_writer,
                                                event_concentration_filler,
+                                               event_text_reader,
                                                )
 from utils_shared.helpers import file_name_sanitiser
 from utils_shared.paf_reader import experiment_summary_reader, PafError
@@ -38,7 +39,9 @@ from utils_shared.user_notices import problem_teller
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-IGNORE_LABEL = 'ignore'  # the label that leaves an event out, in any capitals
+# the label that leaves an event out, typed in any capitals; datasets saved before it
+# was written in capitals say 'ignore', which is read the same
+IGNORE_LABEL = 'IGNORE'
 JOURNAL_NAMES = {key: spec['name'] for key, spec in settings.JOURNAL_SPECS.items()}
 OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'od': 'OCR / OD (µM min⁻¹ OD⁻¹)',
@@ -440,61 +443,6 @@ def _subscript_stripper(match: 're.Match') -> str:
     return match.group(1) if match.group(1) is not None else match.group(2)
 
 
-# ---- _tidy_labels_offerer ------------------------------------------------------------
-def _tidy_labels_offerer(with_events: List[dict],
-                         result: Dict[str, List[dict]],
-                         ) -> bool:
-    """
-    ---- Summary ----
-    Helper function to list the event labels that will be written more tidily (8 ug
-    ml-1 as 8 µg mL⁻¹), each by its file and time, and to ask whether to continue
-    with them (3.3.1). Asks nothing when every label is tidy already.
-
-    ---- Inputs ----
-    with_events : List[dict]
-        File summaries (DATA_FORMAT.md) of the files that have events.
-    result : Dict[str, List[dict]]
-        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
-        labels are replaced by their tidy forms when the user continues.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    bool
-        True to go on (the labels were tidy, or are now); False when the user chose
-        to change them in the table again, the labels being left as typed.
-
-    ---- Globals mutated ----
-    None. Changes the labels in ``result`` and reads from and prints to the terminal
-    (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    info_printer
-    tidy_labels_finder
-    yes_no_asker
-    """
-
-    found = tidy_labels_finder(with_events, result)
-    if not found:
-        return True
-    info_printer('These labels will be written more tidily:')
-    for name, time, _, tidy in found:
-        info_printer(f'  {name}, {time:.2f} min: {tidy}', depth=2)
-    if not yes_no_asker('Do you want to continue?',
-                        False,
-                        note='Click No to change them yourself in the table.',
-                        number='3.3.1',
-                        ):
-        return False
-    for _, _, entry, tidy in found:
-        entry['label'] = tidy
-    return True
-
-
 # ---- _trim_minutes_clamper -----------------------------------------------------------
 def _trim_minutes_clamper(summary: dict,
                           minutes: Dict[str, float],
@@ -882,11 +830,10 @@ def event_asker(summaries: List[dict],
     ---- Summary ----
     Main function to have the label, the stock and the volume added (or the
     concentration in the chamber) of every event filled in in the labels table,
-    starting from the saved or file values, an event being left out by writing ignore
-    as its label. Labels that could be written more tidily (8 ug ml-1 as 8 µg mL⁻¹) are
-    then listed in their tidy forms: continuing uses them, and otherwise the table
-    opens again with the labels as typed. The concentrations are then worked out and
-    one line says the labels are saved. Nothing is asked when no file has events.
+    starting from the saved values or else from what the text in the file says, an
+    event being left out by writing IGNORE as its label. The labels are kept as typed;
+    the concentrations are then worked out and one line says the labels are saved.
+    Nothing is asked when no file has events.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -904,7 +851,7 @@ def event_asker(summaries: List[dict],
     ---- Outputs ----
     Dict[str, List[dict]]
         {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md). An event
-        labelled ignore is left out and has no stock or concentration.
+        labelled IGNORE is left out and has no stock or concentration.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effects).
@@ -914,7 +861,6 @@ def event_asker(summaries: List[dict],
 
     ---- Helpers ----
     _event_line_builder
-    _tidy_labels_offerer
     event_concentration_filler
     event_entries_builder
     info_printer
@@ -926,18 +872,13 @@ def event_asker(summaries: List[dict],
     if not with_events:
         return result
 
-    # ---- 2 Fill in the table, until the tidy forms are taken -------------------------
-    # The same thing added again is known by its label, so the concentrations are
-    # worked out from the labels in their final form.
-    while True:
-        result = table_filler(result)
-        for events in result.values():
-            for entry in events:
-                entry['ignored'] = entry['label'].strip().lower() == IGNORE_LABEL
-                if entry['ignored']:
-                    entry['label'] = IGNORE_LABEL
-        if _tidy_labels_offerer(with_events, result):
-            break
+    # ---- 2 Fill in the table ---------------------------------------------------------
+    result = table_filler(result)
+    for events in result.values():
+        for entry in events:
+            entry['ignored'] = entry['label'].strip().lower() == IGNORE_LABEL.lower()
+            if entry['ignored']:
+                entry['label'] = IGNORE_LABEL
 
     # ---- 3 Work out the concentrations and list the labels ---------------------------
     result = {name: event_concentration_filler(events, settings.CHAMBER_VOLUME_ML)
@@ -960,7 +901,9 @@ def event_entries_builder(summaries: List[dict], saved: dict) -> Dict[str, List[
     ---- Summary ----
     Main function to give the events of every file as the labels table starts them:
     the label, stock, volume added, concentrations and whether it is left out as saved
-    for the dataset, or else the file's own text, with no concentration.
+    for the dataset; or else what the text in the file says ('1ul 8mm nd-011992':
+    1 µL of an 8 mM stock of nd-011992), the chemical written tidily, with IGNORE as
+    the label when the text names no chemical.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -974,7 +917,7 @@ def event_entries_builder(summaries: List[dict], saved: dict) -> Dict[str, List[
     ---- Outputs ----
     Dict[str, List[dict]]
         {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md), one per event
-        of the file, in its order; an event left out is labelled ignore.
+        of the file, in its order; an event left out is labelled IGNORE.
 
     ---- Globals mutated ----
     None.
@@ -983,7 +926,8 @@ def event_entries_builder(summaries: List[dict], saved: dict) -> Dict[str, List[
     None.
 
     ---- Helpers ----
-    None.
+    event_text_reader
+    label_tidier
     """
 
     result = {}
@@ -993,7 +937,16 @@ def event_entries_builder(summaries: List[dict], saved: dict) -> Dict[str, List[
                }
         events = []
         for event in summary['events']:
-            before = old.get(event['datapoint'], {})
+            before = old.get(event['datapoint'])
+            if before is None:
+                # nothing saved for this event: start from what its text says
+                found = event_text_reader(event.get('text') or '')
+                label = label_tidier(found['label']) if found['label'] else ''
+                before = dict(found,
+                              label=label or IGNORE_LABEL,
+                              addition_uM=None,
+                              ignored=not label,
+                              )
             ignored = bool(before.get('ignored', False))
             events.append({'datapoint': event['datapoint'],
                            'label': (IGNORE_LABEL
@@ -2245,49 +2198,6 @@ def temperature_asker(answers: dict, defaults: dict) -> None:
                                             maximum=TEMPERATURE_LIMITS_C[1],
                                             number='3.1',
                                             )
-
-
-# ---- tidy_labels_finder --------------------------------------------------------------
-def tidy_labels_finder(with_events: List[dict],
-                       result: Dict[str, List[dict]],
-                       ) -> List[Tuple[str, float, dict, str]]:
-    """
-    ---- Summary ----
-    Main function to find the event labels that could be written more tidily (8 ug
-    ml-1 as 8 µg mL⁻¹), leaving out the events left out.
-
-    ---- Inputs ----
-    with_events : List[dict]
-        File summaries (DATA_FORMAT.md) of the files that have events.
-    result : Dict[str, List[dict]]
-        {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
-        per event of the summary, in the same order.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    List[Tuple[str, float, dict, str]]
-        (file name, time of the event in min, its entry in ``result``, tidy form) for
-        each such label, in the order of the files and events.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    label_tidier
-    """
-
-    found = []
-    for summary in with_events:
-        for event, entry in zip(summary['events'], result[summary['name']]):
-            tidy = label_tidier(entry['label'])
-            if tidy != entry['label'] and not entry['ignored']:
-                found.append((summary['name'], event['time'], entry, tidy))
-    return found
 
 
 # ---- trim_layout_finder --------------------------------------------------------------

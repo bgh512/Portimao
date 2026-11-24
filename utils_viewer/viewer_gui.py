@@ -52,7 +52,7 @@ from utils_viewer.viewer_strip import (EdgeRow,
                                        SettingsStrip,
                                        strip_values_checker,
                                        )
-from utils_viewer.viewer_table import AnswerTable
+from utils_viewer.viewer_table import AnswerTable, table_texts_filler
 from utils_viewer.viewer_terminal import (ansi_splitter,
                                           ansi_style_updater,
                                           OutputRouter,
@@ -401,6 +401,16 @@ class ViewerGui:
         self._file_count = 0
         self._help_base = ''
         self._is_table_shown = False
+        # The open table belongs to one step of the guide: it is shown only while that
+        # step is open. A table opened over another (Edit ODs from the labels table)
+        # keeps the one under it, as typed, until it closes.
+        self._table_shown: Optional[dict] = None
+        self._table_step: Optional[int] = None
+        self._table_stack: List[Tuple[dict, List[Dict[str, str]], Optional[int]]] = []
+        # What was typed in a table left for another step, by kind of table, to open
+        # it again as it was left; and whether the program is to take it as it is.
+        self._left_texts: Dict[str, List[Dict[str, str]]] = {}
+        self._is_table_left = False
         self._is_busy = False
         self._is_wheel_turning = False  # the wheel of the "Plotting data …" sign
         self._click_count = 0  # clicks sent to the program, for the sign after a click
@@ -1387,10 +1397,9 @@ class ViewerGui:
             self._is_busy = True
             self._picture_shower()
         elif kind == 'table_show':
-            self._table.rows_setter(event[1])
-            self._table_layout_setter(True)
+            self._table_opener(event[1])
         elif kind == 'table_hide':
-            self._table_layout_setter(False)
+            self._table_closer()
         elif kind == 'time':
             self._time_kind, self._time_reader = event[1], event[2]
             self._drag_start = None
@@ -1647,8 +1656,10 @@ class ViewerGui:
         GuidePanel.rows_drawer
         GuideState.card_teller
         GuideState.row_lister
+        _table_step_follower
         """
 
+        self._table_step_follower()
         self._guide_panel.rows_drawer(self._guide.row_lister())
         card = self._guide.card_teller()
         if card['note']:
@@ -1665,8 +1676,12 @@ class ViewerGui:
                       )
                      for change, words in card['extra']
                      ]
-            # a table opened from the View box (Edit ODs) keeps its Confirm
-            is_table = bool(self._request) and self._request.get('kind') == 'confirm'
+            # a table opened from the View box (Edit ODs) keeps its Confirm; one put
+            # away while another step is open does not
+            is_table = (self._is_table_shown and
+                        bool(self._request) and
+                        self._request.get('kind') == 'confirm'
+                        )
             self._area.back_shower(card['back'], self._back_taker, extra, is_table)
             self._is_back_shown = True
         else:
@@ -2855,6 +2870,46 @@ class ViewerGui:
             self._entry.insert('insert', symbol)
         self._entry.focus_set()
 
+    # ---- _table_closer ---------------------------------------------------------------
+    def _table_closer(self) -> None:
+        """
+        ---- Summary ----
+        Method to close the open table once the program has read it. A table it was
+        opened over comes back as it was typed, shown while its step is open.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the table and the layout of the open step (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _table_layout_setter
+        _table_step_follower
+        AnswerTable.rows_setter
+        table_texts_filler
+        """
+
+        self._is_table_left = False
+        if not self._table_stack:
+            self._table_shown = self._table_step = None
+            self._table_layout_setter(False)
+            return
+        table, texts, self._table_step = self._table_stack.pop()
+        self._table_shown = table
+        self._table.rows_setter(table_texts_filler(table, texts))
+        self._table_step_follower()
+
     # ---- _table_layout_setter --------------------------------------------------------
     def _table_layout_setter(self, is_shown: bool) -> None:
         """
@@ -2906,6 +2961,110 @@ class ViewerGui:
             self._text_box.pack_configure(expand=True)
         self._keys_shower()
         self._text.see('end')
+
+    # ---- _table_opener ---------------------------------------------------------------
+    def _table_opener(self, table: dict) -> None:
+        """
+        ---- Summary ----
+        Method to open a table in the step open in the guide, which it then belongs
+        to. A table already open is kept as typed under it; a table of a kind left
+        for another step before opens as it was left.
+
+        ---- Inputs ----
+        table : dict
+            The table to show (table_rows, DATA_FORMAT.md).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the table and the layout of the open step (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _table_layout_setter
+        AnswerTable.rows_setter
+        AnswerTable.texts_reader
+        table_texts_filler
+        """
+
+        if self._table_shown is not None:
+            self._table_stack.append((self._table_shown,
+                                      self._table.texts_reader(),
+                                      self._table_step,
+                                      ),
+                                     )
+        guide = self._guide
+        self._table_step = guide.shown if guide.shown is not None else guide.current
+        self._table_shown = table
+        self._is_table_left = False
+        left = self._left_texts.pop(table.get('kind') or '', None)
+        self._table.rows_setter(table if left is None else table_texts_filler(table,
+                                                                              left,
+                                                                              ),
+                                )
+        self._table_layout_setter(True)
+
+    # ---- _table_step_follower --------------------------------------------------------
+    def _table_step_follower(self) -> None:
+        """
+        ---- Summary ----
+        Method to keep the open table with its step as the guide changes: shown while
+        its step is open. When another step is opened from the step the program waits
+        at, the table is put away as typed and comes back with its step. When it was
+        opened from the View box (Edit ODs, Edit labels) and another step is opened,
+        it is taken as it is, unchecked, and kept to open again as it was left.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the layout of the open step and may wake the question thread
+        (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _click_sign_starter
+        _pane_writer
+        _table_layout_setter
+        AnswerTable.texts_reader
+        """
+
+        if self._table_shown is None or self._is_table_left:
+            return
+        guide = self._guide
+        open_step = guide.shown if guide.shown is not None else guide.current
+        if open_step == self._table_step:
+            self._table_layout_setter(True)
+            return
+        if self._table_step == guide.current or not self._is_waiting:
+            self._table_layout_setter(False)
+            return
+
+        # ---- 1 Left from the View box: taken as it is --------------------------------
+        self._left_texts[self._table_shown.get('kind') or ''] = self._table.texts_reader()
+        self._is_table_left = True
+        self._is_waiting = False
+        self._table_layout_setter(False)
+        self._pane_writer('→ Kept as it is\n', 'answer')
+        self._text.mark_set('since', 'end-1c')
+        self._answers.put('')
+        self._click_sign_starter()
 
     # ---- _time_clicker ---------------------------------------------------------------
     def _time_clicker(self, event: Any) -> None:
@@ -4239,6 +4398,35 @@ class ViewerGui:
         """
 
         self._events.put(('table_hide',))
+
+    # ---- table_leave_taker -----------------------------------------------------------
+    def table_leave_taker(self) -> bool:
+        """
+        ---- Summary ----
+        Method to say whether the table that waits was left for another step, so the
+        program takes it as it is, without checking it.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        bool
+            True when the table was left for another step.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return self._is_table_left
 
     # ---- table_reader ----------------------------------------------------------------
     def table_reader(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]:

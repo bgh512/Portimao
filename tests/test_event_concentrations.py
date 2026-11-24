@@ -1,5 +1,5 @@
 """
-Tests of the concentration of each addition, worked out by hand: the stock with its unit, the concentration in the chamber adding up, a concentration typed, an ignored event and the text of the labels.
+Tests of the concentration of each addition, worked out by hand: the stock with its unit, the concentration in the chamber adding up, a concentration typed, an ignored event, the text of the labels and what the text in the file gives.
 """
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
@@ -7,11 +7,14 @@ import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.event_concentrations import (addition_calculator,
+                                               CHAMBER_UNIT,
                                                concentration_reader,
                                                event_concentration_filler,
+                                               event_text_reader,
                                                event_text_writer,
+                                               STOCK_UNIT,
+                                               unit_concentration_writer,
                                                )
-from utils_shared.helpers import concentration_formatter
 from utils_viewer.viewer_table import label_worked_writer
 
 
@@ -201,10 +204,10 @@ def test_a_stock_typed_with_its_unit() -> None:
 def test_the_text_of_the_labels() -> None:
     """
     ---- Summary ----
-    Main function to check the labels on the plot: in the chamber '1.2 mM KCN' (from
-    1200 µM, in its most readable unit); what was added '10 µL of 200 mM KCN'; an
-    event with only a typed concentration shows it either way; an event with no
-    concentration shows its label alone. Concentrations below 1 µM are written in nM.
+    Main function to check the labels on the plot: in the chamber always in µM
+    ('1200 µM KCN', not 1.2 mM); what was added with the stock always in mM ('10 µL of
+    200 mM KCN', and a 1 M stock as 1000 mM); an event with only a typed concentration
+    shows it either way; an event with no concentration shows its label alone.
 
     ---- Inputs ----
     None.
@@ -227,13 +230,79 @@ def test_the_text_of_the_labels() -> None:
     """
 
     last = event_concentration_filler(RUN, CHAMBER_ML)[4]
-    assert event_text_writer(last, 'chamber') == '1.2 mM KCN'
+    assert event_text_writer(last, 'chamber') == '1200 µM KCN'
     assert event_text_writer(last, 'added') == '10 µL of 200 mM KCN'
     typed = {'label': 'BD', 'concentration_uM': 10.0}
     assert event_text_writer(typed, 'added') == '10 µM BD'
     assert event_text_writer({'label': 'nd-011992'}, 'chamber') == 'nd-011992'
-    assert concentration_formatter(0.5) == '500 nM'
-    assert concentration_formatter(1200.0) == '1.2 mM'
+    # 20 µL of a 1 M stock: 1 000 000 × 20 ÷ 5000 = 4000 µM
+    dithionite = {'label': 'dithi', 'stock_uM': 1_000_000.0, 'added_uL': 20.0}
+    filled = event_concentration_filler([dithionite], CHAMBER_ML)[0]
+    assert event_text_writer(filled, 'chamber') == '4000 µM dithi'
+    assert event_text_writer(filled, 'added') == '20 µL of 1000 mM dithi'
+    # 1 µL of an 8 mM stock: 8000 × 1 ÷ 5000 = 1.6 µM
+    small = {'label': 'nd-011992', 'stock_uM': 8000.0, 'added_uL': 1.0}
+    filled = event_concentration_filler([small], CHAMBER_ML)[0]
+    assert event_text_writer(filled, 'chamber') == '1.6 µM nd-011992'
+    assert unit_concentration_writer(200_000.0, STOCK_UNIT) == '200 mM'
+    assert unit_concentration_writer(0.5, CHAMBER_UNIT) == '0.5 µM'
+    assert unit_concentration_writer(1200.0, CHAMBER_UNIT, 10, False) == '1200'
+
+
+# ---- test_the_text_in_the_file_read --------------------------------------------------
+def test_the_text_in_the_file_read() -> None:
+    """
+    ---- Summary ----
+    Main function to check what the text the instrument keeps with an addition gives,
+    on the texts of the example run and a few made up: a number with a volume unit is
+    the volume added (µL; 1 mL = 1000 µL), a number with a molar unit the stock (8mm
+    = 8 mM = 8000 µM; 1m = 1 M = 1 000 000 µM), or the concentration in the chamber
+    when no volume is given (100uM = 100 µM), and what is left the chemical; a text
+    with nothing of these keeps it all as the chemical, and one with only a volume
+    leaves the chemical empty.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    def read(text: str) -> tuple:
+        found = event_text_reader(text)
+        return (found['added_uL'],
+                found['stock_uM'],
+                found['label'],
+                found['concentration_uM'],
+                )
+
+    assert read('1ul 8mm nd-011992') == (1.0, 8000.0, 'nd-011992', None)
+    assert read('10ul 8mm nd-011992') == (10.0, 8000.0, 'nd-011992', None)
+    assert read('9ul 10mm kcn') == (9.0, 10_000.0, 'kcn', None)
+    assert read('4ul 100mm kcn') == (4.0, 100_000.0, 'kcn', None)
+    assert read('20ul 1m dithi') == (20.0, 1_000_000.0, 'dithi', None)
+    assert read('2.5 µL 0,5 M KCN') == (2.5, 500_000.0, 'KCN', None)
+    assert read('0.01ml 200mM KCN') == (pytest.approx(10.0), 200_000.0, 'KCN', None)
+    assert read('100uM KCN') == (None, None, 'KCN', 100.0)
+    assert read('bubble') == (None, None, 'bubble', None)
+    assert read('2 ul') == (2.0, None, '', None)
+    assert read('') == (None, None, '', None)
+    # numbers inside a name, or minutes, are not taken for a unit
+    assert read('5 min wait') == (None, None, '5 min wait', None)
+    assert read('8ug ml-1 DAP') == (None, None, '8ug ml-1 DAP', None)
 
 
 # ---- test_the_table_fills_in_the_chamber ---------------------------------------------
@@ -241,8 +310,9 @@ def test_the_table_fills_in_the_chamber() -> None:
     """
     ---- Summary ----
     Main function to check what the labels table fills in as it is typed: the rows
-    with a stock and a volume get their concentration in the chamber (10 µM, 400 µM,
-    800 µM, the second KCN adding up); a row left out and a row typed by hand are not
+    with a stock and a volume get their concentration in the chamber (10, 400 and 800
+    µM, the second KCN adding up); a row left out (IGNORE in any capitals) and a row
+    typed by hand are not
     filled in; each file adds up on its own.
 
     ---- Inputs ----
@@ -276,9 +346,10 @@ def test_the_table_fills_in_the_chamber() -> None:
     values = [{'label': 'BD', 'stock_uM': 10_000.0, 'added_uL': 5.0},
               dict(kcn),
               dict(kcn, concentration_uM=400.0),  # the value shown before is not used
-              {'label': 'ignore', 'stock_uM': None, 'added_uL': None},
+              {'label': 'Ignore', 'stock_uM': None, 'added_uL': None},
               dict(kcn),
               {'label': None, 'concentration_uM': 10.0},
               ]
-    shown = label_worked_writer(rows, values, 'ignore', CHAMBER_ML)
-    assert shown == ['10 µM', '400 µM', '800 µM', None, '400 µM', None]
+    # the cells are in µM, the unit of their heading
+    shown = label_worked_writer(rows, values, 'IGNORE', CHAMBER_ML)
+    assert shown == ['10', '400', '800', None, '400', None]

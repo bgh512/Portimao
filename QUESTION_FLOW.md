@@ -1,4 +1,4 @@
-# Portimao question flow (V2.21)
+# Portimao question flow (V2.22)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -131,23 +131,20 @@ Dilution    = any dilution factor after additions
 
 If no file has any event, nothing is asked here and the next step is **4.1**.
 
-The labels table opens on the terminal side: one row per event, under the name of its file, with the time of the event (min), the text in the file (grey, not typed in), its label, the **Stock**, the volume **Added (µL)** and the concentration **In the chamber**. Each row starts as saved for the dataset, or else with the label as written in the file; an event left out before reads `ignore`. Clicking a cell of a file shows that file on the plot. The **Symbols** row under the table types µ, ⁻¹, ₂ and the like into the cell last typed in.
+The labels table opens on the terminal side: one row per event, under the name of its file, with the time of the event (min), the text in the file (grey, not typed in), the **Volume added (µL)**, the **Stock (mM)**, the **Chemical** (the label shown on the plot, in a wider box) and the concentration **In the chamber (µM)**. Each row starts as saved for the dataset, or else filled in from the text in the file: a number with a volume unit (nL, µL or mL; `ul` for µL) is the volume added, a number with a molar unit (nM, µM, mM or M, in any capitals; `1m` is 1 M) the stock, or the concentration in the chamber when the text gives no volume, and what is left the chemical, written tidily (`8ug ml-1` as 8 µg mL⁻¹). `1ul 8mm nd-011992` gives 1, 8 and nd-011992; `100uM KCN` gives KCN with 100 in the chamber. What cannot be worked out is left empty, and a text that names no chemical (`2 ul`) gives `IGNORE`. An event left out before reads `IGNORE`. Clicking a cell of a file shows that file on the plot. The **Symbols** row under the table types µ, ⁻¹, ₂ and the like into the cell last typed in.
 
-- Type the stock with its unit (nM, µM, mM or M, in any capitals; `u` for µ); a number alone is mM. Once a row has both a stock and a volume, its concentration in the chamber fills itself in, in green, and cannot be typed in: stock × volume ÷ 5 mL (the chamber), the same label added again in a file adding up (10 µL of 200 mM KCN gives 400 µM, the next 800 µM). The maths is in `MATHS.md`, section 8.
-- A row with no stock and volume takes a concentration in the chamber typed by hand (a number alone is µM), or none.
-- Concentrations are written in their most readable unit: 1.2 mM, not 1200 µM.
+- A number typed alone is in the unit of its column: mM for the stock, µM in the chamber; a typed unit (nM, µM, mM or M) is also taken. Once a row has both a stock and a volume, its concentration in the chamber fills itself in, in green, and cannot be typed in: stock × volume ÷ 5 mL (the chamber), the same chemical added again in a file adding up (10 µL of 200 mM KCN gives 400 µM, the next 800 µM). The maths is in `MATHS.md`, section 8.
+- A row with no stock and volume takes a concentration in the chamber typed by hand, or none.
+- A stock is always written in mM and a concentration in the chamber in µM, in the table and on the labels of the plots alike (1200 µM, not 1.2 mM).
+- The chemical is kept as typed: only what the program fills in from the file is tidied.
 
 | # | Question | Leads to |
 |---|---|---|
-| 3.3 | Fill in the label, the stock and the volume added of each event, then press Confirm. (above it, in grey: "One row per event. Write ignore as the label to leave an event out. Type the stock with its unit (nM, µM, mM or M; a number alone is mM) and the volume added, and the concentration in the chamber (5 mL) is worked out, the same label added again adding up. Or leave them empty and type the concentration in the chamber (a number alone is µM).") | An event labelled `ignore` (in any capitals) is left out, and its other cells are greyed out. If a label is empty, a stock, volume or concentration cannot be used, or a row has a stock without a volume (or a volume without a stock), one line names those cells and the table stays open. Otherwise the table closes: **3.3.1** if a label could be written more tidily; then the concentrations are worked out from the labels as they then are, the labels of every file are listed (with what was added and the concentration in the chamber), one line says "Event labels saved! Edit labels in the View box above the plot changes them at any time." and the labels are drawn **(plot)**; then **4.1**. |
+| 3.3 | Fill the table in with the details of the additions, then press Confirm. (above it, in grey: "Type IGNORE as a label to not show it.") | An event labelled `IGNORE` (in any capitals) is left out, and its other cells are greyed out. If a chemical is empty, a stock, volume or concentration cannot be used, or a row has a stock without a volume (or a volume without a stock), one line names those cells and the table stays open. Otherwise the table closes, the concentrations are worked out, the labels of every file are listed (with what was added and the concentration in the chamber), one line says "Event labels saved! Edit labels in the View box above the plot changes them at any time." and the labels are drawn **(plot)**; then **4.1**. |
 
-A label is written more tidily with `u` in front of a unit as µ (`100 uM` as 100 µM), a litre as a capital L, a space between a number and its unit, and `-1` after a unit or anything after `^` raised (`8ug ml-1` as 8 µg mL⁻¹). Only units are changed: a name with numbers in it (`nd-011992`) and a formula (`H2O2`) are left as they are. Under "These labels will be written more tidily:", each is listed by its file, its time and its tidy form ("run1, 15.01 min: 8 µg mL⁻¹"), then:
+Confirm only confirms: there is no question to accept the labels, as **Edit labels** in the View box opens the labels table again at any later step, and the plot is redrawn after Confirm.
 
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 3.3.1 | *(only when a label could be tidier)* Do you want to continue? `(y/N)` (above it: "Click No to change them yourself in the table.") | every listed label is replaced by its tidy form; the labels are listed, saved and drawn **(plot)**, then **4.1** | **3.3** (the table opens again with the labels as you typed them) |
-
-There is no question to accept the labels: **Edit labels** in the View box opens the labels table again at any later step, and the plot is redrawn after Confirm.
+Going to another step while the table is open keeps it as it is. In the set-up, opening an earlier step puts the table away, and **Back to Event labels** brings it back as you left it. Opened with **Edit labels** (or **Edit ODs**), **Back to** *step* or a click on another step takes the table as it is, without checking it (a cell that cannot be used counts as empty), and redraws the plot; the next **Edit labels** opens it as you left it, wrong cells included. **Edit ODs** pressed while the labels table is open opens the OD table, and the labels table comes back as you left it once the OD table is confirmed.
 
 ### 3.C The export buttons of the trim step
 
@@ -279,7 +276,7 @@ An averaging window is a stretch around an addition that an average is taken ove
 - A **settled window** ends a set time before the next addition (the last one 0.5 min before the end of the recording): the level once things have settled after the addition before.
 - A **quick window** starts a set time after its own addition: the quick response to it.
 
-The windows are placed around the events as they were left in 3.B: an event marked `ignore` gets none. Every window of a kind has the same length unless you set one on its own, so each moves with its addition in every file and one setting fits the whole dataset. The window before the first addition is the baseline, which both kinds are compared with; it is there whenever either kind is ticked, with the length and the gap of the settled windows unless it has its own.
+The windows are placed around the events as they were left in 3.B: an event marked `IGNORE` gets none. Every window of a kind has the same length unless you set one on its own, so each moves with its addition in every file and one setting fits the whole dataset. The window before the first addition is the baseline, which both kinds are compared with; it is there whenever either kind is ticked, with the length and the gap of the settled windows unless it has its own.
 
 - The baseline is **shaded gold** on the plot of every file, with "baseline" and its length by its first edge. It is as long as a settled window and ends the same time before the first addition, so pulling its edges changes the settled windows too.
 - The settled windows are **shaded blue** on the plot of every file, 120 s long and ending 30 s before the next addition; the quick windows are **shaded green**, 30 s long and starting 10 s after their addition; or both are as they were saved with the dataset. They are over the plot only in this step; the steps before it show none.

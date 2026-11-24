@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.20
+- **Version:** V2.21
 - **Date:** 24/11/2026
 
 ## Contents
@@ -155,6 +155,7 @@
     - [`test_a_concentration_typed`](#test_a_concentration_typed)
     - [`test_a_stock_typed_with_its_unit`](#test_a_stock_typed_with_its_unit)
     - [`test_the_text_of_the_labels`](#test_the_text_of_the_labels)
+    - [`test_the_text_in_the_file_read`](#test_the_text_in_the_file_read)
     - [`test_the_table_fills_in_the_chamber`](#test_the_table_fills_in_the_chamber)
 - [`tests/test_experiment_run.py`](#teststest_experiment_runpy)
     - [`_quiet_details`](#_quiet_details)
@@ -533,6 +534,7 @@
     - [`test_cells_of_the_tables`](#test_cells_of_the_tables)
     - [`test_event_labels_from_the_table`](#test_event_labels_from_the_table)
     - [`test_rows_of_the_labels_table`](#test_rows_of_the_labels_table)
+    - [`test_a_table_opened_as_it_was_left`](#test_a_table_opened_as_it_was_left)
     - [`test_rows_of_the_od_table`](#test_rows_of_the_od_table)
     - [`test_od_table_confirmed_with_gaps`](#test_od_table_confirmed_with_gaps)
     - [`test_sentence_when_confirmed_too_early`](#test_sentence_when_confirmed_too_early)
@@ -802,6 +804,8 @@
     - [`event_amount_writer`](#event_amount_writer)
     - [`event_concentration_filler`](#event_concentration_filler)
     - [`event_text_writer`](#event_text_writer)
+    - [`event_text_reader`](#event_text_reader)
+    - [`unit_concentration_writer`](#unit_concentration_writer)
 - [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
     - [`_skip_reporter`](#_skip_reporter)
     - [`event_settings_merger`](#event_settings_merger)
@@ -1055,7 +1059,6 @@
     - [`_minutes_recaller`](#_minutes_recaller)
     - [`_natural_sorter`](#_natural_sorter)
     - [`_subscript_stripper`](#_subscript_stripper)
-    - [`_tidy_labels_offerer`](#_tidy_labels_offerer)
     - [`_trim_minutes_clamper`](#_trim_minutes_clamper)
     - [`data_folder_lister`](#data_folder_lister)
     - [`data_folder_resolver`](#data_folder_resolver)
@@ -1085,7 +1088,6 @@
     - [`size_asker`](#size_asker)
     - [`spectra_export_asker`](#spectra_export_asker)
     - [`temperature_asker`](#temperature_asker)
-    - [`tidy_labels_finder`](#tidy_labels_finder)
     - [`trim_layout_finder`](#trim_layout_finder)
     - [`trim_limits_builder`](#trim_limits_builder)
     - [`trim_minutes_builder`](#trim_minutes_builder)
@@ -1254,6 +1256,7 @@
     - [`od_rows_reader`](#od_rows_reader)
     - [`od_table_builder`](#od_table_builder)
     - [`table_problem_teller`](#table_problem_teller)
+    - [`table_texts_filler`](#table_texts_filler)
     - [`wheel_step_finder`](#wheel_step_finder)
 - [`utils_viewer/viewer_terminal.py`](#utils_viewerviewer_terminalpy)
     - [`OutputRouter`](#outputrouter)
@@ -5745,7 +5748,7 @@ _summaries_builder
 
 ## `tests/test_event_concentrations.py`
 
-Tests of the concentration of each addition, worked out by hand: the stock with its unit, the concentration in the chamber adding up, a concentration typed, an ignored event and the text of the labels.
+Tests of the concentration of each addition, worked out by hand: the stock with its unit, the concentration in the chamber adding up, a concentration typed, an ignored event, the text of the labels and what the text in the file gives.
 
 ### MAIN FUNCTIONS
 
@@ -5867,10 +5870,10 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check the labels on the plot: in the chamber '1.2 mM KCN' (from
-1200 µM, in its most readable unit); what was added '10 µL of 200 mM KCN'; an
-event with only a typed concentration shows it either way; an event with no
-concentration shows its label alone. Concentrations below 1 µM are written in nM.
+Main function to check the labels on the plot: in the chamber always in µM
+('1200 µM KCN', not 1.2 mM); what was added with the stock always in mM ('10 µL of
+200 mM KCN', and a 1 M stock as 1000 mM); an event with only a typed concentration
+shows it either way; an event with no concentration shows its label alone.
 
 ---- Inputs ----
 None.
@@ -5892,13 +5895,46 @@ None.
 None.
 ```
 
+#### `test_the_text_in_the_file_read`
+
+```text
+---- Summary ----
+Main function to check what the text the instrument keeps with an addition gives,
+on the texts of the example run and a few made up: a number with a volume unit is
+the volume added (µL; 1 mL = 1000 µL), a number with a molar unit the stock (8mm
+= 8 mM = 8000 µM; 1m = 1 M = 1 000 000 µM), or the concentration in the chamber
+when no volume is given (100uM = 100 µM), and what is left the chemical; a text
+with nothing of these keeps it all as the chemical, and one with only a volume
+leaves the chemical empty.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_the_table_fills_in_the_chamber`
 
 ```text
 ---- Summary ----
 Main function to check what the labels table fills in as it is typed: the rows
-with a stock and a volume get their concentration in the chamber (10 µM, 400 µM,
-800 µM, the second KCN adding up); a row left out and a row typed by hand are not
+with a stock and a volume get their concentration in the chamber (10, 400 and 800
+µM, the second KCN adding up); a row left out (IGNORE in any capitals) and a row
+typed by hand are not
 filled in; each file adds up on its own.
 
 ---- Inputs ----
@@ -16228,15 +16264,15 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check the labels as the table is confirmed: a label written
-ignore in any capitals leaves its event out and drops its concentration; a label
-that could be tidier is listed by its file, time and tidy form, Yes to continue
-uses the tidy form, and No opens the table again with the label as typed; the
-labels are then said to be saved.
+Main function to check the labels as the table is confirmed: the table starts
+from what the text in the file says, IGNORE where it names no chemical; a label
+written ignore in any capitals leaves its event out and drops its concentration;
+Confirm only confirms, asking nothing more, and the labels are kept as typed, a
+label that could be tidier included; the labels are then said to be saved.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
-    Stands in for the answer box.
+    Stands in for what is said in the terminal.
 
 ---- Globals read ----
 SUMMARIES (module constant).
@@ -16263,6 +16299,34 @@ Main function to check the labels table: it starts from the saved label, or else
 the file's own text, with ignore for an event left out; it has one row per event
 under its file's name, none for a file without events; and the typed labels and
 concentrations go back to the right events, a label left empty keeping its own.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+SUMMARIES (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_table_opened_as_it_was_left`
+
+```text
+---- Summary ----
+Main function to check that a table put away or left for another step opens again
+as it was typed, a wrong cell included, without changing the table it starts
+from; and that a table whose rows have changed since keeps its own cells.
 
 ---- Inputs ----
 None.
@@ -24844,7 +24908,7 @@ None.
 
 ## `utils_shared/event_concentrations.py`
 
-The concentration of each addition: the stock typed with its unit, the concentration in the chamber, adding up for the same thing added again, and the text of its label.
+The concentration of each addition: read from the text in the file, the stock typed with its unit, the concentration in the chamber, adding up for the same thing added again, and the text of its label.
 
 ### HELPERS
 
@@ -24950,8 +25014,8 @@ typed_number_reader
 ```text
 ---- Summary ----
 Main function to write how much of a thing an event holds, as the labels show it:
-the concentration in the chamber after it, or the volume and the stock added (an
-event with no stock shows its concentration either way).
+the concentration in the chamber after it (µM), or the volume and the stock added
+(mM); an event with no stock shows its concentration either way.
 
 ---- Inputs ----
 event : dict
@@ -24965,7 +25029,7 @@ None.
 
 ---- Outputs ----
 str
-    For example '400 µM', '1.2 mM' or '10 µL of 200 mM'; '' when the event has no
+    For example '400 µM', '1200 µM' or '10 µL of 200 mM'; '' when the event has no
     concentration.
 
 ---- Globals mutated ----
@@ -24975,7 +25039,7 @@ None.
 None.
 
 ---- Helpers ----
-concentration_formatter
+unit_concentration_writer
 ```
 
 #### `event_concentration_filler`
@@ -25048,6 +25112,75 @@ None.
 
 ---- Helpers ----
 event_amount_writer
+```
+
+#### `event_text_reader`
+
+```text
+---- Summary ----
+Main function to read what the text the instrument keeps with an addition says
+('1ul 8mm nd-011992'): the volume added, the concentration of the stock and the
+chemical. A concentration with no volume beside it is taken as the concentration in
+the chamber ('100uM KCN'). Only the first volume and the first concentration are
+read; what is left is the chemical.
+
+---- Inputs ----
+text : str
+    The text of the event in the file.
+
+---- Globals read ----
+TEXT_EDGE_CHARACTERS, TEXT_MOLAR_PATTERN, TEXT_VOLUME_PATTERN, UNIT_FACTORS_UM,
+VOLUME_FACTORS_UL.
+
+---- Outputs ----
+dict
+    {'label': the chemical, '' when nothing is left; 'added_uL', 'stock_uM',
+    'concentration_uM': each None when the text does not give it}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+µL = number × VOLUME_FACTORS_UL[unit]; µM = number × UNIT_FACTORS_UM[unit]:
+'1ul 8mm nd-011992' gives 1 µL, 8 × 1000 = 8000 µM and 'nd-011992'.
+
+---- Helpers ----
+typed_number_reader
+```
+
+#### `unit_concentration_writer`
+
+```text
+---- Summary ----
+Main function to write a concentration in one fixed unit: the stock in mM and the
+concentration in the chamber in µM, whatever its size.
+
+---- Inputs ----
+value_um : float
+    The concentration (µM).
+unit : str
+    STOCK_UNIT or CHAMBER_UNIT (a key of UNIT_NAMES).
+significant : int
+    Significant figures written: 4 on a label, more in a cell of a table, so the
+    number read back from the cell is the one kept.
+is_unit_written : bool
+    False for the number alone (a cell whose heading gives the unit).
+
+---- Globals read ----
+LABEL_FIGURES, UNIT_FACTORS_UM, UNIT_NAMES.
+
+---- Outputs ----
+str
+    For example '200 mM' (from 200 000 µM), '1200 µM' or '0.2'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+number = µM ÷ UNIT_FACTORS_UM[unit]: 200 000 µM ÷ 1000 = 200 mM.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_shared/experiment_processing.py`
@@ -33989,42 +34122,6 @@ None.
 None.
 ```
 
-#### `_tidy_labels_offerer`
-
-```text
----- Summary ----
-Helper function to list the event labels that will be written more tidily (8 ug
-ml-1 as 8 µg mL⁻¹), each by its file and time, and to ask whether to continue
-with them (3.3.1). Asks nothing when every label is tidy already.
-
----- Inputs ----
-with_events : List[dict]
-    File summaries (DATA_FORMAT.md) of the files that have events.
-result : Dict[str, List[dict]]
-    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}; the
-    labels are replaced by their tidy forms when the user continues.
-
----- Globals read ----
-None.
-
----- Outputs ----
-bool
-    True to go on (the labels were tidy, or are now); False when the user chose
-    to change them in the table again, the labels being left as typed.
-
----- Globals mutated ----
-None. Changes the labels in ``result`` and reads from and prints to the terminal
-(side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-info_printer
-tidy_labels_finder
-yes_no_asker
-```
-
 #### `_trim_minutes_clamper`
 
 ```text
@@ -34248,11 +34345,10 @@ b_haem_column_finder
 ---- Summary ----
 Main function to have the label, the stock and the volume added (or the
 concentration in the chamber) of every event filled in in the labels table,
-starting from the saved or file values, an event being left out by writing ignore
-as its label. Labels that could be written more tidily (8 ug ml-1 as 8 µg mL⁻¹) are
-then listed in their tidy forms: continuing uses them, and otherwise the table
-opens again with the labels as typed. The concentrations are then worked out and
-one line says the labels are saved. Nothing is asked when no file has events.
+starting from the saved values or else from what the text in the file says, an
+event being left out by writing IGNORE as its label. The labels are kept as typed;
+the concentrations are then worked out and one line says the labels are saved.
+Nothing is asked when no file has events.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -34270,7 +34366,7 @@ IGNORE_LABEL; settings.CHAMBER_VOLUME_ML.
 ---- Outputs ----
 Dict[str, List[dict]]
     {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md). An event
-    labelled ignore is left out and has no stock or concentration.
+    labelled IGNORE is left out and has no stock or concentration.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effects).
@@ -34280,7 +34376,6 @@ See event_concentration_filler.
 
 ---- Helpers ----
 _event_line_builder
-_tidy_labels_offerer
 event_concentration_filler
 event_entries_builder
 info_printer
@@ -34292,7 +34387,9 @@ info_printer
 ---- Summary ----
 Main function to give the events of every file as the labels table starts them:
 the label, stock, volume added, concentrations and whether it is left out as saved
-for the dataset, or else the file's own text, with no concentration.
+for the dataset; or else what the text in the file says ('1ul 8mm nd-011992':
+1 µL of an 8 mM stock of nd-011992), the chemical written tidily, with IGNORE as
+the label when the text names no chemical.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -34306,7 +34403,7 @@ IGNORE_LABEL.
 ---- Outputs ----
 Dict[str, List[dict]]
     {file name: [event entry, ...]} (event_entries, DATA_FORMAT.md), one per event
-    of the file, in its order; an event left out is labelled ignore.
+    of the file, in its order; an event left out is labelled IGNORE.
 
 ---- Globals mutated ----
 None.
@@ -34315,7 +34412,8 @@ None.
 None.
 
 ---- Helpers ----
-None.
+event_text_reader
+label_tidier
 ```
 
 #### `files_asker`
@@ -35043,38 +35141,6 @@ None.
 
 ---- Helpers ----
 number_asker
-```
-
-#### `tidy_labels_finder`
-
-```text
----- Summary ----
-Main function to find the event labels that could be written more tidily (8 ug
-ml-1 as 8 µg mL⁻¹), leaving out the events left out.
-
----- Inputs ----
-with_events : List[dict]
-    File summaries (DATA_FORMAT.md) of the files that have events.
-result : Dict[str, List[dict]]
-    {file name: [{'datapoint', 'label', 'concentration_uM', 'ignored'}, ...]}, one
-    per event of the summary, in the same order.
-
----- Globals read ----
-None.
-
----- Outputs ----
-List[Tuple[str, float, dict, str]]
-    (file name, time of the event in min, its entry in ``result``, tidy form) for
-    each such label, in the order of the files and events.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-label_tidier
 ```
 
 #### `trim_layout_finder`
@@ -37543,6 +37609,7 @@ AnswerArea.request_shower
 GuidePanel.rows_drawer
 GuideState.card_teller
 GuideState.row_lister
+_table_step_follower
 ```
 
 ##### `_guide_line_clicker`
@@ -38291,6 +38358,36 @@ None.
 AnswerTable.symbol_inserter
 ```
 
+##### `_table_closer`
+
+```text
+---- Summary ----
+Method to close the open table once the program has read it. A table it was
+opened over comes back as it was typed, shown while its step is open.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the table and the layout of the open step (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_table_layout_setter
+_table_step_follower
+AnswerTable.rows_setter
+table_texts_filler
+```
+
 ##### `_table_layout_setter`
 
 ```text
@@ -38319,6 +38416,72 @@ None.
 
 ---- Helpers ----
 _keys_shower
+```
+
+##### `_table_opener`
+
+```text
+---- Summary ----
+Method to open a table in the step open in the guide, which it then belongs
+to. A table already open is kept as typed under it; a table of a kind left
+for another step before opens as it was left.
+
+---- Inputs ----
+table : dict
+    The table to show (table_rows, DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the table and the layout of the open step (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_table_layout_setter
+AnswerTable.rows_setter
+AnswerTable.texts_reader
+table_texts_filler
+```
+
+##### `_table_step_follower`
+
+```text
+---- Summary ----
+Method to keep the open table with its step as the guide changes: shown while
+its step is open. When another step is opened from the step the program waits
+at, the table is put away as typed and comes back with its step. When it was
+opened from the View box (Edit ODs, Edit labels) and another step is opened,
+it is taken as it is, unchecked, and kept to open again as it was left.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the layout of the open step and may wake the question thread
+(side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_click_sign_starter
+_pane_writer
+_table_layout_setter
+AnswerTable.texts_reader
 ```
 
 ##### `_time_clicker`
@@ -39196,6 +39359,33 @@ None
 
 ---- Globals mutated ----
 None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `table_leave_taker`
+
+```text
+---- Summary ----
+Method to say whether the table that waits was left for another step, so the
+program takes it as it is, without checking it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the table was left for another step.
+
+---- Globals mutated ----
+None.
 
 ---- Equations ----
 None.
@@ -43111,7 +43301,8 @@ strip_values_builder
 Helper function to have a table filled in in the window: the table fills the
 terminal side, the instruction waits for Confirm, and while a cell is wrong or a
 needed cell empty one sentence names those cells and the instruction goes on
-waiting. The table is then taken away.
+waiting. A table left for another step (opened from the View box) is taken as it
+is, its wrong cells read as empty. The table is then taken away.
 
 ---- Inputs ----
 session : ViewerSession
@@ -45979,6 +46170,7 @@ cell_focuser
 problems_lister
 rows_setter
 symbol_inserter
+texts_reader
 values_reader
 ```
 
@@ -46465,6 +46657,33 @@ None.
 None.
 ```
 
+##### `texts_reader`
+
+```text
+---- Summary ----
+Method to give what each cell holds as typed, wrong cells included, so the
+table can be opened again as it was left.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Dict[str, str]]
+    One {name of the value: text} per row, in the order of the rows.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `values_reader`
 
 ```text
@@ -46528,19 +46747,21 @@ None.
 
 ```text
 ---- Summary ----
-Helper function to write a concentration in a cell with its most readable unit, or
-nothing.
+Helper function to write a concentration in a cell as a number in the unit of its
+column, or nothing.
 
 ---- Inputs ----
 value_um : Optional[float]
     The concentration (µM), or None.
+unit : str
+    STOCK_UNIT (mM) or CHAMBER_UNIT (µM).
 
 ---- Globals read ----
 CELL_FIGURES.
 
 ---- Outputs ----
 str
-    For example '200 mM' or ''.
+    For example '200' (a stock of 200 000 µM, in mM) or ''.
 
 ---- Globals mutated ----
 None.
@@ -46549,7 +46770,7 @@ None.
 None.
 
 ---- Helpers ----
-concentration_formatter
+unit_concentration_writer
 ```
 
 #### `_number_writer`
@@ -46659,9 +46880,10 @@ None.
 ```text
 ---- Summary ----
 Main function to lay out the labels table: one row per event, with its time, the
-text in the file, its label, stock, volume added and concentration in the chamber,
-under the name of its file; files without events have no rows. The concentration
-is worked out by the table from the stock and the volume while they are typed.
+text in the file, its volume added (µL), stock (mM), chemical (its label) and
+concentration in the chamber (µM), under the name of its file; files without events
+have no rows. The concentration is worked out by the table from the stock and the
+volume while they are typed.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -46716,8 +46938,8 @@ None.
 
 ---- Outputs ----
 List[Optional[str]]
-    For each row, the concentration in the chamber to show, such as '800 µM'; None
-    for a row the program does not fill in (no stock and volume, or left out).
+    For each row, the concentration in the chamber to show, in µM, such as '800';
+    None for a row the program does not fill in (no stock and volume, or left out).
 
 ---- Globals mutated ----
 None.
@@ -46726,7 +46948,7 @@ None.
 See event_concentration_filler.
 
 ---- Helpers ----
-concentration_formatter
+_concentration_writer
 event_concentration_filler
 ```
 
@@ -46817,6 +47039,37 @@ None.
 
 ---- Helpers ----
 _cell_name_joiner
+```
+
+#### `table_texts_filler`
+
+```text
+---- Summary ----
+Main function to give a table with its cells as they were typed when it was put
+away or left, so it opens again as it was. Texts are matched to rows in order; a
+table whose number of rows has changed since keeps its own cells.
+
+---- Inputs ----
+table : dict
+    The table to show (table_rows, DATA_FORMAT.md); not changed.
+texts : List[Dict[str, str]]
+    What AnswerTable.texts_reader gave for it, row by row.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    A copy of ``table`` with the cells of each row as typed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `wheel_step_finder`

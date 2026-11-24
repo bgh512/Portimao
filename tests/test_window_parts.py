@@ -2,8 +2,8 @@
 Tests of the parts of the window that need no window: the widths a journal allows, the
 check of a typed height, the check of values meant for the strip, the answers shown in
 the strip and taken back from it, the ways of showing the haems it offers and the
-answers each kind of plot is drawn with, the cells and rows of the OD and labels tables and
-the sentence said when one is confirmed too early, the way a turn of the mouse wheel
+answers each kind of plot is drawn with, the cells and rows of the OD and labels tables,
+a table opened again as it was left, and the sentence said when one is confirmed too early, the way a turn of the mouse wheel
 scrolls, the time axis title of a preview and which files the window keeps read and
 redraws.
 """
@@ -25,7 +25,6 @@ from utils_shared.spectral_decomposer import OWN_HAEMS_NAME
 from utils_shared.survey import (event_entries_builder,
                                  event_asker,
                                  IGNORE_LABEL,
-                                 tidy_labels_finder,
                                  )
 from utils_viewer.viewer_preview import (_loaded_experiment_getter,
                                          kept_file_lister,
@@ -70,6 +69,7 @@ from utils_viewer.viewer_table import (ABOVE_ZERO,
                                        od_table_builder,
                                        STOCK,
                                        table_problem_teller,
+                                       table_texts_filler,
                                        wheel_step_finder,
                                        ZERO_OR_MORE,
                                        )
@@ -160,15 +160,15 @@ def test_cells_of_the_tables() -> None:
 def test_event_labels_from_the_table(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     ---- Summary ----
-    Main function to check the labels as the table is confirmed: a label written
-    ignore in any capitals leaves its event out and drops its concentration; a label
-    that could be tidier is listed by its file, time and tidy form, Yes to continue
-    uses the tidy form, and No opens the table again with the label as typed; the
-    labels are then said to be saved.
+    Main function to check the labels as the table is confirmed: the table starts
+    from what the text in the file says, IGNORE where it names no chemical; a label
+    written ignore in any capitals leaves its event out and drops its concentration;
+    Confirm only confirms, asking nothing more, and the labels are kept as typed, a
+    label that could be tidier included; the labels are then said to be saved.
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
-        Stands in for the answer box.
+        Stands in for what is said in the terminal.
 
     ---- Globals read ----
     SUMMARIES (module constant).
@@ -187,28 +187,35 @@ def test_event_labels_from_the_table(monkeypatch: pytest.MonkeyPatch) -> None:
     None.
     """
 
-    # ---- 1 Confirm the table: the tidy form listed and taken -------------------------
-    typed = ['y']
-    monkeypatch.setattr('utils_shared.questions._input_reader',
-                        lambda text, indent='': typed.pop(0),
-                        )
+    # ---- no_question -----------------------------------------------------------------
+    def no_question(*_: object, **__: object) -> None:
+        raise AssertionError('Confirm asks nothing more')
+    monkeypatch.setattr('utils_shared.questions._input_reader', no_question)
     said = []
     monkeypatch.setattr('utils_shared.survey.info_printer',
                         lambda text, **_: said.append(text),
                         )
+    started = []
     def table_filler(entries: dict) -> dict:
+        started.append({name: [dict(entry) for entry in events]
+                        for name, events in entries.items()
+                        },
+                       )
         filled = {name: [dict(entry) for entry in events]
                   for name, events in entries.items()
                   }
         filled['kd_run1'][1].update(label=' Ignore ', concentration_uM=5.0)
-        filled['kd_run1'][2].update(label='2 mM azide', concentration_uM=2000.0)
+        filled['kd_run1'][2].update(label='2 mm azide', concentration_uM=2000.0)
         return filled
     result = event_asker(SUMMARIES, {}, table_filler)
     first, second, third = result['kd_run1']
-    time = SUMMARIES[0]['events'][0]['time']
-    assert f'  kd_run1, {time:.2f} min: 100 µM KCN' in said
+    assert len(started) == 1
     assert said[-1].startswith('Event labels saved!')
-    assert (first['label'], first['ignored']) == ('100 µM KCN', False)
+    # '100uM KCN' in the file: KCN, 100 µM in the chamber
+    assert (first['label'], first['concentration_uM'], first['ignored']) == ('KCN',
+                                                                             100.0,
+                                                                             False,
+                                                                             )
     assert second == {'datapoint': 20,
                       'label': IGNORE_LABEL,
                       'stock_uM': None,
@@ -217,20 +224,28 @@ def test_event_labels_from_the_table(monkeypatch: pytest.MonkeyPatch) -> None:
                       'concentration_uM': None,
                       'ignored': True,
                       }
-    assert (third['label'], third['concentration_uM']) == ('2 mM azide', 2000.0)
-    assert result['kd_run2'] == [] and not typed
+    # kept as typed: not written more tidily
+    assert (third['label'], third['concentration_uM']) == ('2 mm azide', 2000.0)
+    assert result['kd_run2'] == []
 
-    # ---- 2 No opens the table again with the label as typed, then Yes tidies it ------
-    typed = ['n', 'y']
-    shown = []
-    def plain_filler(entries: dict) -> dict:
-        shown.append(entries['kd_run1'][0]['label'])
-        return entries
-    result = event_asker(SUMMARIES, {}, plain_filler)
-    assert shown == ['100uM KCN', '100uM KCN']
-    assert result['kd_run1'][0]['label'] == '100 µM KCN' and not typed
-    with_events = [SUMMARIES[0]]
-    assert tidy_labels_finder(with_events, result) == []
+    # ---- 2 The start from the file: IGNORE where no chemical is named ----------------
+    summaries = [{'name': 'run',
+                  'events': [{'datapoint': 1, 'time': 1.0, 'text': '1ul 8mm nd-011992'},
+                             {'datapoint': 2, 'time': 2.0, 'text': '2 ul'},
+                             {'datapoint': 3, 'time': 3.0, 'text': '8ug ml-1 DAP'},
+                             ],
+                  },
+                 ]
+    first, second, third = event_entries_builder(summaries, {})['run']
+    assert (first['label'], first['added_uL'], first['stock_uM']) == ('nd-011992',
+                                                                      1.0,
+                                                                      8000.0,
+                                                                      )
+    assert (second['label'], second['added_uL'], second['ignored']) == (IGNORE_LABEL,
+                                                                        2.0,
+                                                                        True,
+                                                                        )
+    assert (third['label'], third['ignored']) == ('8 µg mL⁻¹ DAP', False)
 
 
 # ---- test_rows_of_the_labels_table ---------------------------------------------------
@@ -294,12 +309,26 @@ def test_rows_of_the_labels_table() -> None:
         ]
     assert table['rows'][0]['name'] == 'kd_run1 at 15.00 min'
     assert table['rows'][0]['shown'] == {'text': '100uM KCN'}
+    # the columns in order, each concentration a number in the unit of its heading
+    assert [heading for _, heading, _ in table['columns']] == ['Volume added (µL)',
+                                                               'Stock (mM)',
+                                                               'Chemical',
+                                                               'In the chamber (µM)',
+                                                               ]
     assert table['rows'][0]['cells'] == {'label': '100 µM KCN',
                                          'stock_uM': '',
                                          'added_uL': '',
-                                         'concentration_uM': '100 µM',
+                                         'concentration_uM': '100',
                                          }
     assert table['rows'][1]['cells']['concentration_uM'] == ''
+    stocked = {'kd_run1': [dict(entries['kd_run1'][0],
+                                stock_uM=200_000.0,
+                                added_uL=10.0,
+                                ),
+                           ] + entries['kd_run1'][1:],
+               }
+    cells = label_table_builder(SUMMARIES, stocked, IGNORE_LABEL, 5.0)['rows'][0]
+    assert (cells['cells']['stock_uM'], cells['cells']['added_uL']) == ('200', '10')
 
     # ---- 3 The typed values go back to their events ----------------------------------
     values = [{'label': 'KCN',
@@ -327,6 +356,50 @@ def test_rows_of_the_labels_table() -> None:
     assert [e['added_uL'] for e in result['kd_run1']] == [10.0, None, None]
     assert [e['concentration_uM'] for e in result['kd_run1']] == [None, 1.5, None]
     assert entries['kd_run1'][0]['label'] == '100 µM KCN'  # the start is not changed
+
+
+# ---- test_a_table_opened_as_it_was_left ----------------------------------------------
+def test_a_table_opened_as_it_was_left() -> None:
+    """
+    ---- Summary ----
+    Main function to check that a table put away or left for another step opens again
+    as it was typed, a wrong cell included, without changing the table it starts
+    from; and that a table whose rows have changed since keeps its own cells.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    SUMMARIES (module constant).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    entries = event_entries_builder(SUMMARIES, {})
+    table = label_table_builder(SUMMARIES, entries, IGNORE_LABEL, 5.0)
+    assert table['kind'] == 'labels'
+    typed = [dict(row['cells']) for row in table['rows']]
+    typed[0].update(added_uL='10', stock_uM='abc')
+    typed[1].update(label='')
+    again = table_texts_filler(table, typed)
+    assert again['rows'][0]['cells']['stock_uM'] == 'abc'
+    assert again['rows'][0]['cells']['added_uL'] == '10'
+    assert again['rows'][1]['cells']['label'] == ''
+    assert again['rows'][2]['cells'] == table['rows'][2]['cells']
+    assert table['rows'][0]['cells']['stock_uM'] == ''  # the start is not changed
+    assert table_texts_filler(table, typed[:2])['rows'] == table['rows']
+    assert od_table_builder({'a': {'OD': 1.0}})['kind'] == 'od'
 
 
 # ---- test_rows_of_the_od_table -------------------------------------------------------

@@ -1,5 +1,5 @@
 """
-The concentration of each addition: the stock typed with its unit, the concentration in the chamber, adding up for the same thing added again, and the text of its label.
+The concentration of each addition: read from the text in the file, the stock typed with its unit, the concentration in the chamber, adding up for the same thing added again, and the text of its label.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -7,7 +7,7 @@ import re
 from typing import List, Optional, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.helpers import concentration_formatter, name_simplifier
+from utils_shared.helpers import name_simplifier
 from utils_shared.questions import typed_number_reader
 
 
@@ -27,6 +27,29 @@ TYPED_CONCENTRATION_PATTERN = re.compile(r'\s*(.*?)\s*([nuµμm]?m)?\s*')
 # addition ("400 µM KCN"), or what was added ("10 µL of 200 mM KCN").
 LABEL_MODES = {'chamber': 'In the chamber', 'added': 'What was added'}
 UL_PER_ML = 1000.0
+# A stock is always written in mM and a concentration in the chamber in µM, on the
+# labels and in the labels table alike: {unit key of UNIT_FACTORS_UM: unit written}.
+STOCK_UNIT = 'mm'
+CHAMBER_UNIT = 'um'
+UNIT_NAMES = {'mm': 'mM', 'um': 'µM'}
+LABEL_FIGURES = 4  # significant figures of a concentration on a label
+# In the text the instrument keeps with an addition ('1ul 8mm nd-011992'): a number
+# followed by a volume unit, and a number followed by a molar unit (in any capitals; a
+# lone m is molar, as in '20ul 1m dithi'). Neither may sit inside a longer word or
+# number ('5 min', 'nd-011992').
+TEXT_VOLUME_PATTERN = re.compile(
+    r'(?<![\w.,-])(\d+(?:[.,]\d+)?)\s*(nl|ul|µl|μl|ml)(?!\w)',
+    re.IGNORECASE,
+    )
+TEXT_MOLAR_PATTERN = re.compile(
+    r'(?<![\w.,-])(\d+(?:[.,]\d+)?)\s*(nm|um|µm|μm|mm|m)(?!\w)',
+    re.IGNORECASE,
+    )
+# Each volume unit of the text, in µL.
+VOLUME_FACTORS_UL = {'nl': 0.001, 'ul': 1.0, 'µl': 1.0, 'μl': 1.0, 'ml': 1000.0}
+# What is left of the text once the volume and the stock are taken out loses these at
+# its ends.
+TEXT_EDGE_CHARACTERS = ' ,;:'
 
 
 # ---- HELPERS -------------------------------------------------------------------------
@@ -153,8 +176,8 @@ def event_amount_writer(event: dict, mode: str) -> str:
     """
     ---- Summary ----
     Main function to write how much of a thing an event holds, as the labels show it:
-    the concentration in the chamber after it, or the volume and the stock added (an
-    event with no stock shows its concentration either way).
+    the concentration in the chamber after it (µM), or the volume and the stock added
+    (mM); an event with no stock shows its concentration either way.
 
     ---- Inputs ----
     event : dict
@@ -168,7 +191,7 @@ def event_amount_writer(event: dict, mode: str) -> str:
 
     ---- Outputs ----
     str
-        For example '400 µM', '1.2 mM' or '10 µL of 200 mM'; '' when the event has no
+        For example '400 µM', '1200 µM' or '10 µL of 200 mM'; '' when the event has no
         concentration.
 
     ---- Globals mutated ----
@@ -178,14 +201,16 @@ def event_amount_writer(event: dict, mode: str) -> str:
     None.
 
     ---- Helpers ----
-    concentration_formatter
+    unit_concentration_writer
     """
 
     stock, added = event.get('stock_uM'), event.get('added_uL')
     if mode == 'added' and stock is not None and added is not None:
-        return f'{float(added):g} µL of {concentration_formatter(stock)}'
+        return f'{float(added):g} µL of {unit_concentration_writer(stock, STOCK_UNIT)}'
     concentration = event.get('concentration_uM')
-    return '' if concentration is None else concentration_formatter(concentration)
+    if concentration is None:
+        return ''
+    return unit_concentration_writer(concentration, CHAMBER_UNIT)
 
 
 # ---- event_concentration_filler ------------------------------------------------------
@@ -292,3 +317,99 @@ def event_text_writer(event: dict, mode: str) -> str:
     """
 
     return f"{event_amount_writer(event, mode)} {event.get('label') or ''}".strip()
+
+
+# ---- event_text_reader ---------------------------------------------------------------
+def event_text_reader(text: str) -> dict:
+    """
+    ---- Summary ----
+    Main function to read what the text the instrument keeps with an addition says
+    ('1ul 8mm nd-011992'): the volume added, the concentration of the stock and the
+    chemical. A concentration with no volume beside it is taken as the concentration in
+    the chamber ('100uM KCN'). Only the first volume and the first concentration are
+    read; what is left is the chemical.
+
+    ---- Inputs ----
+    text : str
+        The text of the event in the file.
+
+    ---- Globals read ----
+    TEXT_EDGE_CHARACTERS, TEXT_MOLAR_PATTERN, TEXT_VOLUME_PATTERN, UNIT_FACTORS_UM,
+    VOLUME_FACTORS_UL.
+
+    ---- Outputs ----
+    dict
+        {'label': the chemical, '' when nothing is left; 'added_uL', 'stock_uM',
+        'concentration_uM': each None when the text does not give it}.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    µL = number × VOLUME_FACTORS_UL[unit]; µM = number × UNIT_FACTORS_UM[unit]:
+    '1ul 8mm nd-011992' gives 1 µL, 8 × 1000 = 8000 µM and 'nd-011992'.
+
+    ---- Helpers ----
+    typed_number_reader
+    """
+
+    found = {'label': '', 'added_uL': None, 'stock_uM': None, 'concentration_uM': None}
+    left = str(text or '')
+    volume = TEXT_VOLUME_PATTERN.search(left)
+    if volume:
+        found['added_uL'] = (typed_number_reader(volume.group(1)) *
+                             VOLUME_FACTORS_UL[volume.group(2).lower()]
+                             )
+        left = f'{left[:volume.start()]} {left[volume.end():]}'
+    molar = TEXT_MOLAR_PATTERN.search(left)
+    if molar:
+        value_um = (typed_number_reader(molar.group(1)) *
+                    UNIT_FACTORS_UM[molar.group(2).lower()]
+                    )
+        found['stock_uM' if volume else 'concentration_uM'] = value_um
+        left = f'{left[:molar.start()]} {left[molar.end():]}'
+    found['label'] = ' '.join(left.split()).strip(TEXT_EDGE_CHARACTERS)
+    return found
+
+
+# ---- unit_concentration_writer -------------------------------------------------------
+def unit_concentration_writer(value_um: float,
+                              unit: str,
+                              significant: int = LABEL_FIGURES,
+                              is_unit_written: bool = True,
+                              ) -> str:
+    """
+    ---- Summary ----
+    Main function to write a concentration in one fixed unit: the stock in mM and the
+    concentration in the chamber in µM, whatever its size.
+
+    ---- Inputs ----
+    value_um : float
+        The concentration (µM).
+    unit : str
+        STOCK_UNIT or CHAMBER_UNIT (a key of UNIT_NAMES).
+    significant : int
+        Significant figures written: 4 on a label, more in a cell of a table, so the
+        number read back from the cell is the one kept.
+    is_unit_written : bool
+        False for the number alone (a cell whose heading gives the unit).
+
+    ---- Globals read ----
+    LABEL_FIGURES, UNIT_FACTORS_UM, UNIT_NAMES.
+
+    ---- Outputs ----
+    str
+        For example '200 mM' (from 200 000 µM), '1200 µM' or '0.2'.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    number = µM ÷ UNIT_FACTORS_UM[unit]: 200 000 µM ÷ 1000 = 200 mM.
+
+    ---- Helpers ----
+    None.
+    """
+
+    number = f'{float(value_um) / UNIT_FACTORS_UM[unit]:.{significant}g}'
+    return f'{number} {UNIT_NAMES[unit]}' if is_unit_written else number

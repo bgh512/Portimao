@@ -480,14 +480,14 @@ Checked by: `test_each_window_falls_on_its_own`, `test_a_window_left_out_keeps_i
 
 ## 8. The concentration of each addition
 
-The labels table (question 3.3) takes, for each addition, its label, the concentration of the stock and the volume added. The program works out the concentration in the chamber from them:
+The labels table (question 3.3) takes, for each addition, the volume added, the concentration of the stock and the chemical (its label); it starts filled in from the text the instrument keeps with the addition (`1ul 8mm nd-011992` is v = 1 µL, s = 8 mM, nd-011992). The program works out the concentration in the chamber from them:
 
 ```text
 a = s × v ÷ V
 c = c_before + a
 ```
 
-- s: the concentration of the stock, typed with its unit (nM, µM, mM or M; a number alone is mM), worked in µM
+- s: the concentration of the stock, typed in mM (or with its unit: nM, µM, mM or M), worked in µM
 - v: the volume of stock added (µL)
 - V: the volume of the chamber, always 5 mL = 5000 µL
 - a: how much this addition raises the concentration in the chamber (µM)
@@ -495,14 +495,14 @@ c = c_before + a
 - c: the concentration in the chamber after this addition (µM)
 
 - The volume added is not counted in the chamber's volume: 10 µL in 5 mL makes the concentration read 0.2 % high, and three such additions 0.6 %.
-- An addition with no stock and volume can have its concentration in the chamber typed by hand (a number alone is µM). It then counts as c, and a = c − c_before.
-- An event left out (labelled ignore) holds nothing and changes nothing.
+- An addition with no stock and volume can have its concentration in the chamber typed by hand (in µM). It then counts as c, and a = c − c_before.
+- An event left out (labelled IGNORE) holds nothing and changes nothing.
 - Each file is worked out on its own.
-- The labels on the plots show c ("In the chamber", the standard) or v and s ("What was added"), chosen with **Labels as** in the strip. A concentration is written in its most readable unit, to four significant figures: 1200 µM as 1.2 mM, 0.5 µM as 500 nM.
+- The labels on the plots show c ("In the chamber", the standard) or v and s ("What was added"), chosen with **Labels as** in the strip. c is always written in µM and s in mM, to four significant figures: 1200 µM stays 1200 µM, and a 1 M stock is 1000 mM.
 - Each experiment's workbook gives s (in mM), v, a and c in its Events sheet.
 
-Example 1: 10 µL of a 200 mM KCN stock. s = 200 mM = 200 000 µM, so a = 200 000 × 10 ÷ 5000 = 400 µM, and c = 0 + 400 = 400 µM. The same again gives c = 400 + 400 = 800 µM, and a third time 1200 µM (shown as 1.2 mM). 5 µL of a 10 mM BD stock in between gives 10 000 × 5 ÷ 5000 = 10 µM of BD, and does not change the KCN.
+Example 1: 10 µL of a 200 mM KCN stock. s = 200 mM = 200 000 µM, so a = 200 000 × 10 ÷ 5000 = 400 µM, and c = 0 + 400 = 400 µM. The same again gives c = 400 + 400 = 800 µM, and a third time 1200 µM (shown as 1200 µM). 5 µL of a 10 mM BD stock in between gives 10 000 × 5 ÷ 5000 = 10 µM of BD, and does not change the KCN.
 
 Example 2: BD typed by hand as 10 µM in the chamber; then 5 µL of 10 mM BD gives c = 10 + 10 = 20 µM; then BD typed as 50 µM gives a = 50 − 20 = 30 µM.
 
-Checked by: `test_one_addition`, `test_the_same_thing_added_again_adds_up`, `test_a_concentration_typed`, `test_a_stock_typed_with_its_unit` and `test_the_text_of_the_labels` in `tests/test_event_concentrations.py`.
+Checked by: `test_one_addition`, `test_the_same_thing_added_again_adds_up`, `test_a_concentration_typed`, `test_a_stock_typed_with_its_unit`, `test_the_text_of_the_labels` and `test_the_text_in_the_file_read` in `tests/test_event_concentrations.py`.

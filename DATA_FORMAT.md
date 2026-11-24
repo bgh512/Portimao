@@ -407,12 +407,13 @@ A table to fill in on the terminal side of the window (`AnswerTable`, `utils_vie
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
+| `'kind'` | str | | | `'od'` or `'labels'`: a table left for another step opens again as it was left, by its kind (`table_texts_filler`) |
 | `'first_heading'` | str | | | Heading of the fixed first column: `'File'` or `'Time (min)'` |
 | `'shown_columns'` | Sequence[Tuple[str, str]] | (n_shown,) | | Optional. `(name, heading)` of each column shown after the first and not typed in, in grey italics: the labels table's `('text', 'Text in the file')` |
-| `'columns'` | Sequence[Tuple[str, str, str]] | (n_columns,) | | `(name of the value, column heading, kind)` for each column typed in; the kind is `'above_zero'` (a number above 0, needed), `'above_zero_or_empty'` (a number above 0, or nothing), `'zero_or_more'` (a number of 0 or more, or nothing), `'label'` (text, needed), `'stock'` (a concentration above 0 with its unit, mM when none is typed, or nothing) or `'chamber'` (a concentration of 0 or more with its unit, µM when none is typed, or nothing) |
+| `'columns'` | Sequence[Tuple[str, str, str]] | (n_columns,) | | `(name of the value, column heading, kind)` for each column typed in; the kind is `'above_zero'` (a number above 0, needed), `'above_zero_or_empty'` (a number above 0, or nothing), `'zero_or_more'` (a number of 0 or more, or nothing), `'label'` (text, needed), `'stock'` (a concentration above 0, written and read in mM unless a unit is typed, or nothing) or `'chamber'` (a concentration of 0 or more, written and read in µM unless a unit is typed, or nothing); the labels table's columns are the volume added (µL), the stock (mM), the chemical (the label) and the concentration in the chamber (µM) |
 | `'pairs'` | Sequence[Tuple[str, str]] | (n_pairs,) | | Optional. Names of two values filled in together or not at all (the stock and the volume added); the empty one of a pair filled in by half is a problem `'pair'` |
 | `'worked'` | Optional[dict] | | | Optional. `{'key': name of the value, 'writer': function(rows, values) -> [text or None per row]}`: the cell the table fills in itself as the others are typed (the concentration in the chamber, `label_worked_writer`), in green and not typed in; a row given None is typed in as usual |
-| `'skip_word'` | Optional[str] | | | A label that leaves its row out (`'ignore'`): the row's other cells are greyed out and not read; `None` for none |
+| `'skip_word'` | Optional[str] | | | A label that leaves its row out (`'IGNORE'`, typed in any capitals): the row's other cells are greyed out and not read; `None` for none |
 | `'rows'` | List[dict] | (n_rows,) | | One per row, in the order shown; the keys below |
 | `'file'` | str | | | File the row belongs to; entering one of its cells shows that file on the plot |
 | `'position'` | int | | | Place of the event in its file, from 0 (0 in the OD table) |

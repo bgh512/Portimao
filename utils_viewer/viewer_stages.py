@@ -940,18 +940,11 @@ def _label_table_filler(session: ViewerSession,
                                 IGNORE_LABEL,
                                 settings.CHAMBER_VOLUME_ML,
                                 )
-    chamber = f'{settings.CHAMBER_VOLUME_ML:g} mL'
     values = _table_filler(session,
                            table,
-                           question='Fill in the label, the stock and the volume added '
-                           'of each event, then press Confirm.',
-                           note=f'One row per event. Write {IGNORE_LABEL} as the label '
-                           'to leave an event out. Type the stock with its unit (nM, '
-                           'µM, mM or M; a number alone is mM) and the volume added, '
-                           f'and the concentration in the chamber ({chamber}) is '
-                           'worked out, the same label added again adding up. Or '
-                           'leave them empty and type the concentration in the '
-                           'chamber (a number alone is µM).',
+                           question='Fill the table in with the details of the '
+                           'additions, then press Confirm.',
+                           note=f'Type {IGNORE_LABEL} as a label to not show it.',
                            number='3.3',
                            )
     return label_entries_reader(table, values, entries)
@@ -2603,7 +2596,8 @@ def _table_filler(session: ViewerSession,
     Helper function to have a table filled in in the window: the table fills the
     terminal side, the instruction waits for Confirm, and while a cell is wrong or a
     needed cell empty one sentence names those cells and the instruction goes on
-    waiting. The table is then taken away.
+    waiting. A table left for another step (opened from the View box) is taken as it
+    is, its wrong cells read as empty. The table is then taken away.
 
     ---- Inputs ----
     session : ViewerSession
@@ -2640,6 +2634,9 @@ def _table_filler(session: ViewerSession,
     window = session.window
     window.table_shower(table)
     def table_checker() -> Optional[str]:
+        # a table left for another step is taken as it is
+        if window.table_leave_taker() is True:
+            return None
         return table_problem_teller(window.table_reader()[1])
     try:
         confirm_waiter(question, table_checker, note=note, number=number)
