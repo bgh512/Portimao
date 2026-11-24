@@ -272,7 +272,7 @@ def test_given_number_is_shown(monkeypatch: pytest.MonkeyPatch,
     questions.numbering_setter(0, 4)
     questions.numbering_setter(1, 2)
     _typist_setter(monkeypatch, ['', 'n', '', '', ''])
-    yes_no_asker('Do you want to scale by OD?', False, number='3.1')
+    yes_no_asker('Do you want to provide OD values?', False, number='3.2')
     one = [('no', 'change the labels again')]
     assert accept_asker('Do you accept these event labels?', one, number='3.5') == 'no'
     for _ in range(2):
@@ -282,17 +282,17 @@ def test_given_number_is_shown(monkeypatch: pytest.MonkeyPatch,
     # ---- 2 Check the numbers and the indent ------------------------------------------
     printed = capsys.readouterr().out
     lines = _lines_reader(printed)
-    assert lines[0] == '3.1 Do you want to scale by OD? (y/N)'
+    assert lines[0] == '3.2 Do you want to provide OD values? (y/N)'
     assert lines[2] == '3.5 Do you accept these event labels? (Y/n)'
     assert lines[3:5] == ['3.4.1 What was added at 15.01 min? [KCN]'] * 2
     assert lines[5] == '4.3 Do you want to average around the events? (y/N)'
     plain = CODE_PATTERN.sub('', printed).splitlines()
     assert f'{questions.INDENT}3.4.1 What was added at 15.01 min? [KCN]' in plain
-    assert '3.1 Do you want to scale by OD? (y/N)' in plain
+    assert '3.2 Do you want to provide OD values? (y/N)' in plain
 
     # ---- 3 A number not like 3.5 -----------------------------------------------------
     with pytest.raises(ValueError):
-        yes_no_asker('Do you want to scale by OD?', False, number='3')
+        yes_no_asker('Do you want to provide OD values?', False, number='3')
 
 
 # ---- test_number_endings_and_hints ---------------------------------------------------
@@ -454,11 +454,11 @@ def test_table_instruction_waits(monkeypatch: pytest.MonkeyPatch,
     confirm_waiter('Fill in the table, then press Confirm.',
                    lambda: sentences.pop(0),
                    note='One row per file.',
-                   number='3.1.1',
+                   number='3.2.1',
                    )
     printed = capsys.readouterr().out
     assert _lines_reader(printed) == ['One row per file.',
-                                      '3.1.1 Fill in the table, then press Confirm.',
+                                      '3.2.1 Fill in the table, then press Confirm.',
                                       'Fill in these empty cells: a: OD.',
                                       ]
     assert f'{COLOUR_QUIET}One row per file.' in printed

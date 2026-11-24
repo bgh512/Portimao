@@ -22,6 +22,7 @@ from utils_shared.event_concentrations import (event_amount_writer,
 from utils_shared.helpers import file_name_sanitiser
 from utils_shared.paf_reader import experiment_summary_reader, PafError
 from utils_shared.questions import (choice_asker,
+                                    enter_waiter,
                                     folder_asker,
                                     guide_step_starter,
                                     info_printer,
@@ -44,8 +45,11 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'percent': 'OCR (% of the range)',
               'baseline': 'OCR (% of baseline)',
               }
-# the ways of showing the OCR offered once the OD values are in (3.1.1.1)
-OCR_VIEW_KEYS = ('raw', 'od', 'percent')
+# the ways of showing the OCR a dataset keeps once the OD values are in (3.2.2); any
+# other (µM min⁻¹, % of baseline, none saved) becomes per OD
+OCR_KEPT_KEYS = ('od', 'percent')
+OCR_VIEW_NUDGE = ('Change the OCR and the haems in the View box above the plot, then '
+                  'press Continue.')
 # The OD values of a file, in the order of the OD table, with their plain names.
 OD_VALUE_NAMES = {'OD': 'OD', 'volume': 'volume', 'dilution_factor': 'dilution'}
 PCA_CHOICE = '__pca__'
@@ -444,7 +448,7 @@ def _tidy_labels_offerer(with_events: List[dict],
     ---- Summary ----
     Helper function to list the event labels that will be written more tidily (8 ug
     ml-1 as 8 µg mL⁻¹), each by its file and time, and to ask whether to continue
-    with them (3.2.1). Asks nothing when every label is tidy already.
+    with them (3.3.1). Asks nothing when every label is tidy already.
 
     ---- Inputs ----
     with_events : List[dict]
@@ -483,7 +487,7 @@ def _tidy_labels_offerer(with_events: List[dict],
     if not yes_no_asker('Do you want to continue?',
                         False,
                         note='Click No to change them yourself in the table.',
-                        number='3.2.1',
+                        number='3.3.1',
                         ):
         return False
     for _, _, entry, tidy in found:
@@ -1561,27 +1565,33 @@ def ocr_option_builder(keys: List[str]) -> List[Tuple[str, str]]:
     return [(key, OCR_LABELS[key]) for key in keys]
 
 
-# ---- ocr_view_asker ------------------------------------------------------------------
-def ocr_view_asker(answers: dict, defaults: dict) -> str:
+# ---- ocr_view_teller -----------------------------------------------------------------
+def ocr_view_teller(answers: dict,
+                    defaults: dict,
+                    shower: Callable[[], None],
+                    ) -> str:
     """
     ---- Summary ----
-    Main function to ask, once the OD values are in, how the OCR is shown: in µM
-    min⁻¹, per OD or as % of the range. It sets "OCR as" in the View box, and one line
-    says it can be changed there at any time. Per OD is offered first, unless the
-    dataset was saved with another of the three.
+    Main function to show the OCR per OD once the OD values are in, unless the dataset
+    was saved with the OCR as % of the range, and point to the View box, where it and
+    the haems can be shown per OD or not at any time; the step waits for Continue
+    (3.2.2).
 
     ---- Inputs ----
     answers : dict
         Answers dictionary the value is stored in (ocr_mode).
     defaults : dict
-        Default answers (ocr_mode).
+        Default answers (ocr_mode, as the dataset was saved).
+    shower : Callable[[], None]
+        Shows the new ocr_mode in the View box and redraws the plot, before the step
+        waits.
 
     ---- Globals read ----
-    OCR_VIEW_KEYS (module constant).
+    OCR_KEPT_KEYS, OCR_VIEW_NUDGE (module constants).
 
     ---- Outputs ----
     str
-        The ocr_mode chosen: 'raw', 'od' or 'percent'.
+        The ocr_mode set: 'od', or 'percent' when the dataset was saved with it.
 
     ---- Globals mutated ----
     None. Stores ocr_mode in ``answers`` and reads from and prints to the terminal
@@ -1591,21 +1601,21 @@ def ocr_view_asker(answers: dict, defaults: dict) -> str:
     None.
 
     ---- Helpers ----
-    choice_asker
+    enter_waiter
     info_printer
-    ocr_option_builder
     """
 
     guide_step_starter('ocr_view')
     saved = defaults.get('ocr_mode')
-    info_printer('The OD values are in, so the OCR can be shown per OD.')
-    answers['ocr_mode'] = choice_asker('How would you like the OCR shown?',
-                                       ocr_option_builder(list(OCR_VIEW_KEYS)),
-                                       saved if saved in OCR_VIEW_KEYS else 'od',
-                                       number='3.1.1.1',
-                                       )
-    info_printer('You can change this under OCR as in the View box above the plot at '
-                 'any time.',
+    answers['ocr_mode'] = saved if saved in OCR_KEPT_KEYS else 'od'
+    shower()
+    shown ='per OD' if answers['ocr_mode'] == 'od' else 'as % of the range'
+    info_printer(f'The OCR is now shown {shown}. You can change it under OCR as in the '
+                 'View box at any time.',
+                 )
+    enter_waiter('Use the View box to show the OCR and the haems per OD.',
+                 OCR_VIEW_NUDGE,
+                 number='3.2.2',
                  )
     return answers['ocr_mode']
 
@@ -1657,7 +1667,7 @@ def od_scaling_asker(summaries: List[dict],
                      ) -> Dict[str, dict]:
     """
     ---- Summary ----
-    Main function to ask whether to scale by OD and, if so, have the OD, volume and
+    Main function to ask whether to give OD values and, if so, have the OD, volume and
     dilution factor of every file filled in in the table, starting from the stored
     values.
 
@@ -1698,12 +1708,12 @@ def od_scaling_asker(summaries: List[dict],
     # ---- 1 Ask whether to scale ------------------------------------------------------
     guide_step_starter('od_scaling')
     answers['normalise_od'] = yes_no_asker(
-        'Do you want to scale by OD?',
+        'Do you want to provide OD values?',
         defaults['normalise_od'],
         note='Scaling by OD divides the OCR and the haems by '
         'dilution factor × OD × volume; the View box above the '
         'plot then offers per OD for each.',
-        number='3.1',
+        number='3.2',
         )
     details = {s['name']: {} for s in summaries}
     if not answers['normalise_od']:
@@ -2233,7 +2243,7 @@ def temperature_asker(answers: dict, defaults: dict) -> None:
                                             defaults['temperature_c'],
                                             minimum=TEMPERATURE_LIMITS_C[0],
                                             maximum=TEMPERATURE_LIMITS_C[1],
-                                            number='3.1.2',
+                                            number='3.1',
                                             )
 
 

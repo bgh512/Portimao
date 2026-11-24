@@ -83,7 +83,7 @@ from utils_shared.survey import (decomposition_asker,
                                  event_asker,
                                  IGNORE_LABEL,
                                  ocr_kind_lister,
-                                 ocr_view_asker,
+                                 ocr_view_teller,
                                  od_gaps_finder,
                                  od_scaling_asker,
                                  saved_values_reader,
@@ -167,6 +167,11 @@ TRIM_KEY_TEXT = 'orange hatched = trimmed, grey = ignored in calculations'
 TRIM_KEY_LINES = ('TRIM (orange)  = data not plotted or used for calculations',
                   'IGNORED (grey) = data plotted but not used for calculations',
                   )
+# The key above the OD table, its '=' signs lined up in the same way.
+OD_KEY_LINES = ('OD          = measured OD of the sample',
+                'Volume (mL) = total volume of cells spun down',
+                'Dilution    = any dilution factor after additions',
+                )
 # The numbers of the haem fit questions of the processing, from QUESTION_FLOW.md 4.A.
 PROCESSING_FIT_NUMBERS = {'decompose': '4.1', 'fit': '4.1.1', 'spectrometer': '4.1.2'}
 TRIM_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
@@ -513,17 +518,11 @@ def _box_edit_runner(session: ViewerSession,
                      )
         return
     if name == EDIT_ODS_CHANGE:
-        if not session.is_od_chosen:
-            info_printer(
-                'The OD values are typed once you choose to scale by OD in the '
-                'set-up.',
-                )
-            return
-        rows = {summary['name']: {'OD': details[summary['name']].get('OD'),
-                                  'volume': details[summary['name']].get('volume'),
-                                  'dilution_factor': details[summary['name']].get('dilution_factor',
-                                                                                  ) or 1.0,
-                                  }
+        rows ={summary['name']: {'OD': details[summary['name']].get('OD'),
+                                 'volume': details[summary['name']].get('volume'),
+                                 'dilution_factor': details[summary['name']].get('dilution_factor',
+                                                                                 ) or 1.0,
+                                 }
                 for summary in session.summaries
                 }
         for file_name, values in _od_table_filler(session, rows, False).items():
@@ -902,7 +901,7 @@ def _label_table_filler(session: ViewerSession,
     ---- Summary ----
     Helper function to have the label, the stock and the volume added (or the
     concentration in the chamber) of every event filled in in the labels table of the
-    window (3.2).
+    window (3.3).
 
     ---- Inputs ----
     session : ViewerSession
@@ -953,7 +952,7 @@ def _label_table_filler(session: ViewerSession,
                            'worked out, the same label added again adding up. Or '
                            'leave them empty and type the concentration in the '
                            'chamber (a number alone is µM).',
-                           number='3.2',
+                           number='3.3',
                            )
     return label_entries_reader(table, values, entries)
 
@@ -1083,9 +1082,9 @@ def _master_page_saver(session: ViewerSession,
 def _od_gaps_teller(details: Dict[str, dict]) -> None:
     """
     ---- Summary ----
-    Helper function to say, once the OD table is confirmed, either that every OD value
-    is in, or, as a warning, which are missing and that the OD scaling stays off until
-    Edit ODs fills them in.
+    Helper function to say, once the OD table is confirmed, as a warning, which OD
+    values are missing and that the OD scaling stays off until Edit ODs fills them in;
+    nothing is said when every value is in.
 
     ---- Inputs ----
     details : Dict[str, dict]
@@ -1105,14 +1104,12 @@ def _od_gaps_teller(details: Dict[str, dict]) -> None:
     None.
 
     ---- Helpers ----
-    info_printer
     od_gaps_finder
     warning_shower
     """
 
     gaps = od_gaps_finder(details)
     if not gaps:
-        info_printer('OD values entered for every file.')
         return
     shown = ', '.join(gaps[:5],
                       ) + (f' and {len(gaps) - 5} more' if len(gaps) > 5 else '')
@@ -1168,7 +1165,7 @@ def _od_table_filler(session: ViewerSession,
     """
     ---- Summary ----
     Helper function to have the OD, volume and dilution of every file filled in in the
-    OD table of the window (3.1.1).
+    OD table of the window (3.2.1), under the key of its columns.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1180,7 +1177,7 @@ def _od_table_filler(session: ViewerSession,
         leaves the guide at the step that waits.
 
     ---- Globals read ----
-    settings.OD_RESUSPENDED_ML.
+    OD_KEY_LINES (module constant).
 
     ---- Outputs ----
     Dict[str, Dict[str, Optional[float]]]
@@ -1195,6 +1192,7 @@ def _od_table_filler(session: ViewerSession,
 
     ---- Helpers ----
     _table_filler
+    info_printer
     od_rows_reader
     od_table_builder
     """
@@ -1202,15 +1200,14 @@ def _od_table_filler(session: ViewerSession,
     if is_step:
         guide_step_starter('od_values')
     table = od_table_builder(rows)
+    info_printer(OD_KEY_LINES[0])
+    for line in OD_KEY_LINES[1:]:
+        info_printer(line, tight=True)
     values = _table_filler(session,
                            table,
-                           question='Fill in the OD, volume and dilution of each '
-                           'file, then press Confirm.',
-                           note='One row per file: the OD of the cells added, the '
-                           'volume of cells (mL) spun down and resuspended in '
-                           f'{settings.OD_RESUSPENDED_ML:g} mL, and the dilution '
-                           'factor if the cells were diluted mid run.',
-                           number='3.1.1',
+                           question='Fill in the table, then press Confirm.',
+                           note='',
+                           number='3.2.1',
                            )
     return od_rows_reader(table, values)
 
@@ -2580,7 +2577,6 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
                                         session.has_od,
                                         session.has_windows,
                                         has_psi,
-                                        session.is_od_chosen or session.has_od,
                                         )
     fit = session.fit
     session.window.strip_setter(strip_values_builder(answers,
@@ -3159,12 +3155,12 @@ def details_stage_runner(session: ViewerSession,
     """
     ---- Summary ----
     Main function to ask the last questions of the import, on the standard plot cut to
-    the limits: the OD values, the temperature of the runs, then the event labels, the
+    the limits: the temperature of the runs, the OD values, then the event labels, the
     OD values and the labels each in a table of the window.
-    Once the OD table is confirmed, one line says every value is in, or a warning
-    names the missing ones, the OD scaling staying off until Edit ODs fills them in.
-    Once every OD value is in, the View box shows its per OD boxes, a line says so,
-    and how the OCR is shown is asked (3.1.1.1).
+    Once the OD table is confirmed, a warning names the OD values missing, the OD
+    scaling staying off until Edit ODs fills them in. Once every OD value is in, the
+    OCR is shown per OD, the View box shows its per OD boxes, and a line points to them
+    (3.2.2).
     The plot is redrawn with the labels once they are saved; Edit labels changes them
     later. The haems are those of the session's fit.
 
@@ -3208,8 +3204,7 @@ def details_stage_runner(session: ViewerSession,
     _od_table_filler
     _strip_shower
     event_asker
-    info_printer
-    ocr_view_asker
+    ocr_view_teller
     od_scaling_asker
     preview_drawer
     saved_values_reader
@@ -3235,35 +3230,30 @@ def details_stage_runner(session: ViewerSession,
                               )
     session.redraw = redraw
 
-    # ---- 2 OD values -----------------------------------------------------------------
+    # ---- 2 The temperature of the runs -----------------------------------------------
+    # One value for the dataset, asked of everyone: delta psi is worked out with it.
+    # The Δψ box holds the same value, so the one in use (the box may have changed it)
+    # is offered, and the box shows the answer.
+    temperature_asker(answers, dict(defaults, temperature_c=answers['temperature_c']))
+    _strip_shower(session, answers)
+
+    # ---- 3 OD values -----------------------------------------------------------------
     # They are filled in in a table, which is its own check. The per OD boxes of the
     # strip then say whether the OCR and the haems are scaled by them.
     def table_filler(rows: Dict[str, dict]) -> Dict[str, dict]:
         return _od_table_filler(session, rows)
     details = od_scaling_asker(summaries, answers, defaults, saved, table_filler)
     session.has_od = bool(answers['normalise_od'])
-    # the OD table was shown, so Edit ODs can fill in what is still missing
-    session.is_od_chosen = any(details.values())
     _strip_shower(session, answers)
-    if session.is_od_chosen:
+    if any(details.values()):
         _od_lister(details)
         _od_gaps_teller(details)
     if answers['normalise_od']:
-        info_printer('The OCR and the haems can now be shown per OD: the per OD boxes '
-                     'beside OCR as and Haems as in the View box above the plot.',
-                     )
-
-        # ---- 2.1 How the OCR is shown, now that it can be per OD ---------------------
-        ocr_view_asker(answers, defaults)
-        _strip_shower(session, answers)
-        redraw()
-
-    # ---- 2.2 The temperature of the runs ---------------------------------------------
-    # One value for the dataset, asked of everyone: delta psi is worked out with it.
-    # The Δψ box holds the same value, so the one in use (the box may have changed it)
-    # is offered, and the box shows the answer.
-    temperature_asker(answers, dict(defaults, temperature_c=answers['temperature_c']))
-    _strip_shower(session, answers)
+        # ---- shower ------------------------------------------------------------------
+        def shower() -> None:
+            _strip_shower(session, answers)
+            redraw()
+        ocr_view_teller(answers, defaults, shower)
 
     # ---- 3 Event labels --------------------------------------------------------------
     # Edit labels in the View box changes them later, so they are not accepted here.

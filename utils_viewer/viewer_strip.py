@@ -819,7 +819,6 @@ class SettingsStrip:
         self._ocr_keys: List[str] = []
         self._has_percent = False
         self._has_od = False
-        self._can_edit_od = False
         self._has_baseline = False
         self._has_psi = False
         self._fit_names: List[str] = [self._values['fit_file']]
@@ -905,14 +904,7 @@ class SettingsStrip:
                                        lambda: self._per_od_handler('haem_per_od'),
                                        line,
                                        )
-        self._od_line = line_maker(view)
-        self._edit_ods_button = tk.Button(self._od_line,
-                                          text=EDIT_ODS_TEXT,
-                                          command=lambda: self._edit_handler(EDIT_ODS_CHANGE,
-                                                                             ),
-                                          )
-        self._edit_ods_button.pack(side='left')
-        line = self._labels_line = line_maker(view)
+        line = line_maker(view)
         tk.Label(line, text='Labels as', bg=background).pack(side='left', padx=(0, 4))
         self._label_mode_combo = ttk.Combobox(line,
                                               state='readonly',
@@ -922,7 +914,7 @@ class SettingsStrip:
         self._label_mode_combo.pack(side='left')
         self._angle_line = line_maker(view)
         tk.Label(self._angle_line,
-                 text='Angle',
+                 text='Label angle',
                  bg=background,
                  ).pack(side='left', padx=(0, 4))
         self._angle_entry = tk.Entry(self._angle_line,
@@ -935,9 +927,17 @@ class SettingsStrip:
                                      )
         self._angle_entry.pack(side='left')
         tk.Label(self._angle_line, text='°', bg=background).pack(side='left',
-                                                                 padx=(2, 8),
+                                                                 padx=(2, 0),
                                                                  )
-        self._edit_labels_button = tk.Button(self._angle_line,
+        # Edit ODs is always there, so OD values can be given later even after No.
+        line = self._edit_line = line_maker(view)
+        self._edit_ods_button = tk.Button(line,
+                                          text=EDIT_ODS_TEXT,
+                                          command=lambda: self._edit_handler(EDIT_ODS_CHANGE,
+                                                                             ),
+                                          )
+        self._edit_ods_button.pack(side='left', padx=(0, 4))
+        self._edit_labels_button = tk.Button(line,
                                              text=EDIT_LABELS_TEXT,
                                              command=lambda: self._edit_handler(EDIT_LABELS_CHANGE,
                                                                                 ),
@@ -1260,7 +1260,7 @@ class SettingsStrip:
         if angle is None or not ANGLE_LIMITS[0] <= angle <= ANGLE_LIMITS[1]:
             self._angle_entry.configure(bg=ERROR_BACKGROUND)
             self._angle_note.configure(text=ANGLE_HELP)
-            self._angle_note.pack(anchor='w')
+            self._angle_note.pack(anchor='w', before=self._edit_line)
             return
         before = dict(self._values)
         self._values['event_label_angle'] = float(angle)
@@ -2224,7 +2224,7 @@ class SettingsStrip:
                      )
         self._haem_od_box.configure(state='normal' if can_scale else 'disabled')
         # The spectrometer only when there is a choice; the per OD boxes only once
-        # every OD value is in, Edit ODs once scaling by OD was chosen.
+        # every OD value is in.
         if len(self._spectra_names) > 1:
             self._spectra_line.pack(anchor='w', pady=(0, 2), before=self._upper)
         else:
@@ -2234,10 +2234,6 @@ class SettingsStrip:
                 box.pack(side='left')
             else:
                 box.pack_forget()
-        if self._can_edit_od:
-            self._od_line.pack(anchor='w', pady=(0, 2), before=self._labels_line)
-        else:
-            self._od_line.pack_forget()
         # The Δψ row: shown only while Δψ is worked out, its boxes holding the values
         # in use (a number typed and refused is taken away with its reason).
         seconds = psi_seconds_filler(values['psi_bH_mV'],
@@ -2433,15 +2429,14 @@ class SettingsStrip:
                        has_od: bool,
                        has_baseline: bool = False,
                        has_psi: bool = False,
-                       can_edit_od: Optional[bool] = None,
                        ) -> None:
         """
         ---- Summary ----
         Method to say what the boxes offer: the spectrometers of the "Spectra"
         drop-down (shown only with more than one), whether % oxidised is in the "Haems
         as" drop-down, whether the per OD boxes of the OCR and the haems are shown,
-        whether Edit ODs is, whether % of baseline is in the "OCR as" drop-down, and
-        whether the tick of the Δψ box can be clicked. The values stay.
+        whether % of baseline is in the "OCR as" drop-down, and whether the tick of the
+        Δψ box can be clicked. The values stay.
 
         ---- Inputs ----
         spectra : List[str]
@@ -2456,9 +2451,6 @@ class SettingsStrip:
         has_psi : bool
             True when Δψ can be worked out (a file with both regions and a fit with bH
             and bL), so its tick can be clicked.
-        can_edit_od : Optional[bool]
-            True when scaling by OD was chosen, so Edit ODs is shown even while some
-            OD values are missing; None follows has_od.
 
         ---- Globals read ----
         None.
@@ -2480,7 +2472,6 @@ class SettingsStrip:
         self._spectra_names = list(spectra)
         self._has_percent = bool(has_percent)
         self._has_od = bool(has_od)
-        self._can_edit_od = bool(has_od if can_edit_od is None else can_edit_od)
         self._has_baseline = bool(has_baseline)
         self._has_psi = bool(has_psi)
         self._size_refresher()

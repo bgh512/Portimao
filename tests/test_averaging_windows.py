@@ -1061,15 +1061,15 @@ def test_a_file_without_a_baseline_keeps_its_usual_ocr(capsys: pytest.CaptureFix
     assert 'VoO2_baseline' in result['experiment']
 
 
-# ---- test_the_ocr_view_question_sets_ocr_as ------------------------------------------
-def test_the_ocr_view_question_sets_ocr_as(monkeypatch: pytest.MonkeyPatch) -> None:
+# ---- test_the_ocr_turns_per_od -------------------------------------------------------
+def test_the_ocr_turns_per_od(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     ---- Summary ----
-    Main function to check the question of how the OCR is shown, asked once the OD
-    values are in (3.1.1.1): it offers µM min⁻¹, per OD and % of the range, never %
-    of baseline (no windows yet); per OD is highlighted, unless the dataset was saved
-    with another of the three; the answer is kept as the ocr_mode. The figures of
-    several files are not offered % of baseline. The question is stood in for.
+    Main function to check the step once the OD values are in (3.2.2): the OCR is set
+    per OD, unless the dataset was saved with it as % of the range (µM min⁻¹, % of
+    baseline and none saved all become per OD), and the step waits for Continue with
+    its own number. The figures of several files are not offered % of baseline. The
+    instruction is stood in for.
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
@@ -1092,31 +1092,30 @@ def test_the_ocr_view_question_sets_ocr_as(monkeypatch: pytest.MonkeyPatch) -> N
     None.
     """
 
-    offered = []
-    reply = {'chosen': 'percent'}
-    def choice(question: str, options: list, default: str, **kwargs: object) -> str:
-        offered.append(([key for key, _ in options], default, kwargs.get('number')))
-        return reply['chosen']
-    monkeypatch.setattr(survey, 'choice_asker', choice)
+    numbers = []
+    def waiter(question: str, nudge: str, **kwargs: object) -> str:
+        numbers.append(kwargs.get('number'))
+        return ''
+    monkeypatch.setattr(survey, 'enter_waiter', waiter)
     monkeypatch.setattr(survey, 'info_printer', lambda *args, **kwargs: None)
     monkeypatch.setattr(survey, 'guide_step_starter', lambda key: None)
 
-    # ---- 1 The standard settings, then a dataset saved with µM min⁻¹ -----------------
-    answers = {}
-    assert survey.ocr_view_asker(answers, {'ocr_mode': 'od'}) == 'percent'
-    assert offered == [(['raw', 'od', 'percent'], 'od', '3.1.1.1')]
-    assert answers['ocr_mode'] == 'percent'
-    survey.ocr_view_asker(answers, {'ocr_mode': 'raw'})
-    assert offered[-1][1] == 'raw'
-    survey.ocr_view_asker(answers, {})
-    assert offered[-1][1] == 'od'
+    # ---- 1 Per OD, whatever was saved but % of the range -----------------------------
+    for saved, shown in (('od', 'od'),
+                         ('raw', 'od'),
+                         ('baseline', 'od'),
+                         (None, 'od'),
+                         ('percent', 'percent'),
+                         ):
+        answers = {}
+        seen = []
+        def shower() -> None:
+            seen.append(answers['ocr_mode'])
+        assert survey.ocr_view_teller(answers, {'ocr_mode': saved}, shower) == shown
+        assert answers['ocr_mode'] == shown and seen == [shown]
+    assert numbers == ['3.2.2'] * 5
 
-    # ---- 2 Saved with % of baseline, not offered here: per OD ------------------------
-    reply['chosen'] = 'od'
-    survey.ocr_view_asker(answers, {'ocr_mode': 'baseline'})
-    assert offered[-1][1] == 'od' and answers['ocr_mode'] == 'od'
-
-    # ---- 3 The figures of several files are not offered % of baseline ----------------
+    # ---- 2 The figures of several files are not offered % of baseline ----------------
     assert survey.ocr_kind_lister(True) == ['raw', 'od', 'percent']
 
 

@@ -480,7 +480,7 @@ Checked by: `test_each_window_falls_on_its_own`, `test_a_window_left_out_keeps_i
 
 ## 8. The concentration of each addition
 
-The labels table (question 3.2) takes, for each addition, its label, the concentration of the stock and the volume added. The program works out the concentration in the chamber from them:
+The labels table (question 3.3) takes, for each addition, its label, the concentration of the stock and the volume added. The program works out the concentration in the chamber from them:
 
 ```text
 a = s × v ÷ V

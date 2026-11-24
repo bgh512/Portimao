@@ -40,11 +40,11 @@ FIRST_QUESTIONS = {'data_folder': '1.1',
                    'results_folder': '1.2',
                    'previous': '1.3',
                    'trim': '2.1',
-                   'od_scaling': '3.1',
-                   'od_values': '3.1.1',
-                   'ocr_view': '3.1.1.1',
-                   'temperature': '3.1.2',
-                   'labels': '3.2',
+                   'temperature': '3.1',
+                   'od_scaling': '3.2',
+                   'od_values': '3.2.1',
+                   'ocr_view': '3.2.2',
+                   'labels': '3.3',
                    'haems': '4.1',
                    'regions': '4.4',
                    'delta_psi': '4.5',
@@ -307,15 +307,16 @@ def test_steps_move_on_and_fold() -> None:
     state = _state_maker(['data_folder',
                           'results_folder',
                           'trim',
-                          'od_scaling',
                           'temperature',
+                          'od_scaling',
+                          'labels',
                           ],
                          )
-    assert _status_reader(state) == {'od_scaling': 'done',
+    assert _status_reader(state) == {'temperature': 'done',
+                                     'od_scaling': 'done',
                                      'od_values': 'skipped',
                                      'ocr_view': 'skipped',
-                                     'temperature': 'open',
-                                     'labels': 'later',
+                                     'labels': 'open',
                                      }
     stage_rows = [row for row in state.row_lister() if row['kind'] == 'stage']
     stages = [row['text'] for row in stage_rows]
@@ -326,7 +327,7 @@ def test_steps_move_on_and_fold() -> None:
     assert stages[-1] == 'Dataset export  ·  step 21'
     assert [row['is_open'] for row in stage_rows] == [False, True] + [False] * 4
     open_row = next(row for row in state.row_lister() if row.get('status') == 'open')
-    assert open_row['text'] == ' 8  Temperature' and open_row['mark'] == '▸'
+    assert open_row['text'] == ' 9  Event labels' and open_row['mark'] == '▸'
     # a step not needed this run stays in the list, so the numbers do not jump
     tags = {GUIDE_KEYS[row['index']]: row['tag']
             for row in state.row_lister()

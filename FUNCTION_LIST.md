@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.19
+- **Version:** V2.20
 - **Date:** 24/11/2026
 
 ## Contents
@@ -88,7 +88,7 @@
     - [`test_both_kinds_are_averaged_from_one_baseline`](#test_both_kinds_are_averaged_from_one_baseline)
     - [`test_the_ocr_is_put_on_its_percent_of_baseline`](#test_the_ocr_is_put_on_its_percent_of_baseline)
     - [`test_a_file_without_a_baseline_keeps_its_usual_ocr`](#test_a_file_without_a_baseline_keeps_its_usual_ocr)
-    - [`test_the_ocr_view_question_sets_ocr_as`](#test_the_ocr_view_question_sets_ocr_as)
+    - [`test_the_ocr_turns_per_od`](#test_the_ocr_turns_per_od)
     - [`test_every_haem_view_and_delta_psi_are_averaged`](#test_every_haem_view_and_delta_psi_are_averaged)
     - [`test_the_averages_sheet_holds_every_view`](#test_the_averages_sheet_holds_every_view)
     - [`test_the_windows_fall_before_the_additions`](#test_the_windows_fall_before_the_additions)
@@ -1072,7 +1072,7 @@
     - [`multi_experiment_asker`](#multi_experiment_asker)
     - [`ocr_kind_lister`](#ocr_kind_lister)
     - [`ocr_option_builder`](#ocr_option_builder)
-    - [`ocr_view_asker`](#ocr_view_asker)
+    - [`ocr_view_teller`](#ocr_view_teller)
     - [`od_gaps_finder`](#od_gaps_finder)
     - [`od_scaling_asker`](#od_scaling_asker)
     - [`paf_finder`](#paf_finder)
@@ -3929,15 +3929,15 @@ and 6 in the settled window 17.5 to 19.5 min, so 100 and 60 % of baseline.
 _response_experiment_builder
 ```
 
-#### `test_the_ocr_view_question_sets_ocr_as`
+#### `test_the_ocr_turns_per_od`
 
 ```text
 ---- Summary ----
-Main function to check the question of how the OCR is shown, asked once the OD
-values are in (3.1.1.1): it offers µM min⁻¹, per OD and % of the range, never %
-of baseline (no windows yet); per OD is highlighted, unless the dataset was saved
-with another of the three; the answer is kept as the ocr_mode. The figures of
-several files are not offered % of baseline. The question is stood in for.
+Main function to check the step once the OD values are in (3.2.2): the OCR is set
+per OD, unless the dataset was saved with it as % of the range (µM min⁻¹, % of
+baseline and none saved all become per OD), and the step waits for Continue with
+its own number. The figures of several files are not offered % of baseline. The
+instruction is stood in for.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -16323,7 +16323,7 @@ until every value is in.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
-    Stands in for the answer to "Do you want to scale by OD?".
+    Stands in for the answer to "Do you want to provide OD values?".
 
 ---- Globals read ----
 OD_COLUMNS.
@@ -33995,7 +33995,7 @@ None.
 ---- Summary ----
 Helper function to list the event labels that will be written more tidily (8 ug
 ml-1 as 8 µg mL⁻¹), each by its file and time, and to ask whether to continue
-with them (3.2.1). Asks nothing when every label is tidy already.
+with them (3.3.1). Asks nothing when every label is tidy already.
 
 ---- Inputs ----
 with_events : List[dict]
@@ -34608,27 +34608,30 @@ None.
 None.
 ```
 
-#### `ocr_view_asker`
+#### `ocr_view_teller`
 
 ```text
 ---- Summary ----
-Main function to ask, once the OD values are in, how the OCR is shown: in µM
-min⁻¹, per OD or as % of the range. It sets "OCR as" in the View box, and one line
-says it can be changed there at any time. Per OD is offered first, unless the
-dataset was saved with another of the three.
+Main function to show the OCR per OD once the OD values are in, unless the dataset
+was saved with the OCR as % of the range, and point to the View box, where it and
+the haems can be shown per OD or not at any time; the step waits for Continue
+(3.2.2).
 
 ---- Inputs ----
 answers : dict
     Answers dictionary the value is stored in (ocr_mode).
 defaults : dict
-    Default answers (ocr_mode).
+    Default answers (ocr_mode, as the dataset was saved).
+shower : Callable[[], None]
+    Shows the new ocr_mode in the View box and redraws the plot, before the step
+    waits.
 
 ---- Globals read ----
-OCR_VIEW_KEYS (module constant).
+OCR_KEPT_KEYS, OCR_VIEW_NUDGE (module constants).
 
 ---- Outputs ----
 str
-    The ocr_mode chosen: 'raw', 'od' or 'percent'.
+    The ocr_mode set: 'od', or 'percent' when the dataset was saved with it.
 
 ---- Globals mutated ----
 None. Stores ocr_mode in ``answers`` and reads from and prints to the terminal
@@ -34638,9 +34641,8 @@ None. Stores ocr_mode in ``answers`` and reads from and prints to the terminal
 None.
 
 ---- Helpers ----
-choice_asker
+enter_waiter
 info_printer
-ocr_option_builder
 ```
 
 #### `od_gaps_finder`
@@ -34678,7 +34680,7 @@ None.
 
 ```text
 ---- Summary ----
-Main function to ask whether to scale by OD and, if so, have the OD, volume and
+Main function to ask whether to give OD values and, if so, have the OD, volume and
 dilution factor of every file filled in in the table, starting from the stored
 values.
 
@@ -38946,8 +38948,7 @@ None.
 ---- Summary ----
 Method to tell the boxes above the plot what they offer: the spectrometers of
 the "Spectra" drop-down, whether % oxidised is in "Haems as", whether per OD is
-offered, whether Edit ODs is shown, whether % of baseline is in "OCR as", and
-whether Δψ can be ticked.
+offered, whether % of baseline is in "OCR as", and whether Δψ can be ticked.
 
 ---- Inputs ----
 spectra : List[str]
@@ -38960,9 +38961,6 @@ has_baseline : bool
     True when the averaging windows are set up.
 has_psi : bool
     True when Δψ can be worked out.
-can_edit_od : Optional[bool]
-    True when scaling by OD was chosen, so Edit ODs is shown even while some
-    OD values are missing; None follows has_od.
 
 ---- Globals read ----
 None.
@@ -42247,7 +42245,7 @@ info_printer
 ---- Summary ----
 Helper function to have the label, the stock and the volume added (or the
 concentration in the chamber) of every event filled in in the labels table of the
-window (3.2).
+window (3.3).
 
 ---- Inputs ----
 session : ViewerSession
@@ -42355,9 +42353,9 @@ warning_shower
 
 ```text
 ---- Summary ----
-Helper function to say, once the OD table is confirmed, either that every OD value
-is in, or, as a warning, which are missing and that the OD scaling stays off until
-Edit ODs fills them in.
+Helper function to say, once the OD table is confirmed, as a warning, which OD
+values are missing and that the OD scaling stays off until Edit ODs fills them in;
+nothing is said when every value is in.
 
 ---- Inputs ----
 details : Dict[str, dict]
@@ -42377,7 +42375,6 @@ None. Prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
-info_printer
 od_gaps_finder
 warning_shower
 ```
@@ -42415,7 +42412,7 @@ info_printer
 ```text
 ---- Summary ----
 Helper function to have the OD, volume and dilution of every file filled in in the
-OD table of the window (3.1.1).
+OD table of the window (3.2.1), under the key of its columns.
 
 ---- Inputs ----
 session : ViewerSession
@@ -42427,7 +42424,7 @@ is_step : bool
     leaves the guide at the step that waits.
 
 ---- Globals read ----
-settings.OD_RESUSPENDED_ML.
+OD_KEY_LINES (module constant).
 
 ---- Outputs ----
 Dict[str, Dict[str, Optional[float]]]
@@ -42442,6 +42439,7 @@ None.
 
 ---- Helpers ----
 _table_filler
+info_printer
 od_rows_reader
 od_table_builder
 ```
@@ -43384,12 +43382,12 @@ preview_drawer
 ```text
 ---- Summary ----
 Main function to ask the last questions of the import, on the standard plot cut to
-the limits: the OD values, the temperature of the runs, then the event labels, the
+the limits: the temperature of the runs, the OD values, then the event labels, the
 OD values and the labels each in a table of the window.
-Once the OD table is confirmed, one line says every value is in, or a warning
-names the missing ones, the OD scaling staying off until Edit ODs fills them in.
-Once every OD value is in, the View box shows its per OD boxes, a line says so,
-and how the OCR is shown is asked (3.1.1.1).
+Once the OD table is confirmed, a warning names the OD values missing, the OD
+scaling staying off until Edit ODs fills them in. Once every OD value is in, the
+OCR is shown per OD, the View box shows its per OD boxes, and a line points to them
+(3.2.2).
 The plot is redrawn with the labels once they are saved; Edit labels changes them
 later. The haems are those of the session's fit.
 
@@ -43433,8 +43431,7 @@ _od_lister
 _od_table_filler
 _strip_shower
 event_asker
-info_printer
-ocr_view_asker
+ocr_view_teller
 od_scaling_asker
 preview_drawer
 saved_values_reader
@@ -45110,8 +45107,8 @@ _change_reporter
 Method to say what the boxes offer: the spectrometers of the "Spectra"
 drop-down (shown only with more than one), whether % oxidised is in the "Haems
 as" drop-down, whether the per OD boxes of the OCR and the haems are shown,
-whether Edit ODs is, whether % of baseline is in the "OCR as" drop-down, and
-whether the tick of the Δψ box can be clicked. The values stay.
+whether % of baseline is in the "OCR as" drop-down, and whether the tick of the
+Δψ box can be clicked. The values stay.
 
 ---- Inputs ----
 spectra : List[str]
@@ -45126,9 +45123,6 @@ has_baseline : bool
 has_psi : bool
     True when Δψ can be worked out (a file with both regions and a fit with bH
     and bL), so its tick can be clicked.
-can_edit_od : Optional[bool]
-    True when scaling by OD was chosen, so Edit ODs is shown even while some
-    OD values are missing; None follows has_od.
 
 ---- Globals read ----
 None.

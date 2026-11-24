@@ -15,8 +15,6 @@ from utils_shared.questions import path_cleaner
 # The stages, in order, and the steps of each: (key, stage, name, help). The program
 # says which step starts with guide_step_starter(key); the help is shown when the step
 # is opened again after it was done.
-GO_BACK_HELP = ('To change it, go back to its stage at Go back or save (step 15), once '
-                'the figure is accepted.')
 GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
     (
         'data_folder',
@@ -40,7 +38,18 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
      'regions box above it. Click Export full + trimmed csv or Export trimmed csv to '
      'write the csv files with the bars as they are.',
      ),
-    ('od_scaling', 'Set-up', 'Scale by OD', f'Whether the OCR and the haems can be shown per OD was set here. {GO_BACK_HELP}'),
+    ('temperature',
+     'Set-up',
+     'Temperature',
+     'The temperature of the runs was typed here. It can also be changed in the Δψ box, '
+     'under More.',
+     ),
+    ('od_scaling',
+     'Set-up',
+     'OD values or not',
+     'Whether OD values are given was chosen here. Click Edit ODs in the View box to '
+     'give them at any time.',
+     ),
     ('od_values',
      'Set-up',
      'OD values',
@@ -50,13 +59,7 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
     ('ocr_view',
      'Set-up',
      'OCR view',
-     'How the OCR is shown was chosen here. Change it under OCR as in the View box.',
-     ),
-    ('temperature',
-     'Set-up',
-     'Temperature',
-     'The temperature of the runs was typed here. It can also be changed in the Δψ box, '
-     'under More.',
+     'The OCR was set to per OD here. Change it under OCR as in the View box.',
      ),
     ('labels',
      'Set-up',

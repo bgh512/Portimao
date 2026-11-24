@@ -3951,14 +3951,12 @@ class ViewerGui:
                              has_od: bool,
                              has_baseline: bool = False,
                              has_psi: bool = False,
-                             can_edit_od: Optional[bool] = None,
                              ) -> None:
         """
         ---- Summary ----
         Method to tell the boxes above the plot what they offer: the spectrometers of
         the "Spectra" drop-down, whether % oxidised is in "Haems as", whether per OD is
-        offered, whether Edit ODs is shown, whether % of baseline is in "OCR as", and
-        whether Δψ can be ticked.
+        offered, whether % of baseline is in "OCR as", and whether Δψ can be ticked.
 
         ---- Inputs ----
         spectra : List[str]
@@ -3971,9 +3969,6 @@ class ViewerGui:
             True when the averaging windows are set up.
         has_psi : bool
             True when Δψ can be worked out.
-        can_edit_od : Optional[bool]
-            True when scaling by OD was chosen, so Edit ODs is shown even while some
-            OD values are missing; None follows has_od.
 
         ---- Globals read ----
         None.
@@ -3998,7 +3993,6 @@ class ViewerGui:
                           bool(has_od),
                           bool(has_baseline),
                           bool(has_psi),
-                          can_edit_od,
                           ),
                          )
 

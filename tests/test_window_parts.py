@@ -18,6 +18,7 @@ import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+import utils_shared.survey as survey
 import utils_viewer.viewer_preview as viewer_preview
 import utils_viewer.viewer_stages as viewer_stages
 from utils_shared.spectral_decomposer import OWN_HAEMS_NAME
@@ -40,12 +41,15 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        kept_decomposition_builder,
                                        NO_JOURNAL,
                                        ocr_form_choices_lister,
+                                       ocr_mode_builder,
+                                       ocr_view_reader,
                                        psi_answers_builder,
                                        psi_change_describer,
                                        psi_number_checker,
                                        psi_seconds_filler,
                                        psi_summary_writer,
                                        psi_values_builder,
+                                       SAVE_FIT_CHANGE,
                                        SettingsStrip,
                                        size_answers_builder,
                                        strip_values_builder,
@@ -60,6 +64,8 @@ from utils_viewer.viewer_table import (ABOVE_ZERO,
                                        label_entries_reader,
                                        label_table_builder,
                                        LABEL,
+                                       NEEDED_KINDS,
+                                       OD_COLUMNS,
                                        od_rows_reader,
                                        od_table_builder,
                                        STOCK,
@@ -156,7 +162,9 @@ def test_event_labels_from_the_table(monkeypatch: pytest.MonkeyPatch) -> None:
     ---- Summary ----
     Main function to check the labels as the table is confirmed: a label written
     ignore in any capitals leaves its event out and drops its concentration; a label
-    that could be tidier is offered once, and one kept as it is is not offered again.
+    that could be tidier is listed by its file, time and tidy form, Yes to continue
+    uses the tidy form, and No opens the table again with the label as typed; the
+    labels are then said to be saved.
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
@@ -179,10 +187,14 @@ def test_event_labels_from_the_table(monkeypatch: pytest.MonkeyPatch) -> None:
     None.
     """
 
-    # ---- 1 Confirm the table: one tidy form offered and taken ------------------------
+    # ---- 1 Confirm the table: the tidy form listed and taken -------------------------
     typed = ['y']
     monkeypatch.setattr('utils_shared.questions._input_reader',
                         lambda text, indent='': typed.pop(0),
+                        )
+    said = []
+    monkeypatch.setattr('utils_shared.survey.info_printer',
+                        lambda text, **_: said.append(text),
                         )
     def table_filler(entries: dict) -> dict:
         filled = {name: [dict(entry) for entry in events]
@@ -191,9 +203,11 @@ def test_event_labels_from_the_table(monkeypatch: pytest.MonkeyPatch) -> None:
         filled['kd_run1'][1].update(label=' Ignore ', concentration_uM=5.0)
         filled['kd_run1'][2].update(label='2 mM azide', concentration_uM=2000.0)
         return filled
-    kept: set = set()
-    result = event_asker(SUMMARIES, {}, table_filler, kept)
+    result = event_asker(SUMMARIES, {}, table_filler)
     first, second, third = result['kd_run1']
+    time = SUMMARIES[0]['events'][0]['time']
+    assert f'  kd_run1, {time:.2f} min: 100 µM KCN' in said
+    assert said[-1].startswith('Event labels saved!')
     assert (first['label'], first['ignored']) == ('100 µM KCN', False)
     assert second == {'datapoint': 20,
                       'label': IGNORE_LABEL,
@@ -204,16 +218,19 @@ def test_event_labels_from_the_table(monkeypatch: pytest.MonkeyPatch) -> None:
                       'ignored': True,
                       }
     assert (third['label'], third['concentration_uM']) == ('2 mM azide', 2000.0)
-    assert result['kd_run2'] == [] and not typed and not kept
+    assert result['kd_run2'] == [] and not typed
 
-    # ---- 2 A label kept as it is is not offered again --------------------------------
-    typed = ['n']
-    result = event_asker(SUMMARIES, {}, lambda entries: entries, kept)
-    assert result['kd_run1'][0]['label'] == '100uM KCN'
-    assert kept == {'100uM KCN'} and not typed
+    # ---- 2 No opens the table again with the label as typed, then Yes tidies it ------
+    typed = ['n', 'y']
+    shown = []
+    def plain_filler(entries: dict) -> dict:
+        shown.append(entries['kd_run1'][0]['label'])
+        return entries
+    result = event_asker(SUMMARIES, {}, plain_filler)
+    assert shown == ['100uM KCN', '100uM KCN']
+    assert result['kd_run1'][0]['label'] == '100 µM KCN' and not typed
     with_events = [SUMMARIES[0]]
-    assert tidy_labels_finder(with_events, result, kept) == []
-    assert len(tidy_labels_finder(with_events, result, set())) == 1
+    assert tidy_labels_finder(with_events, result) == []
 
 
 # ---- test_rows_of_the_labels_table ---------------------------------------------------
@@ -356,6 +373,73 @@ def test_rows_of_the_od_table() -> None:
               {'OD': 0.7, 'volume': 2.0, 'dilution_factor': 2.0},
               ]
     assert od_rows_reader(table, values) == {'a': values[0], 'b': values[1]}
+
+
+# ---- test_od_table_confirmed_with_gaps -----------------------------------------------
+def test_od_table_confirmed_with_gaps(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    ---- Summary ----
+    Main function to check an OD table confirmed with cells left empty: the empty
+    cells are not a problem that keeps the table open, the values typed are kept, the
+    gaps are named in the order of the files and columns, and the OD scaling stays off
+    until every value is in.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the answer to "Do you want to provide OD values?".
+
+    ---- Globals read ----
+    OD_COLUMNS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 An empty OD cell is never a problem at Confirm ----------------------------
+    for _, _, kind in OD_COLUMNS:
+        assert cell_reader('', kind) == (None, True)
+        assert kind not in NEEDED_KINDS
+        assert cell_reader('0', kind) == (None, False)
+
+    # ---- 2 The gaps are named, the values kept, the scaling off ----------------------
+    summaries = [{'name': 'a'}, {'name': 'b'}]
+    filled = {'a': {'OD': 0.5, 'volume': None, 'dilution_factor': 1.0},
+              'b': {'OD': None, 'volume': 2.0, 'dilution_factor': None},
+              }
+    monkeypatch.setattr(survey, 'yes_no_asker', lambda *args, **kwargs: True)
+    monkeypatch.setattr(survey, 'guide_step_starter', lambda *args: None)
+    answers = {}
+    details = survey.od_scaling_asker(summaries,
+                                      answers,
+                                      {'normalise_od': False},
+                                      {},
+                                      lambda rows: filled,
+                                      )
+    assert details == filled
+    assert survey.od_gaps_finder(details) == ['a: volume', 'b: OD', 'b: dilution']
+    assert answers['normalise_od'] is False
+
+    # ---- 3 Every value in: the scaling is on -----------------------------------------
+    filled['a']['volume'] = 1.5
+    filled['b'].update(OD=0.7, dilution_factor=2.0)
+    details = survey.od_scaling_asker(summaries,
+                                      answers,
+                                      {'normalise_od': False},
+                                      {},
+                                      lambda rows: filled,
+                                      )
+    assert survey.od_gaps_finder(details) == []
+    assert answers['normalise_od'] is True
 
 
 # ---- test_sentence_when_confirmed_too_early ------------------------------------------
@@ -543,7 +627,7 @@ def test_keep_to_compare_keeps_the_regions_in_use(monkeypatch: pytest.MonkeyPatc
     ---- Summary ----
     Main function to check that a click on Keep to compare keeps the fit, the regions
     and the numbers of delta psi in use at that moment and redraws the plot, and that
-    Keep this one drops them. The showing of the strip is stood in for.
+    Keep new drops them. The showing of the strip is stood in for.
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
@@ -593,7 +677,7 @@ def test_keep_to_compare_keeps_the_regions_in_use(monkeypatch: pytest.MonkeyPatc
     assert session.kept['answers']['psi_share'] == 0.4
     assert redraws == [True]
 
-    # ---- 3 Keep this one -------------------------------------------------------------
+    # ---- 3 Keep new ------------------------------------------------------------------
     viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': False})
     assert session.kept is None
     assert redraws == [True, True]
@@ -604,13 +688,13 @@ def test_go_back_to_kept_puts_the_kept_one_back(monkeypatch: pytest.MonkeyPatch,
                                                 ) -> None:
     """
     ---- Summary ----
-    Main function to check the two ways of choosing after Keep to compare. Go back to
-    kept puts the kept fit, background, number of delta psi and regions back in use,
-    drops the kept one and redraws the plot; while the regions are being chosen on the
-    plot it leaves the regions as they are; with nothing kept it does nothing. Keep
-    this one leaves what is in use as it is and drops the kept one. The strip tells
-    the click on Go back to kept only while one is kept. The showing of the strip is
-    stood in for.
+    Main function to check the two ways of choosing after Keep to compare. Keep old
+    puts the kept fit, background, number of delta psi and regions back in use, drops
+    the kept one and redraws the plot; while the regions are being chosen on the plot
+    it leaves the regions as they are; with nothing kept it does nothing. Keep new
+    leaves what is in use as it is and drops the kept one. The strip tells the click
+    on Keep old only while one is kept, and a click on Keep new as no longer
+    comparing. The showing of the strip is stood in for.
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
@@ -668,7 +752,7 @@ def test_go_back_to_kept_puts_the_kept_one_back(monkeypatch: pytest.MonkeyPatch,
     viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': True})
     changer()
 
-    # ---- 2 Go back to kept -----------------------------------------------------------
+    # ---- 2 Keep old ------------------------------------------------------------------
     viewer_stages._strip_change_applier(session,
                                         answers,
                                         Path('.'),
@@ -708,7 +792,7 @@ def test_go_back_to_kept_puts_the_kept_one_back(monkeypatch: pytest.MonkeyPatch,
     assert session.fit is first_fit
     assert len(redraws) == drawn
 
-    # ---- 5 Keep this one: what is in use stays, the kept one goes --------------------
+    # ---- 5 Keep new: what is in use stays, the kept one goes -------------------------
     viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': True})
     changer()
     viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': False})
@@ -720,13 +804,115 @@ def test_go_back_to_kept_puts_the_kept_one_back(monkeypatch: pytest.MonkeyPatch,
     # ---- 6 The strip tells the click only while one is kept --------------------------
     # Every widget is the same stand-in, so only what the strip tells is checked.
     told: list = []
-    strip = SettingsStrip(MagicMock(), MagicMock(), MagicMock(), 'white', told.append)
+    tk = MagicMock()
+    strip = SettingsStrip(tk, MagicMock(), MagicMock(), 'white', told.append)
     strip.state_setter(True)
     strip._back_handler()
     assert told == []
     strip.values_setter({'plot_haems': True, 'compare': True, 'kept': 'made_up.csv'})
     strip._back_handler()
     assert told == [{BACK_CHANGE: True}]
+    commands = {call.kwargs.get('text'): call.kwargs.get('command')
+                for call in tk.Button.call_args_list
+                }
+    assert commands['Keep old'] == strip._back_handler
+    assert commands['Keep new'] == strip._compare_handler
+    commands['Keep new']()
+    assert told[1:] == [{'compare': False}]
+
+
+# ---- test_save_fit_names_the_fit_in_use ----------------------------------------------
+def test_save_fit_names_the_fit_in_use(monkeypatch: pytest.MonkeyPatch,
+                                       tmp_path: Path,
+                                       ) -> None:
+    """
+    ---- Summary ----
+    Main function to check Save fit under Build a fit: the strip tells the name typed
+    beside it; the haems ticked are saved under that name, which becomes the fit in
+    use and joins the Fit list, with the haems on the plot left as they are; with a
+    preset in use nothing is ticked, so nothing is saved and one sentence says why.
+    The saving of the file and the showing of the strip are stood in for.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the saving and the showing of the strip.
+    tmp_path : Path
+        Empty folder from pytest, as the fits folder.
+
+    ---- Globals read ----
+    OWN_HAEMS_NAME, SAVE_FIT_CHANGE.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. The stand-ins are undone after the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The strip tells the name typed --------------------------------------------
+    told: list = []
+    strip = SettingsStrip(MagicMock(), MagicMock(), MagicMock(), 'white', told.append)
+    strip._fit_saver()
+    assert told == []  # greyed out
+    strip.state_setter(True)
+    strip._fit_name_entry.get.return_value = '  my haems  '
+    strip._fit_saver()
+    assert told == [{SAVE_FIT_CHANGE: 'my haems'}]
+
+    # ---- 2 The haems ticked are saved and become the fit in use ----------------------
+    monkeypatch.setattr(viewer_stages, '_strip_shower', lambda session, answers: None)
+    saved: list = []
+    def saver(folder: Path, name: str, files: list) -> Path:
+        if not files:
+            raise ValueError('Tick the haems of the fit under Build a fit, then save '
+                             'it.',
+                             )
+        saved.append((folder, name, list(files)))
+        return folder / f'{name}.csv'
+    monkeypatch.setattr(viewer_stages, 'built_fit_saver', saver)
+    printed: list = []
+    monkeypatch.setattr(viewer_stages,
+                        'info_printer',
+                        lambda text, **kwargs: printed.append(text),
+                        )
+    window = MagicMock()
+    session = ViewerSession(summaries=[], export_root=Path('.'), window=window)
+    fit = {'haem_list': ['bH', 'cc']}
+    session.fit = fit
+    session.redraw = MagicMock()
+    answers = dict(settings.DEFAULT_ANSWERS,
+                   fit_file=OWN_HAEMS_NAME,
+                   haem_files=['bH.csv', 'cc.csv'],
+                   )
+    viewer_stages._strip_change_applier(session,
+                                        answers,
+                                        tmp_path,
+                                        {SAVE_FIT_CHANGE: 'my haems'},
+                                        )
+    assert saved == [(tmp_path, 'my haems', ['bH.csv', 'cc.csv'])]
+    assert answers['fit_file'] == 'my haems.csv'
+    assert answers['haem_files'] == []
+    assert session.fit is fit
+    assert not session.redraw.called
+    window.strip_fits_setter.assert_called_once()
+    assert 'my haems.csv' in printed[-1]
+
+    # ---- 3 A preset in use: nothing ticked, nothing saved ----------------------------
+    viewer_stages._strip_change_applier(session,
+                                        answers,
+                                        tmp_path,
+                                        {SAVE_FIT_CHANGE: 'again'},
+                                        )
+    assert len(saved) == 1
+    assert answers['fit_file'] == 'my haems.csv'
+    assert printed[-1].startswith('The fit was not saved')
 
 
 # ---- test_answers_shown_in_the_strip -------------------------------------------------
@@ -768,11 +954,13 @@ def test_answers_shown_in_the_strip() -> None:
                       'haem_files': ['c1_myco.csv', 'bH_bswitch.csv'],
                       'compare': False,
                       'kept': '',
+                      'compare_layout': 'side',
                       'spectra': 'Cyt',
                       'haem_mode': 'delta',
                       'haem_per_od': True,
                       'ocr_mode': 'od',
                       'label_mode': 'chamber',
+                      'event_label_angle': 45.0,
                       'delta_psi': False,
                       'psi_bH_mV': 40.0,
                       'psi_bL_mV': -20.0,
@@ -805,6 +993,8 @@ def test_answers_shown_in_the_strip() -> None:
                   haem_per_od=False,
                   ocr_mode='percent',
                   label_mode='added',
+                  event_label_angle=30,
+                  compare_layout='overlaid',
                   )
     values = strip_values_builder(chosen, False, [], kept='made_up.csv, Valencia')
     assert values == {'plot_haems': False,
@@ -813,11 +1003,13 @@ def test_answers_shown_in_the_strip() -> None:
                       'haem_files': [],
                       'compare': True,
                       'kept': 'made_up.csv, Valencia',
+                      'compare_layout': 'overlaid',
                       'spectra': 'NADH',
                       'haem_mode': 'percent',
                       'haem_per_od': False,
                       'ocr_mode': 'percent',
                       'label_mode': 'added',
+                      'event_label_angle': 30.0,
                       'delta_psi': False,
                       'psi_bH_mV': 40.0,
                       'psi_bL_mV': -20.0,
@@ -840,6 +1032,67 @@ def test_answers_shown_in_the_strip() -> None:
     # ---- 3 Only what changed is given back -------------------------------------------
     assert size_answers_builder({'height': 0.3}) == {'height': 0.3}
     assert size_answers_builder({'plot_haems': False, 'fit_file': 'x.csv'}) == {}
+
+
+# ---- test_ocr_view_and_the_new_box_values --------------------------------------------
+def test_ocr_view_and_the_new_box_values() -> None:
+    """
+    ---- Summary ----
+    Main function to check the OCR as of the View box, a drop-down and a per OD box,
+    both ways: µM min⁻¹ with per OD ticked is the OCR per OD, and the % views have no
+    per OD; and that the angle of the labels and the tab of the Time regions box are
+    checked and given back as answers.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The drop-down and the per OD box, both ways -------------------------------
+    assert ocr_mode_builder('raw', True) == 'od'
+    assert ocr_mode_builder('raw', False) == 'raw'
+    assert ocr_mode_builder('percent', True) == 'percent'
+    assert ocr_mode_builder('baseline', True) == 'baseline'
+    for mode in ('raw', 'od', 'percent', 'baseline'):
+        assert ocr_mode_builder(*ocr_view_reader(mode)) == mode
+    assert ocr_view_reader('od') == ('raw', True)
+    assert ocr_view_reader('percent') == ('percent', False)
+    with pytest.raises(ValueError):
+        ocr_mode_builder('od', False)  # not a choice of the drop-down
+    with pytest.raises(ValueError):
+        ocr_view_reader('concentration')
+
+    # ---- 2 The angle of the labels and the tab of the Time regions box ---------------
+    strip_values_checker({'event_label_angle': 0, 'time_tab': ''})
+    strip_values_checker({'event_label_angle': 90.0, 'time_tab': 'windows'})
+    strip_values_checker({'compare_layout': 'side'})
+    strip_values_checker({'compare_layout': 'overlaid'})
+    for bad in ({'event_label_angle': 91},
+                {'event_label_angle': -1},
+                {'event_label_angle': True},
+                {'time_tab': 'figure'},
+                {'compare_layout': 'dashed'},
+                ):
+        with pytest.raises(ValueError):
+            strip_values_checker(bad)
+    assert form_answers_builder({'event_label_angle': 30.0}) == {
+        'event_label_angle': 30.0,
+        }
 
 
 # ---- test_values_meant_for_the_strip -------------------------------------------------
@@ -981,7 +1234,7 @@ def test_numbers_of_the_delta_psi_row() -> None:
     changed = dict(standard, **typed)
     assert psi_change_describer({'psi_bH_mV': 50.0}, changed) == [
         'Δψ is now worked out with bH at 50 mV (-20 mV with bL reduced) and bL at '
-        '-20 mV (-90 mV with bH reduced): a fall of 70 mV.',
+        '-20 mV (-90 mV with bH reduced): a shift of 70 mV.',
         ]
     assert psi_change_describer({'psi_share': 0.4,
                                  'temperature_c': 30.0,
