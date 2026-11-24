@@ -14,6 +14,7 @@ from utils_shared.redox_regions import (edge_anchor_finder,
                                         edge_time_finder,
                                         haem_levels_finder,
                                         percent_oxidised_calculator,
+                                        region_edge_copier,
                                         region_level_finder,
                                         short_region_closer,
                                         )
@@ -257,6 +258,52 @@ def test_an_edge_is_copied_by_its_nearest_addition() -> None:
     assert edge_anchor_finder(18.5, []) is None
     assert edge_anchor_finder(float('nan'), FIRST_FILE) is None
     assert edge_time_finder(anchor, []) is None
+
+
+# ---- test_an_edge_after_the_last_addition_is_copied_from_the_end ---------------------
+def test_an_edge_after_the_last_addition_is_copied_from_the_end() -> None:
+    """
+    ---- Summary ----
+    Main function to check the example of MATHS.md section 5: an edge after the last
+    addition is copied by its distance from the end of the used part of each file,
+    also to a file with fewer additions, while an edge before the last addition is
+    still copied by its nearest addition.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    First file: additions at 10, 15 and 20 min, end at 30 min; second: 11, 16 and 22
+    min, end at 34 min; third: 9 and 14 min, end at 26 min.
+    An edge at 29 min is after the last addition (20): 30 - 29 = 1 min from the end,
+    so 34 - 1 = 33 min in the second file and 26 - 1 = 25 min in the third.
+    An edge at 30 min (the end itself): 34 and 26 min.
+    An edge at 18.5 min is 1.5 min before the last addition: 22 - 1.5 = 20.5 min in
+    the second file; the third has no third addition, so no time.
+    Without the ends, the edge at 29 min goes by the last addition: 22 + 9 = 31 min.
+
+    ---- Helpers ----
+    None.
+    """
+
+    first, second, third = [10.0, 15.0, 20.0], [11.0, 16.0, 22.0], [9.0, 14.0]
+    assert region_edge_copier(29.0, first, second, 30.0, 34.0) == pytest.approx(33.0)
+    assert region_edge_copier(29.0, first, third, 30.0, 26.0) == pytest.approx(25.0)
+    assert region_edge_copier(30.0, first, second, 30.0, 34.0) == pytest.approx(34.0)
+    assert region_edge_copier(30.0, first, third, 30.0, 26.0) == pytest.approx(26.0)
+    assert region_edge_copier(18.5, first, second, 30.0, 34.0) == pytest.approx(20.5)
+    assert region_edge_copier(18.5, first, third, 30.0, 26.0) is None
+    assert region_edge_copier(29.0, first, second) == pytest.approx(31.0)
+    assert region_edge_copier(29.0, [], second, 30.0, 34.0) is None
 
 
 # ---- test_percent_oxidised_runs_between_the_two_levels -------------------------------

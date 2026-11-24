@@ -250,7 +250,20 @@ Notes:
 
 Example: one file has its additions at 5, 12, 20 and 30 min, another at 6, 13, 22 and 31 min. An edge at t = 18.5 min in the first file is 13.5, 6.5, 1.5 and 11.5 min from its four additions, so the third is nearest: a = 20 and d = 18.5 − 20 = −1.5 min. In the other file the third addition is at a_new = 22 min, so t_new = 22 − 1.5 = 20.5 min. A file with only two additions is not given this edge.
 
-Checked by: `test_an_edge_is_copied_by_its_nearest_addition` in `tests/test_redox_regions.py`.
+An edge after the last addition is copied by its distance from the end instead, so a region that runs to the end of one file runs to the end of every file, whatever the number of additions:
+
+```text
+e = E − t
+t_new = E_new − e
+```
+
+- E: the end of the used part of the file the edge was set on (min): the end of the plot, less any ignored end
+- e: the distance of the edge from that end (min)
+- E_new: the end of the used part of the other file (min)
+
+Example: a file has its additions at 10, 15 and 20 min and its used part ends at E = 30 min; another has its additions at 11, 16 and 22 min and ends at E_new = 34 min; a third has only two additions, at 9 and 14 min, and ends at 26 min. An edge at t = 29 min in the first file is after its last addition, so e = 30 − 29 = 1 min, and t_new = 34 − 1 = 33 min in the second file and 26 − 1 = 25 min in the third, which has fewer additions but is still given the edge.
+
+Checked by: `test_an_edge_is_copied_by_its_nearest_addition` and `test_an_edge_after_the_last_addition_is_copied_from_the_end` in `tests/test_redox_regions.py`.
 
 ---
 

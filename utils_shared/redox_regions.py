@@ -1,7 +1,7 @@
 """
 The maths of the oxidised and reduced regions: a haem's level in a region, the two
 levels of a file, % oxidised from them, and an edge copied to another file by its
-nearest addition.
+nearest addition or, after the last addition, by its distance from the end.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -326,11 +326,15 @@ def percent_oxidised_calculator(haem_table: pd.DataFrame,
 def region_edge_copier(time_min: float,
                        source_additions_min: Sequence[float],
                        target_additions_min: Sequence[float],
+                       source_end_min: Optional[float] = None,
+                       target_end_min: Optional[float] = None,
                        ) -> Optional[float]:
     """
     ---- Summary ----
-    Main function to copy an edge set on one file to another file: the same distance
-    from the addition of the same number as the one nearest to it in the first file.
+    Main function to copy an edge set on one file to another file. An edge after the
+    last addition of the first file is copied by its distance from the end of the run
+    in use (when both ends are given); any other edge goes at the same distance from
+    the addition of the same number as the one nearest to it in the first file.
 
     ---- Inputs ----
     time_min : float
@@ -340,6 +344,12 @@ def region_edge_copier(time_min: float,
     target_additions_min : Sequence[float]
         Times of the additions of the file the edge is copied to (min), on that
         file's time axis.
+    source_end_min : Optional[float]
+        End of the used part of the run of the file the edge was set on (min); None
+        to copy every edge by its nearest addition.
+    target_end_min : Optional[float]
+        End of the used part of the run of the other file (min), on its time axis;
+        None to copy every edge by its nearest addition.
 
     ---- Globals read ----
     None.
@@ -348,13 +358,16 @@ def region_edge_copier(time_min: float,
     Optional[float]
         Time of the edge in the other file (min), not yet kept within its limits, or
         None when it cannot be copied (the first file has no addition, or the other
-        has fewer additions), so the other file keeps the edge it had.
+        has fewer additions and the edge is not after the last one), so the other
+        file keeps the edge it had.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    time = time of the same addition in the other file + (edge - nearest addition).
+    After the last addition: time = end of the other file - (end - edge).
+    Otherwise: time = time of the same addition in the other file + (edge - nearest
+    addition).
 
     ---- Helpers ----
     edge_anchor_finder
@@ -364,6 +377,15 @@ def region_edge_copier(time_min: float,
     anchor = edge_anchor_finder(time_min, source_additions_min)
     if anchor is None:
         return None
+    number, distance = anchor
+    is_after_last = (number == len([a for a in source_additions_min
+                                    if np.isfinite(a)
+                                    ],
+                                   ) - 1
+                     and distance > 0
+                     )
+    if is_after_last and source_end_min is not None and target_end_min is not None:
+        return float(target_end_min) - (float(source_end_min) - float(time_min))
     return edge_time_finder(anchor, target_additions_min)
 
 

@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.22
+- **Version:** V2.23
 - **Date:** 24/11/2026
 
 ## Contents
@@ -452,11 +452,13 @@
     - [`test_a_level_is_the_median_in_the_region`](#test_a_level_is_the_median_in_the_region)
     - [`test_a_file_needs_both_regions_for_its_levels`](#test_a_file_needs_both_regions_for_its_levels)
     - [`test_an_edge_is_copied_by_its_nearest_addition`](#test_an_edge_is_copied_by_its_nearest_addition)
+    - [`test_an_edge_after_the_last_addition_is_copied_from_the_end`](#test_an_edge_after_the_last_addition_is_copied_from_the_end)
     - [`test_percent_oxidised_runs_between_the_two_levels`](#test_percent_oxidised_runs_between_the_two_levels)
     - [`test_the_least_spectra_of_the_program`](#test_the_least_spectra_of_the_program)
 - [`tests/test_region_edges.py`](#teststest_region_edgespy)
     - [`_edge_setter`](#_edge_setter)
     - [`test_copy_to_every_file_or_one_file`](#test_copy_to_every_file_or_one_file)
+    - [`test_end_region_copied_to_every_file`](#test_end_region_copied_to_every_file)
     - [`test_edge_copied_by_its_nearest_addition`](#test_edge_copied_by_its_nearest_addition)
     - [`test_edges_stay_in_the_used_part`](#test_edges_stay_in_the_used_part)
     - [`test_layout_of_the_regions`](#test_layout_of_the_regions)
@@ -13999,6 +14001,41 @@ earlier is taken, so it is 3.5 min after the first: 6 + 3.5 = 9.5 min.
 None.
 ```
 
+#### `test_an_edge_after_the_last_addition_is_copied_from_the_end`
+
+```text
+---- Summary ----
+Main function to check the example of MATHS.md section 5: an edge after the last
+addition is copied by its distance from the end of the used part of each file,
+also to a file with fewer additions, while an edge before the last addition is
+still copied by its nearest addition.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+First file: additions at 10, 15 and 20 min, end at 30 min; second: 11, 16 and 22
+min, end at 34 min; third: 9 and 14 min, end at 26 min.
+An edge at 29 min is after the last addition (20): 30 - 29 = 1 min from the end,
+so 34 - 1 = 33 min in the second file and 26 - 1 = 25 min in the third.
+An edge at 30 min (the end itself): 34 and 26 min.
+An edge at 18.5 min is 1.5 min before the last addition: 22 - 1.5 = 20.5 min in
+the second file; the third has no third addition, so no time.
+Without the ends, the edge at 29 min goes by the last addition: 22 + 9 = 31 min.
+
+---- Helpers ----
+None.
+```
+
 #### `test_percent_oxidised_runs_between_the_two_levels`
 
 ```text
@@ -14106,6 +14143,36 @@ Oxidised end set to 18.5 on 'one': 1.5 min before its 3rd addition (20). 'two':
 22 - 1.5 = 20.5. 'few' has no 3rd addition: it keeps 5. Typed as 70 on 'one': it
 stops at 55, which is 35 min after its 3rd addition; 'two' gets 22 + 35 = 57,
 stopped at 55.
+
+---- Helpers ----
+_edge_setter
+```
+
+#### `test_end_region_copied_to_every_file`
+
+```text
+---- Summary ----
+Main function to check that an edge set after the last addition on every file is
+copied by its distance from the end of each file's used part, also to the file with
+fewer additions, which kept what it had before.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+ADDITIONS, PARKED (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The used parts end at 55 ('one'), 53 ('two') and 50 min ('few'). Reduced start set
+to 54 on 'one', after its last addition (20): 55 - 54 = 1 min from the end, so
+53 - 1 = 52 on 'two' and 50 - 1 = 49 on 'few'.
 
 ---- Helpers ----
 _edge_setter
@@ -31894,8 +31961,10 @@ value_getter
 
 ```text
 ---- Summary ----
-Main function to copy an edge set on one file to another file: the same distance
-from the addition of the same number as the one nearest to it in the first file.
+Main function to copy an edge set on one file to another file. An edge after the
+last addition of the first file is copied by its distance from the end of the run
+in use (when both ends are given); any other edge goes at the same distance from
+the addition of the same number as the one nearest to it in the first file.
 
 ---- Inputs ----
 time_min : float
@@ -31905,6 +31974,12 @@ source_additions_min : Sequence[float]
 target_additions_min : Sequence[float]
     Times of the additions of the file the edge is copied to (min), on that
     file's time axis.
+source_end_min : Optional[float]
+    End of the used part of the run of the file the edge was set on (min); None
+    to copy every edge by its nearest addition.
+target_end_min : Optional[float]
+    End of the used part of the run of the other file (min), on its time axis;
+    None to copy every edge by its nearest addition.
 
 ---- Globals read ----
 None.
@@ -31913,13 +31988,16 @@ None.
 Optional[float]
     Time of the edge in the other file (min), not yet kept within its limits, or
     None when it cannot be copied (the first file has no addition, or the other
-    has fewer additions), so the other file keeps the edge it had.
+    has fewer additions and the edge is not after the last one), so the other
+    file keeps the edge it had.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-time = time of the same addition in the other file + (edge - nearest addition).
+After the last addition: time = end of the other file - (end - edge).
+Otherwise: time = time of the same addition in the other file + (edge - nearest
+addition).
 
 ---- Helpers ----
 edge_anchor_finder
@@ -43087,13 +43165,12 @@ None.
 ```text
 ---- Summary ----
 Helper function to run the regions step on the plot of every file: the oxidised and
-the reduced region are pulled out on the plot or typed in the strip under it, and
-Enter accepts them. With "Apply to all" ticked, an edge set on the file shown is
-copied to every file at the same distance from its nearest addition. Enter with no
-region on any file means no regions; when only some files have both, a question
-names the others and asks whether to continue without them, and No goes back to
-the edges as they were. The regions are then listed, with the files a copy could
-not reach.
+the reduced region are dragged out on the plot or typed in the Time regions box
+above it, under the key of their colours, and Continue accepts them. With "Apply to
+all" ticked, an edge set on the file shown is copied to every file at the same
+distance from its nearest addition, or from the end when it lies after the last
+addition. A file without both regions stays in delta D. The regions are then
+listed, with the files a copy could not reach.
 
 ---- Inputs ----
 session : ViewerSession
@@ -43111,7 +43188,7 @@ remembered : Optional[Dict[str, Dict[str, float]]]
     file missing, for regions not chosen.
 
 ---- Globals read ----
-REGION_FIELDS, REGION_KEY_TEXT, REGION_NUDGE (module constants).
+REGION_KEY_LINES, REGION_NUDGE (module constants).
 
 ---- Outputs ----
 Dict[str, Dict[str, float]]
@@ -43133,10 +43210,9 @@ _regions_finisher
 _step_edges_reader
 _step_edges_shower
 enter_waiter
+guide_step_starter
 info_printer
-region_span_reader
 short_region_closer
-yes_no_asker
 ```
 
 #### `_regions_choice_builder`
@@ -43172,7 +43248,9 @@ Tuple[EdgeChoice, Dict[str, dict], Dict[str, Set[str]]]
 None.
 
 ---- Equations ----
-time on the plot = time on the recording - trim start.
+time on the plot = time on the recording - trim start. A copied edge after the
+last addition: end of the other file - (end - edge), the ends being those of the
+used parts on the plot.
 
 ---- Helpers ----
 _addition_time_lister

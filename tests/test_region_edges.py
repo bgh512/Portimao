@@ -133,6 +133,65 @@ def test_copy_to_every_file_or_one_file() -> None:
     assert values['one'] == PARKED
 
 
+# ---- test_end_region_copied_to_every_file --------------------------------------------
+def test_end_region_copied_to_every_file() -> None:
+    """
+    ---- Summary ----
+    Main function to check that an edge set after the last addition on every file is
+    copied by its distance from the end of each file's used part, also to the file with
+    fewer additions, which kept what it had before.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    ADDITIONS, PARKED (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The used parts end at 55 ('one'), 53 ('two') and 50 min ('few'). Reduced start set
+    to 54 on 'one', after its last addition (20): 55 - 54 = 1 min from the end, so
+    53 - 1 = 52 on 'two' and 50 - 1 = 49 on 'few'.
+
+    ---- Helpers ----
+    _edge_setter
+    """
+
+    ends = {'one': 55.0, 'two': 53.0, 'few': 50.0}
+    def setter(name: str,
+               values: Dict[str, float],
+               key: str,
+               value: float,
+               ) -> Dict[str, float]:
+        return _edge_setter(values, key, value)
+    def copier(shown: str, name: str, key: str, value: float) -> Optional[float]:
+        return region_edge_copier(value,
+                                  ADDITIONS[shown],
+                                  ADDITIONS[name],
+                                  ends[shown],
+                                  ends[name],
+                                  )
+    values = {name: dict(PARKED) for name in ADDITIONS}
+    names = list(values)
+    everywhere = every_file_setter(values,
+                                   names,
+                                   'reduced_start',
+                                   54.0,
+                                   setter,
+                                   shown='one',
+                                   copier=copier,
+                                   )
+    assert [everywhere[name]['reduced_start'] for name in names] == pytest.approx(
+        [54.0, 52.0, 49.0],
+        )
+
+
 # ---- test_edge_copied_by_its_nearest_addition ----------------------------------------
 def test_edge_copied_by_its_nearest_addition() -> None:
     """

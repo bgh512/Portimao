@@ -185,9 +185,15 @@ REGION_FIELDS = [('oxidised_start', 'Oxidised from'),
                  ('reduced_end', 'to'),
                  ]
 REGION_KEY_TEXT = 'red = oxidised region, blue = reduced region'
-REGION_NUDGE = ('Type the times in the Time regions box above the plot, or pull the '
-                'regions out on the plot; press Enter with this box empty when every '
-                'file looks right.')
+# The key above the regions question, its '=' signs lined up as the trim key's.
+REGION_KEY_LINES = ("OXIDISED (red) = haems fully oxidised: each haem's level here is "
+                    '100 %',
+                    "REDUCED (blue) = haems fully reduced: each haem's level here is "
+                    '0 %',
+                    )
+REGION_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
+                'regions out on the plot; press Continue when every experiment looks '
+                'right.')
 # The boxes of the window step, and its tick boxes (averaging.WINDOW_KEYS):
 # one row for the settled windows, one for the quick windows.
 WINDOW_FIELDS = [('window_s', 'Settled window'),
@@ -1421,13 +1427,12 @@ def _regions_chooser(session: ViewerSession,
     """
     ---- Summary ----
     Helper function to run the regions step on the plot of every file: the oxidised and
-    the reduced region are pulled out on the plot or typed in the strip under it, and
-    Enter accepts them. With "Apply to all" ticked, an edge set on the file shown is
-    copied to every file at the same distance from its nearest addition. Enter with no
-    region on any file means no regions; when only some files have both, a question
-    names the others and asks whether to continue without them, and No goes back to
-    the edges as they were. The regions are then listed, with the files a copy could
-    not reach.
+    the reduced region are dragged out on the plot or typed in the Time regions box
+    above it, under the key of their colours, and Continue accepts them. With "Apply to
+    all" ticked, an edge set on the file shown is copied to every file at the same
+    distance from its nearest addition, or from the end when it lies after the last
+    addition. A file without both regions stays in delta D. The regions are then
+    listed, with the files a copy could not reach.
 
     ---- Inputs ----
     session : ViewerSession
@@ -1445,7 +1450,7 @@ def _regions_chooser(session: ViewerSession,
         file missing, for regions not chosen.
 
     ---- Globals read ----
-    REGION_FIELDS, REGION_KEY_TEXT, REGION_NUDGE (module constants).
+    REGION_KEY_LINES, REGION_NUDGE (module constants).
 
     ---- Outputs ----
     Dict[str, Dict[str, float]]
@@ -1467,10 +1472,9 @@ def _regions_chooser(session: ViewerSession,
     _step_edges_reader
     _step_edges_shower
     enter_waiter
+    guide_step_starter
     info_printer
-    region_span_reader
     short_region_closer
-    yes_no_asker
     """
 
     # ---- 1 The edges of the regions of every file ------------------------------------
@@ -1483,15 +1487,11 @@ def _regions_chooser(session: ViewerSession,
 
     # ---- 2 Pull out or type the regions until Continue -------------------------------
     guide_step_starter('regions')
-    info_printer('OXIDISED and REDUCED regions = where the haems are fully oxidised '
-                 "and fully reduced. Each haem's level in them gives its % oxidised.",
+    info_printer(REGION_KEY_LINES[0])
+    info_printer(REGION_KEY_LINES[1], tight=True)
+    info_printer('Ticking Apply to all copies the regions of the experiment shown to '
+                 'every experiment; it unticks itself when the next one is shown.',
                  )
-    info_printer(
-        'Red is oxidised, blue is reduced; ticking "Apply to all" copies the '
-        'regions to every file at the same distance from their nearest addition, '
-        'and it unticks itself when the next file is shown.',
-        tight=True,
-        )
     info_printer('With no regions the haems cannot be shown in % oxidised; everything '
                  'else is the same.',
                  tight=True,
@@ -1501,42 +1501,14 @@ def _regions_chooser(session: ViewerSession,
     # Keep old leaves the regions alone.
     session.is_choosing_regions = True
     try:
-        while True:
-            enter_waiter('Pull the oxidised and the reduced region out on the plot, '
-                         'or type their times under Ox / Red in the Time regions box '
-                         'above it. Click Continue when every file looks right, or '
-                         'straight away for no regions.',
-                         REGION_NUDGE,
-                         number='4.4',
-                         )
-            values = {name: short_region_closer(own, rules[name]['minimum_min'])
-                      for name, own in session.window.edges_reader().items()
-                      }
-
-            # ---- 2.1 Ask again when only some files have both regions ----------------
-            # No region anywhere means none are wanted, so nothing is asked.
-            spans = {name: region_span_reader(own, rules[name]['minimum_min'])
-                     for name, own in values.items()
-                     }
-            missing = [summary['name']
-                       for summary in session.summaries
-                       if None in spans[summary['name']].values()
-                       ]
-            is_any_open = any(span is not None
-                              for own in spans.values()
-                              for span in own.values()
-                              )
-            if not missing or not is_any_open:
-                break
-            info_printer(f"Without both an oxidised and a reduced region: "
-                         f"{', '.join(missing)}. A file needs both to be shown in % "
-                         'oxidised.',
-                         )
-            if yes_no_asker('Do you want to continue?',
-                            False,
-                            number='4.4.1',
-                            ):
-                break
+        enter_waiter('Drag the regions out on the plot, or type the times in the Time '
+                     'regions box. Check each experiment, then press Continue.',
+                     REGION_NUDGE,
+                     number='4.4',
+                     )
+        values = {name: short_region_closer(own, rules[name]['minimum_min'])
+                  for name, own in session.window.edges_reader().items()
+                  }
     finally:
         session.is_choosing_regions = False
         _step_edges_reader(session)
@@ -1584,7 +1556,9 @@ def _regions_choice_builder(
     None.
 
     ---- Equations ----
-    time on the plot = time on the recording - trim start.
+    time on the plot = time on the recording - trim start. A copied edge after the
+    last addition: end of the other file - (end - edge), the ends being those of the
+    used parts on the plot.
 
     ---- Helpers ----
     _addition_time_lister
@@ -1631,7 +1605,12 @@ def _regions_choice_builder(
                                   rules[name]['minimum_min'],
                                   )
     def copier(shown: str, name: str, key: str, value: float) -> Optional[float]:
-        copied = region_edge_copier(value, additions[shown], additions[name])
+        copied = region_edge_copier(value,
+                                    additions[shown],
+                                    additions[name],
+                                    rules[shown]['used_span'][1],
+                                    rules[name]['used_span'][1],
+                                    )
         if copied is None:
             unreached.setdefault(name, set()).add(key)
         return copied
