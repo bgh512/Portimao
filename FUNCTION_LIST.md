@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.18
+- **Version:** V2.19
 - **Date:** 24/11/2026
 
 ## Contents
@@ -510,6 +510,7 @@
     - [`test_minutes_to_limits_and_back`](#test_minutes_to_limits_and_back)
     - [`test_pointer_gives_the_minutes_of_each_edge`](#test_pointer_gives_the_minutes_of_each_edge)
     - [`test_full_times_in_the_boxes`](#test_full_times_in_the_boxes)
+    - [`test_apply_to_all_copies_once`](#test_apply_to_all_copies_once)
     - [`test_shaded_picture`](#test_shaded_picture)
     - [`test_trimmed_edges_stop_at_the_events`](#test_trimmed_edges_stop_at_the_events)
 - [`tests/test_user_notices.py`](#teststest_user_noticespy)
@@ -2409,12 +2410,12 @@ Main program: read .paf files, process them and export figures and workbooks.
 ```text
 ---- Summary ----
 Main function to say what a run cancelled during the questions left in the results
-folder: the data exported with Export csv, the plots and the workbooks of the files
+folder: the data exported with the trim step's export buttons, the plots and the workbooks of the files
 saved once their processing and figure were accepted, any of these, or nothing.
 
 ---- Inputs ----
 exported : List[Path]
-    The results folder, once Export csv wrote into it; else empty.
+    The results folder, once an export button wrote into it; else empty.
 saved_plots : List[str]
     Names of the files whose plot was saved; empty when none was.
 export_root : Path
@@ -2498,8 +2499,8 @@ saved : dict
     Settings saved with the dataset, from files_asker; empty for a dataset never
     run.
 exported : Optional[List[Path]]
-    List the results folder is added to once Export csv of the trimming step
-    (3.4) writes into it; None when not needed.
+    List the results folder is added to once an export button of the trimming
+    step (3.4) writes into it; None when not needed.
 saved_plots : Optional[List[str]]
     List that holds the names of the files whose plot is saved in the results
     folder before the run starts; None when not needed.
@@ -2519,7 +2520,7 @@ Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
 ---- Globals mutated ----
 None. Reads from and prints to the terminal; writes last_answers.json through
 last_answers_saver, the settings file of the dataset through
-dataset_settings_saver, the export of Export csv when one is chosen, adding to
+dataset_settings_saver, the export of the trim step when one is chosen, adding to
 ``exported``, and the plot and the workbook of every file, filling
 ``saved_plots`` and ``saved_workbooks`` (side effects).
 
@@ -6797,8 +6798,8 @@ None.
 ---- Summary ----
 Main function to check that changing the fit while at Δψ opens the haem step,
 with an arrow and "you were here" on Δψ and a button back to it, that going back
-opens Δψ again, and that the Trim / Ignore tab opens the trim step with its
-Export csv button.
+opens Δψ again, and that the Trim / Ignore tab opens the trim step with its two
+export buttons.
 
 ---- Inputs ----
 None.
@@ -15022,7 +15023,7 @@ None.
 
 ## `tests/test_time_regions.py`
 
-Tests of the boxes above the plot that the program runs: the tabs of the Time regions box, Export csv of the trim step and the figure step that asks only Continue.
+Tests of the boxes above the plot that the program runs: the tabs of the Time regions box, the export buttons of the trim step and the figure step that asks only Continue.
 
 ### CLASSES
 
@@ -15350,10 +15351,11 @@ _kits_maker
 
 ```text
 ---- Summary ----
-Main function to check the Export csv button of the trim step: it is offered above
-Continue, writes the files with the edges as they are, and the step waits again;
-Continue then gives the limits of the edges. Without an exporter there is no
-button. The plot, the edges and the questions are stood in for.
+Main function to check the two export buttons of the trim step: they are offered
+above Continue, each writes the files with the edges as they are (Export full +
+trimmed csv with the whole recordings too), and the step waits again; Continue
+then gives the limits of the edges. Without an exporter there are no buttons. The
+plot, the edges and the questions are stood in for.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -15649,8 +15651,8 @@ None.
 ---- Summary ----
 Main function to check that the Trim / Ignore boxes show the four edges as times
 on the whole recording, that a time typed in a box puts the edge at that time, and
-that with "Apply to every experiment" ticked the other files take the same minutes
-from their own start or end. The window is stood in for.
+that with "Apply to all" ticked the other files take the same minutes from their
+own start or end. The window is stood in for.
 
 ---- Inputs ----
 None.
@@ -15674,13 +15676,47 @@ min off the end, so the 40 min file is trimmed after 40 - 8 = 32 min.
 None.
 ```
 
+#### `test_apply_to_all_copies_once`
+
+```text
+---- Summary ----
+Main function to check "Apply to all": it starts unticked, so a change moves the
+file shown only; ticking it copies the four edges of the file shown to the other
+file once, and while that file is shown a change moves both; showing the other
+file unticks it (and tells the window), so that file then changes alone. The
+window is stood in for.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+LONG, SHORT, NOTHING, PICTURE_BOX, TIME_AXIS (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The 60 min file trimmed 4 and 5 min, ignored 5 and 2 min. Copied to the 40 min
+file (additions at 5 and 30 min) the same minutes from its own start and end: its
+kept part runs from 4 to 40 - 5 = 35 min, which keeps both additions. Trim before
+typed as 3 on the 60 min file while ticked: 3 min on both. Trim before typed as 2
+on the 40 min file once it is shown: 2 min there, the 60 min file stays at 3.
+
+---- Helpers ----
+None.
+```
+
 #### `test_shaded_picture`
 
 ```text
 ---- Summary ----
-Main function to check that a shaded part is see-through amber on a white picture,
-that the rest of the picture is untouched, and that a part narrower than a pixel is
-left out.
+Main function to check that an ignored part is see-through grey on a white
+picture, that the rest of the picture is untouched, and that a part narrower than
+a pixel is left out.
 
 ---- Inputs ----
 None.
@@ -15696,8 +15732,8 @@ None
 None.
 
 ---- Equations ----
-Amber #e8a317 = (232, 163, 23) at 22 % (56 of 255) over white:
-255 - (255 - channel) * 56 / 255 = (249.95, 234.8, 204.05), so (250, 235, 204).
+Grey #8c8c8c = (140, 140, 140) at 22 % (56 of 255) over white:
+255 - (255 - 140) * 56 / 255 = 229.75, so (230, 230, 230).
 
 ---- Helpers ----
 None.
@@ -30535,7 +30571,7 @@ number : Optional[str]
     number it in the order asked.
 extras : Sequence[Tuple[str, str]]
     (answer, words) of each button shown above Continue, such as ('export',
-    'Export csv'); empty for Continue alone.
+    'Export trimmed csv'); empty for Continue alone.
 
 ---- Globals read ----
 None.
@@ -34949,12 +34985,12 @@ number_asker
 ---- Summary ----
 Main function to ask, at the end of the experiment export, whether the workbook
 of each experiment is written with its spectra as csv files (5.9). It is not asked
-when Export csv of the trimming step wrote them already: one line says so, and
+when an export button of the trimming step wrote them already: one line says so, and
 they are not written a second time.
 
 ---- Inputs ----
 has_spectra : bool
-    True when Export csv of the trimming step wrote the spectra as csv files.
+    True when an export button of the trimming step wrote the spectra as csv files.
 default : bool
     The answer Enter gives.
 
@@ -35762,7 +35798,8 @@ values : Dict[str, Dict[str, float]]
     {file name: {field: value}} as the user has set them so far; replaced, never
     changed in place, at each change.
 is_every_file : bool
-    True: a moved or typed edge moves on every file; False: on the file shown only.
+    True ("Apply to all" ticked): a moved or typed edge moves on every file; False:
+    on the file shown only. It goes back to False when another file is shown.
 
 ---- Globals read ----
 The module constants.
@@ -35773,6 +35810,7 @@ _edges_drawer
 _picture_shader
 _update_runner
 _values_changer
+all_files_copier
 choice_setter
 every_file_field_setter
 field_setter
@@ -35803,6 +35841,9 @@ family : str
     Font family of the words by the handles.
 on_change : Callable[[], None]
     Called after every change of the values, so the window can show them.
+on_untick : Optional[Callable[[], None]]
+    Called when "Apply to all" unticks itself because another file is shown,
+    so the window can untick its box; None for nothing.
 
 ---- Globals read ----
 None.
@@ -35944,6 +35985,38 @@ _picture_shader
 every_file_setter
 ```
 
+##### `all_files_copier`
+
+```text
+---- Summary ----
+Method to copy the edges of the file shown to every other file once, when
+"Apply to all" is ticked: each field of the boxes (and the step's own switches)
+is set on every other file as a change on the file shown would set it, within
+that file's limits and through the step's rule for copying. The file shown is
+not changed, and "Apply to all" stays on until another file is shown.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces values, redraws the overlay and tells the window (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_edges_drawer
+_picture_shader
+```
+
 ##### `choice_setter`
 
 ```text
@@ -35976,7 +36049,7 @@ None.
 
 ```text
 ---- Summary ----
-Method to set one field on every file, whatever "Apply to every experiment"
+Method to set one field on every file, whatever "Apply to all"
 says: for a switch of the whole step (a kind of window, "Adjust each window").
 
 ---- Inputs ----
@@ -36178,7 +36251,8 @@ _update_runner
 ---- Summary ----
 Method to take the picture of a file just put on the canvas, shade it and draw
 its edges; with no picture (a message, a figure, a picture without a time
-axis) nothing is drawn until the next one.
+axis) nothing is drawn until the next one. A file other than the one "Apply
+to all" was ticked on unticks it, so that file can be changed alone.
 
 ---- Inputs ----
 name : Optional[str]
@@ -36633,6 +36707,7 @@ _drawing_sign_drawer
 _edges_refresher
 _event_handler
 _every_file_taker
+_every_file_unticker
 _file_follower
 _guide_drawer
 _guide_line_clicker
@@ -37215,7 +37290,7 @@ _wheel_turner
 ```text
 ---- Summary ----
 Method to take a numbered tick of a row of the edges (an averaging window used
-or left out): on every file when "Apply to every experiment" is ticked,
+or left out): on every file when "Apply to all" is ticked,
 otherwise on the file shown.
 
 ---- Inputs ----
@@ -37350,18 +37425,18 @@ GuideState.step_starter
 
 ```text
 ---- Summary ----
-Method to take the tick box of a row of the edges. As "Apply to every
-experiment": ticked, a moved or typed edge moves on every file; unticked, on
-the file shown only. As the step's own switch (EdgeChoice.switch, or
-second_switch for the second row), it sets the field of the switch to 1 or 0
-on every file.
+Method to take the tick box of a row of the edges. As "Apply to all": ticking
+it copies the edges of the file shown to every file once, and until another
+file is shown a moved or typed edge moves on every file; unticked, on the file
+shown only. As the step's own switch (EdgeChoice.switch, or second_switch for
+the second row), it sets the field of the switch to 1 or 0 on every file.
 
 ---- Inputs ----
 is_every_file : bool
     The new state of the tick box.
 row : str
-    'first', 'second' or 'options' (the line of "Apply to every experiment"
-    of a step whose rows have switches).
+    'first', 'second' or 'options' (the line of "Apply to all" of a step whose
+    rows have switches).
 
 ---- Globals read ----
 None.
@@ -37378,6 +37453,33 @@ None.
 
 ---- Helpers ----
 _edges_refresher
+```
+
+##### `_every_file_unticker`
+
+```text
+---- Summary ----
+Method to untick "Apply to all" in the Time regions box when the overlay has
+unticked it, because another file is shown.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the tick box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `_file_follower`
@@ -38099,7 +38201,7 @@ _navigator
 Method to hand a change made in the boxes above the plot to the function the
 program registered, on the program thread while a question waits. What it
 prints goes on lines of its own, and the answer prompt is shown again under it.
-A click that asks questions of its own (Edit ODs, Edit labels, Export csv) is
+A click that asks questions of its own (Edit ODs, Edit labels, the export buttons) is
 not held back, so its questions show as they are asked; afterwards the answers
 of the question that waits come back, and the guide goes back to its step.
 
@@ -38283,7 +38385,7 @@ pointed_time_finder
 ```text
 ---- Summary ----
 Method to take a number typed in the edges row: the edge moves there (on every
-file when "Apply to every experiment" is ticked), within the limits of each file, and the row
+file when "Apply to all" is ticked), within the limits of each file, and the row
 shows where it went.
 
 ---- Inputs ----
@@ -39579,20 +39681,20 @@ None.
 ---- Summary ----
 Method to give what the open step says above its messages when it is an
 earlier step: the note on where you were, the step's help, the words of the
-button that goes back and those of the step's own button (Export csv of the
-trim step), if it has one.
+button that goes back and the step's own buttons (the two export buttons of
+the trim step), if it has any.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-GUIDE_STEPS.
+GUIDE_STEPS, STEP_EXTRAS.
 
 ---- Outputs ----
-Dict[str, str]
-    {'note', 'help', 'back', 'extra'}; each empty while the step open is the
-    one the program waits at, and 'extra' empty for a step without a button
-    of its own.
+Dict[str, Any]
+    {'note', 'help', 'back': str, 'extra': tuple of (change, words)}; each
+    empty while the step open is the one the program waits at, and 'extra'
+    empty for a step without buttons of its own.
 
 ---- Globals mutated ----
 None.
@@ -40196,7 +40298,7 @@ None.
 ```text
 ---- Summary ----
 Method to show only the button that goes back to the step waited at, while an
-earlier step is open, under the step's own button when it has one. While a
+earlier step is open, under the step's own buttons when it has any. While a
 table waits (Edit ODs, Edit labels), its Confirm button stays above them, and
 Enter gives it.
 
@@ -40205,8 +40307,9 @@ text : str
     Its words ("Back to Δψ").
 on_back : Callable[[], None]
     What a click does.
-extra : Optional[Tuple[str, Callable[[], None]]]
-    (words, what a click does) of the step's own button (Export csv), or None.
+extra : Sequence[Tuple[str, Callable[[], None]]]
+    (words, what a click does) of each of the step's own buttons (the two
+    export buttons of the trim step); empty for none.
 is_confirm : bool
     True while the question that waits is a table, so Confirm is shown too.
 
@@ -41919,10 +42022,11 @@ _strip_shower
 ```text
 ---- Summary ----
 Helper function to carry out a click on Edit ODs or Edit labels in the View box, or
-on Export csv of the trim step opened again: the OD table or the labels table opens
-while the question waits and the plot is redrawn after Confirm; Export csv writes
-the files with the trim and ignore edges as they are (those on the plot while Trim
-/ Ignore is pressed). Before the values exist, one line says where they are typed.
+on an export button of the trim step opened again: the OD table or the labels table
+opens while the question waits and the plot is redrawn after Confirm; an export
+button writes the files with the trim and ignore edges as they are (those on the
+plot while Trim / Ignore is pressed). Before the values exist, one line says where
+they are typed.
 
 ---- Inputs ----
 session : ViewerSession
@@ -41933,12 +42037,14 @@ state : dict
     The run so far (viewer_asker): limits and details; the details are changed in
     place.
 name : str
-    EDIT_ODS_CHANGE, EDIT_LABELS_CHANGE or EXPORT_CSV_CHANGE.
-exporter : Callable[[Dict[str, dict]], None]
-    Asks what to export and writes it, given the limits.
+    EDIT_ODS_CHANGE, EDIT_LABELS_CHANGE, EXPORT_FULL_CHANGE or
+    EXPORT_TRIMMED_CHANGE.
+exporter : Callable[[Dict[str, dict], bool], None]
+    Asks about the spectra and writes the export, given the limits and whether
+    the whole recording of each trimmed file is written too.
 
 ---- Globals read ----
-EDIT_LABELS_CHANGE, EDIT_ODS_CHANGE, EXPORT_CSV_CHANGE.
+EDIT_LABELS_CHANGE, EDIT_ODS_CHANGE, EXPORT_FULL_CHANGE, EXPORT_TRIMMED_CHANGE.
 
 ---- Outputs ----
 None
@@ -41968,13 +42074,13 @@ trim_limits_builder
 
 ```text
 ---- Summary ----
-Helper function to ask, from the Export csv button of the trim step, whether to
-export the files of each experiment now so they can be plotted outside the program
-(nothing; the workbook of the trimmed data; that and the whole recording of each
-trimmed file; either of those with the spectra as csv files; each with its size
-worked out for these files), and to do it. Enter gives the last choice, or nothing
-the first time. The choice and the limits exported are kept in the session; the
-guide stays where it is.
+Helper function to export the files of each experiment now, from one of the two
+export buttons of the trim step, so they can be plotted outside the program: the
+workbook of the trimmed data, with the whole recording of each trimmed file too
+from "Export full + trimmed csv". One yes or no question asks whether to write the
+spectra as csv files too, with the size of both worked out for these files; Enter
+gives the last answer, or no the first time. The choice and the limits exported
+are kept in the session; the guide stays where it is.
 
 ---- Inputs ----
 session : ViewerSession
@@ -41983,6 +42089,8 @@ limits : Dict[str, dict]
     Trim and ignore limits of every file.
 details : Dict[str, dict]
     OD values and events of every file, as entered so far.
+with_full : bool
+    True to write the whole recording of each trimmed file too.
 
 ---- Globals read ----
 WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES,
@@ -41997,11 +42105,10 @@ None. Reads from and prints to the terminal, writes the files and sets
 session.export_choice and session.export_limits (side effects).
 
 ---- Equations ----
-Size of a choice = the trimmed workbooks, + the whole recordings' workbooks when
-it writes them, + the spectra of each when it writes them.
+Size of the workbooks = the trimmed workbooks, + the whole recordings' workbooks
+with ``with_full``; size of the spectra likewise.
 
 ---- Helpers ----
-choice_asker
 import_data_exporter
 info_printer
 progress_clearer
@@ -42010,6 +42117,7 @@ size_describer
 spectra_size_estimator
 text_colourer
 workbook_size_estimator
+yes_no_asker
 ```
 
 #### `_figure_starter`
@@ -42496,7 +42604,7 @@ None.
 ---- Summary ----
 Helper function to run the regions step on the plot of every file: the oxidised and
 the reduced region are pulled out on the plot or typed in the strip under it, and
-Enter accepts them. With "Apply to every experiment" ticked, an edge set on the file shown is
+Enter accepts them. With "Apply to all" ticked, an edge set on the file shown is
 copied to every file at the same distance from its nearest addition. Enter with no
 region on any file means no regions; when only some files have both, a question
 names the others and asks whether to continue without them, and No goes back to
@@ -43086,7 +43194,7 @@ ends. The quick windows (green) have a length and a start after their addition:
 pulling the start of any of them changes how long after the addition they start,
 pulling its end the length. A change moves every window of its kind, or with
 Adjust each window ticked only the window dragged (the boxes then show it), on
-every file or with Apply to every experiment unticked on the file shown. The four
+every file while Apply to all is ticked, otherwise on the file shown. The four
 values are also typed in the two rows of the Time regions box, where each kind has
 its tick box (with both unticked there are no windows) and a numbered tick per
 window to leave it out (grey). Enter accepts. The windows that do not fit are
@@ -43195,8 +43303,8 @@ EdgeChoice
 ---- Summary ----
 Helper function to keep the averaging windows read from the edges, say what they
 are, and name in a warning those that do not fit. The windows most files share
-are the dataset's; a file whose windows differ (fixed by hand with "Apply to every
-experiment" unticked) keeps its own.
+are the dataset's; a file whose windows differ (fixed by hand with "Apply to all"
+unticked) keeps its own.
 
 ---- Inputs ----
 session : ViewerSession
@@ -43560,8 +43668,10 @@ region_span_reader
 ---- Summary ----
 Main function to run the trimming step on the standard plot of the whole recording
 of every file: the trimmed and ignored edges are dragged on the plot or typed in
-the Time regions box above it, and Continue accepts them; Export csv writes the
-files with the edges as they are, and the step waits again. When the step is
+the Time regions box above it, under the key of their colours, and Continue
+accepts them; the two export buttons write the files with the edges as they are
+(Export full + trimmed csv with the whole recording of each trimmed file too), and
+the step waits again. When the step is
 opened again, the limits it had stay on the plot as red dashed lines. The limits
 are then listed and the trimmed data is drawn. The haems are those of the
 session's fit (none when it has none).
@@ -43577,12 +43687,13 @@ remembered : Dict[str, dict]
 previous : Optional[Dict[str, dict]]
     Limits in the same layout drawn as red dashed lines while the edges are
     dragged; None for none.
-exporter : Optional[Callable[[Dict[str, dict]], None]]
-    Called with the limits of the edges as they are when Export csv is clicked;
-    None for no Export csv button.
+exporter : Optional[Callable[[Dict[str, dict], bool], None]]
+    Called with the limits of the edges as they are when an export button is
+    clicked, and True for Export full + trimmed csv; None for no export buttons.
 
 ---- Globals read ----
-EXPORT_CSV_CHANGE, EXPORT_CSV_TEXT, TRIM_NUDGE.
+TRIM_KEY_LINES, TRIM_NUDGE (module constants); EXPORT_BUTTONS,
+EXPORT_FULL_CHANGE.
 
 ---- Outputs ----
 Dict[str, dict]
@@ -43730,8 +43841,8 @@ The five boxes above the plot: Time regions, View, Haem decomposition, Δψ and 
 ```text
 ---- Summary ----
 The row of the strip shown while edges are dragged on the plot: a typing box for
-each edge, holding its value for the file shown, and the "Apply to every
-experiment" tick box. It
+each edge, holding its value for the file shown, and the "Apply to all" tick box.
+It
 follows the drag and passes on what the user types or ticks; it changes nothing by
 itself. Every method runs on the window thread.
 
@@ -43747,6 +43858,7 @@ __init__
 _every_file_handler
 _tick_handler
 _value_handler
+every_file_unticker
 fields_setter
 ticks_setter
 toggles_setter
@@ -43801,7 +43913,7 @@ _every_file_handler
 
 ```text
 ---- Summary ----
-Method to pass on the new state of the "Apply to every experiment" tick box.
+Method to pass on the new state of the "Apply to all" tick box.
 
 ---- Inputs ----
 None.
@@ -43885,6 +43997,33 @@ None.
 minutes_checker
 ```
 
+##### `every_file_unticker`
+
+```text
+---- Summary ----
+Method to untick the "Apply to all" tick box without passing anything on, when
+another file is shown.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the tick box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `fields_setter`
 
 ```text
@@ -43902,7 +44041,7 @@ is_every_file : bool
 unit : str
     The unit written after the boxes: 'min' or 's' (a key of UNIT_HELP).
 tick_text : str
-    The words of the tick box: "Apply to every experiment", or those of the step's own
+    The words of the tick box: "Apply to all", or those of the step's own
     switch.
 
 ---- Globals read ----

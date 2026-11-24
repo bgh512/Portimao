@@ -38,7 +38,6 @@ from utils_viewer.viewer_edges import (EdgeChoice,
                                        )
 from utils_viewer.viewer_guide import (AnswerArea,
                                        CARD_BACKGROUND,
-                                       EXPORT_CSV_CHANGE,
                                        GuidePanel,
                                        GuideState,
                                        )
@@ -245,6 +244,7 @@ class ViewerGui:
     _edges_refresher
     _event_handler
     _every_file_taker
+    _every_file_unticker
     _file_follower
     _guide_drawer
     _guide_line_clicker
@@ -1124,7 +1124,7 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to take a numbered tick of a row of the edges (an averaging window used
-        or left out): on every file when "Apply to every experiment" is ticked,
+        or left out): on every file when "Apply to all" is ticked,
         otherwise on the file shown.
 
         ---- Inputs ----
@@ -1504,18 +1504,18 @@ class ViewerGui:
     def _every_file_taker(self, is_every_file: bool, row: str = 'first') -> None:
         """
         ---- Summary ----
-        Method to take the tick box of a row of the edges. As "Apply to every
-        experiment": ticked, a moved or typed edge moves on every file; unticked, on
-        the file shown only. As the step's own switch (EdgeChoice.switch, or
-        second_switch for the second row), it sets the field of the switch to 1 or 0
-        on every file.
+        Method to take the tick box of a row of the edges. As "Apply to all": ticking
+        it copies the edges of the file shown to every file once, and until another
+        file is shown a moved or typed edge moves on every file; unticked, on the file
+        shown only. As the step's own switch (EdgeChoice.switch, or second_switch for
+        the second row), it sets the field of the switch to 1 or 0 on every file.
 
         ---- Inputs ----
         is_every_file : bool
             The new state of the tick box.
         row : str
-            'first', 'second' or 'options' (the line of "Apply to every experiment"
-            of a step whose rows have switches).
+            'first', 'second' or 'options' (the line of "Apply to all" of a step whose
+            rows have switches).
 
         ---- Globals read ----
         None.
@@ -1544,8 +1544,45 @@ class ViewerGui:
                                                 )
             self._edges_refresher()
             return
-        if row != 'second':
-            self._edges.is_every_file = is_every_file
+        if row == 'second':
+            return
+        if is_every_file:
+            self._edges.all_files_copier()
+        else:
+            self._edges.is_every_file = False
+
+    # ---- _every_file_unticker --------------------------------------------------------
+    def _every_file_unticker(self) -> None:
+        """
+        ---- Summary ----
+        Method to untick "Apply to all" in the Time regions box when the overlay has
+        unticked it, because another file is shown.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the tick box (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        choice = self._edges.choice
+        if choice is None:
+            return
+        row = self._edge_row if choice.switch is None else self._options_row
+        row.every_file_unticker()
 
     # ---- _file_follower --------------------------------------------------------------
     def _file_follower(self, name: str) -> None:
@@ -1622,13 +1659,12 @@ class ViewerGui:
                                   pady=(8, 0),
                                   before=self._text_box,
                                   )
-            # the trim step opened again keeps its Export csv button
-            extra = ((card['extra'],
-                      lambda: self._strip_change_teller({EXPORT_CSV_CHANGE: True}),
+            # the trim step opened again keeps its two export buttons
+            extra = [(words,
+                      lambda change=change: self._strip_change_teller({change: True}),
                       )
-                     if card['extra']
-                     else None
-                     )
+                     for change, words in card['extra']
+                     ]
             # a table opened from the View box (Edit ODs) keeps its Confirm
             is_table = bool(self._request) and self._request.get('kind') == 'confirm'
             self._area.back_shower(card['back'], self._back_taker, extra, is_table)
@@ -2703,7 +2739,7 @@ class ViewerGui:
         Method to hand a change made in the boxes above the plot to the function the
         program registered, on the program thread while a question waits. What it
         prints goes on lines of its own, and the answer prompt is shown again under it.
-        A click that asks questions of its own (Edit ODs, Edit labels, Export csv) is
+        A click that asks questions of its own (Edit ODs, Edit labels, the export buttons) is
         not held back, so its questions show as they are asked; afterwards the answers
         of the question that waits come back, and the guide goes back to its step.
 
@@ -3002,7 +3038,7 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to take a number typed in the edges row: the edge moves there (on every
-        file when "Apply to every experiment" is ticked), within the limits of each file, and the row
+        file when "Apply to all" is ticked), within the limits of each file, and the row
         shows where it went.
 
         ---- Inputs ----
@@ -3304,7 +3340,7 @@ class ViewerGui:
                                    self._area.focuser,
                                    on_tick=self._edge_tick_taker,
                                    )
-        # the "Apply to every experiment" line of a step whose rows have switches of
+        # the "Apply to all" line of a step whose rows have switches of
         # their own, with the step's toggles
         self._options_row = EdgeRow(tk,
                                     self._strip.time_box,
@@ -3337,7 +3373,12 @@ class ViewerGui:
                                  highlightthickness=0,
                                  )
         self._canvas.pack(side='top', fill='both', expand=True, padx=8, pady=8)
-        self._edges = EdgeOverlay(tk, self._canvas, self._family, self._edges_refresher)
+        self._edges = EdgeOverlay(tk,
+                                  self._canvas,
+                                  self._family,
+                                  self._edges_refresher,
+                                  on_untick=self._every_file_unticker,
+                                  )
         self._previous_button = ttk.Button(controls,
                                            text='< Prev',
                                            width=7,

@@ -310,7 +310,7 @@ which has only this one answer between 0 and the smaller of R_H and R_L.
 Notes:
 
 - The midpoint potentials, β and the temperature above are the paper's, measured on the bc1 complex of mitochondria. They are the numbers the program starts with; each is kept with the dataset so that it can be changed for another organism, in the Δψ row of the strip under the plot.
-- M_H1 − M_H2 must equal M_L1 − M_L2 (70 mV for both here): each is the push of one electron on the other. So the program has M_H1, M_L1 and this fall typed, and fills in M_H2 = M_H1 − fall and M_L2 = M_L1 − fall itself (40 and −20 with a fall of 70 give −30 and −90; with a fall of 60, −20 and −80). Numbers that break the rule cannot be typed, and are refused if they reach the maths another way.
+- M_H1 − M_H2 must equal M_L1 − M_L2 (70 mV for both here): each is the push of one electron on the other. So the program has M_H1, M_L1 and this fall typed (the **shift** box of the Δψ box), and fills in M_H2 = M_H1 − fall and M_L2 = M_L1 − fall itself (40 and −20 with a fall of 70 give −30 and −90; with a fall of 60, −20 and −80). Numbers that break the rule cannot be typed, and are refused if they reach the maths another way.
 - Δψ is left empty in a spectrum where bH or bL is less than 10 % or more than 90 % reduced (the paper's rule): outside these limits a small error in the % gives a large error in Δψ. A haem exactly at a limit is kept. The two limits can be changed in the same row.
 - The paper finds E_H and β × Δψ by fitting a model to R_H and R_L. With two measured values and two unknowns nothing is left over to fit, so the equations above give the same two numbers directly.
 - Only a file with both regions has P, so only such a file has Δψ; its fit must have one bH and one bL.
@@ -328,8 +328,8 @@ Checked by: `test_equal_haems_at_their_midpoints_give_120_mV`, `test_unequal_hae
 
 An averaging window is a stretch of time over which a measurement (the OCR, a haem, a spectrum) is averaged. There are two kinds, and a dataset can have either or both:
 
-- A **settled window** is the stretch before an addition, once the measurement has settled after the addition before. Every settled window has the same length, w, and ends the same time, g, before the next addition, in every file of the dataset.
-- A **quick window** is the stretch just after an addition, for the quick response to it. Every quick window has the same length, q, and starts the same time, d, after its own addition, in every file of the dataset.
+- A **settled window** is the stretch before an addition, once the measurement has settled after the addition before. Every settled window has the same length, w, and ends the same time, g, before the next addition, in every file of the dataset, unless it is set on its own (7.5).
+- A **quick window** is the stretch just after an addition, for the quick response to it. Every quick window has the same length, q, and starts the same time, d, after its own addition, in every file of the dataset, unless it is set on its own (7.5).
 
 The window before the first addition is the baseline, which both kinds are compared with. Every figure that averages around the additions uses these windows; a figure that averages files together uses one kind, which it asks for when the dataset has both.
 
@@ -360,7 +360,7 @@ start_last = end_last − w
 - w: the length of the baseline and of every settled window (min; typed in seconds in the program, 120 s to start with)
 - g: the gap between the end of the baseline or of a settled window and the next addition (min; typed in seconds, 30 s to start with)
 - T: the time of the last measurement of the file, after trimming (min)
-- f: the gap between the last window and the end of the file, 0.5 min
+- f: the gap between the last window and the end of the file (min; 0.5 min to start with, and set by moving the right edge of the last window)
 - start, end: the first and last time of a window (min); the measurements from start to end, both included, are averaged
 
 Notes:
@@ -447,6 +447,34 @@ y = x ÷ b × 100
 Example: an OCR of 10 µM min⁻¹ all through the baseline (7.5 to 9.5 min), so b = 10. Where the OCR is 10, y = 10 ÷ 10 × 100 = 100 %. Where it is 6, y = 6 ÷ 10 × 100 = 60 %. Where it is 2, y = 2 ÷ 10 × 100 = 20 %.
 
 Checked by: `test_the_ocr_is_put_on_its_percent_of_baseline` in `tests/test_averaging_windows.py`.
+
+### 7.5 A window set on its own
+
+Any window can be given its own length and its own gap (a settled window or the baseline) or its own start (a quick window). The equations of 7.1 and 7.2 stay the same; only the numbers put into them change for that window:
+
+```text
+settled window i:  end_i = a_(i+1) − g_i      start_i = end_i − w_i
+quick window i:    start_i = a_i + d_i        end_i = start_i + q_i
+```
+
+- w_i, g_i: the length and gap of settled window number i (the baseline is i = 0); where it has none of its own, w_i = w and g_i = g of 7.1
+- d_i, q_i: the start and length of quick window number i; where it has none of its own, d_i = d and q_i = q of 7.2
+- The last settled window always ends f before the end of the file (end_last = T − f): its own length is used, but it has no gap of its own, as nothing follows it. f can be changed, and is the same in every file.
+
+Notes:
+
+- A settled or quick window can be left out with its tick. It is not averaged, and the figures leave a gap where it would be. Its row stays in the Averages sheet with its numbers empty and its kind marked "left out". The baseline cannot be left out, as every change is measured from it (7.3).
+- A window set on its own is set in every file of the dataset, while "Apply to all" is ticked. Unticked (as it is at first, and again whenever another file is shown), only the file shown gets its own windows, and it keeps them however the others are changed.
+- A window set on its own fits, or does not, by the same rules as in 7.1 and 7.2.
+
+Example: a file of 30 min with additions at 10 and 20 min, w = 2 min, g = 0.5 min and f = 1 min.
+
+- The baseline is set to 3 min long: it ends at 10 − 0.5 = 9.5 min and starts at 9.5 − 3 = 6.5 min.
+- The window after the first addition is set to end 1.5 min before the next addition: it ends at 20 − 1.5 = 18.5 min and starts at 18.5 − 2 = 16.5 min.
+- The last window is set to 4 min long: it ends at 30 − 1 = 29 min and starts at 29 − 4 = 25 min.
+- With quick windows of q = 1 min starting d = 0.5 min after their addition, the first set to start 1 min after and last 0.5 min runs from 10 + 1 = 11 min to 11 + 0.5 = 11.5 min. The second, left out, would run from 20.5 to 21.5 min but is not averaged.
+
+Checked by: `test_each_window_falls_on_its_own`, `test_a_window_left_out_keeps_its_row` and `test_each_file_finds_its_own_windows` in `tests/test_averaging_windows.py`.
 
 ---
 

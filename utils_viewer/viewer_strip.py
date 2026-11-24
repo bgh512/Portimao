@@ -1,7 +1,5 @@
 """
-The settings strip under the plot: the haems, the fit, the background, the decomposition
-kept to compare with, the spectrometer, how the haems and the OCR are shown, what the
-event labels show, the numbers of Δψ, the journal, the figure size and the times of the edges dragged on the plot.
+The five boxes above the plot: Time regions, View, Haem decomposition, Δψ and Figure.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -23,7 +21,7 @@ from utils_shared.survey import JOURNAL_NAMES, TEMPERATURE_LIMITS_C
 # ---- CONSTANTS -----------------------------------------------------------------------
 # The numbers of the Δψ row: each haem's midpoint potential with the other haem
 # oxidised and how far it falls when the other is reduced (mV), which the user types,
-# then the numbers opened by "More".
+# then the numbers opened by "More options".
 PSI_MIDPOINT_FIELDS = ('psi_bH_mV', 'psi_bL_mV', 'psi_fall_mV')
 PSI_MORE_FIELDS = ('psi_share',
                    'temperature_c',
@@ -31,7 +29,7 @@ PSI_MORE_FIELDS = ('psi_share',
                    'psi_highest_percent',
                    )
 PSI_FIELDS = PSI_MIDPOINT_FIELDS + PSI_MORE_FIELDS
-# The answer each number of the "More" line is kept in.
+# The answer each number of the "More options" line is kept in.
 PSI_MORE_ANSWERS = {'psi_share': 'psi_share',
                     'temperature_c': 'temperature_c',
                     'psi_lowest_percent': 'psi_reduced_lowest_percent',
@@ -51,11 +49,14 @@ VALUE_NAMES = ('plot_haems',
                'haem_files',
                'compare',
                'kept',
+               'compare_layout',
                'spectra',
                'haem_mode',
                'haem_per_od',
                'ocr_mode',
                'label_mode',
+               'event_label_angle',
+               'time_tab',
                'delta_psi',
                ) + PSI_FIELDS + ('journal',
                                  'columns',
@@ -81,11 +82,21 @@ BUILD_OPEN_TEXT = 'Build a fit ▾'
 # that choose between it and the one on the plot, and the line under the first row that
 # says which one is kept.
 KEEP_TEXT = 'Keep to compare'
-STOP_TEXT = 'Keep this one'
-BACK_TEXT = 'Go back to kept'
+STOP_TEXT = 'Keep new'
+BACK_TEXT = 'Keep old'
 # What a click on BACK_TEXT is told as: a click, not a value the strip keeps.
 BACK_CHANGE = 'go_back'
-KEPT_PREFIX = 'Kept to compare (dashed on the plot): '
+# The button under Build a fit that saves the haems ticked as a fit file of their own,
+# and what a click on it is told as: {SAVE_FIT_CHANGE: the name typed beside it}, not a
+# value the strip keeps.
+SAVE_FIT_TEXT = 'Save fit'
+SAVE_FIT_CHANGE = 'save_fit'
+# How the kept decomposition is shown, in the order of the switch beside Keep new, with
+# its words, and the line saying which one is kept in each.
+COMPARE_LAYOUT_TEXTS = {'side': 'Side by side', 'overlaid': 'Overlaid'}
+KEPT_PREFIXES = {'side': 'Kept to compare (the plot on the left): ',
+                 'overlaid': 'Kept to compare (dashed on the plot): ',
+                 }
 # The button that saves one page of the journal as a PDF with the figure of the file
 # shown on it, and what a click on it is told as: a click, not a value the strip keeps.
 MASTER_TEXT = 'Export master'
@@ -104,7 +115,24 @@ NOTE_TEXT = '#404040'
 MINUTES_HELP = 'Type a number of minutes, 0 or more.'
 # What to type in a box of the edges row, by the unit of the step.
 UNIT_HELP = {'min': MINUTES_HELP, 's': 'Type a number of seconds, 0 or more.'}
-EVERY_FILE_TEXT = 'Every file'
+EVERY_FILE_TEXT = 'Apply to all'
+# The tabs of the Time regions box, each with the edges it puts on the plot, and the
+# line shown while none is pressed. A tab pressed is told as {TIME_TAB_CHANGE: tab}.
+TIME_TAB_TEXTS = {'trim': 'Trim / Ignore',
+                  'regions': 'Ox / Red',
+                  'windows': 'Averaging',
+                  }
+TIME_TAB_CHANGE = 'time_tab'
+TAB_NOTE = 'Press a tab to set its edges on the plot.'
+# The buttons that open the OD table and the labels table again, and what a click on
+# each is told as: a click, not a value the boxes keep.
+EDIT_ODS_TEXT = 'Edit ODs'
+EDIT_ODS_CHANGE = 'edit_ods'
+EDIT_LABELS_TEXT = 'Edit labels'
+EDIT_LABELS_CHANGE = 'edit_labels'
+# The angle of the event labels (°).
+ANGLE_LIMITS = (0.0, 90.0)
+ANGLE_HELP = 'Type an angle from 0 (flat) to 90 (upright).'
 
 
 # ---- EdgeRow -------------------------------------------------------------------------
@@ -112,7 +140,8 @@ class EdgeRow:
     """
     ---- Summary ----
     The row of the strip shown while edges are dragged on the plot: a typing box for
-    each edge, holding its value for the file shown, and the "Every file" tick box. It
+    each edge, holding its value for the file shown, and the "Apply to all" tick box.
+    It
     follows the drag and passes on what the user types or ticks; it changes nothing by
     itself. Every method runs on the window thread.
 
@@ -126,8 +155,12 @@ class EdgeRow:
     ---- Methods ----
     __init__
     _every_file_handler
+    _tick_handler
     _value_handler
+    every_file_unticker
     fields_setter
+    ticks_setter
+    toggles_setter
     values_setter
     """
 
@@ -139,10 +172,13 @@ class EdgeRow:
                  on_value: Callable[[str, float], None],
                  on_every_file: Callable[[bool], None],
                  on_return: Callable[[], None],
+                 on_tick: Optional[Callable[[str, bool], None]] = None,
+                 on_toggle: Optional[Callable[[str, bool], None]] = None,
                  ) -> None:
         """
         ---- Summary ----
-        Method to build the row, with no boxes until fields_setter.
+        Method to build the row, with no boxes until fields_setter, and no ticks or
+        toggles until ticks_setter and toggles_setter.
 
         ---- Inputs ----
         tk : Any
@@ -158,6 +194,11 @@ class EdgeRow:
         on_return : Callable[[], None]
             Called after Enter in a box has passed its number on (or found it as it
             was), so the keyboard can go back to the answer box.
+        on_tick : Optional[Callable[[str, bool], None]]
+            Called with (field, new state) when a numbered tick is clicked.
+        on_toggle : Optional[Callable[[str, bool], None]]
+            Called with (field, new state) when a toggle beside the tick box is
+            clicked.
 
         ---- Globals read ----
         NOTE_TEXT.
@@ -181,14 +222,26 @@ class EdgeRow:
         self._on_value = on_value
         self._on_every_file = on_every_file
         self._on_return = on_return
+        self._on_tick = on_tick
+        self._on_toggle = on_toggle
         self._boxes: Dict[str, Any] = {}
         self._shown: Dict[str, str] = {}
+        self._tick_vars: Dict[str, Any] = {}
+        self._toggle_vars: Dict[str, Any] = {}
         self.frame = tk.Frame(parent, bg=background)
         self._boxes_frame = tk.Frame(self.frame, bg=background)
-        self._boxes_frame.pack(side='left')
+        self._boxes_frame.pack(side='top', anchor='w')
+        # the numbered ticks of the windows, with the note of which window the boxes
+        # show
+        self._ticks_frame = tk.Frame(self.frame, bg=background)
+        self._ticks_frame.pack(side='top', anchor='w')
+        self._row_note: Any = None
+        # the tick box and the note on a line of their own, so the row fits its box
+        under = tk.Frame(self.frame, bg=background)
+        under.pack(side='top', anchor='w')
         self._help = UNIT_HELP['min']
-        self._every_file = tk.BooleanVar(master=parent, value=True)
-        self._tick = tk.Checkbutton(self.frame,
+        self._every_file = tk.BooleanVar(master=parent, value=False)
+        self._tick = tk.Checkbutton(under,
                                     text=EVERY_FILE_TEXT,
                                     variable=self._every_file,
                                     command=self._every_file_handler,
@@ -196,8 +249,10 @@ class EdgeRow:
                                     activebackground=background,
                                     highlightthickness=0,
                                     )
-        self._tick.pack(side='left', padx=(12, 4))
-        self._note = tk.Label(self.frame, text='', bg=background, fg=NOTE_TEXT)
+        self._tick.pack(side='left', padx=(0, 4))
+        self._toggles_frame = tk.Frame(under, bg=background)
+        self._toggles_frame.pack(side='left')
+        self._note = tk.Label(under, text='', bg=background, fg=NOTE_TEXT)
         self._note.pack(side='left', padx=(0, 4))
 
     # ---- ROW HELPERS -----------------------------------------------------------------
@@ -206,7 +261,7 @@ class EdgeRow:
     def _every_file_handler(self) -> None:
         """
         ---- Summary ----
-        Method to pass on the new state of the "Every file" tick box.
+        Method to pass on the new state of the "Apply to all" tick box.
 
         ---- Inputs ----
         None.
@@ -229,6 +284,40 @@ class EdgeRow:
         """
 
         self._on_every_file(bool(self._every_file.get()))
+
+    # ---- _tick_handler ---------------------------------------------------------------
+    def _tick_handler(self, field: str, is_toggle: bool) -> None:
+        """
+        ---- Summary ----
+        Method to pass on the new state of a numbered tick or of a toggle.
+
+        ---- Inputs ----
+        field : str
+            The field of the tick or toggle.
+        is_toggle : bool
+            True for a toggle beside the tick box.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the function given as on_tick or on_toggle (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        kept = self._toggle_vars if is_toggle else self._tick_vars
+        handler = self._on_toggle if is_toggle else self._on_tick
+        if handler is not None and field in kept:
+            handler(field, bool(kept[field].get()))
 
     # ---- _value_handler --------------------------------------------------------------
     def _value_handler(self, key: str, is_return: bool = False) -> None:
@@ -281,6 +370,35 @@ class EdgeRow:
 
     # ---- MAIN METHODS ----------------------------------------------------------------
 
+    # ---- every_file_unticker ---------------------------------------------------------
+    def every_file_unticker(self) -> None:
+        """
+        ---- Summary ----
+        Method to untick the "Apply to all" tick box without passing anything on, when
+        another file is shown.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the tick box (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._every_file.set(False)
+
     # ---- fields_setter ---------------------------------------------------------------
     def fields_setter(self,
                       fields: List[Tuple[str, str]],
@@ -290,8 +408,10 @@ class EdgeRow:
                       ) -> None:
         """
         ---- Summary ----
-        Method to make one typing box for each field, each after its name, followed by
-        the unit, and set the tick box and its words.
+        Method to make one typing box for each field, each after its name, and set the
+        tick box and its words. A name starting with a capital starts a new line (Trim
+        before ... after, then Ignore before ... after), and each line ends with the
+        unit.
 
         ---- Inputs ----
         fields : List[Tuple[str, str]]
@@ -301,7 +421,7 @@ class EdgeRow:
         unit : str
             The unit written after the boxes: 'min' or 's' (a key of UNIT_HELP).
         tick_text : str
-            The words of the tick box: "Every file", or those of the step's own
+            The words of the tick box: "Apply to all", or those of the step's own
             switch.
 
         ---- Globals read ----
@@ -325,13 +445,25 @@ class EdgeRow:
         for child in self._boxes_frame.winfo_children():
             child.destroy()
         self._boxes, self._shown = {}, {}
-        for index, (key, name) in enumerate(fields):
-            gap = 12 if index and name[:1].isupper() else 4
-            tk.Label(self._boxes_frame,
+        # A name with a capital starts a line of its own (Trim, then Ignore), and each
+        # line ends with the unit.
+        line = None
+        for key, name in fields:
+            if line is None or name[:1].isupper():
+                if line is not None:
+                    tk.Label(line, text=unit, bg=background).pack(side='left',
+                                                                  padx=(4, 0),
+                                                                  )
+                line = tk.Frame(self._boxes_frame, bg=background)
+                line.pack(side='top', anchor='w', pady=(0, 1))
+                gap = 0
+            else:
+                gap = 4
+            tk.Label(line,
                      text=name,
                      bg=background,
                      ).pack(side='left', padx=(gap, 4))
-            box = tk.Entry(self._boxes_frame,
+            box = tk.Entry(line,
                            width=6,
                            justify='right',
                            bg='white',
@@ -344,13 +476,133 @@ class EdgeRow:
                      )
             box.bind('<FocusOut>', lambda event, name=key: self._value_handler(name))
             self._boxes[key] = box
-        tk.Label(self._boxes_frame, text=unit, bg=background).pack(side='left',
-                                                                   padx=(4, 0),
-                                                                   )
+        if line is not None:
+            tk.Label(line, text=unit, bg=background).pack(side='left', padx=(4, 0))
         self._help = UNIT_HELP[unit]
         self._tick.configure(text=tick_text)
         self._every_file.set(is_every_file)
         self._note.configure(text='')
+
+    # ---- ticks_setter ----------------------------------------------------------------
+    def ticks_setter(self, note: str, ticks: List[Tuple[str, str, bool]]) -> None:
+        """
+        ---- Summary ----
+        Method to show the numbered ticks under the boxes ("Use: 1 2 3"), one per
+        window of the file shown, and the note of which window the boxes show. The
+        ticks are made again only when they change.
+
+        ---- Inputs ----
+        note : str
+            The note beside the ticks ('settled window 2'), or ''.
+        ticks : List[Tuple[str, str, bool]]
+            [(field, words, is_ticked)]; empty for none.
+
+        ---- Globals read ----
+        NOTE_TEXT.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the ticks (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _tick_handler
+        """
+
+        tk, background = self._tk, self._background
+        if not ticks and not note:
+            # nothing to show, so the line takes no room
+            for child in self._ticks_frame.winfo_children():
+                child.destroy()
+            self._tick_vars, self._row_note = {}, None
+            return
+        fields = [field for field, _, _ in ticks]
+        if fields != list(self._tick_vars) or self._row_note is None:
+            for child in self._ticks_frame.winfo_children():
+                child.destroy()
+            self._tick_vars = {}
+            if ticks:
+                tk.Label(self._ticks_frame,
+                         text='Use:',
+                         bg=background,
+                         ).pack(side='left', padx=(0, 4))
+            for field, words, _ in ticks:
+                variable = tk.BooleanVar(master=self._ticks_frame, value=True)
+                tk.Checkbutton(self._ticks_frame,
+                               text=words,
+                               variable=variable,
+                               command=lambda name=field: self._tick_handler(name,
+                                                                             False,
+                                                                             ),
+                               bg=background,
+                               activebackground=background,
+                               highlightthickness=0,
+                               ).pack(side='left')
+                self._tick_vars[field] = variable
+            self._row_note = tk.Label(self._ticks_frame,
+                                      text='',
+                                      bg=background,
+                                      fg=NOTE_TEXT,
+                                      )
+            self._row_note.pack(side='left', padx=(8, 0))
+        for field, _, is_ticked in ticks:
+            self._tick_vars[field].set(is_ticked)
+        self._row_note.configure(text=note)
+
+    # ---- toggles_setter --------------------------------------------------------------
+    def toggles_setter(self, toggles: List[Tuple[str, str, bool]]) -> None:
+        """
+        ---- Summary ----
+        Method to show the toggles beside the tick box ("Adjust each window"); they
+        are made again only when they change.
+
+        ---- Inputs ----
+        toggles : List[Tuple[str, str, bool]]
+            [(field, words, is_on)]; empty for none.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the toggles (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _tick_handler
+        """
+
+        tk, background = self._tk, self._background
+        fields = [field for field, _, _ in toggles]
+        if fields != list(self._toggle_vars):
+            for child in self._toggles_frame.winfo_children():
+                child.destroy()
+            self._toggle_vars = {}
+            for field, words, _ in toggles:
+                variable = tk.BooleanVar(master=self._toggles_frame, value=False)
+                tk.Checkbutton(self._toggles_frame,
+                               text=words,
+                               variable=variable,
+                               command=lambda name=field: self._tick_handler(name,
+                                                                             True,
+                                                                             ),
+                               bg=background,
+                               activebackground=background,
+                               highlightthickness=0,
+                               ).pack(side='left', padx=(0, 4))
+                self._toggle_vars[field] = variable
+        for field, _, is_on in toggles:
+            self._toggle_vars[field].set(is_on)
 
     # ---- values_setter ---------------------------------------------------------------
     def values_setter(self, values: Optional[Dict[str, float]]) -> None:
@@ -392,30 +644,34 @@ class EdgeRow:
 class SettingsStrip:
     """
     ---- Summary ----
-    The strip under the plot that always shows the current choices: a tick box for the
-    haems, a drop-down of the fits, a drop-down of the backgrounds, a button that folds
-    out a tick box for each haem of the library (Build a fit), a button that keeps the
-    decomposition in use to compare the next ones with (with a line saying which one is
-    kept; while one is kept it reads "Keep this one", and a second button goes back to
-    the kept one), a drop-down of the spectrometer whose spectra hold the haems (shown when the
-    files share more than one), a drop-down of how the haems are shown with a "per OD"
-    box (shown only when OD values were entered), a drop-down of how the OCR is shown
-    (per OD only when OD values were entered, % of baseline only when the averaging
-    windows are set up), a
-    row of the numbers of Δψ (shown only while Δψ is worked out: the midpoint of bH
-    and of bL and the fall typed, each midpoint with the other haem reduced filled in,
-    a button for the paper's values, and the share, the temperature and the limits as
-    text, or as boxes when "More" is ticked), a drop-down of the journal, a drop-down of the widths that journal allows, a typing
-    box for the height, a button that exports the master page (a page of the
-    journal with the figure of the file shown on it) and a button that puts the panels
-    of the plot back in the standard order. It tells the window what the user changed and can be
-    set by the program; it changes nothing by itself. It starts greyed out, until the
-    program says it is listening. Every method runs on the window thread, except
-    values_reader.
+    The five boxes above the plot, in one row, that always show the current choices.
+    Time regions: a tab each for the trim and ignore edges, the oxidised and reduced
+    regions and the averaging windows, the one pressed having its edges on the plot
+    (the window places their rows in the box). View: how the OCR is shown with its per
+    OD box, how the haems are shown with theirs (the per OD boxes and Edit ODs only
+    once OD values were entered), what the event labels show, their angle and Edit
+    labels. Haem decomposition, with its tick as title: the fit, the background (the
+    scatter), the spectrometer whose spectra hold the haems (shown when the files
+    share more than one), a button that folds out a tick box for each haem of the
+    library with a name box and Save fit under them (Build a fit), a button that keeps
+    the decomposition in use to compare the next ones with (greyed while one is kept,
+    with a line saying which one, and Keep old and Keep new under it to choose between
+    the two). Δψ, with its tick as title (it can be clicked only while Δψ can be worked
+    out): the midpoint of bH and of bL (written as in the figures) and the shift typed,
+    each midpoint with the other haem reduced filled in, a button for the paper's
+    values, and the share, the temperature and the limits as text, or as boxes when
+    "More options" is ticked. Figure: the journal, the widths that journal allows, the
+    height, a button that exports the master page and a button that puts the panels of
+    the plot back in the standard order. It tells the window what the user changed and
+    can be set by the program; it changes nothing by itself. It starts greyed out,
+    until the program says it is listening. Every method runs on the window thread,
+    except values_reader.
 
     ---- Attributes ----
     frame : Any
-        The Tk frame holding the strip, for the window to place.
+        The Tk frame holding the boxes, for the window to place.
+    time_box : Any
+        The Time regions box, where the window places the rows of the edges.
 
     ---- Globals read ----
     settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS, JOURNAL_NAMES,
@@ -423,12 +679,15 @@ class SettingsStrip:
 
     ---- Methods ----
     __init__
+    _angle_handler
     _back_handler
     _background_handler
     _build_toggler
     _change_reporter
     _compare_handler
+    _edit_handler
     _fit_handler
+    _fit_saver
     _form_handler
     _haems_handler
     _height_handler
@@ -441,9 +700,11 @@ class SettingsStrip:
     _paper_handler
     _per_od_handler
     _psi_handler
+    _psi_tick_handler
     _size_refresher
     _spectra_handler
     _tick_handler
+    _time_tab_handler
     _width_handler
     choices_setter
     fits_setter
@@ -494,16 +755,20 @@ class SettingsStrip:
         None.
 
         ---- Helpers ----
+        _angle_handler
         _back_handler
         _background_handler
         _build_toggler
         _compare_handler
+        _edit_handler
         _fit_handler
+        _fit_saver
         _form_handler
         _haems_handler
         _height_handler
         _journal_handler
         _label_mode_handler
+        _layout_handler
         _master_handler
         _more_toggler
         _ocr_handler
@@ -511,8 +776,10 @@ class SettingsStrip:
         _paper_handler
         _per_od_handler
         _psi_handler
+        _psi_tick_handler
         _size_refresher
         _spectra_handler
+        _time_tab_handler
         _width_handler
         psi_values_builder
         """
@@ -528,11 +795,16 @@ class SettingsStrip:
                                         'haem_files': [],
                                         'compare': False,
                                         'kept': '',
+                                        'compare_layout': standard['compare_layout'],
                                         'spectra': standard['decomposition_dataset'],
                                         'haem_mode': standard['haem_mode'],
                                         'haem_per_od': bool(standard['haem_per_od']),
                                         'ocr_mode': standard['ocr_mode'],
                                         'label_mode': standard['label_mode'],
+                                        'event_label_angle': float(
+                                            standard['event_label_angle'],
+                                            ),
+                                        'time_tab': '',
                                         'journal': NO_JOURNAL,
                                         'columns': standard['columns'],
                                         'height': standard['height'],
@@ -547,7 +819,9 @@ class SettingsStrip:
         self._ocr_keys: List[str] = []
         self._has_percent = False
         self._has_od = False
+        self._can_edit_od = False
         self._has_baseline = False
+        self._has_psi = False
         self._fit_names: List[str] = [self._values['fit_file']]
         self._haems_by_file: Dict[str, str] = {}
         self._tick_vars: Dict[str, Any] = {}
@@ -558,36 +832,157 @@ class SettingsStrip:
         self._background = background
         self.frame = tk.Frame(parent, bg=background)
 
-        # ---- 2 First row: the haems and the fit --------------------------------------
-        upper = tk.Frame(self.frame, bg=background)
-        upper.pack(pady=(0, 3))
+        # ---- 2 The five boxes, in one row --------------------------------------------
+        # The Haem decomposition and Δψ boxes have a tick box as their title.
+        def frame_maker(column: int, title: Any) -> Any:
+            options = ({'text': title} if isinstance(title, str)
+                       else {'labelwidget': title}
+                       )
+            box = tk.LabelFrame(self.frame,
+                                bg=background,
+                                padx=4,
+                                pady=2,
+                                **options,
+                                )
+            box.grid(row=0, column=column, sticky='nsew', padx=3)
+            return box
+        def tick_maker(text: str,
+                       variable: Any,
+                       command: Callable[[], None],
+                       holder: Any = None,
+                       ) -> Any:
+            return tk.Checkbutton(self.frame if holder is None else holder,
+                                  text=text,
+                                  variable=variable,
+                                  command=command,
+                                  bg=background,
+                                  activebackground=background,
+                                  highlightthickness=0,
+                                  )
+        def line_maker(box: Any) -> Any:
+            line = tk.Frame(box, bg=background)
+            line.pack(anchor='w', pady=(0, 2))
+            return line
+
+        # ---- 2.1 Time regions: one tab of edges at a time ----------------------------
+        # The window packs the rows of the edges under the tabs (time_box).
+        self.time_box = frame_maker(0, 'Time regions')
+        tabs = tk.Frame(self.time_box, bg=background)
+        tabs.pack(anchor='w', pady=(0, 2))
+        self._tab_buttons: Dict[str, Any] = {}
+        for tab, words in TIME_TAB_TEXTS.items():
+            button = tk.Button(tabs,
+                               text=words,
+                               command=lambda chosen=tab: self._time_tab_handler(chosen),
+                               )
+            button.pack(side='left', padx=(0, 2))
+            self._tab_buttons[tab] = button
+        self._tab_note = tk.Label(self.time_box,
+                                  text=TAB_NOTE,
+                                  bg=background,
+                                  fg=NOTE_TEXT,
+                                  anchor='w',
+                                  )
+
+        # ---- 2.2 View: how the OCR, the haems and the labels are shown ---------------
+        # _size_refresher places the per OD boxes and Edit ODs only when OD values were
+        # entered.
+        view = frame_maker(1, 'View')
+        line = line_maker(view)
+        tk.Label(line, text='OCR as', bg=background).pack(side='left', padx=(0, 4))
+        self._ocr_combo = ttk.Combobox(line, state='readonly', width=15)
+        self._ocr_combo.pack(side='left', padx=(0, 4))
+        self._ocr_od = tk.BooleanVar(master=parent, value=False)
+        self._ocr_od_box = tick_maker('per OD', self._ocr_od, self._ocr_handler, line)
+        line = line_maker(view)
+        self._form_label = tk.Label(line, text='Haems as', bg=background)
+        self._form_label.pack(side='left', padx=(0, 4))
+        self._form_combo = ttk.Combobox(line, state='readonly', width=15)
+        self._form_combo.pack(side='left', padx=(0, 4))
+        self._haem_od = tk.BooleanVar(master=parent, value=self._values['haem_per_od'])
+        self._haem_od_box = tick_maker('per OD',
+                                       self._haem_od,
+                                       lambda: self._per_od_handler('haem_per_od'),
+                                       line,
+                                       )
+        self._od_line = line_maker(view)
+        self._edit_ods_button = tk.Button(self._od_line,
+                                          text=EDIT_ODS_TEXT,
+                                          command=lambda: self._edit_handler(EDIT_ODS_CHANGE,
+                                                                             ),
+                                          )
+        self._edit_ods_button.pack(side='left')
+        line = self._labels_line = line_maker(view)
+        tk.Label(line, text='Labels as', bg=background).pack(side='left', padx=(0, 4))
+        self._label_mode_combo = ttk.Combobox(line,
+                                              state='readonly',
+                                              width=15,
+                                              values=list(LABEL_FORM_TEXTS.values()),
+                                              )
+        self._label_mode_combo.pack(side='left')
+        self._angle_line = line_maker(view)
+        tk.Label(self._angle_line,
+                 text='Angle',
+                 bg=background,
+                 ).pack(side='left', padx=(0, 4))
+        self._angle_entry = tk.Entry(self._angle_line,
+                                     width=5,
+                                     justify='right',
+                                     bg='white',
+                                     disabledbackground=background,
+                                     relief='solid',
+                                     borderwidth=1,
+                                     )
+        self._angle_entry.pack(side='left')
+        tk.Label(self._angle_line, text='°', bg=background).pack(side='left',
+                                                                 padx=(2, 8),
+                                                                 )
+        self._edit_labels_button = tk.Button(self._angle_line,
+                                             text=EDIT_LABELS_TEXT,
+                                             command=lambda: self._edit_handler(EDIT_LABELS_CHANGE,
+                                                                                ),
+                                             )
+        self._edit_labels_button.pack(side='left')
+        self._angle_note = tk.Label(view, text='', bg=background, fg=ERROR_TEXT)
+
+        # ---- 2.3 Haem decomposition: the fit, the background and the spectra ---------
         self._haems = tk.BooleanVar(master=parent, value=self._values['plot_haems'])
-        self._haems_box = tk.Checkbutton(upper,
-                                         text='Haems',
-                                         variable=self._haems,
-                                         command=self._haems_handler,
-                                         bg=background,
-                                         activebackground=background,
-                                         highlightthickness=0,
-                                         )
-        self._haems_box.pack(side='left', padx=(4, 12))
-        tk.Label(upper, text='Fit', bg=background).pack(side='left', padx=(0, 4))
-        self._fit_combo = ttk.Combobox(upper,
+        self._haems_box = tick_maker('Haem decomposition',
+                                     self._haems,
+                                     self._haems_handler,
+                                     )
+        haem_box = frame_maker(2, self._haems_box)
+        line = line_maker(haem_box)
+        tk.Label(line, text='Fit', bg=background).pack(side='left', padx=(0, 4))
+        self._fit_combo = ttk.Combobox(line,
                                        state='readonly',
-                                       width=36,
+                                       width=28,
                                        values=[self._values['fit_file']],
                                        )
         self._fit_combo.set(self._values['fit_file'])
-        self._fit_combo.pack(side='left', padx=(0, 12))
-        tk.Label(upper, text='Background', bg=background).pack(side='left', padx=(0, 4))
-        self._background_combo = ttk.Combobox(upper,
+        self._fit_combo.pack(side='left')
+        line = line_maker(haem_box)
+        tk.Label(line, text='Scatter', bg=background).pack(side='left', padx=(0, 4))
+        self._background_combo = ttk.Combobox(line,
                                               state='readonly',
-                                              width=30,
+                                              width=22,
                                               values=list(
                                                   BACKGROUND_SHORT_NAMES.values(),
                                                   ),
                                               )
-        self._background_combo.pack(side='left', padx=(0, 12))
+        self._background_combo.pack(side='left')
+        # the spectrometer, placed only when the files share more than one
+        self._spectra_line = line_maker(haem_box)
+        tk.Label(self._spectra_line,
+                 text='Spectra',
+                 bg=background,
+                 ).pack(side='left', padx=(0, 4))
+        self._spectra_combo = ttk.Combobox(self._spectra_line,
+                                           state='readonly',
+                                           width=8,
+                                           )
+        self._spectra_combo.pack(side='left')
+        upper = line_maker(haem_box)
         self._build_button = tk.Button(upper,
                                        text=BUILD_CLOSED_TEXT,
                                        command=self._build_toggler,
@@ -598,65 +993,73 @@ class SettingsStrip:
                                          command=self._compare_handler,
                                          )
         self._compare_button.pack(side='left', padx=(0, 4))
-        # _size_refresher places it only while a decomposition is kept.
-        self._back_button = tk.Button(upper,
+        self._upper = upper
+        # Keep old and Keep new, on a line under the buttons: _size_refresher places it
+        # only while a decomposition is kept.
+        self._choose_line = tk.Frame(haem_box, bg=background)
+        self._back_button = tk.Button(self._choose_line,
                                       text=BACK_TEXT,
                                       command=self._back_handler,
                                       )
-        self._upper = upper
+        self._back_button.pack(side='left', padx=(0, 4))
+        self._new_button = tk.Button(self._choose_line,
+                                     text=STOP_TEXT,
+                                     command=self._compare_handler,
+                                     )
+        self._new_button.pack(side='left', padx=(0, 8))
+        # the switch between the kept plot beside the one in use and dashed over it
+        self._layout_buttons: Dict[str, Any] = {}
+        for layout, words in COMPARE_LAYOUT_TEXTS.items():
+            button = tk.Button(self._choose_line,
+                               text=words,
+                               command=lambda chosen=layout: self._layout_handler(chosen),
+                               )
+            button.pack(side='left', padx=(0, 2))
+            self._layout_buttons[layout] = button
 
-        # ---- 2.1 The tick boxes of the library haems, folded away at first -----------
-        # library_setter fills them in.
-        self._panel = tk.Frame(self.frame, bg=background)
+        # ---- 2.3.1 The tick boxes of the library haems, folded away at first ---------
+        # library_setter fills them in, above the line that saves the haems ticked as a
+        # fit of its own.
+        self._panel = tk.Frame(haem_box, bg=background)
+        self._library = tk.Frame(self._panel, bg=background)
+        self._library.pack(anchor='w')
+        line = line_maker(self._panel)
+        tk.Label(line, text='Name', bg=background).pack(side='left', padx=(4, 4))
+        self._fit_name_entry = tk.Entry(line,
+                                        width=18,
+                                        bg='white',
+                                        disabledbackground=background,
+                                        relief='solid',
+                                        borderwidth=1,
+                                        )
+        self._fit_name_entry.pack(side='left', padx=(0, 4))
+        self._fit_name_entry.bind('<Return>', lambda event: self._fit_saver())
+        self._save_button = tk.Button(line, text=SAVE_FIT_TEXT, command=self._fit_saver)
+        self._save_button.pack(side='left')
 
-        # ---- 2.2 The line saying which decomposition is kept, hidden until one is ----
-        self._kept_label = tk.Label(self.frame,
+        # ---- 2.3.2 The line saying which decomposition is kept, hidden until one is --
+        self._kept_label = tk.Label(haem_box,
                                     text='',
                                     bg=background,
                                     fg=NOTE_TEXT,
                                     anchor='w',
+                                    justify='left',
+                                    wraplength=260,
                                     )
 
-        # ---- 3 Second row: the spectrometer and how the haems and the OCR are shown --
-        # _size_refresher places the parts in use: the spectrometer only when there is
-        # a choice, the per OD box only when OD values were entered.
-        middle = tk.Frame(self.frame, bg=background)
-        middle.pack(pady=(0, 3))
-        self._spectra_label = tk.Label(middle, text='Spectra', bg=background)
-        self._spectra_combo = ttk.Combobox(middle, state='readonly', width=8)
-        self._form_label = tk.Label(middle, text='Haems as', bg=background)
-        self._form_combo = ttk.Combobox(middle, state='readonly', width=17)
-        self._haem_od = tk.BooleanVar(master=parent, value=self._values['haem_per_od'])
-        self._haem_od_box = tk.Checkbutton(
-            middle,
-            text='per OD',
-            variable=self._haem_od,
-            command=lambda: self._per_od_handler('haem_per_od'),
-            bg=background,
-            activebackground=background,
-            highlightthickness=0,
-            )
-        self._ocr_label = tk.Label(middle, text='OCR as', bg=background)
-        self._ocr_combo = ttk.Combobox(middle, state='readonly', width=22)
-        self._label_mode_label = tk.Label(middle, text='Labels as', bg=background)
-        self._label_mode_combo = ttk.Combobox(middle,
-                                              state='readonly',
-                                              width=15,
-                                              values=list(LABEL_FORM_TEXTS.values()),
-                                              )
-
-        # ---- 3.1 The Δψ row, placed only while Δψ is worked out ----------------------
-        # First line: each haem's midpoint, typed, then (after the arrow) its midpoint
-        # with the other haem reduced, filled in and not typed in; the fall; the
-        # button of the paper's values; the box that opens the second line. Second
-        # line: the other numbers as text, or as boxes when "More" is ticked.
-        self._psi_row = tk.Frame(self.frame, bg=background)
-        first = tk.Frame(self._psi_row, bg=background)
-        first.pack()
+        # ---- 2.4 Δψ: its tick, then the numbers of the method while it is ticked -----
+        # Each haem's midpoint, typed, then (after the arrow) its midpoint with the
+        # other haem reduced, filled in and not typed in; the fall; the button of the
+        # paper's values and the box that opens the other numbers, as text or as boxes
+        # when "More options" is ticked.
+        self._psi_on = tk.BooleanVar(master=parent, value=False)
+        self._psi_tick = tick_maker('Δψ', self._psi_on, self._psi_tick_handler)
+        psi_box = frame_maker(3, self._psi_tick)
+        self._psi_row = tk.Frame(psi_box, bg=background)
         self._psi_boxes: Dict[str, Any] = {}
         self._psi_seconds: Dict[str, Any] = {}
 
-        def box_maker(parent_line: Any, name: str, gap: Tuple[int, int]) -> None:
+        def entry_maker(parent_line: Any, name: str, gap: Tuple[int, int]) -> None:
             box = tk.Entry(parent_line,
                            width=6,
                            justify='right',
@@ -670,10 +1073,31 @@ class SettingsStrip:
             box.bind('<FocusOut>', lambda event, chosen=name: self._psi_handler(chosen))
             self._psi_boxes[name] = box
 
-        tk.Label(first, text='Δψ', bg=background).pack(side='left', padx=(4, 8))
-        for haem, name in (('bH', 'psi_bH_mV'), ('bL', 'psi_bL_mV')):
-            tk.Label(first, text=haem, bg=background).pack(side='left', padx=(0, 4))
-            box_maker(first, name, (0, 2))
+        # The haem names as in the figures: b in italics, then its letter smaller and
+        # lower (the font is read from Tk's own, so it matches the other words).
+        fonts = getattr(tk, 'font', None)  # tkinter.font, once the window imported it
+        base = (fonts.nametofont('TkDefaultFont').actual() if fonts is not None
+                else {'family': 'Helvetica', 'size': 9}
+                )
+        family, size = base['family'], abs(int(base['size'])) or 9
+        for letter, name in (('H', 'psi_bH_mV'), ('L', 'psi_bL_mV')):
+            first = line_maker(self._psi_row)
+            haem = tk.Frame(first, bg=background, width=34, height=22)
+            haem.pack_propagate(False)
+            haem.pack(side='left')
+            tk.Label(haem,
+                     text='b',
+                     font=(family, size + 1, 'italic'),
+                     bg=background,
+                     padx=0,
+                     ).pack(side='left', anchor='n')
+            tk.Label(haem,
+                     text=letter,
+                     font=(family, max(size - 2, 6), 'italic'),
+                     bg=background,
+                     padx=0,
+                     ).pack(side='left', anchor='s')
+            entry_maker(first, name, (0, 2))
             tk.Label(first, text='→', bg=background).pack(side='left', padx=(0, 2))
             second = tk.Entry(first,
                               width=6,
@@ -684,11 +1108,16 @@ class SettingsStrip:
                               state='readonly',
                               takefocus=0,
                               )
-            second.pack(side='left', padx=(0, 12))
+            second.pack(side='left')
+            tk.Label(first, text='mV', bg=background).pack(side='left', padx=(2, 0))
             self._psi_seconds[name] = second
-        tk.Label(first, text='fall', bg=background).pack(side='left', padx=(0, 4))
-        box_maker(first, 'psi_fall_mV', (0, 2))
-        tk.Label(first, text='mV', bg=background).pack(side='left', padx=(0, 12))
+        first = line_maker(self._psi_row)
+        tk.Label(first, text='shift', width=4, anchor='w', bg=background).pack(
+            side='left',
+            )
+        entry_maker(first, 'psi_fall_mV', (0, 2))
+        tk.Label(first, text='mV', bg=background).pack(side='left')
+        first = line_maker(self._psi_row)
         self._paper_button = tk.Button(first,
                                        text=PAPER_TEXT,
                                        command=self._paper_handler,
@@ -696,7 +1125,7 @@ class SettingsStrip:
         self._paper_button.pack(side='left', padx=(0, 8))
         self._more = tk.BooleanVar(master=parent, value=False)
         self._more_box = tk.Checkbutton(first,
-                                        text='More',
+                                        text='More options',
                                         variable=self._more,
                                         command=self._more_toggler,
                                         bg=background,
@@ -708,6 +1137,8 @@ class SettingsStrip:
                                      text='',
                                      bg=background,
                                      fg=NOTE_TEXT,
+                                     justify='left',
+                                     wraplength=220,
                                      )
         self._psi_more = tk.Frame(self._psi_row, bg=background)
         for words, name, after in (('Share', 'psi_share', ''),
@@ -715,30 +1146,36 @@ class SettingsStrip:
                                    ('Given between', 'psi_lowest_percent', ''),
                                    ('and', 'psi_highest_percent', '% reduced'),
                                    ):
-            tk.Label(self._psi_more, text=words, bg=background).pack(side='left',
-                                                                     padx=(4, 4),
-                                                                     )
-            box_maker(self._psi_more, name, (0, 2))
-            tk.Label(self._psi_more, text=after, bg=background).pack(side='left',
-                                                                     padx=(0, 8),
-                                                                     )
-        self._psi_note = tk.Label(self._psi_row, text='', bg=background, fg=ERROR_TEXT)
+            more_line = line_maker(self._psi_more)
+            tk.Label(more_line, text=words, bg=background).pack(side='left',
+                                                                padx=(0, 4),
+                                                                )
+            entry_maker(more_line, name, (0, 2))
+            tk.Label(more_line, text=after, bg=background).pack(side='left')
+        self._psi_note = tk.Label(self._psi_row,
+                                  text='',
+                                  bg=background,
+                                  fg=ERROR_TEXT,
+                                  justify='left',
+                                  wraplength=220,
+                                  )
 
-        # ---- 4 Third row: the journal, the width and the height ----------------------
-        lower = tk.Frame(self.frame, bg=background)
-        lower.pack()
-        self._lower = lower
-        tk.Label(lower, text='Journal', bg=background).pack(side='left', padx=(4, 4))
-        self._journal_combo = ttk.Combobox(lower,
+        # ---- 2.5 Figure: the journal, the width and the height -----------------------
+        figure_box = frame_maker(4, 'Figure')
+        line = line_maker(figure_box)
+        tk.Label(line, text='Journal', bg=background).pack(side='left', padx=(0, 4))
+        self._journal_combo = ttk.Combobox(line,
                                            state='readonly',
                                            width=19,
                                            values=[NO_JOURNAL_TEXT]
                                            + list(JOURNAL_NAMES.values()),
                                            )
-        self._journal_combo.pack(side='left', padx=(0, 12))
-        tk.Label(lower, text='Width', bg=background).pack(side='left', padx=(0, 4))
-        self._width_combo = ttk.Combobox(lower, state='readonly', width=20)
-        self._width_combo.pack(side='left', padx=(0, 12))
+        self._journal_combo.pack(side='left')
+        line = line_maker(figure_box)
+        tk.Label(line, text='Width', bg=background).pack(side='left', padx=(0, 4))
+        self._width_combo = ttk.Combobox(line, state='readonly', width=20)
+        self._width_combo.pack(side='left')
+        lower = line_maker(figure_box)
         tk.Label(lower, text='Height', bg=background).pack(side='left', padx=(0, 4))
         self._height_entry = tk.Entry(lower,
                                       width=6,
@@ -751,20 +1188,23 @@ class SettingsStrip:
         self._height_entry.pack(side='left', padx=(0, 4))
         self._note = tk.Label(lower, text='', bg=background, fg=NOTE_TEXT, anchor='w')
         self._note.pack(side='left', padx=(0, 4))
+        line = line_maker(figure_box)
         # the button that saves a page of the journal with the figure on it
-        self._master_button = tk.Button(lower,
+        self._master_button = tk.Button(line,
                                         text=MASTER_TEXT,
                                         command=self._master_handler,
                                         )
-        self._master_button.pack(side='left', padx=(8, 4))
+        self._master_button.pack(side='left', padx=(0, 4))
         # the button that puts the panels of the plot back in the standard order
-        self._order_button = tk.Button(lower,
+        self._order_button = tk.Button(line,
                                        text=ORDER_TEXT,
                                        command=self._order_handler,
                                        )
-        self._order_button.pack(side='left', padx=(4, 4))
+        self._order_button.pack(side='left')
 
-        # ---- 5 What the user does ----------------------------------------------------
+        # ---- 3 What the user does ----------------------------------------------------
+        self._angle_entry.bind('<Return>', self._angle_handler)
+        self._angle_entry.bind('<FocusOut>', self._angle_handler)
         self._fit_combo.bind('<<ComboboxSelected>>', self._fit_handler)
         self._spectra_combo.bind('<<ComboboxSelected>>', self._spectra_handler)
         self._form_combo.bind('<<ComboboxSelected>>', self._form_handler)
@@ -778,6 +1218,54 @@ class SettingsStrip:
         self._size_refresher()
 
     # ---- STRIP HELPERS ---------------------------------------------------------------
+
+    # ---- _angle_handler --------------------------------------------------------------
+    def _angle_handler(self, event: Any = None) -> None:
+        """
+        ---- Summary ----
+        Method to take the angle of the event labels typed in the View box, when Enter
+        is pressed or the box is left; a box left as it was shown passes nothing on.
+        An angle that cannot be used turns the box red, with the reason under it, and
+        the angle in use stays.
+
+        ---- Inputs ----
+        event : Any
+            The Tk event (unused).
+
+        ---- Globals read ----
+        ANGLE_HELP, ANGLE_LIMITS, ERROR_BACKGROUND.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        typed_number_reader
+        """
+
+        if str(self._angle_entry.cget('state')) == 'disabled':
+            return
+        angle = typed_number_reader(self._angle_entry.get())
+        if angle == self._values['event_label_angle']:
+            self._size_refresher()
+            return
+        if angle is None or not ANGLE_LIMITS[0] <= angle <= ANGLE_LIMITS[1]:
+            self._angle_entry.configure(bg=ERROR_BACKGROUND)
+            self._angle_note.configure(text=ANGLE_HELP)
+            self._angle_note.pack(anchor='w')
+            return
+        before = dict(self._values)
+        self._values['event_label_angle'] = float(angle)
+        self._size_refresher()
+        self._change_reporter(before)
 
     # ---- _background_handler ---------------------------------------------------------
     def _background_handler(self, event: Any = None) -> None:
@@ -948,6 +1436,37 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _edit_handler ---------------------------------------------------------------
+    def _edit_handler(self, name: str) -> None:
+        """
+        ---- Summary ----
+        Method to take a click on Edit ODs or Edit labels. The boxes keep nothing: the
+        click is told as {name: True}, and the program opens the table.
+
+        ---- Inputs ----
+        name : str
+            EDIT_ODS_CHANGE or EDIT_LABELS_CHANGE.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the function given as on_change (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self._is_enabled:
+            self._on_change({name: True})
+
     # ---- _fit_handler ----------------------------------------------------------------
     def _fit_handler(self, event: Any = None) -> None:
         """
@@ -981,6 +1500,37 @@ class SettingsStrip:
         self._fit_combo.selection_clear()
         self._size_refresher()
         self._change_reporter(before)
+
+    # ---- _fit_saver ------------------------------------------------------------------
+    def _fit_saver(self) -> None:
+        """
+        ---- Summary ----
+        Method to take a click on Save fit, or Enter in the name box beside it. The
+        boxes keep nothing: the click is told as {SAVE_FIT_CHANGE: the name typed},
+        and the program saves the haems ticked under that name, or says why it cannot.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        SAVE_FIT_CHANGE.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the function given as on_change (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self._is_enabled:
+            self._on_change({SAVE_FIT_CHANGE: self._fit_name_entry.get().strip()})
 
     # ---- _form_handler ---------------------------------------------------------------
     def _form_handler(self, event: Any = None) -> None:
@@ -1171,6 +1721,44 @@ class SettingsStrip:
         self._label_mode_combo.selection_clear()
         self._change_reporter(before)
 
+    # ---- _layout_handler -------------------------------------------------------------
+    def _layout_handler(self, layout: str) -> None:
+        """
+        ---- Summary ----
+        Method to take a click on the switch beside Keep new: the kept decomposition
+        shown as a plot of its own beside the one in use, or dashed over it. A click on
+        the layout already in use changes nothing.
+
+        ---- Inputs ----
+        layout : str
+            A key of COMPARE_LAYOUT_TEXTS: 'side' or 'overlaid'.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value, presses the button in and reports the change (side
+        effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        """
+
+        if not self._is_enabled:
+            return
+        before = dict(self._values)
+        self._values['compare_layout'] = layout
+        self._size_refresher()
+        self._change_reporter(before)
+
     # ---- _master_handler -------------------------------------------------------------
     def _master_handler(self) -> None:
         """
@@ -1205,7 +1793,7 @@ class SettingsStrip:
     def _more_toggler(self) -> None:
         """
         ---- Summary ----
-        Method to take the "More" box of the Δψ row: ticked, the share, the temperature
+        Method to take the "More options" box of the Δψ row: ticked, the share, the temperature
         and the limits are boxes to type in; unticked, they are one line of text.
 
         ---- Inputs ----
@@ -1305,7 +1893,8 @@ class SettingsStrip:
     def _ocr_handler(self, event: Any = None) -> None:
         """
         ---- Summary ----
-        Method to take the way of showing the OCR picked in the drop-down.
+        Method to take the way of showing the OCR picked in the drop-down, or its per
+        OD box clicked: together they make the way the OCR is shown.
 
         ---- Inputs ----
         event : Any
@@ -1327,10 +1916,19 @@ class SettingsStrip:
         ---- Helpers ----
         _change_reporter
         _size_refresher
+        ocr_mode_builder
         """
 
         before = dict(self._values)
-        self._values['ocr_mode'] = self._ocr_keys[self._ocr_combo.current()]
+        index = self._ocr_combo.current()
+        shown = (self._ocr_keys[index]
+                 if index >= 0
+                 else ocr_view_reader(self._values['ocr_mode'])[0]
+                 )
+        self._values['ocr_mode'] = ocr_mode_builder(shown,
+                                                    self._has_od and
+                                                    bool(self._ocr_od.get()),
+                                                    )
         self._ocr_combo.selection_clear()
         self._size_refresher()
         self._change_reporter(before)
@@ -1417,6 +2015,39 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _psi_tick_handler -----------------------------------------------------------
+    def _psi_tick_handler(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the tick box of the Δψ box: ticked, Δψ is worked out and its
+        numbers show under it.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        """
+
+        before = dict(self._values)
+        self._values['delta_psi'] = bool(self._psi_on.get())
+        self._size_refresher()
+        self._change_reporter(before)
+
     # ---- _size_refresher -------------------------------------------------------------
     def _size_refresher(self) -> None:
         """
@@ -1436,9 +2067,9 @@ class SettingsStrip:
         None.
 
         ---- Globals read ----
-        HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIX,
-        NO_JOURNAL, NOTE_TEXT, STOP_TEXT.
-        (BACK_TEXT is set on its button once, when it is built.)
+        HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIXES,
+        NO_JOURNAL, NOTE_TEXT.
+        (BACK_TEXT and STOP_TEXT are set on their buttons once, when they are built.)
 
         ---- Outputs ----
         None
@@ -1502,21 +2133,46 @@ class SettingsStrip:
         self._build_button.configure(state=button_state)
         for box in self._tick_boxes.values():
             box.configure(state=button_state)
+        self._fit_name_entry.configure(state=button_state)
+        self._save_button.configure(state=button_state)
+        # Keep to compare is greyed while one is kept: Keep old and Keep new, on the
+        # line under it, then choose between the two.
         can_compare = self._is_enabled and values['plot_haems']
         self._compare_button.configure(
-            text=STOP_TEXT if values['compare'] else KEEP_TEXT,
-            state='normal' if can_compare else 'disabled',
+            text=KEEP_TEXT,
+            state='normal' if can_compare and not values['compare'] else 'disabled',
             )
         if values['compare']:
-            self._back_button.configure(state='normal' if can_compare else 'disabled')
-            self._back_button.pack(side='left', padx=(0, 4))
+            for button in (self._back_button, self._new_button):
+                button.configure(state='normal' if can_compare else 'disabled')
+            # the switch shows the layout in use pressed in
+            for layout, button in self._layout_buttons.items():
+                button.configure(relief=('sunken'
+                                         if values['compare_layout'] == layout
+                                         else 'raised'
+                                         ),
+                                 state='normal' if can_compare else 'disabled',
+                                 )
+            self._choose_line.pack(anchor='w', pady=(0, 2), after=self._upper)
         else:
-            self._back_button.pack_forget()
+            self._choose_line.pack_forget()
         if values['kept']:
-            self._kept_label.configure(text=KEPT_PREFIX + values['kept'])
-            self._kept_label.pack(before=self._lower, pady=(0, 3), fill='x')
+            self._kept_label.configure(text=KEPT_PREFIXES[values['compare_layout']] +
+                                       values['kept'],
+                                       )
+            self._kept_label.pack(anchor='w', pady=(0, 2), fill='x')
         else:
             self._kept_label.pack_forget()
+        # ---- the tabs of the Time regions box: the one whose edges are on the plot
+        for tab, button in self._tab_buttons.items():
+            is_pressed = values['time_tab'] == tab
+            button.configure(relief='sunken' if is_pressed else 'raised',
+                             state=button_state,
+                             )
+        if values['time_tab']:
+            self._tab_note.pack_forget()
+        else:
+            self._tab_note.pack(anchor='w')
         haem_state = choice_state if values['plot_haems'] else 'disabled'
         forms = haem_form_choices_lister(self._has_percent)
         self._form_keys = [key for key, _ in forms]
@@ -1530,16 +2186,33 @@ class SettingsStrip:
         self._spectra_combo.set(values['spectra'])
         self._spectra_combo.configure(state=haem_state)
         self._haem_od.set(values['haem_per_od'])
-        # A way of showing the OCR that is not offered now (% of baseline before the
-        # windows are set up) is still shown as the choice in use.
-        forms = ocr_form_choices_lister(self._has_od, self._has_baseline)
+        # The OCR per OD is µM min⁻¹ with its per OD box ticked. A way of showing the
+        # OCR that is not offered now (% of baseline before the windows are set up) is
+        # still shown as the choice in use.
+        forms = [(key, text)
+                 for key, text in ocr_form_choices_lister(False, self._has_baseline)
+                 ]
         self._ocr_keys = [key for key, _ in forms]
+        shown, is_per_od = ocr_view_reader(values['ocr_mode'])
         self._ocr_combo.configure(state='readonly', values=[text for _, text in forms])
-        if values['ocr_mode'] in self._ocr_keys:
-            self._ocr_combo.current(self._ocr_keys.index(values['ocr_mode']))
+        if shown in self._ocr_keys:
+            self._ocr_combo.current(self._ocr_keys.index(shown))
         else:
-            self._ocr_combo.set(OCR_FORM_TEXTS.get(values['ocr_mode'], ''))
+            self._ocr_combo.set(OCR_FORM_TEXTS.get(shown, ''))
         self._ocr_combo.configure(state=choice_state)
+        self._ocr_od.set(is_per_od)
+        self._ocr_od_box.configure(state='normal'
+                                   if self._is_enabled and shown == 'raw'
+                                   else 'disabled',
+                                   )
+        angle_text = f"{values['event_label_angle']:g}"
+        self._angle_entry.configure(state='normal', bg='white')
+        self._angle_entry.delete(0, 'end')
+        self._angle_entry.insert(0, angle_text)
+        self._angle_entry.configure(state=button_state)
+        self._angle_note.pack_forget()
+        self._edit_ods_button.configure(state=button_state)
+        self._edit_labels_button.configure(state=button_state)
         self._label_mode_combo.configure(state='readonly')
         self._label_mode_combo.current(
             list(LABEL_FORM_TEXTS).index(values['label_mode']),
@@ -1550,22 +2223,21 @@ class SettingsStrip:
                      values['haem_mode'] != 'percent'
                      )
         self._haem_od_box.configure(state='normal' if can_scale else 'disabled')
-        has_choice = len(self._spectra_names) > 1
-        parts = [(self._spectra_label, has_choice, (4, 4)),
-                 (self._spectra_combo, has_choice, (0, 12)),
-                 (self._form_label, True, (4, 4)),
-                 (self._form_combo, True, (0, 4)),
-                 (self._haem_od_box, self._has_od, (0, 12)),
-                 (self._ocr_label, True, (4, 4)),
-                 (self._ocr_combo, True, (0, 12)),
-                 (self._label_mode_label, True, (4, 4)),
-                 (self._label_mode_combo, True, (0, 4)),
-                 ]
-        for part, _, _ in parts:
-            part.pack_forget()
-        for part, is_shown, gap in parts:
-            if is_shown:
-                part.pack(side='left', padx=gap)
+        # The spectrometer only when there is a choice; the per OD boxes only once
+        # every OD value is in, Edit ODs once scaling by OD was chosen.
+        if len(self._spectra_names) > 1:
+            self._spectra_line.pack(anchor='w', pady=(0, 2), before=self._upper)
+        else:
+            self._spectra_line.pack_forget()
+        for box in (self._ocr_od_box, self._haem_od_box):
+            if self._has_od:
+                box.pack(side='left')
+            else:
+                box.pack_forget()
+        if self._can_edit_od:
+            self._od_line.pack(anchor='w', pady=(0, 2), before=self._labels_line)
+        else:
+            self._od_line.pack_forget()
         # The Δψ row: shown only while Δψ is worked out, its boxes holding the values
         # in use (a number typed and refused is taken away with its reason).
         seconds = psi_seconds_filler(values['psi_bH_mV'],
@@ -1588,9 +2260,14 @@ class SettingsStrip:
         self._psi_note.pack_forget()
         self._psi_summary.pack_forget()
         self._psi_more.pack_forget()
-        (self._psi_more if self._is_more_open else self._psi_summary).pack()
+        (self._psi_more if self._is_more_open else self._psi_summary).pack(anchor='w')
+        # The Δψ box: its tick only while Δψ can be worked out, its numbers while it is
+        # ticked.
+        self._psi_on.set(values['delta_psi'])
+        can_psi = self._is_enabled and (self._has_psi or values['delta_psi'])
+        self._psi_tick.configure(state='normal' if can_psi else 'disabled')
         if values['delta_psi']:
-            self._psi_row.pack(before=self._lower, pady=(0, 3))
+            self._psi_row.pack(anchor='w')
         else:
             self._psi_row.pack_forget()
         self._journal_combo.configure(state=choice_state)
@@ -1677,6 +2354,42 @@ class SettingsStrip:
             self._note.configure(text=note, fg=NOTE_TEXT)
         self._change_reporter(before)
 
+    # ---- _time_tab_handler -----------------------------------------------------------
+    def _time_tab_handler(self, tab: str) -> None:
+        """
+        ---- Summary ----
+        Method to take a tab of the Time regions box pressed: its edges go on the plot.
+        The tab already pressed passes nothing on.
+
+        ---- Inputs ----
+        tab : str
+            A key of TIME_TAB_TEXTS.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        """
+
+        if not self._is_enabled or self._values['time_tab'] == tab:
+            return
+        before = dict(self._values)
+        self._values['time_tab'] = tab
+        self._size_refresher()
+        self._change_reporter(before)
+
     # ---- _width_handler --------------------------------------------------------------
     def _width_handler(self, event: Any = None) -> None:
         """
@@ -1719,13 +2432,16 @@ class SettingsStrip:
                        has_percent: bool,
                        has_od: bool,
                        has_baseline: bool = False,
+                       has_psi: bool = False,
+                       can_edit_od: Optional[bool] = None,
                        ) -> None:
         """
         ---- Summary ----
-        Method to say what the strip offers: the spectrometers of the "Spectra"
+        Method to say what the boxes offer: the spectrometers of the "Spectra"
         drop-down (shown only with more than one), whether % oxidised is in the "Haems
-        as" drop-down, whether the per OD box of the haems is shown and per OD is in
-        the "OCR as" drop-down, and whether % of baseline is in it. The values stay.
+        as" drop-down, whether the per OD boxes of the OCR and the haems are shown,
+        whether Edit ODs is, whether % of baseline is in the "OCR as" drop-down, and
+        whether the tick of the Δψ box can be clicked. The values stay.
 
         ---- Inputs ----
         spectra : List[str]
@@ -1737,6 +2453,12 @@ class SettingsStrip:
         has_baseline : bool
             True when the averaging windows are set up, so the OCR is offered as % of
             baseline.
+        has_psi : bool
+            True when Δψ can be worked out (a file with both regions and a fit with bH
+            and bL), so its tick can be clicked.
+        can_edit_od : Optional[bool]
+            True when scaling by OD was chosen, so Edit ODs is shown even while some
+            OD values are missing; None follows has_od.
 
         ---- Globals read ----
         None.
@@ -1758,7 +2480,9 @@ class SettingsStrip:
         self._spectra_names = list(spectra)
         self._has_percent = bool(has_percent)
         self._has_od = bool(has_od)
+        self._can_edit_od = bool(has_od if can_edit_od is None else can_edit_od)
         self._has_baseline = bool(has_baseline)
+        self._has_psi = bool(has_psi)
         self._size_refresher()
 
     # ---- fits_setter -----------------------------------------------------------------
@@ -1823,14 +2547,14 @@ class SettingsStrip:
         """
 
         tk = self._tk
-        for child in self._panel.winfo_children():
+        for child in self._library.winfo_children():
             child.destroy()
         self._haems_by_file = {item['file']: item['haem'] for item in haems}
         self._tick_vars, self._tick_boxes = {}, {}
         lines: Dict[str, Any] = {}
         for item in haems:
             if item['type'] not in lines:
-                lines[item['type']] = tk.Frame(self._panel, bg=self._background)
+                lines[item['type']] = tk.Frame(self._library, bg=self._background)
                 lines[item['type']].pack(anchor='w')
                 tk.Label(lines[item['type']],
                          text=item['type'],
@@ -1839,7 +2563,7 @@ class SettingsStrip:
                          bg=self._background,
                          ).pack(side='left', padx=(4, 4))
             name = item['file']
-            self._tick_vars[name] = tk.BooleanVar(master=self._panel, value=False)
+            self._tick_vars[name] = tk.BooleanVar(master=self._library, value=False)
             box = tk.Checkbutton(lines[item['type']],
                                  text=name[:-4] if name.lower().endswith('.csv') else name,
                                  variable=self._tick_vars[name],
@@ -1995,8 +2719,8 @@ def _page_journal_finder(journal: str) -> str:
 def form_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
     """
     ---- Summary ----
-    Main function to turn the spectrometer, the ways of showing the haems and the OCR
-    and what the event labels show of the strip into the answers of the run.
+    Main function to turn the spectrometer, the ways of showing the haems and the OCR,
+    what the event labels show and their angle into the answers of the run.
 
     ---- Inputs ----
     values : Dict[str, Any]
@@ -2009,8 +2733,8 @@ def form_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
     ---- Outputs ----
     Dict[str, Any]
         The answers to update: decomposition_dataset for the spectrometer, and
-        haem_mode, haem_per_od, ocr_mode and label_mode as given. Empty when the
-        values hold none of them.
+        haem_mode, haem_per_od, ocr_mode, label_mode and event_label_angle as given.
+        Empty when the values hold none of them.
 
     ---- Globals mutated ----
     None.
@@ -2025,7 +2749,12 @@ def form_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
     answers: Dict[str, Any] = {}
     if 'spectra' in values:
         answers['decomposition_dataset'] = values['spectra']
-    for name in ('haem_mode', 'haem_per_od', 'ocr_mode', 'label_mode'):
+    for name in ('haem_mode',
+                 'haem_per_od',
+                 'ocr_mode',
+                 'label_mode',
+                 'event_label_angle',
+                 ):
         if name in values:
             answers[name] = values[name]
     return answers
@@ -2266,6 +2995,78 @@ def ocr_form_choices_lister(has_od: bool, has_baseline: bool) -> List[Tuple[str,
             ]
 
 
+# ---- ocr_mode_builder ----------------------------------------------------------------
+def ocr_mode_builder(shown: str, is_per_od: bool) -> str:
+    """
+    ---- Summary ----
+    Main function to give the way the OCR is shown from the "OCR as" drop-down of the
+    View box and its per OD box: µM min⁻¹ with per OD ticked is the OCR per OD; the %
+    views have no per OD, so the box is left out for them.
+
+    ---- Inputs ----
+    shown : str
+        The choice of the drop-down: 'raw', 'percent' or 'baseline'.
+    is_per_od : bool
+        True when the per OD box is ticked (and can be).
+
+    ---- Globals read ----
+    OCR_FORM_TEXTS.
+
+    ---- Outputs ----
+    str
+        The ocr_mode of the answers: 'raw', 'od', 'percent' or 'baseline'. Raises
+        ValueError for a choice the drop-down does not have.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if shown not in OCR_FORM_TEXTS or shown == 'od':
+        raise ValueError(f"'OCR as' has no choice called '{shown}'.")
+    return 'od' if shown == 'raw' and is_per_od else shown
+
+
+# ---- ocr_view_reader -----------------------------------------------------------------
+def ocr_view_reader(ocr_mode: str) -> Tuple[str, bool]:
+    """
+    ---- Summary ----
+    Main function to give what the View box shows for a way of showing the OCR: the
+    choice of the "OCR as" drop-down and whether its per OD box is ticked. The
+    opposite of ocr_mode_builder.
+
+    ---- Inputs ----
+    ocr_mode : str
+        'raw', 'od', 'percent' or 'baseline'.
+
+    ---- Globals read ----
+    OCR_FORM_TEXTS.
+
+    ---- Outputs ----
+    Tuple[str, bool]
+        (choice of the drop-down, True when per OD is ticked). Raises ValueError for
+        an unknown way.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if ocr_mode not in OCR_FORM_TEXTS:
+        raise ValueError(f"The OCR cannot be shown as '{ocr_mode}'.")
+    return ('raw', True) if ocr_mode == 'od' else (ocr_mode, False)
+
+
 # ---- minutes_checker -----------------------------------------------------------------
 def minutes_checker(text: str) -> Tuple[Optional[float], str]:
     """
@@ -2390,7 +3191,7 @@ def psi_change_describer(changes: Dict[str, Any], answers: dict) -> List[str]:
         lines.append(f"Δψ is now worked out with bH at {values['psi_bH_mV']:g} mV "
                      f"({answers['psi_bH_second_mV']:g} mV with bL reduced) and bL at "
                      f"{values['psi_bL_mV']:g} mV ({answers['psi_bL_second_mV']:g} mV "
-                     f"with bH reduced): a fall of {values['psi_fall_mV']:g} mV.",
+                     f"with bH reduced): a shift of {values['psi_fall_mV']:g} mV.",
                      )
     if 'psi_share' in changes:
         lines.append('The share of the membrane potential between bH and bL is now '
@@ -2516,7 +3317,7 @@ def psi_summary_writer(values: Dict[str, Any]) -> str:
     """
     ---- Summary ----
     Main function to write the share, the temperature and the limits of Δψ as the one
-    line of text shown in the Δψ row while "More" is not ticked.
+    line of text shown in the Δψ row while "More options" is not ticked.
 
     ---- Inputs ----
     values : Dict[str, Any]
@@ -2650,9 +3451,10 @@ def strip_values_builder(answers: dict,
     ---- Inputs ----
     answers : dict
         The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
-        haem_per_od, ocr_mode, label_mode, delta_psi and the numbers of Δψ, journal,
-        columns, height, size_mode); a fit_file of None shows an empty fit, and a
-        missing label_mode the labels in the chamber.
+        haem_per_od, ocr_mode, label_mode, compare_layout, delta_psi and the numbers
+        of Δψ, journal, columns, height, size_mode); a fit_file of None shows an empty
+        fit, a missing label_mode the labels in the chamber, and a missing
+        compare_layout the standard one.
     has_haems : bool
         True when the haems are worked out and shown, which ticks the box.
     haem_files : Sequence[str]
@@ -2687,11 +3489,19 @@ def strip_values_builder(answers: dict,
             'haem_files': list(haem_files),
             'compare': bool(kept),
             'kept': str(kept),
+            'compare_layout': answers.get('compare_layout',
+                                          settings.DEFAULT_ANSWERS['compare_layout'],
+                                          ),
             'spectra': str(answers.get('decomposition_dataset') or ''),
             'haem_mode': answers['haem_mode'],
             'haem_per_od': bool(answers['haem_per_od']),
             'ocr_mode': answers['ocr_mode'],
             'label_mode': answers.get('label_mode', 'chamber'),
+            'event_label_angle': float(answers.get(
+                'event_label_angle',
+                settings.DEFAULT_ANSWERS['event_label_angle'],
+                ),
+                                       ),
             **psi_values_builder(answers, has_haems and answers['delta_psi']),
             'journal': answers['journal'] if is_custom else NO_JOURNAL,
             'columns': answers['columns'],
@@ -2717,8 +3527,8 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         Some or all of the strip values (DATA_FORMAT.md).
 
     ---- Globals read ----
-    VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, HAEM_FORM_TEXTS,
-    OCR_FORM_TEXTS, LABEL_FORM_TEXTS, PSI_FIELDS.
+    VALUE_NAMES, HEIGHT_HELP, BACKGROUND_SHORT_NAMES, COMPARE_LAYOUT_TEXTS,
+    HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, PSI_FIELDS.
 
     ---- Outputs ----
     None
@@ -2763,6 +3573,13 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         raise ValueError('The decomposition kept in the strip is given in words; '
                          f"{values['kept']!r} is not.",
                          )
+    if ('compare_layout' in values and
+        values['compare_layout'] not in COMPARE_LAYOUT_TEXTS
+        ):
+        raise ValueError('The strip cannot show the kept decomposition as '
+                         f"'{values['compare_layout']}'; it has "
+                         f"{', '.join(COMPARE_LAYOUT_TEXTS)}.",
+                         )
     if 'spectra' in values and not isinstance(values['spectra'], str):
         raise ValueError('The spectrometer of the strip is given by its name; '
                          f"{values['spectra']!r} is not.",
@@ -2784,6 +3601,18 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         raise ValueError('The per OD box of the strip is True or False; '
                          f"{values['haem_per_od']!r} is not.",
                          )
+    if 'time_tab' in values and values['time_tab'] not in ('', *TIME_TAB_TEXTS):
+        raise ValueError(f"The Time regions box has no tab called "
+                         f"'{values['time_tab']}'; it has "
+                         f"{', '.join(TIME_TAB_TEXTS)}.",
+                         )
+    if 'event_label_angle' in values:
+        angle = values['event_label_angle']
+        is_number = isinstance(angle, (int, float)) and not isinstance(angle, bool)
+        if not is_number or not ANGLE_LIMITS[0] <= angle <= ANGLE_LIMITS[1]:
+            raise ValueError('The angle of the event labels is from 0 to 90°; '
+                             f'{angle!r} is not.',
+                             )
     if 'delta_psi' in values and not isinstance(values['delta_psi'], bool):
         raise ValueError('Whether the strip shows the Δψ row is True or False; '
                          f"{values['delta_psi']!r} is not.",

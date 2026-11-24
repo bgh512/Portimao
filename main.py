@@ -96,12 +96,12 @@ def cancel_sentence_builder(exported: List[Path],
     """
     ---- Summary ----
     Main function to say what a run cancelled during the questions left in the results
-    folder: the data exported with Export csv, the plots and the workbooks of the files
+    folder: the data exported with the trim step's export buttons, the plots and the workbooks of the files
     saved once their processing and figure were accepted, any of these, or nothing.
 
     ---- Inputs ----
     exported : List[Path]
-        The results folder, once Export csv wrote into it; else empty.
+        The results folder, once an export button wrote into it; else empty.
     saved_plots : List[str]
         Names of the files whose plot was saved; empty when none was.
     export_root : Path
@@ -265,8 +265,8 @@ def everything_asker(folder: Path,
         Settings saved with the dataset, from files_asker; empty for a dataset never
         run.
     exported : Optional[List[Path]]
-        List the results folder is added to once Export csv of the trimming step
-        (3.4) writes into it; None when not needed.
+        List the results folder is added to once an export button of the trimming
+        step (3.4) writes into it; None when not needed.
     saved_plots : Optional[List[str]]
         List that holds the names of the files whose plot is saved in the results
         folder before the run starts; None when not needed.
@@ -286,7 +286,7 @@ def everything_asker(folder: Path,
     ---- Globals mutated ----
     None. Reads from and prints to the terminal; writes last_answers.json through
     last_answers_saver, the settings file of the dataset through
-    dataset_settings_saver, the export of Export csv when one is chosen, adding to
+    dataset_settings_saver, the export of the trim step when one is chosen, adding to
     ``exported``, and the plot and the workbook of every file, filling
     ``saved_plots`` and ``saved_workbooks`` (side effects).
 
@@ -427,7 +427,7 @@ def everything_asker(folder: Path,
     experiments = []
     for s in summaries:
         name = s['name']
-        # the spectra csv files written by Export csv or with the workbooks stay listed
+        # the spectra csv files written by the trim step's export or with the workbooks stay listed
         has_spectra_csv = (has_spectra or
                            (bool(answers['export_spectra']) and name in saved_workbooks)
                            )
@@ -1211,7 +1211,7 @@ def program_runner() -> int:
     failed = []
     unsaved: List[str] = []  # files whose workbook could not be saved
     kept = {}
-    exported: List[Path] = []  # Export csv adds the results folder
+    exported: List[Path] = []  # the trim step's export adds the results folder
     saved_plots: List[str] = []  # the files whose plot is saved before the run
     saved_workbooks: List[str] = []  # the files whose workbook is written before it
     try:

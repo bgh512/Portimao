@@ -109,7 +109,10 @@ from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
-from utils_viewer.viewer_guide import EXPORT_CSV_CHANGE, EXPORT_CSV_TEXT
+from utils_viewer.viewer_guide import (EXPORT_BUTTONS,
+                                       EXPORT_FULL_CHANGE,
+                                       EXPORT_TRIMMED_CHANGE,
+                                       )
 from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        EDIT_LABELS_CHANGE,
                                        EDIT_ODS_CHANGE,
@@ -147,7 +150,7 @@ COMPARE_LAYOUT_WORDS = {'side': 'the kept one shows as a plot of its own, on the
                         }
 PCA_COMPONENTS_TITLE = 'PCA components'
 PCA_EXAMPLES_TITLE = 'PCA examples (smallest and largest residual)'
-STAGE_TITLES = {'trim': 'Set-up: trimming and ignoring',
+STAGE_TITLES = {'trim': 'Import: trimming and ignoring',
                 'details': 'Set-up: OD values, temperature and event labels',
                 'processing': 'Experiment processing',
                 'plots': 'Experiment export: the figure of each file',
@@ -158,11 +161,16 @@ TRIM_FIELDS = [('trim_start', 'Trim before'),
                ('ignore_start', 'Ignore before'),
                ('ignore_end', 'after'),
                ]
-TRIM_KEY_TEXT = 'grey hatched = trimmed away, amber = ignored in calculations'
+TRIM_KEY_TEXT = 'orange hatched = trimmed, grey = ignored in calculations'
+# The key above the trim question, its '=' signs lined up (the terminal side is in a
+# font of one width).
+TRIM_KEY_LINES = ('TRIM (orange)  = data not plotted or used for calculations',
+                  'IGNORED (grey) = data plotted but not used for calculations',
+                  )
 # The numbers of the haem fit questions of the processing, from QUESTION_FLOW.md 4.A.
 PROCESSING_FIT_NUMBERS = {'decompose': '4.1', 'fit': '4.1.1', 'spectrometer': '4.1.2'}
 TRIM_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
-              'edges; press Enter with this box empty when every file looks right.')
+              'bars; press Continue when every experiment looks right.')
 # The boxes of the regions step, in the order of redox_regions.REGION_KEYS.
 REGION_FIELDS = [('oxidised_start', 'Oxidised from'),
                  ('oxidised_end', 'to'),
@@ -181,7 +189,7 @@ WINDOW_FIELDS = [('window_s', 'Settled window'),
 WINDOW_SWITCH = ('is_on', 'Settled windows')
 QUICK_FIELDS = [('quick_s', 'Quick window'), ('delay_s', 'Start after the addition')]
 QUICK_SWITCH = ('quick_is_on', 'Quick windows')
-# the toggle beside "Apply to every experiment": a drag or a typed number moves only
+# the toggle beside "Apply to all": a drag or a typed number moves only
 # the window touched
 WINDOW_OPTIONS = [('each_is_on', 'Adjust each window')]
 WINDOW_KEY_TEXT = ('gold = baseline, blue = settled window, green = quick window, red '
@@ -431,15 +439,16 @@ def _box_edit_runner(session: ViewerSession,
                      answers: dict,
                      state: dict,
                      name: str,
-                     exporter: Callable[[Dict[str, dict]], None],
+                     exporter: Callable[[Dict[str, dict], bool], None],
                      ) -> None:
     """
     ---- Summary ----
     Helper function to carry out a click on Edit ODs or Edit labels in the View box, or
-    on Export csv of the trim step opened again: the OD table or the labels table opens
-    while the question waits and the plot is redrawn after Confirm; Export csv writes
-    the files with the trim and ignore edges as they are (those on the plot while Trim
-    / Ignore is pressed). Before the values exist, one line says where they are typed.
+    on an export button of the trim step opened again: the OD table or the labels table
+    opens while the question waits and the plot is redrawn after Confirm; an export
+    button writes the files with the trim and ignore edges as they are (those on the
+    plot while Trim / Ignore is pressed). Before the values exist, one line says where
+    they are typed.
 
     ---- Inputs ----
     session : ViewerSession
@@ -450,12 +459,14 @@ def _box_edit_runner(session: ViewerSession,
         The run so far (viewer_asker): limits and details; the details are changed in
         place.
     name : str
-        EDIT_ODS_CHANGE, EDIT_LABELS_CHANGE or EXPORT_CSV_CHANGE.
-    exporter : Callable[[Dict[str, dict]], None]
-        Asks what to export and writes it, given the limits.
+        EDIT_ODS_CHANGE, EDIT_LABELS_CHANGE, EXPORT_FULL_CHANGE or
+        EXPORT_TRIMMED_CHANGE.
+    exporter : Callable[[Dict[str, dict], bool], None]
+        Asks about the spectra and writes the export, given the limits and whether
+        the whole recording of each trimmed file is written too.
 
     ---- Globals read ----
-    EDIT_LABELS_CHANGE, EDIT_ODS_CHANGE, EXPORT_CSV_CHANGE.
+    EDIT_LABELS_CHANGE, EDIT_ODS_CHANGE, EXPORT_FULL_CHANGE, EXPORT_TRIMMED_CHANGE.
 
     ---- Outputs ----
     None
@@ -481,15 +492,17 @@ def _box_edit_runner(session: ViewerSession,
     trim_limits_builder
     """
 
-    # ---- 1 Export csv ----------------------------------------------------------------
-    if name == EXPORT_CSV_CHANGE:
+    # ---- 1 The export buttons --------------------------------------------------------
+    if name in (EXPORT_FULL_CHANGE, EXPORT_TRIMMED_CHANGE):
+        with_full = name == EXPORT_FULL_CHANGE
         if session.time_tab == 'trim':
             exporter(trim_limits_builder(session.summaries,
                                          session.window.edges_reader(),
                                          ),
+                     with_full,
                      )
         elif state.get('limits'):
-            exporter(state['limits'])
+            exporter(state['limits'], with_full)
         return
 
     # ---- 2 The OD table and the labels table -----------------------------------------
@@ -542,16 +555,17 @@ def _box_edit_runner(session: ViewerSession,
 def _export_asker(session: ViewerSession,
                   limits: Dict[str, dict],
                   details: Dict[str, dict],
+                  with_full: bool,
                   ) -> None:
     """
     ---- Summary ----
-    Helper function to ask, from the Export csv button of the trim step, whether to
-    export the files of each experiment now so they can be plotted outside the program
-    (nothing; the workbook of the trimmed data; that and the whole recording of each
-    trimmed file; either of those with the spectra as csv files; each with its size
-    worked out for these files), and to do it. Enter gives the last choice, or nothing
-    the first time. The choice and the limits exported are kept in the session; the
-    guide stays where it is.
+    Helper function to export the files of each experiment now, from one of the two
+    export buttons of the trim step, so they can be plotted outside the program: the
+    workbook of the trimmed data, with the whole recording of each trimmed file too
+    from "Export full + trimmed csv". One yes or no question asks whether to write the
+    spectra as csv files too, with the size of both worked out for these files; Enter
+    gives the last answer, or no the first time. The choice and the limits exported
+    are kept in the session; the guide stays where it is.
 
     ---- Inputs ----
     session : ViewerSession
@@ -560,6 +574,8 @@ def _export_asker(session: ViewerSession,
         Trim and ignore limits of every file.
     details : Dict[str, dict]
         OD values and events of every file, as entered so far.
+    with_full : bool
+        True to write the whole recording of each trimmed file too.
 
     ---- Globals read ----
     WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES,
@@ -574,11 +590,10 @@ def _export_asker(session: ViewerSession,
     session.export_choice and session.export_limits (side effects).
 
     ---- Equations ----
-    Size of a choice = the trimmed workbooks, + the whole recordings' workbooks when
-    it writes them, + the spectra of each when it writes them.
+    Size of the workbooks = the trimmed workbooks, + the whole recordings' workbooks
+    with ``with_full``; size of the spectra likewise.
 
     ---- Helpers ----
-    choice_asker
     import_data_exporter
     info_printer
     progress_clearer
@@ -587,9 +602,10 @@ def _export_asker(session: ViewerSession,
     spectra_size_estimator
     text_colourer
     workbook_size_estimator
+    yes_no_asker
     """
 
-    # ---- 1 Ask what to export, with the size of each choice --------------------------
+    # ---- 1 Ask about the spectra, with the size of each part -------------------------
     sheets_bytes = workbook_size_estimator(session.summaries,
                                            limits,
                                            settings.WORKBOOK_POINT_BYTES,
@@ -598,40 +614,24 @@ def _export_asker(session: ViewerSession,
                                            limits,
                                            settings.SPECTRA_CSV_BYTES,
                                            )
-    sizes = {}
-    for key, (with_full, with_spectra) in EXPORT_PARTS.items():
-        size = sheets_bytes[0] + (sheets_bytes[1] if with_full else 0.0)
-        if with_spectra:
-            size += spectra_bytes[0] + (spectra_bytes[1] if with_full else 0.0)
-        sizes[key] = size_describer(size)
-    options = [('none', 'No'),
-               ('summary', f"Summary sheet, trimmed ({sizes['summary']})"),
-               ('summary_full',
-                f"Summary sheet, trimmed and full ({sizes['summary_full']})",
-                ),
-               ('spectra',
-                f"Summary sheet and raw CSVs, trimmed ({sizes['spectra']})",
-                ),
-               ('spectra_full',
-                'Summary sheet and raw CSVs, trimmed and full '
-                f"({sizes['spectra_full']})",
-                ),
-               ]
-    info_printer('The summary sheet is a workbook for each file; the raw CSVs are its '
-                 'spectra, which are large and take a while to write.',
-                 )
-    if sheets_bytes[1] <= 0:
-        info_printer('No file is trimmed, so "trimmed and full" writes the same as '
-                     '"trimmed".',
+    sheets = sheets_bytes[0] + (sheets_bytes[1] if with_full else 0.0)
+    spectra = spectra_bytes[0] + (spectra_bytes[1] if with_full else 0.0)
+    if with_full and sheets_bytes[1] <= 0:
+        info_printer('No file is trimmed, so this writes the same as Export trimmed '
+                     'csv.',
                      )
-    choice = choice_asker('Would you like to export the individual experiment files '
-                          'now?',
-                          options,
-                          session.export_choice or 'none',
-                          number='3.4',
-                          )
-    if choice == 'none':
-        return
+    info_printer(f'A workbook is written for each file ({size_describer(sheets)}). '
+                 f'The spectra as csv files are large ({size_describer(spectra)}) and '
+                 'take a while to write.',
+                 )
+    was_spectra = EXPORT_PARTS.get(session.export_choice, (False, False))[1]
+    with_spectra = yes_no_asker('Do you want the spectra as csv files too?',
+                                was_spectra,
+                                number='3.4',
+                                )
+    choice = (('spectra' if with_spectra else 'summary') +
+              ('_full' if with_full else '')
+              )
 
     # ---- 2 Export --------------------------------------------------------------------
     problems = import_data_exporter(
@@ -1471,7 +1471,7 @@ def _regions_chooser(session: ViewerSession,
     ---- Summary ----
     Helper function to run the regions step on the plot of every file: the oxidised and
     the reduced region are pulled out on the plot or typed in the strip under it, and
-    Enter accepts them. With "Apply to every experiment" ticked, an edge set on the file shown is
+    Enter accepts them. With "Apply to all" ticked, an edge set on the file shown is
     copied to every file at the same distance from its nearest addition. Enter with no
     region on any file means no regions; when only some files have both, a question
     names the others and asks whether to continue without them, and No goes back to
@@ -1536,9 +1536,9 @@ def _regions_chooser(session: ViewerSession,
                  "and fully reduced. Each haem's level in them gives its % oxidised.",
                  )
     info_printer(
-        'Red is oxidised, blue is reduced; with "Apply to every experiment" '
-        'ticked, an edge is copied to every file at the same distance from its '
-        'nearest addition.',
+        'Red is oxidised, blue is reduced; ticking "Apply to all" copies the '
+        'regions to every file at the same distance from their nearest addition, '
+        'and it unticks itself when the next file is shown.',
         tight=True,
         )
     info_printer('With no regions the haems cannot be shown in % oxidised; everything '
@@ -1805,7 +1805,7 @@ def _regions_lister(summaries: List[dict],
                 )
         warning_shower(f"{', '.join(unreached)}: {kept} when an edge was copied to "
                        'every file. Go back to the processing step to set it on that '
-                       'file alone, with "Apply to every experiment" unticked.',
+                       'file alone, with "Apply to all" unticked.',
                        )
 
 
@@ -2348,7 +2348,7 @@ def _strip_change_applier(session: ViewerSession,
     size_answers_builder
     """
 
-    # ---- 0 The clicks: the master page, a tab, the tables and Export csv -------------
+    # ---- 0 The clicks: the master page, a tab, the tables and the export buttons -----
     if changes.get(MASTER_CHANGE):
         if session.is_figure and session.master_exporter is not None:
             session.master_exporter()
@@ -2364,7 +2364,11 @@ def _strip_change_applier(session: ViewerSession,
         else:
             session.window.strip_setter({TIME_TAB_CHANGE: session.time_tab})
         return
-    for name in (EDIT_ODS_CHANGE, EDIT_LABELS_CHANGE, EXPORT_CSV_CHANGE):
+    for name in (EDIT_ODS_CHANGE,
+                 EDIT_LABELS_CHANGE,
+                 EXPORT_FULL_CHANGE,
+                 EXPORT_TRIMMED_CHANGE,
+                 ):
         if changes.get(name):
             if session.edit_runner is not None:
                 session.edit_runner(name)
@@ -2719,7 +2723,7 @@ def _windows_chooser(session: ViewerSession,
     pulling the start of any of them changes how long after the addition they start,
     pulling its end the length. A change moves every window of its kind, or with
     Adjust each window ticked only the window dragged (the boxes then show it), on
-    every file or with Apply to every experiment unticked on the file shown. The four
+    every file while Apply to all is ticked, otherwise on the file shown. The four
     values are also typed in the two rows of the Time regions box, where each kind has
     its tick box (with both unticked there are no windows) and a numbered tick per
     window to leave it out (grey). Enter accepts. The windows that do not fit are
@@ -2799,9 +2803,10 @@ def _windows_chooser(session: ViewerSession,
                  )
     info_printer('A change moves every window of its kind; tick Adjust each window to '
                  'move only the window you drag, and the boxes then show that window. '
-                 'Untick a number under Use to leave that window out (grey). With '
-                 'Apply to every experiment unticked, a change is made on the file '
-                 'shown only.',
+                 'Untick a number under Use to leave that window out (grey). A change '
+                 'is made on the file shown only; ticking Apply to all copies its '
+                 'windows to every file, and it unticks itself when the next file is '
+                 'shown.',
                  tight=True,
                  )
     _step_edges_shower(session, 'windows', choice)
@@ -2956,8 +2961,8 @@ def _windows_keeper(session: ViewerSession,
     ---- Summary ----
     Helper function to keep the averaging windows read from the edges, say what they
     are, and name in a warning those that do not fit. The windows most files share
-    are the dataset's; a file whose windows differ (fixed by hand with "Apply to every
-    experiment" unticked) keeps its own.
+    are the dataset's; a file whose windows differ (fixed by hand with "Apply to all"
+    unticked) keeps its own.
 
     ---- Inputs ----
     session : ViewerSession
@@ -3046,7 +3051,7 @@ def _windows_keeper(session: ViewerSession,
     if told:
         info_printer(told, tight=True)
     if answers['file_windows']:
-        info_printer('Windows of their own (Apply to every experiment unticked): '
+        info_printer('Windows of their own (changed with Apply to all unticked): '
                      f"{', '.join(answers['file_windows'])}.",
                      tight=True,
                      )
@@ -3923,14 +3928,18 @@ def trim_stage_runner(session: ViewerSession,
                       answers: dict,
                       remembered: Dict[str, dict],
                       previous: Optional[Dict[str, dict]] = None,
-                      exporter: Optional[Callable[[Dict[str, dict]], None]] = None,
+                      exporter: Optional[Callable[[Dict[str, dict], bool],
+                                                  None,
+                                                  ]] = None,
                       ) -> Dict[str, dict]:
     """
     ---- Summary ----
     Main function to run the trimming step on the standard plot of the whole recording
     of every file: the trimmed and ignored edges are dragged on the plot or typed in
-    the Time regions box above it, and Continue accepts them; Export csv writes the
-    files with the edges as they are, and the step waits again. When the step is
+    the Time regions box above it, under the key of their colours, and Continue
+    accepts them; the two export buttons write the files with the edges as they are
+    (Export full + trimmed csv with the whole recording of each trimmed file too), and
+    the step waits again. When the step is
     opened again, the limits it had stay on the plot as red dashed lines. The limits
     are then listed and the trimmed data is drawn. The haems are those of the
     session's fit (none when it has none).
@@ -3946,12 +3955,13 @@ def trim_stage_runner(session: ViewerSession,
     previous : Optional[Dict[str, dict]]
         Limits in the same layout drawn as red dashed lines while the edges are
         dragged; None for none.
-    exporter : Optional[Callable[[Dict[str, dict]], None]]
-        Called with the limits of the edges as they are when Export csv is clicked;
-        None for no Export csv button.
+    exporter : Optional[Callable[[Dict[str, dict], bool], None]]
+        Called with the limits of the edges as they are when an export button is
+        clicked, and True for Export full + trimmed csv; None for no export buttons.
 
     ---- Globals read ----
-    EXPORT_CSV_CHANGE, EXPORT_CSV_TEXT, TRIM_NUDGE.
+    TRIM_KEY_LINES, TRIM_NUDGE (module constants); EXPORT_BUTTONS,
+    EXPORT_FULL_CHANGE.
 
     ---- Outputs ----
     Dict[str, dict]
@@ -3994,35 +4004,37 @@ def trim_stage_runner(session: ViewerSession,
     draw()
 
     # ---- 2 Drag or type the edges until Continue -------------------------------------
-    # Export csv writes the files with the edges as they are, and the step waits again.
+    # An export button writes the files with the edges as they are, and the step waits
+    # again.
     choice = _trim_choice_builder(session, remembered, previous)
     guide_step_starter('trim')
-    info_printer('TRIM = data that is not imported, plotted or used.')
-    info_printer('IGNORE = data that is plotted but not used for calculations.')
-    info_printer(
-        'Grey edges trim, amber edges ignore; with "Apply to every experiment" '
-        'ticked, a change moves every file.',
-        tight=True,
-        )
+    info_printer(TRIM_KEY_LINES[0])
+    info_printer(TRIM_KEY_LINES[1], tight=True)
+    info_printer('Ticking Apply to all copies the times of the experiment shown to '
+                 'every experiment; it unticks itself when the next one is shown.',
+                 )
     if exporter is not None:
-        info_printer('Export csv writes the data of every file with these edges, to '
-                     'plot it outside Portimao.',
+        info_printer('The export buttons write the data of every experiment with these '
+                     'times, to plot it outside Portimao.',
                      tight=True,
                      )
     _step_edges_shower(session, 'trim', choice)
     try:
-        while enter_waiter('Drag the edges on the plot, or type the times in the Time '
-                           'regions box above it. Click Continue when every file looks '
-                           'right.',
-                           TRIM_NUDGE,
-                           number='2.1',
-                           extras=[(EXPORT_CSV_CHANGE, EXPORT_CSV_TEXT)]
-                           if exporter is not None
-                           else [],
-                           ):
+        while True:
+            clicked = enter_waiter(
+                'Drag the bars on the plot, or type the times in the '
+                'Time regions box. Check each experiment, then '
+                'press Continue.',
+                TRIM_NUDGE,
+                number='2.1',
+                extras=EXPORT_BUTTONS if exporter is not None else (),
+                )
+            if not clicked:
+                break
             exporter(trim_limits_builder(session.summaries,
                                          session.window.edges_reader(),
                                          ),
+                     clicked == EXPORT_FULL_CHANGE,
                      )
     finally:
         minutes = _step_edges_reader(session)
@@ -4159,7 +4171,7 @@ def viewer_asker(summaries: List[dict],
                                  )
     window.strip_state_setter(True)
 
-    # ---- 2.1 The tabs of the Time regions box, the edit buttons, Export csv ----------
+    # ---- 2.1 The tabs of the Time regions box, the edit and export buttons -----------
     # The limits are one record, changed in place, so every step and plot uses the
     # trim and ignore edges of now.
     def keep_limits(new: Dict[str, dict]) -> Dict[str, dict]:
@@ -4178,8 +4190,8 @@ def viewer_asker(summaries: List[dict],
                                              for v in state['limits'].values()
                                              )
         return state['limits']
-    def export_csv(limits: Dict[str, dict]) -> None:
-        _export_asker(session, limits, state.get('details') or {})
+    def export_csv(limits: Dict[str, dict], with_full: bool) -> None:
+        _export_asker(session, limits, state.get('details') or {}, with_full)
     kits = _tab_kits_builder(session, answers, state, keep_limits)
     session.tab_switcher = lambda tab: _tab_switcher(session, kits, tab)
     session.edit_runner = lambda name: _box_edit_runner(session,

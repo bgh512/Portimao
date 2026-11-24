@@ -311,8 +311,7 @@ def test_steps_move_on_and_fold() -> None:
                           'temperature',
                           ],
                          )
-    assert _status_reader(state) == {'trim': 'done',
-                                     'od_scaling': 'done',
+    assert _status_reader(state) == {'od_scaling': 'done',
                                      'od_values': 'skipped',
                                      'ocr_view': 'skipped',
                                      'temperature': 'open',
@@ -320,7 +319,8 @@ def test_steps_move_on_and_fold() -> None:
                                      }
     stage_rows = [row for row in state.row_lister() if row['kind'] == 'stage']
     stages = [row['text'] for row in stage_rows]
-    assert stages[0] == 'Import  ·  steps 1–3  ✓'
+    # the trim step is the last step of the import
+    assert stages[0] == 'Import  ·  steps 1–4  ✓'
     assert stages[1] == 'Set-up'
     assert stages[2] == 'Experiment processing  ·  steps 10–13'
     assert stages[-1] == 'Dataset export  ·  step 21'
@@ -333,9 +333,9 @@ def test_steps_move_on_and_fold() -> None:
             if row['kind'] == 'step'
             }
     assert tags['od_values'] == tags['ocr_view'] == 'not needed this run'
-    assert tags['trim'] == tags['temperature'] == tags['labels'] == ''
+    assert tags['temperature'] == tags['labels'] == ''
     assert not state.is_back()
-    assert state.card_teller() == {'note': '', 'help': '', 'back': '', 'extra': ''}
+    assert state.card_teller() == {'note': '', 'help': '', 'back': '', 'extra': ()}
     with pytest.raises(ValueError):
         state.step_starter('not_a_step')
 
@@ -423,8 +423,8 @@ def test_change_opens_earlier_step() -> None:
     ---- Summary ----
     Main function to check that changing the fit while at Δψ opens the haem step,
     with an arrow and "you were here" on Δψ and a button back to it, that going back
-    opens Δψ again, and that the Trim / Ignore tab opens the trim step with its
-    Export csv button.
+    opens Δψ again, and that the Trim / Ignore tab opens the trim step with its two
+    export buttons.
 
     ---- Inputs ----
     None.
@@ -459,7 +459,7 @@ def test_change_opens_earlier_step() -> None:
     assert card['back'] == 'Back to Δψ'
     assert card['note'] == ('This is step 10, Haems. When you are done here, go back '
                             'to step 12, Δψ, where you were.')
-    assert 'Keep to compare' in card['help'] and card['extra'] == ''
+    assert 'Keep to compare' in card['help'] and card['extra'] == ()
     state.back_taker()
     assert not state.is_back() and _status_reader(state)['delta_psi'] == 'open'
 
@@ -467,11 +467,14 @@ def test_change_opens_earlier_step() -> None:
     assert step_of_change_finder({'edit_ods': True}) == 'od_values'
     assert step_of_change_finder({'edit_labels': True}) == 'labels'
 
-    # the Trim / Ignore tab opens the trim step, which keeps its Export csv button
+    # the Trim / Ignore tab opens the trim step, which keeps its two export buttons
     assert step_of_change_finder({'time_tab': 'trim'}) == 'trim'
     assert state.change_opener({'time_tab': 'trim'})
     assert state.shown == GUIDE_KEYS.index('trim')
-    assert state.card_teller()['extra'] == 'Export csv'
+    assert [words for _, words in state.card_teller()['extra']] == [
+        'Export full + trimmed csv',
+        'Export trimmed csv',
+        ]
     state.back_taker()
 
     # the program going back to an earlier step keeps how far it had reached

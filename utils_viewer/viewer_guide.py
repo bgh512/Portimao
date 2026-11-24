@@ -34,10 +34,11 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
         ),
     ('previous', 'Import', 'Previous processing', 'Whether the previous processing is loaded is chosen when Portimao opens.'),
     ('trim',
-     'Set-up',
+     'Import',
      'Trim and ignore',
-     'Drag the trim and ignore edges on the plot, or type them in the Time regions box '
-     'above it. Click Export csv to write the csv files with the edges as they are.',
+     'Drag the bars on the plot, or type the times under Trim / Ignore in the Time '
+     'regions box above it. Click Export full + trimmed csv or Export trimmed csv to '
+     'write the csv files with the bars as they are.',
      ),
     ('od_scaling', 'Set-up', 'Scale by OD', f'Whether the OCR and the haems can be shown per OD was set here. {GO_BACK_HELP}'),
     ('od_values',
@@ -139,11 +140,18 @@ CHANGE_STEPS = {'edit_ods': 'od_values',
                 'height': 'figure',
                 'export_master': 'figure',
                 }
-# The button a step keeps when it is opened again from a later one: its words. A click
-# is told as {EXPORT_CSV_CHANGE: True}, as a change in the boxes is.
-EXPORT_CSV_TEXT = 'Export csv'
-EXPORT_CSV_CHANGE = 'export_csv'
-STEP_EXTRAS = {'trim': EXPORT_CSV_TEXT}
+# The buttons a step keeps when it is opened again from a later one: (what a click is
+# told as, its words). A click is told as {change: True}, as a change in the boxes is.
+# The trim step's two export buttons write the trimmed data, or that and the whole
+# recording of each trimmed file.
+EXPORT_FULL_TEXT = 'Export full + trimmed csv'
+EXPORT_FULL_CHANGE = 'export_full'
+EXPORT_TRIMMED_TEXT = 'Export trimmed csv'
+EXPORT_TRIMMED_CHANGE = 'export_trimmed'
+EXPORT_BUTTONS = ((EXPORT_FULL_CHANGE, EXPORT_FULL_TEXT),
+                  (EXPORT_TRIMMED_CHANGE, EXPORT_TRIMMED_TEXT),
+                  )
+STEP_EXTRAS = {'trim': EXPORT_BUTTONS}
 MARKS = {'open': '▸', 'here': '→', 'done': '✓', 'skipped': ' ', 'later': ' '}
 HERE_TAG = 'you were here'
 # beside a step passed without being asked, so the numbers do not seem to jump
@@ -277,25 +285,25 @@ class GuideState:
         self.shown = self.current
 
     # ---- card_teller -----------------------------------------------------------------
-    def card_teller(self) -> Dict[str, str]:
+    def card_teller(self) -> Dict[str, Any]:
         """
         ---- Summary ----
         Method to give what the open step says above its messages when it is an
         earlier step: the note on where you were, the step's help, the words of the
-        button that goes back and those of the step's own button (Export csv of the
-        trim step), if it has one.
+        button that goes back and the step's own buttons (the two export buttons of
+        the trim step), if it has any.
 
         ---- Inputs ----
         None.
 
         ---- Globals read ----
-        GUIDE_STEPS.
+        GUIDE_STEPS, STEP_EXTRAS.
 
         ---- Outputs ----
-        Dict[str, str]
-            {'note', 'help', 'back', 'extra'}; each empty while the step open is the
-            one the program waits at, and 'extra' empty for a step without a button
-            of its own.
+        Dict[str, Any]
+            {'note', 'help', 'back': str, 'extra': tuple of (change, words)}; each
+            empty while the step open is the one the program waits at, and 'extra'
+            empty for a step without buttons of its own.
 
         ---- Globals mutated ----
         None.
@@ -308,7 +316,7 @@ class GuideState:
         """
 
         if not self.is_back():
-            return {'note': '', 'help': '', 'back': '', 'extra': ''}
+            return {'note': '', 'help': '', 'back': '', 'extra': ()}
         key, _, name, help_text = GUIDE_STEPS[self.shown]
         _, _, here, _ = GUIDE_STEPS[self.current]
         return {'note': (f'This is step {self.shown + 1}, {name}. When you are done '
@@ -317,7 +325,7 @@ class GuideState:
                          ),
                 'help': help_text,
                 'back': f'Back to {here}',
-                'extra': STEP_EXTRAS.get(key, ''),
+                'extra': STEP_EXTRAS.get(key, ()),
                 }
 
     # ---- change_opener ---------------------------------------------------------------
@@ -1286,13 +1294,13 @@ class AnswerArea:
     def back_shower(self,
                     text: str,
                     on_back: Callable[[], None],
-                    extra: Optional[Tuple[str, Callable[[], None]]] = None,
+                    extra: Sequence[Tuple[str, Callable[[], None]]] = (),
                     is_confirm: bool = False,
                     ) -> None:
         """
         ---- Summary ----
         Method to show only the button that goes back to the step waited at, while an
-        earlier step is open, under the step's own button when it has one. While a
+        earlier step is open, under the step's own buttons when it has any. While a
         table waits (Edit ODs, Edit labels), its Confirm button stays above them, and
         Enter gives it.
 
@@ -1301,8 +1309,9 @@ class AnswerArea:
             Its words ("Back to Δψ").
         on_back : Callable[[], None]
             What a click does.
-        extra : Optional[Tuple[str, Callable[[], None]]]
-            (words, what a click does) of the step's own button (Export csv), or None.
+        extra : Sequence[Tuple[str, Callable[[], None]]]
+            (words, what a click does) of each of the step's own buttons (the two
+            export buttons of the trim step); empty for none.
         is_confirm : bool
             True while the question that waits is a table, so Confirm is shown too.
 
@@ -1324,8 +1333,8 @@ class AnswerArea:
         self._clearer()
         if is_confirm:
             self.confirm.pack(side='top', fill='x', pady=2)
-        if extra is not None:
-            own = self._button_maker(extra[0], extra[1], False)
+        for words, on_click in extra:
+            own = self._button_maker(words, on_click, False)
             own.pack(side='top', fill='x', pady=2)
             self._widgets.append(own)
         button = self._button_maker(text, on_back, not is_confirm)
@@ -1424,7 +1433,7 @@ class AnswerArea:
 
         # ---- 2 Show the answers of this one ------------------------------------------
         if kind == 'continue':
-            # the extra buttons of the step (Export csv) sit above Continue
+            # the extra buttons of the step (the two export buttons) sit above Continue
             for answer, words in request['options'] or []:
                 made(words, answer, words, False).pack(side='top', fill='x', pady=2)
             made('Continue', '', 'Continue', True).pack(side='top', fill='x', pady=2)

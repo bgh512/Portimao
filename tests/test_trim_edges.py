@@ -4,6 +4,7 @@ Tests that the edges of the trimming step move, stop and shade as worked out by 
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from typing import Dict
+from unittest.mock import MagicMock
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import pytest
@@ -16,8 +17,11 @@ from utils_shared.survey import (trim_layout_finder,
                                  trim_minutes_builder,
                                  trim_minutes_setter,
                                  trim_pointer_reader,
+                                 trim_times_finder,
                                  )
 from utils_viewer.viewer_edges import (edge_hit_finder,
+                                       EdgeChoice,
+                                       EdgeOverlay,
                                        every_file_setter,
                                        minute_x_finder,
                                        own_value_lister,
@@ -143,6 +147,19 @@ def test_every_file_or_one_file() -> None:
     assert [alone[name]['trim_start'] for name in summaries] == [8.0, 0.0, 0.0]
     assert values['long']['trim_start'] == 0.0
     assert own_value_lister({'long': dict(NOTHING)}) == []
+    # a value one file has and the others lack is its own; a field left unmarked
+    # (which window of the averaging step was dragged last) never marks a file
+    assert own_value_lister({'a': {'x': 1.0},
+                             'b': {'x': 1.0},
+                             'c': {'x': 1.0, 'average2:window_s': 90.0},
+                             },
+                            ) == ['c']
+    assert own_value_lister({'a': {'x': 1.0, 'picked': 1.0},
+                             'b': {'x': 1.0, 'picked': 2.0},
+                             'c': {'x': 1.0, 'picked': 2.0},
+                             },
+                            ('picked',),
+                            ) == []
 
 
 # ---- test_ignored_parts_stay_inside_the_kept_part ------------------------------------
@@ -425,13 +442,180 @@ def test_pointer_gives_the_minutes_of_each_edge() -> None:
     assert trim_pointer_reader(LONG, minutes, 'trim_end', 61.0) == 0.0
 
 
+# ---- test_full_times_in_the_boxes ----------------------------------------------------
+def test_full_times_in_the_boxes() -> None:
+    """
+    ---- Summary ----
+    Main function to check that the Trim / Ignore boxes show the four edges as times
+    on the whole recording, that a time typed in a box puts the edge at that time, and
+    that with "Apply to all" ticked the other files take the same minutes from their
+    own start or end. The window is stood in for.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    LONG, SHORT, NOTHING (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    60 min trimmed 4 and 5 min, ignored 5 and 2 min: trim before 4, after 60 - 5 = 55,
+    ignore before 4 + 5 = 9, after 55 - 2 = 53. Trim after typed as 52: 60 - 52 = 8
+    min off the end, so the 40 min file is trimmed after 40 - 8 = 32 min.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The times shown, and read back --------------------------------------------
+    minutes = {'trim_start': 4.0,
+               'trim_end': 5.0,
+               'ignore_start': 5.0,
+               'ignore_end': 2.0,
+               }
+    shown = trim_times_finder(LONG, minutes)
+    assert shown == pytest.approx({'trim_start': 4.0,
+                                   'trim_end': 55.0,
+                                   'ignore_start': 9.0,
+                                   'ignore_end': 53.0,
+                                   },
+                                  )
+    for key, time_min in shown.items():
+        assert trim_pointer_reader(LONG, minutes, key, time_min) == pytest.approx(
+            minutes[key],
+            )
+
+    # ---- 2 A time typed in a box, on every file --------------------------------------
+    by_name = {'long': LONG, 'short': SHORT}
+    choice = EdgeChoice(fields=[('trim_start', 'Trim before'),
+                                ('trim_end', 'after'),
+                                ('ignore_start', 'Ignore before'),
+                                ('ignore_end', 'after'),
+                                ],
+                        values={'long': dict(NOTHING), 'short': dict(NOTHING)},
+                        layout_finder=lambda name, own: trim_layout_finder(by_name[name], own),
+                        pointer_reader=lambda name, own, key, time_min: (
+                            trim_pointer_reader(by_name[name], own, key, time_min)),
+                        value_setter=lambda name, own, key, value: (
+                            trim_minutes_setter(by_name[name], own, key, value)),
+                        shown_maker=lambda name, own: trim_times_finder(by_name[name],
+                                                                        own,
+                                                                        ),
+                        typed_reader=lambda name, own, key, time_min: (
+                            trim_pointer_reader(by_name[name], own, key, time_min)),
+                        )
+    overlay = EdgeOverlay(MagicMock(), MagicMock(), 'Courier', lambda: None)
+    overlay.choice_setter(choice)
+    overlay._name = 'long'  # the file shown, as the window places it
+    overlay.all_files_copier()  # "Apply to all" ticked
+    overlay.field_setter('trim_end', 52.0)
+    assert overlay.values['long']['trim_end'] == pytest.approx(8.0)
+    assert overlay.shown_values_reader('long')['trim_end'] == pytest.approx(52.0)
+    assert overlay.shown_values_reader('short')['trim_end'] == pytest.approx(32.0)
+    assert overlay.shown_values_reader('nothing') is None
+
+
+# ---- test_apply_to_all_copies_once ---------------------------------------------------
+def test_apply_to_all_copies_once() -> None:
+    """
+    ---- Summary ----
+    Main function to check "Apply to all": it starts unticked, so a change moves the
+    file shown only; ticking it copies the four edges of the file shown to the other
+    file once, and while that file is shown a change moves both; showing the other
+    file unticks it (and tells the window), so that file then changes alone. The
+    window is stood in for.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    LONG, SHORT, NOTHING, PICTURE_BOX, TIME_AXIS (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The 60 min file trimmed 4 and 5 min, ignored 5 and 2 min. Copied to the 40 min
+    file (additions at 5 and 30 min) the same minutes from its own start and end: its
+    kept part runs from 4 to 40 - 5 = 35 min, which keeps both additions. Trim before
+    typed as 3 on the 60 min file while ticked: 3 min on both. Trim before typed as 2
+    on the 40 min file once it is shown: 2 min there, the 60 min file stays at 3.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Unticked at the start: the file shown only --------------------------------
+    by_name = {'long': LONG, 'short': SHORT}
+    trimmed = {'trim_start': 4.0,
+               'trim_end': 5.0,
+               'ignore_start': 5.0,
+               'ignore_end': 2.0,
+               }
+    choice = EdgeChoice(fields=[('trim_start', 'Trim before'),
+                                ('trim_end', 'after'),
+                                ('ignore_start', 'Ignore before'),
+                                ('ignore_end', 'after'),
+                                ],
+                        values={'long': dict(trimmed), 'short': dict(NOTHING)},
+                        layout_finder=lambda name, own: trim_layout_finder(by_name[name], own),
+                        pointer_reader=lambda name, own, key, time_min: (
+                            trim_pointer_reader(by_name[name], own, key, time_min)),
+                        value_setter=lambda name, own, key, value: (
+                            trim_minutes_setter(by_name[name], own, key, value)),
+                        )
+    unticked = []
+    overlay = EdgeOverlay(MagicMock(),
+                          MagicMock(),
+                          'Courier',
+                          lambda: None,
+                          on_untick=lambda: unticked.append(True),
+                          )
+    overlay.choice_setter(choice)
+    assert overlay.is_every_file is False
+    picture = Image.new('RGB', (800, 400), (255, 255, 255))
+    overlay.picture_placer('long', picture, 1, PICTURE_BOX, TIME_AXIS)
+    overlay.field_setter('trim_end', 6.0)
+    assert overlay.values['long']['trim_end'] == pytest.approx(6.0)
+    assert overlay.values['short'] == pytest.approx(NOTHING)
+    overlay.field_setter('trim_end', 5.0)
+
+    # ---- 2 Ticked: copied once, and changes go to every file -------------------------
+    overlay.all_files_copier()
+    assert overlay.is_every_file is True
+    assert overlay.values['short'] == pytest.approx(trimmed)
+    assert overlay.values['long'] == pytest.approx(trimmed)
+    overlay.picture_placer('long', picture, 1, PICTURE_BOX, TIME_AXIS)  # redrawn
+    assert overlay.is_every_file is True and unticked == []
+    overlay.field_setter('trim_start', 3.0)
+    assert overlay.values['long']['trim_start'] == pytest.approx(3.0)
+    assert overlay.values['short']['trim_start'] == pytest.approx(3.0)
+
+    # ---- 3 Another file shown: unticked, that file changes alone ---------------------
+    overlay.picture_placer('short', picture, 1, PICTURE_BOX, TIME_AXIS)
+    assert overlay.is_every_file is False and unticked == [True]
+    overlay.field_setter('trim_start', 2.0)
+    assert overlay.values['short']['trim_start'] == pytest.approx(2.0)
+    assert overlay.values['long']['trim_start'] == pytest.approx(3.0)
+
+
 # ---- test_shaded_picture -------------------------------------------------------------
 def test_shaded_picture() -> None:
     """
     ---- Summary ----
-    Main function to check that a shaded part is see-through amber on a white picture,
-    that the rest of the picture is untouched, and that a part narrower than a pixel is
-    left out.
+    Main function to check that an ignored part is see-through grey on a white
+    picture, that the rest of the picture is untouched, and that a part narrower than
+    a pixel is left out.
 
     ---- Inputs ----
     None.
@@ -447,8 +631,8 @@ def test_shaded_picture() -> None:
     None.
 
     ---- Equations ----
-    Amber #e8a317 = (232, 163, 23) at 22 % (56 of 255) over white:
-    255 - (255 - channel) * 56 / 255 = (249.95, 234.8, 204.05), so (250, 235, 204).
+    Grey #8c8c8c = (140, 140, 140) at 22 % (56 of 255) over white:
+    255 - (255 - 140) * 56 / 255 = 229.75, so (230, 230, 230).
 
     ---- Helpers ----
     None.
@@ -458,7 +642,7 @@ def test_shaded_picture() -> None:
     shaded = shaded_picture_maker(white, [(5.0, 15.0, 0.0, 10.0, 'ignore')])
     assert shaded.size == (20, 10)
     assert shaded.getpixel((2, 5)) == (255, 255, 255)
-    assert shaded.getpixel((10, 5)) == pytest.approx((250, 235, 204), abs=1)
+    assert shaded.getpixel((10, 5)) == pytest.approx((230, 230, 230), abs=1)
     narrow = shaded_picture_maker(white, [(5.0, 5.5, 0.0, 10.0, 'trim')])
     assert list(narrow.getdata()) == list(white.getdata())
 

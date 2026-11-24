@@ -7,7 +7,7 @@ import copy
 import io
 import threading
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
+from PIL import Image
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
@@ -58,13 +59,20 @@ KEPT_ALPHA = 0.55
 # the share of a kept trace's range left free above and below it when a haem panel is
 # widened to hold it, as the panels leave around the haems in use
 KEPT_MARGIN = 0.05
-IGNORE_COLOUR = '#e8a317'  # also the ignored parts in the trimming step (viewer_edges)
-# what the export of the import writes: the workbooks only, with the trimmed spectra, or
-# with the spectra of the whole recordings as well
-SPECTRA_BY_EXPORT = {'summary': (False, False),
-                     'trimmed': (True, False),
-                     'all': (True, True),
-                     }
+# How the kept decomposition is shown (the answer compare_layout): as a plot of its own
+# on the left of the plot in use, or dashed over it ('overlaid').
+SIDE_BY_SIDE = 'side'
+# the white gap between the two plots shown side by side, in pixels of the picture
+SIDE_GAP_PX = 16
+IGNORE_COLOUR = '#8c8c8c'  # grey; also the ignored parts in the trimming step (viewer_edges)
+# What each choice of the export of the import writes beside the workbook of the trimmed
+# data: (the whole recording of a trimmed file in its full folder, the spectra as csv
+# files beside every workbook written).
+EXPORT_PARTS = {'summary': (False, False),
+                'summary_full': (True, False),
+                'spectra': (False, True),
+                'spectra_full': (True, True),
+                }
 
 
 # ---- PreviewSpec ---------------------------------------------------------------------
@@ -93,7 +101,8 @@ class TimeAxis:
     """
     ---- Summary ----
     Where the time axis shared by the panels sits in a preview picture, and the times at
-    its two ends, so a point of the picture can be turned into a time.
+    its two ends, so a point of the picture can be turned into a time; and where each
+    panel that can be moved sits, so the window can put its arrows beside it.
     Detailed structure can be found in DATA_FORMAT.md.
     """
 
@@ -103,6 +112,7 @@ class TimeAxis:
     top: float
     start_min: float
     end_min: float
+    panels: List[Tuple[str, float, float]] = field(default_factory=list)
 
 
 # ---- ViewerSession -------------------------------------------------------------------
@@ -125,13 +135,23 @@ class ViewerSession:
     regions: Dict[str, Dict[str, float]] = field(default_factory=dict)
     limits: Dict[str, dict] = field(default_factory=dict)
     has_od: bool = False
+    is_od_chosen: bool = False
+    has_windows: bool = False
     redraw: Optional[Callable[[], bool]] = None
     is_figure: bool = False
+    master_exporter: Optional[Callable[[], None]] = None
     is_choosing_regions: bool = False
     export_choice: Optional[str] = None
     export_limits: Dict[str, dict] = field(default_factory=dict)
     full_exports: Dict[str, List[Path]] = field(default_factory=dict)
     exported: List[Path] = field(default_factory=list)
+    time_tab: str = ''
+    step_tab: str = ''
+    step_choice: Any = None
+    step_redraw: Optional[Callable[[], bool]] = None
+    base_redraw: Optional[Callable[[], bool]] = None
+    tab_switcher: Optional[Callable[[str], None]] = None
+    edit_runner: Optional[Callable[[str], None]] = None
 
 
 # ---- PREVIEW HELPERS -----------------------------------------------------------------
@@ -148,10 +168,11 @@ def _file_exporter(session: ViewerSession,
     """
     ---- Summary ----
     Helper function to export the imported data of one file, read once: for a trimmed
-    file the whole recording into the full folder of its results folder, then the data
-    kept by the trimming (all of it for a file not trimmed) into its results folder,
-    with the OD values and labels entered. A file that is no longer trimmed loses the
-    whole recording written for it earlier in this run, as it has nothing called full.
+    file, when the choice asks for it, the whole recording into the full folder of its
+    results folder, then the data kept by the trimming (all of it for a file not
+    trimmed) into its results folder, with the OD values and labels entered. A file
+    that is no longer trimmed loses the whole recording written for it earlier in this
+    run, as it has nothing called full.
 
     ---- Inputs ----
     session : ViewerSession
@@ -163,13 +184,13 @@ def _file_exporter(session: ViewerSession,
     details : dict
         {file name: {OD, volume, dilution_factor, events}}; may lack the file.
     choice : str
-        A key of SPECTRA_BY_EXPORT: 'summary', 'trimmed' or 'all'.
+        A key of EXPORT_PARTS: 'summary', 'summary_full', 'spectra' or 'spectra_full'.
     keep_full : bool
         True leaves a whole recording already written in this run as it is (the edges
         changed, and the whole recording does not depend on them).
 
     ---- Globals read ----
-    FULL_FOLDER, SPECTRA_BY_EXPORT (module constants); settings.DEFAULT_ANSWERS.
+    FULL_FOLDER, EXPORT_PARTS (module constants); settings.DEFAULT_ANSWERS.
 
     ---- Outputs ----
     None
@@ -194,7 +215,7 @@ def _file_exporter(session: ViewerSession,
     own = limits.get(name) or {}
     start, end = own.get('trim_start'), own.get('trim_end')
     is_trimmed = start is not None or end is not None
-    with_spectra, with_full_spectra = SPECTRA_BY_EXPORT[choice]
+    with_full, with_spectra = EXPORT_PARTS[choice]
     cfg = settings.Config(dict(settings.DEFAULT_ANSWERS,
                                decompose=False,
                                normalise_od=False,
@@ -209,13 +230,12 @@ def _file_exporter(session: ViewerSession,
 
     # ---- 2 Write the whole recording, or take away one no longer wanted --------------
     earlier = session.full_exports.get(name)
-    if is_trimmed and not (keep_full and earlier):
-        session.full_exports[name] = experiment_workbook_exporter(
-            experiment,
-            session.export_root,
-            spectra=with_full_spectra,
-            subfolder=FULL_FOLDER,
-            )
+    if is_trimmed and with_full and not (keep_full and earlier):
+        session.full_exports[name] = experiment_workbook_exporter(experiment,
+                                                                  session.export_root,
+                                                                  spectra=with_spectra,
+                                                                  subfolder=FULL_FOLDER,
+                                                                  )
     elif not is_trimmed and earlier:
         for path in earlier:
             path.unlink(missing_ok=True)
@@ -297,31 +317,24 @@ def _kept_haems_drawer(session: ViewerSession,
     pad = (max - min) x KEPT_MARGIN, and never shrinks.
 
     ---- Helpers ----
+    _kept_gap_teller
+    _kept_processor
     _kept_psi_drawer
-    _loaded_experiment_getter
-    decomposition_gap_calculator
-    experiment_data_processor
-    haem_name_plainer
     name_simplifier
     problem_teller
     """
 
     # ---- 1 Work the file out with the kept decomposition -----------------------------
     key = HAEM_KEYS.get(haem_source or '')
-    kept_answers = dict(answers, **kept['answers'], decompose=True, averaging=False)
     name = summary['name']
-    kept_info = dict(info, regions=kept['regions'].get(name))
     try:
-        with session.window.output_capturer():
-            fresh = _loaded_experiment_getter(session,
-                                              summary,
-                                              kept_answers['decomposition_dataset'],
-                                              )
-            kept_experiment = experiment_data_processor(kept_info,
-                                                        settings.Config(kept_answers),
-                                                        kept['fit'],
-                                                        fresh,
-                                                        )['experiment']
+        kept_experiment = _kept_processor(session,
+                                          summary,
+                                          info,
+                                          answers,
+                                          kept,
+                                          False,
+                                          )[0]['experiment']
     except Exception as exc:  # the comparison must never stop the preview
         return problem_teller(f'The kept decomposition is not shown for {name}', exc)
     new_table, kept_table = experiment.get(key), kept_experiment.get(key)
@@ -375,20 +388,121 @@ def _kept_haems_drawer(session: ViewerSession,
                                 )
 
     # ---- 4 Say how far apart they are ------------------------------------------------
-    gaps = decomposition_gap_calculator(new_table, kept_table)
-    if gaps:
-        words = ', '.join(f'{haem_name_plainer(haem)} {largest:.3g} / {average:.3g}'
-                          for haem, (largest, average) in gaps.items()
-                          )
-        lines = [f'{KEY_PREFIX}dashed and paler = kept decomposition',
-                 f'Gap to the kept decomposition, largest / average, in the units of '
-                 f'the haem panels: {words}',
-                 ]
-    else:
-        lines = [f'{KEY_PREFIX}dashed and paler = kept decomposition (no haem in '
-                 'common)',
-                 ]
+    lines = _kept_gap_teller(new_table,
+                             kept_table,
+                             'dashed and paler = kept decomposition',
+                             )
     return '\n'.join(line for line in (*lines, psi_note) if line)
+
+
+# ---- _kept_gap_teller ----------------------------------------------------------------
+def _kept_gap_teller(new_table: Any, kept_table: Any, key_words: str) -> List[str]:
+    """
+    ---- Summary ----
+    Helper function to say how the kept decomposition is shown and how far its haems
+    are from the haems in use.
+
+    ---- Inputs ----
+    new_table : Any
+        Table of the haems worked out with what is in use (pd.DataFrame).
+    kept_table : Any
+        Table of the same haems worked out with the kept decomposition (pd.DataFrame).
+    key_words : str
+        What tells the kept decomposition apart on the plot, after KEY_PREFIX.
+
+    ---- Globals read ----
+    KEY_PREFIX.
+
+    ---- Outputs ----
+    List[str]
+        The key line, then a line with the largest and the average gap of each haem in
+        both; the key line alone, saying there is no haem in common, when there is none.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The gaps: decomposition_gap_calculator.
+
+    ---- Helpers ----
+    decomposition_gap_calculator
+    haem_name_plainer
+    """
+
+    gaps = decomposition_gap_calculator(new_table, kept_table)
+    if not gaps:
+        return [f'{KEY_PREFIX}{key_words} (no haem in common)']
+    words = ', '.join(f'{haem_name_plainer(haem)} {largest:.3g} / {average:.3g}'
+                      for haem, (largest, average) in gaps.items()
+                      )
+    return [f'{KEY_PREFIX}{key_words}',
+            f'Gap to the kept decomposition, largest / average, in the units of the '
+            f'haem panels: {words}',
+            ]
+
+
+# ---- _kept_processor -----------------------------------------------------------------
+def _kept_processor(session: ViewerSession,
+                    summary: dict,
+                    info: dict,
+                    answers: dict,
+                    kept: dict,
+                    is_averaged: bool,
+                    ) -> Tuple[dict, settings.Config]:
+    """
+    ---- Summary ----
+    Helper function to work one file out again with the kept decomposition: its fit,
+    background, regions and numbers of delta psi, everything else as in use. Its own
+    warnings are left out, as they repeat those of the decomposition in use.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (files, window, cache).
+    summary : dict
+        File summary (DATA_FORMAT.md).
+    info : dict
+        Per-file information the decomposition in use was worked out with.
+    answers : dict
+        Answers the decomposition in use was worked out with.
+    kept : dict
+        The kept decomposition (DATA_FORMAT.md, kept decomposition).
+    is_averaged : bool
+        True works out the averaging windows as in use (for a plot of its own); False
+        leaves them out (for lines drawn over the plot in use).
+
+    ---- Globals read ----
+    settings.Config.
+
+    ---- Outputs ----
+    Tuple[dict, settings.Config]
+        (what experiment_data_processor gives, the settings it was worked out with).
+        Raises what the processing raises.
+
+    ---- Globals mutated ----
+    None. Updates the cache of the session (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _loaded_experiment_getter
+    experiment_data_processor
+    """
+
+    kept_answers = dict(answers,
+                        **kept['answers'],
+                        decompose=True,
+                        averaging=bool(is_averaged and answers['averaging']),
+                        )
+    cfg = settings.Config(kept_answers)
+    kept_info = dict(info, regions=kept['regions'].get(summary['name']))
+    with session.window.output_capturer():
+        fresh = _loaded_experiment_getter(session,
+                                          summary,
+                                          kept_answers['decomposition_dataset'],
+                                          )
+        processed = experiment_data_processor(kept_info, cfg, kept['fit'], fresh)
+    return processed, cfg
 
 
 # ---- _kept_psi_drawer ----------------------------------------------------------------
@@ -434,12 +548,12 @@ def _kept_psi_drawer(experiment: dict,
     None. Draws on the delta psi panel (side effect).
 
     ---- Equations ----
-    The gaps: decomposition_gap_calculator, over the spectra where both have a value.
-    The widened panel reaches from min - pad to max + pad of the kept line outside
-    the ignored parts, with pad = (max - min) x KEPT_MARGIN, and never shrinks.
+    The gaps: _kept_psi_gap_teller. The widened panel reaches from min - pad to
+    max + pad of the kept line outside the ignored parts, with
+    pad = (max - min) x KEPT_MARGIN, and never shrinks.
 
     ---- Helpers ----
-    decomposition_gap_calculator
+    _kept_psi_gap_teller
     time_getter
     value_getter
     """
@@ -477,6 +591,45 @@ def _kept_psi_drawer(experiment: dict,
             ax.set_ylim(min(low, used.min() - pad), max(high, used.max() + pad))
 
     # ---- 3 Say how far apart they are ------------------------------------------------
+    return _kept_psi_gap_teller(experiment, kept_experiment)
+
+
+# ---- _kept_psi_gap_teller ------------------------------------------------------------
+def _kept_psi_gap_teller(experiment: dict, kept_experiment: dict) -> str:
+    """
+    ---- Summary ----
+    Helper function to say how far the delta psi of the kept decomposition is from the
+    delta psi in use.
+
+    ---- Inputs ----
+    experiment : dict
+        The experiment worked out with what is in use; it has 'delta_psi'.
+    kept_experiment : dict
+        The same file worked out with the kept decomposition.
+
+    ---- Globals read ----
+    DELTA_PSI_COLUMN.
+
+    ---- Outputs ----
+    str
+        The largest and the average gap between the two in mV, or one sentence saying
+        why no kept delta psi is shown on this file, or why no gap is given.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The gaps: decomposition_gap_calculator, over the spectra where both have a value.
+
+    ---- Helpers ----
+    decomposition_gap_calculator
+    """
+
+    kept_table = kept_experiment.get('delta_psi')
+    if kept_table is None or experiment.get('delta_psi') is None:
+        return ('The kept Δψ is not shown on this file: with what was kept it has no '
+                'Δψ (it had no regions then, or the kept fit has no bH and bL).'
+                )
     gap = decomposition_gap_calculator(experiment['delta_psi'],
                                        kept_table,
                                        ).get(DELTA_PSI_COLUMN)
@@ -485,6 +638,122 @@ def _kept_psi_drawer(experiment: dict,
                 'have a value.'
                 )
     return f'Gap to the kept Δψ, largest / average (mV): {gap[0]:.3g} / {gap[1]:.3g}'
+
+
+# ---- _kept_side_drawer ---------------------------------------------------------------
+def _kept_side_drawer(session: ViewerSession,
+                      summary: dict,
+                      info: dict,
+                      answers: dict,
+                      kept: dict,
+                      haem_source: Optional[str],
+                      experiment: dict,
+                      axes: list,
+                      plot_extras: dict,
+                      ) -> Tuple[Optional[Figure], list, str]:
+    """
+    ---- Summary ----
+    Helper function to work one file out again with the kept decomposition and draw it
+    as a plot of its own, the same size as the plot in use, to be shown on its left.
+    Matching panels of the two plots are given the same y range, so they can be
+    compared by eye.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (files, window, cache, results folder).
+    summary : dict
+        File summary (DATA_FORMAT.md).
+    info : dict
+        Per-file information the decomposition in use was worked out with.
+    answers : dict
+        Answers the decomposition in use was worked out with.
+    kept : dict
+        The kept decomposition (DATA_FORMAT.md, kept decomposition).
+    haem_source : Optional[str]
+        Key of HAEM_KEYS the haem panels show.
+    experiment : dict
+        The experiment worked out with the decomposition in use.
+    axes : list
+        Panels of the plot in use, top to bottom, each with its panel_key.
+    plot_extras : dict
+        Plot settings of the plot in use beyond those of the answers (the time axis
+        title, the size and resolution of the preview), given to the kept plot too.
+
+    ---- Globals read ----
+    settings.PREVIEW_DPI, HAEM_KEYS.
+
+    ---- Outputs ----
+    Tuple[Optional[Figure], list, str]
+        (the kept plot, its panels, the notes): the key line, the gaps of the haems
+        and, when delta psi is shown, the gap of delta psi. The plot is None and its
+        panels empty when it could not be drawn, and the notes then say why in one
+        sentence.
+
+    ---- Globals mutated ----
+    None. Sets the y range of matching panels of the plot in use; the details of a
+    problem go to the log (side effects).
+
+    ---- Equations ----
+    The y range of two matching panels reaches from the lower of their two bottoms to
+    the higher of their two tops.
+
+    ---- Helpers ----
+    _kept_gap_teller
+    _kept_processor
+    _kept_psi_gap_teller
+    experiment_plotter
+    problem_teller
+    """
+
+    # ---- 1 Work the file out with the kept decomposition and draw it -----------------
+    name = summary['name']
+    try:
+        processed, cfg = _kept_processor(session, summary, info, answers, kept, True)
+        plot_config = cfg.plot_config_builder(processed['vo2_source'],
+                                              processed['plotted_haem_source'],
+                                              info['ignore_start'],
+                                              info['ignore_end'],
+                                              delta_psi=answers['delta_psi'],
+                                              )
+        plot_config.update(plot_extras)
+        kept_fig = Figure(dpi=settings.PREVIEW_DPI)
+        with session.window.output_capturer():
+            _, kept_axes = experiment_plotter(processed['experiment'],
+                                              plot_config,
+                                              session.export_root,
+                                              fig=kept_fig,
+                                              )
+    except Exception as exc:  # the comparison must never stop the preview
+        return None, [], problem_teller(f'The kept decomposition is not shown for '
+                                        f'{name}',
+                                        exc,
+                                        )
+    kept_experiment = processed['experiment']
+    key = HAEM_KEYS.get(haem_source or '')
+    new_table, kept_table = experiment.get(key), kept_experiment.get(key)
+    if new_table is None or kept_table is None:
+        return None, [], ('The kept decomposition is not shown on this file: its haems '
+                          'could not be worked out.'
+                          )
+
+    # ---- 2 Give matching panels the same y range -------------------------------------
+    matches = {ax.panel_key: ax for ax in kept_axes if getattr(ax, 'panel_key', None)}
+    for ax in axes:
+        twin = matches.get(getattr(ax, 'panel_key', None))
+        if twin is None:
+            continue
+        (low, high), (kept_low, kept_high) = ax.get_ylim(), twin.get_ylim()
+        for panel in (ax, twin):
+            panel.set_ylim(min(low, kept_low), max(high, kept_high))
+
+    # ---- 3 Say which is which and how far apart they are -----------------------------
+    lines = _kept_gap_teller(new_table,
+                             kept_table,
+                             'left = kept decomposition, right = in use',
+                             )
+    if any(getattr(ax, 'is_delta_psi', False) for ax in axes):
+        lines.append(_kept_psi_gap_teller(experiment, kept_experiment))
+    return kept_fig, kept_axes, '\n'.join(lines)
 
 
 # ---- _loaded_experiment_getter -------------------------------------------------------
@@ -673,9 +942,9 @@ def import_data_exporter(session: ViewerSession,
     Main function to export the imported data of every file (or of the files named), so
     it can be plotted outside the program: in each file's results folder the workbook
     of the data kept by the trimming (the oxygen, OCR, events with their labels, and the
-    OD values and edges), and for a trimmed file the whole recording in its full folder;
-    the spectra as csv files beside them if chosen. No haem decomposition, OD scaling
-    or averaging is applied; the ignored parts are left in.
+    OD values and edges); for a trimmed file the whole recording in its full folder, if
+    chosen; the spectra as csv files beside each workbook, if chosen. No haem
+    decomposition, OD scaling or averaging is applied; the ignored parts are left in.
 
     ---- Inputs ----
     session : ViewerSession
@@ -685,8 +954,9 @@ def import_data_exporter(session: ViewerSession,
     details : dict
         {file name: {OD, volume, dilution_factor, events}} (details_stage_runner).
     choice : str
-        A key of SPECTRA_BY_EXPORT: 'summary' (the workbooks only), 'trimmed' (and the
-        trimmed spectra) or 'all' (and the spectra of the whole recordings too).
+        A key of EXPORT_PARTS: 'summary' (the workbook of the trimmed data),
+        'summary_full' (and the whole recording of a trimmed file), 'spectra' (the
+        trimmed data with its spectra) or 'spectra_full' (both, each with its spectra).
     names : Optional[List[str]]
         Files to export; None for every file.
     keep_full : bool
@@ -702,8 +972,9 @@ def import_data_exporter(session: ViewerSession,
         The problems: a file that could not be exported is named in them and left out.
 
     ---- Globals mutated ----
-    None. Reads the files, writes <results>/<file>/<file>.xlsx (and full/ inside it for
-    a trimmed file, and the spectra), and notes the results folder in session.exported
+    None. Reads the files, writes <results>/<file>/<file>.xlsx (and, as chosen, full/
+    inside it for a trimmed file and the spectra), and notes the results folder in
+    session.exported
     once something is written (side effects).
 
     ---- Equations ----
@@ -814,7 +1085,12 @@ def pca_example_picture_builder(examples: dict,
     plt.rcParams.update(cfg.RC_PARAMS)
     width = cfg.FIGURE_SIZE[0]
     fig = Figure(figsize=(width, width * 1.1), dpi=settings.PREVIEW_DPI)
-    pca_example_figure_builder(examples, names, settings.pca_colour_mapper(types), fig)
+    pca_example_figure_builder(examples,
+                               names,
+                               settings.pca_colour_mapper(types),
+                               settings.COMPONENT_FIGURE_STYLE,
+                               fig,
+                               )
     fig.set_layout_engine('constrained')
     buffer = io.BytesIO()
     fig.savefig(buffer, format='png', dpi=settings.PREVIEW_DPI)
@@ -873,6 +1149,8 @@ def pca_picture_builder(analysis: dict,
                        types,
                        settings.pca_colour_mapper(types),
                        type_colours,
+                       settings.HAEM_USUAL_PEAKS_NM,
+                       settings.COMPONENT_FIGURE_STYLE,
                        fig,
                        )
     fig.set_layout_engine('constrained')
@@ -1069,7 +1347,10 @@ def preview_figure_builder(session: ViewerSession,
         shown while it was drawn (a skipped step, a missing OD), and the gaps to the
         kept decomposition when one is kept, one per line, and may be empty. A line
         starting with KEY_PREFIX explains the shading or the dashed lines and belongs
-        by the controls.
+        by the controls. With a decomposition kept and the answer compare_layout
+        SIDE_BY_SIDE, the figure carries the kept plot as its attribute kept_figure,
+        which preview_picture_maker puts on the left of the picture; otherwise the
+        kept haems are drawn dashed over the haems in use.
 
     ---- Globals mutated ----
     None. Sets the matplotlib rcParams of the figure style; the details of a problem
@@ -1081,6 +1362,7 @@ def preview_figure_builder(session: ViewerSession,
 
     ---- Helpers ----
     _kept_haems_drawer
+    _kept_side_drawer
     _loaded_experiment_getter
     _overlay_drawer
     experiment_data_processor
@@ -1105,7 +1387,13 @@ def preview_figure_builder(session: ViewerSession,
     plt.rcParams.update(cfg.RC_PARAMS)
 
     # ---- 2 Process the data and draw the figure --------------------------------------
-    plot_extras = {'SHOW_SKIPPED_WINDOWS': True}
+    plot_extras = {'SHOW_SKIPPED_WINDOWS': True,
+                   'SAVE_FIGURES': False,
+                   'FIGURE_DPI': settings.PREVIEW_DPI,
+                   'TIME_AXIS_LABEL': time_title_chooser(spec.show_trim,
+                                                         own.get('trim_start'),
+                                                         ),
+                   }
     needs_dataset = preview_answers['decompose'] and spec.fit is not None
     fig = Figure(dpi=settings.PREVIEW_DPI)
     try:
@@ -1119,27 +1407,15 @@ def preview_figure_builder(session: ViewerSession,
                                                    )
             processed = experiment_data_processor(info, cfg, spec.fit, experiment)
             experiment = processed['experiment']
-            haem_panels = preview_answers['plot_haems'] and 'haem_conc' in experiment
+            haem_panels = processed['plotted_haem_source'] is not None
             plot_config = cfg.plot_config_builder(processed['vo2_source'],
-                                                  processed['haem_source']
-                                                  if haem_panels
-                                                  else None,
+                                                  processed['plotted_haem_source'],
                                                   info['ignore_start'],
                                                   info['ignore_end'],
                                                   delta_psi=preview_answers[
                                                       'delta_psi'],
                                                   )
-            plot_config.update({'SAVE_FIGURES': False,
-                                'SHOW_INDIVIDUAL_FIGURES': False,
-                                'FIGURE_DPI': settings.PREVIEW_DPI,
-                                'TIME_AXIS_LABEL': time_title_chooser(spec.show_trim,
-                                                                      own.get(
-                                                                          'trim_start',
-                                                                          ),
-                                                                      ),
-                                **plot_extras,
-                                },
-                               )
+            plot_config.update(plot_extras)
             _, axes = experiment_plotter(experiment,
                                          plot_config,
                                          session.export_root,
@@ -1149,8 +1425,23 @@ def preview_figure_builder(session: ViewerSession,
         return None, problem_teller(f'Preview not drawn for {name}', exc)
     notes = '\n'.join(buffer.warnings)
 
-    # ---- 2.1 Draw the kept decomposition over the haems ------------------------------
-    if spec.kept is not None and haem_panels:
+    # ---- 2.1 Draw the kept decomposition beside the plot, or over the haems ----------
+    kept_fig, kept_axes = None, []
+    if (spec.kept is not None and haem_panels and
+        preview_answers.get('compare_layout') == SIDE_BY_SIDE
+        ):
+        kept_fig, kept_axes, kept_notes = _kept_side_drawer(session,
+                                                            summary,
+                                                            info,
+                                                            preview_answers,
+                                                            spec.kept,
+                                                            processed['haem_source'],
+                                                            experiment,
+                                                            axes,
+                                                            plot_extras,
+                                                            )
+        notes = '\n'.join(line for line in (notes, kept_notes) if line)
+    elif spec.kept is not None and haem_panels:
         kept_notes = _kept_haems_drawer(session,
                                         summary,
                                         info,
@@ -1172,7 +1463,9 @@ def preview_figure_builder(session: ViewerSession,
         regions = [(0.0, own.get('ignore_start') or 0.0),
                    (duration - (own.get('ignore_end') or 0.0), duration),
                    ]
-    _overlay_drawer(axes, regions)
+    _overlay_drawer(axes + kept_axes, regions)
+    if kept_fig is not None:  # put on the left of the picture by preview_picture_maker
+        fig.kept_figure = kept_fig
     if any(end > start for start, end in regions):  # shown above the file selector
         notes = '\n'.join(line
                           for line in (notes,
@@ -1181,6 +1474,82 @@ def preview_figure_builder(session: ViewerSession,
                           if line
                           )
     return fig, notes
+
+
+# ---- preview_picture_maker -----------------------------------------------------------
+def preview_picture_maker(fig: Figure) -> Tuple[bytes, Optional[TimeAxis]]:
+    """
+    ---- Summary ----
+    Main function to turn a drawn preview into the picture the window shows, with where
+    its time axis sits. A figure carrying a kept plot (kept_figure, side by side) gets
+    the kept plot on the left and itself on the right, with a white gap between; the
+    time axis is then that of the plot on the right, so the edges, the arrows and the
+    shading of the window fall on the plot in use.
+
+    ---- Inputs ----
+    fig : Figure
+        The drawn preview (preview_figure_builder).
+
+    ---- Globals read ----
+    settings.PREVIEW_DPI, SIDE_GAP_PX.
+
+    ---- Outputs ----
+    Tuple[bytes, Optional[TimeAxis]]
+        (PNG bytes, the time axis in fractions of the whole picture, or None when the
+        figure has none).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    With the kept plot k pixels wide, the gap g and the plot in use n pixels wide in a
+    picture W = k + g + n wide and H high (the plot in use at its top):
+    x' = (k + g + x n) / W and y' = (H - h + y h) / H, with h the height of the plot
+    in use and x, y the fractions within it.
+
+    ---- Helpers ----
+    time_axis_finder
+    """
+
+    # ---- 1 The plot in use on its own ------------------------------------------------
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=settings.PREVIEW_DPI)
+    time_axis = time_axis_finder(fig)
+    kept_fig = getattr(fig, 'kept_figure', None)
+    if kept_fig is None:
+        return buffer.getvalue(), time_axis
+
+    # ---- 2 The kept plot on its left -------------------------------------------------
+    kept_buffer = io.BytesIO()
+    kept_fig.savefig(kept_buffer, format='png', dpi=settings.PREVIEW_DPI)
+    right = Image.open(io.BytesIO(buffer.getvalue())).convert('RGBA')
+    left = Image.open(io.BytesIO(kept_buffer.getvalue())).convert('RGBA')
+    offset = left.width + SIDE_GAP_PX
+    width, height = offset + right.width, max(left.height, right.height)
+    joined = Image.new('RGBA', (width, height), 'white')
+    joined.paste(left, (0, 0))
+    joined.paste(right, (offset, 0))
+    picture = io.BytesIO()
+    joined.save(picture, format='PNG')
+    if time_axis is None:
+        return picture.getvalue(), None
+
+    # ---- across ----------------------------------------------------------------------
+    def across(share: float) -> float:
+        return (offset + share * right.width) / width
+
+    def up(share: float) -> float:
+        return (height - right.height + share * right.height) / height
+
+    return picture.getvalue(), replace(time_axis,
+                                       left=across(time_axis.left),
+                                       right=across(time_axis.right),
+                                       bottom=up(time_axis.bottom),
+                                       top=up(time_axis.top),
+                                       panels=[(key, up(low), up(high))
+                                               for key, low, high in time_axis.panels
+                                               ],
+                                       )
 
 
 # ---- time_axis_finder ----------------------------------------------------------------
@@ -1200,8 +1569,9 @@ def time_axis_finder(fig: Figure) -> Optional[TimeAxis]:
 
     ---- Outputs ----
     Optional[TimeAxis]
-        The place and the range of the time axis, or None when the figure has no panel
-        or its axis has no length.
+        The place and the range of the time axis, with the key, bottom and top of each
+        panel of the standard plot (experiment_drawer names them), top first; or None
+        when the figure has no panel or its axis has no length.
 
     ---- Globals mutated ----
     None.
@@ -1218,21 +1588,24 @@ def time_axis_finder(fig: Figure) -> Optional[TimeAxis]:
         return None
     first = fig.axes[0]
     shared = first.get_shared_x_axes()
-    boxes = [ax.get_position()
-             for ax in fig.axes
-             if ax is first or shared.joined(first, ax)
-             ]
+    stack = [ax for ax in fig.axes if ax is first or shared.joined(first, ax)]
+    boxes = [ax.get_position() for ax in stack]
     start, end = (float(value) for value in first.get_xlim())
     left = min(box.x0 for box in boxes)
     right = max(box.x1 for box in boxes)
     if end == start or right <= left:
         return None
+    panels = [(ax.panel_key, float(box.y0), float(box.y1))
+              for ax, box in zip(stack, boxes)
+              if getattr(ax, 'panel_key', None)
+              ]
     return TimeAxis(left=left,
                     right=right,
                     bottom=min(box.y0 for box in boxes),
                     top=max(box.y1 for box in boxes),
                     start_min=start,
                     end_min=end,
+                    panels=sorted(panels, key=lambda panel: -panel[2]),
                     )
 
 

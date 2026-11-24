@@ -906,7 +906,7 @@ def enter_waiter(question: str,
         number it in the order asked.
     extras : Sequence[Tuple[str, str]]
         (answer, words) of each button shown above Continue, such as ('export',
-        'Export csv'); empty for Continue alone.
+        'Export trimmed csv'); empty for Continue alone.
 
     ---- Globals read ----
     None.

@@ -20,12 +20,14 @@ from utils_viewer.viewer_preview import IGNORE_COLOUR, TimeAxis
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-TRIM_COLOUR = '0.45'
+TRIM_COLOUR = '#f28e2b'  # orange: the trimmed parts, hatched
 OXIDISED_COLOUR = '#d62728'  # red and blue, as oxidised and reduced blood are drawn
 REDUCED_COLOUR = '#1f77b4'
 AVERAGE_COLOUR = '#2878B5'  # the blue the averaging windows have in the figures
+BASELINE_COLOUR = '#A88600'  # the gold the baseline window has in the figures
 QUICK_COLOUR = '#2E8B3D'  # the green the quick averaging windows have in the figures
 UNFIT_COLOUR = '#d62728'  # an averaging window that does not fit
+LEFT_OUT_COLOUR = '#9a9a9a'  # an averaging window left out with its tick
 PREVIOUS_COLOUR = '#d62728'
 # How each kind of part looks: its colour, how strongly its shading covers the plot (0
 # to 1), whether it is hatched, and the row of its handles above the plot (0 the top).
@@ -34,11 +36,14 @@ PART_STYLES = {'trim': (TRIM_COLOUR, 0.25, True, 0),
                'ignore': (IGNORE_COLOUR, 0.22, False, 1),
                'oxidised': (OXIDISED_COLOUR, 0.18, False, 0),
                'reduced': (REDUCED_COLOUR, 0.18, False, 1),
+               'baseline': (BASELINE_COLOUR, 0.22, False, 0),
+               'baseline_end': (BASELINE_COLOUR, 0.22, False, 1),
                'average': (AVERAGE_COLOUR, 0.22, False, 0),
                'average_end': (AVERAGE_COLOUR, 0.22, False, 1),
                'average_unfit': (UNFIT_COLOUR, 0.22, True, 0),
                'quick': (QUICK_COLOUR, 0.22, False, 0),
                'quick_end': (QUICK_COLOUR, 0.22, False, 1),
+               'left_out': (LEFT_OUT_COLOUR, 0.15, False, 0),
                }
 HANDLE_ROW_PX = 22
 HANDLE_SIZE_PX = (9, 16)  # (width, height)
@@ -74,12 +79,19 @@ class EdgeChoice:
     value_setter: Callable[[str, Dict[str, float], str, float], Dict[str, float]]
     key_text: str = ''
     previous: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    is_every_file: bool = True
+    is_every_file: bool = False
     value_copier: Optional[Callable[[str, str, str, float], Optional[float]]] = None
     unit: str = 'min'
     switch: Optional[Tuple[str, str]] = None
     second_fields: List[Tuple[str, str]] = field(default_factory=list)
     second_switch: Optional[Tuple[str, str]] = None
+    shown_maker: Optional[Callable[[str, Dict[str, float]], Dict[str, float]]] = None
+    typed_reader: Optional[Callable[[str, Dict[str, float], str, float], float]] = None
+    options: List[Tuple[str, str]] = field(default_factory=list)
+    row_teller: Optional[Callable[[str, Dict[str, float]],
+                                  List[Tuple[str, List[Tuple[str, str, bool]]]],
+                                  ]] = None
+    unmarked_fields: Tuple[str, ...] = ()
 
 
 # ---- EdgeOverlay ---------------------------------------------------------------------
@@ -100,7 +112,8 @@ class EdgeOverlay:
         {file name: {field: value}} as the user has set them so far; replaced, never
         changed in place, at each change.
     is_every_file : bool
-        True: a moved or typed edge moves on every file; False: on the file shown only.
+        True ("Apply to all" ticked): a moved or typed edge moves on every file; False:
+        on the file shown only. It goes back to False when another file is shown.
 
     ---- Globals read ----
     The module constants.
@@ -111,7 +124,9 @@ class EdgeOverlay:
     _picture_shader
     _update_runner
     _values_changer
+    all_files_copier
     choice_setter
+    every_file_field_setter
     field_setter
     hit_layout_finder
     hover_handler
@@ -121,6 +136,7 @@ class EdgeOverlay:
     picture_placer
     press_handler
     release_handler
+    shown_values_reader
     values_reader
     """
 
@@ -130,6 +146,7 @@ class EdgeOverlay:
                  canvas: Any,
                  family: str,
                  on_change: Callable[[], None],
+                 on_untick: Optional[Callable[[], None]] = None,
                  ) -> None:
         """
         ---- Summary ----
@@ -144,6 +161,9 @@ class EdgeOverlay:
             Font family of the words by the handles.
         on_change : Callable[[], None]
             Called after every change of the values, so the window can show them.
+        on_untick : Optional[Callable[[], None]]
+            Called when "Apply to all" unticks itself because another file is shown,
+            so the window can untick its box; None for nothing.
 
         ---- Globals read ----
         None.
@@ -166,9 +186,12 @@ class EdgeOverlay:
         self._canvas = canvas
         self._family = family
         self._on_change = on_change
+        self._on_untick = on_untick
         self.choice: Optional[EdgeChoice] = None
         self.values: Dict[str, Dict[str, float]] = {}
-        self.is_every_file = True
+        self.is_every_file = False
+        # the file shown when "Apply to all" was ticked; another file unticks it
+        self._ticked_name: Optional[str] = None
         self._name: Optional[str] = None
         self._picture: Optional[Image.Image] = None
         self._item: Optional[int] = None
@@ -366,7 +389,11 @@ class EdgeOverlay:
         self._values_changer(self._dragged, value)
 
     # ---- _values_changer -------------------------------------------------------------
-    def _values_changer(self, key: str, value: float) -> None:
+    def _values_changer(self,
+                        key: str,
+                        value: float,
+                        is_everywhere: bool = False,
+                        ) -> None:
         """
         ---- Summary ----
         Method to set one field of the file shown, or of every file, through the rules
@@ -378,6 +405,8 @@ class EdgeOverlay:
             The field set.
         value : float
             Its new value, before the rules of each file are applied.
+        is_everywhere : bool
+            True to set it on every file whatever is_every_file says.
 
         ---- Globals read ----
         None.
@@ -401,7 +430,8 @@ class EdgeOverlay:
 
         if not self.is_on or self._name not in self.values:
             return
-        names = list(self.values) if self.is_every_file else [self._name]
+        is_every = self.is_every_file or is_everywhere
+        names = list(self.values) if is_every else [self._name]
         changed = every_file_setter(self.values,
                                     names,
                                     key,
@@ -419,6 +449,71 @@ class EdgeOverlay:
         self._on_change()
 
     # ---- MAIN METHODS ----------------------------------------------------------------
+
+    # ---- all_files_copier ------------------------------------------------------------
+    def all_files_copier(self) -> None:
+        """
+        ---- Summary ----
+        Method to copy the edges of the file shown to every other file once, when
+        "Apply to all" is ticked: each field of the boxes (and the step's own switches)
+        is set on every other file as a change on the file shown would set it, within
+        that file's limits and through the step's rule for copying. The file shown is
+        not changed, and "Apply to all" stays on until another file is shown.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Replaces values, redraws the overlay and tells the window (side
+        effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _edges_drawer
+        _picture_shader
+        """
+
+        if not self.is_on or self._name not in self.values:
+            return
+        choice, shown = self.choice, self._name
+        self.is_every_file = True
+        self._ticked_name = shown
+        # the switches first, so the fields land on windows that are there
+        keys = [own[0] for own in (choice.switch, choice.second_switch) if own]
+        keys += [key for key, _ in choice.fields + choice.second_fields]
+        changed = dict(self.values)
+        for key in keys:
+            if key not in self.values[shown]:
+                continue
+            value = float(self.values[shown][key])
+            for name in changed:
+                if name == shown:
+                    continue
+                copied = (choice.value_copier(shown, name, key, value)
+                          if choice.value_copier is not None
+                          else value
+                          )
+                if copied is not None:
+                    changed[name] = choice.value_setter(name,
+                                                        changed[name],
+                                                        key,
+                                                        copied,
+                                                        )
+        if changed == self.values:
+            return
+        self.values = changed
+        self._picture_shader()
+        self._edges_drawer()
+        self._on_change()
 
     # ---- choice_setter ---------------------------------------------------------------
     def choice_setter(self, choice: Optional[EdgeChoice]) -> None:
@@ -454,16 +549,51 @@ class EdgeOverlay:
         self._dragged = None
         self.choice = choice
         self.values = copy.deepcopy(choice.values) if choice is not None else {}
-        self.is_every_file = choice.is_every_file if choice is not None else True
+        self.is_every_file = choice.is_every_file if choice is not None else False
+        self._ticked_name = None
         self._canvas.delete('edges')
         self._canvas.configure(cursor='')
+
+    # ---- every_file_field_setter -----------------------------------------------------
+    def every_file_field_setter(self, key: str, value: float) -> None:
+        """
+        ---- Summary ----
+        Method to set one field on every file, whatever "Apply to all"
+        says: for a switch of the whole step (a kind of window, "Adjust each window").
+
+        ---- Inputs ----
+        key : str
+            The field set.
+        value : float
+            Its new value.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the values and redraws (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _values_changer
+        """
+
+        self._values_changer(key, value, is_everywhere=True)
 
     # ---- field_setter ----------------------------------------------------------------
     def field_setter(self, key: str, value: float) -> None:
         """
         ---- Summary ----
         Method to take a value typed in the strip for one field of the file shown (of
-        every file when is_every_file).
+        every file when is_every_file). When the boxes show the fields in another form
+        (EdgeChoice.typed_reader, the trim step's times on the whole recording), the
+        number typed is first turned back into the field's own value.
 
         ---- Inputs ----
         key : str
@@ -488,6 +618,13 @@ class EdgeOverlay:
         _values_changer
         """
 
+        choice = self.choice
+        if (choice is not None and
+                choice.typed_reader is not None and
+                self._name in self.values and
+                key in dict(choice.fields)
+                ):
+            value = choice.typed_reader(self._name, self.values[self._name], key, value)
         self._values_changer(key, value)
 
     # ---- hit_layout_finder -----------------------------------------------------------
@@ -679,7 +816,8 @@ class EdgeOverlay:
         ---- Summary ----
         Method to take the picture of a file just put on the canvas, shade it and draw
         its edges; with no picture (a message, a figure, a picture without a time
-        axis) nothing is drawn until the next one.
+        axis) nothing is drawn until the next one. A file other than the one "Apply
+        to all" was ticked on unticks it, so that file can be changed alone.
 
         ---- Inputs ----
         name : Optional[str]
@@ -722,6 +860,11 @@ class EdgeOverlay:
             self._name = self._picture = self._item = self._box = self._axis = None
             self._dragged = None
             return
+        if self.is_every_file and name != self._ticked_name:
+            self.is_every_file = False
+            self._ticked_name = None
+            if self._on_untick is not None:
+                self._on_untick()
         self._name, self._item, self._box, self._axis = name, item, box, axis
         self._picture = picture.convert('RGB')
         self._picture_shader()
@@ -805,6 +948,40 @@ class EdgeOverlay:
         self._dragged = None
         self._edges_drawer()
         return True
+
+    # ---- shown_values_reader ---------------------------------------------------------
+    def shown_values_reader(self, name: str) -> Optional[Dict[str, float]]:
+        """
+        ---- Summary ----
+        Method to give the values of one file as its boxes in the strip show them: as
+        kept, or in the form of EdgeChoice.shown_maker (the trim step's times on the
+        whole recording).
+
+        ---- Inputs ----
+        name : str
+            The file name.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Optional[Dict[str, float]]
+            {field: value shown}, or None when the file has no values.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        values = self.values.get(name)
+        if values is None or self.choice is None or self.choice.shown_maker is None:
+            return values
+        return dict(values, **self.choice.shown_maker(name, values))
 
     # ---- values_reader ---------------------------------------------------------------
     def values_reader(self) -> Dict[str, Dict[str, float]]:
@@ -1013,15 +1190,19 @@ def minute_x_finder(time_min: float,
 
 
 # ---- own_value_lister ----------------------------------------------------------------
-def own_value_lister(values: Dict[str, Dict[str, float]]) -> List[str]:
+def own_value_lister(values: Dict[str, Dict[str, float]],
+                     unmarked: Tuple[str, ...] = (),
+                     ) -> List[str]:
     """
     ---- Summary ----
     Main function to list the files whose values differ from those most files have, so
-    the window can mark them.
+    the window can mark them. A field one file has and another lacks differs.
 
     ---- Inputs ----
     values : Dict[str, Dict[str, float]]
-        {file name: {field: value}}, every file with the same fields.
+        {file name: {field: value}}.
+    unmarked : Tuple[str, ...]
+        Fields that never mark a file (EdgeChoice.unmarked_fields).
 
     ---- Globals read ----
     None.
@@ -1043,15 +1224,22 @@ def own_value_lister(values: Dict[str, Dict[str, float]]) -> List[str]:
 
     if len(values) < 2:
         return []
-    fields = list(next(iter(values.values())))
-    common = {key: Counter(round(own[key], 6)
+    fields = sorted({key
+                     for own in values.values()
+                     for key in own
+                     if key not in unmarked
+                     },
+                    )
+    def rounded(own: Dict[str, float], key: str) -> Optional[float]:
+        return round(own[key], 6) if key in own else None
+    common = {key: Counter(rounded(own, key)
                            for own in values.values()
                            ).most_common(1)[0][0]
               for key in fields
               }
     return [name
             for name, own in values.items()
-            if any(round(own[key], 6) != common[key] for key in fields)
+            if any(rounded(own, key) != common[key] for key in fields)
             ]
 
 
