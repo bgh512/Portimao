@@ -1,7 +1,7 @@
 """
 Tests that our haem amounts move the same way as the instrument's own haem traces of
 the example run, that the instrument's traces go down when the haems are reduced, and
-that the haem shapes of our fit file and our Valencia background are those of the
+that the haem shapes of our fit file and our Palencia background are those of the
 instrument's own fit file.
 """
 
@@ -336,11 +336,11 @@ def test_haem_shapes_are_those_of_the_instrument(name: str) -> None:
     )
 
 
-# ---- test_valencia_background_is_the_instruments -------------------------------------
-def test_valencia_background_is_the_instruments() -> None:
+# ---- test_palencia_background_is_the_instruments -------------------------------------
+def test_palencia_background_is_the_instruments() -> None:
     """
     ---- Summary ----
-    Main function to check that our Valencia background can make the background shape
+    Main function to check that our Palencia background can make the background shape
     of the instrument's own fit file, over the wavelengths the instrument fits.
 
     ---- Inputs ----
@@ -370,11 +370,11 @@ def test_valencia_background_is_the_instruments() -> None:
     inside = (shape[:, 0] >= first) & (shape[:, 0] <= last)
     assert inside.sum() > 100
     theirs = shape[inside, 1]
-    ours = background_builder(shape[inside, 0], 'valencia')
+    ours = background_builder(shape[inside, 0], 'palencia')
     amounts = np.linalg.lstsq(ours, theirs, rcond=None)[0]
     misfit = float(np.max(np.abs(ours @ amounts - theirs)) / np.ptp(theirs))
     assert misfit < SAME_BACKGROUND, (
-        "Our Valencia background cannot make the instrument's own background shape: "
+        "Our Palencia background cannot make the instrument's own background shape: "
         f'they differ by {misfit:.2g} of its range.'
     )
 

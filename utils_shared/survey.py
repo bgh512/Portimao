@@ -34,7 +34,10 @@ from utils_shared.questions import (choice_asker,
                                     text_italiser,
                                     yes_no_asker,
                                     )
-from utils_shared.spectral_decomposer import fit_loader, fit_names_lister
+from utils_shared.spectral_decomposer import (fit_loader,
+                                              fit_names_lister,
+                                              fit_titles_lister,
+                                              )
 from utils_shared.user_notices import problem_teller
 
 
@@ -55,7 +58,6 @@ OCR_VIEW_NUDGE = ('Change the OCR and the haems in the View box above the plot, 
                   'press Continue.')
 # The OD values of a file, in the order of the OD table, with their plain names.
 OD_VALUE_NAMES = {'OD': 'OD', 'volume': 'volume', 'dilution_factor': 'dilution'}
-PCA_CHOICE = '__pca__'
 # raised form of the characters of an exponent typed as -1 or ^2
 SUPERSCRIPT_TABLE = str.maketrans('-+0123456789', '⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹')
 # the temperatures of a run the temperature question takes (°C): liquid water
@@ -591,38 +593,26 @@ def data_folder_resolver(text: str, listed: List[Path]) -> Path:
 def decomposition_asker(summaries: List[dict],
                         defaults: dict,
                         fits_folder: Path,
-                        forced: bool = False,
                         depth: int = 1,
-                        pca_runner: Optional[Callable] = None,
-                        numbers: Optional[Dict[str, str]] = None,
                         ) -> tuple:
     """
     ---- Summary ----
-    Main function to ask whether to decompose the spectra into haems and which fit to
-    use: a fit file, or (when a pca_runner is given) components found from the data
-    with a principal component analysis.
+    Main function to ask which fit to decompose the spectra into haems with, for a
+    figure that needs the haems when the run has none, and which spectrometer holds
+    them when the files share several and the one saved is not among them.
 
     ---- Inputs ----
     summaries : List[dict]
         File summaries (DATA_FORMAT.md); the spectrometers in common are used.
     defaults : dict
-        Default answers (decompose, fit_file, decomposition_dataset).
+        Default answers (fit_file, decomposition_dataset).
     fits_folder : Path
         Folder holding the fit .csv files.
-    forced : bool
-        True to skip the yes/no question (a figure that needs the haems was chosen).
     depth : int
         Numbering depth of the questions (1 = 3.1, 2 = 3.1.1).
-    pca_runner : Optional[Callable]
-        Function (dataset, depth) that finds the components with a principal component
-        analysis and returns (fit file name, fit), or (None, None) when the user wants
-        a fit file instead. None leaves the option out.
-    numbers : Optional[Dict[str, str]]
-        The questions' own numbers from QUESTION_FLOW.md, by 'decompose', 'fit' and
-        'spectrometer'; None numbers them in the order asked.
 
     ---- Globals read ----
-    PCA_CHOICE (module constant).
+    None.
 
     ---- Outputs ----
     tuple
@@ -639,28 +629,19 @@ def decomposition_asker(summaries: List[dict],
     choice_asker
     fit_loader
     fit_names_lister
+    fit_titles_lister
     info_printer
     problem_teller
-    yes_no_asker
     """
 
     # ---- 1 Find the available fits ---------------------------------------------------
-    numbers = numbers or {}
     none_chosen = (False, None, None, defaults['decomposition_dataset'])
     names = fit_names_lister(fits_folder)
-    if not names and pca_runner is None:
+    if not names:
         info_printer(f'No presets or fit files (.csv) were found in {fits_folder}, so '
                      'haems cannot be decomposed this time. Put a fit .csv in that '
                      'folder and run again.',
                      )
-        return none_chosen
-    if (not forced and
-        not yes_no_asker('Do you want to decompose the haems?',
-                         defaults['decompose'],
-                         depth=depth,
-                         number=numbers.get('decompose'),
-                         )
-        ):
         return none_chosen
     def dataset_chooser(extra_depth: int) -> Optional[str]:
         common = set(summaries[0]['datasets'])
@@ -680,44 +661,26 @@ def decomposition_asker(summaries: List[dict],
                                       [(o, o) for o in options],
                                       options[0],
                                       depth=depth + extra_depth,
-                                      number=numbers.get('spectrometer'),
                                       )
         return chosen
 
     # ---- 2 Choose the fit, and the spectral dataset ----------------------------------
     default_fit = defaults.get('fit_file')
-    choices = [(n, n) for n in names]
-    if pca_runner is not None:
-        choices.append((PCA_CHOICE,
-                        'Find the components from the data (principal '
-                        'component analysis)',
-                        ),
-                       )
-    dataset = None
-    while True:
-        fit_file = choice_asker('Which fit would you like to use?',
-                                choices,
-                                default_fit if default_fit in names else choices[0][0],
-                                depth=depth + (0 if forced else 1),
-                                number=numbers.get('fit'),
-                                )
-        if fit_file == PCA_CHOICE:
-            dataset = dataset or dataset_chooser(1)
-            if dataset is None:
-                return none_chosen
-            fit_file, fit = pca_runner(dataset, depth + (0 if forced else 1) + 1)
-            if fit is None:
-                continue
-            break
-        try:
-            fit = fit_loader(fits_folder, fit_file)
-        except (OSError, ValueError) as exc:
-            info_printer(f"{problem_teller('The fit file could not be read', exc)} The "
-                         f'haems will not be decomposed.',
-                         )
-            return none_chosen
-        break
-    dataset = dataset or dataset_chooser(1)
+    titles = fit_titles_lister(fits_folder)
+    choices = [(n, titles.get(n, n)) for n in names]
+    fit_file = choice_asker('Which fit would you like to use?',
+                            choices,
+                            default_fit if default_fit in names else choices[0][0],
+                            depth=depth,
+                            )
+    try:
+        fit = fit_loader(fits_folder, fit_file)
+    except (OSError, ValueError) as exc:
+        info_printer(f"{problem_teller('The fit file could not be read', exc)} The "
+                     f'haems will not be decomposed.',
+                     )
+        return none_chosen
+    dataset = dataset_chooser(1)
     if dataset is None:
         return none_chosen
     return True, fit_file, fit, dataset

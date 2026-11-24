@@ -98,7 +98,7 @@ NAME_HINT = 'Type it in the box, then click Continue or press Enter.'
 FOLDER_HINT = ('Click a folder, then Continue. Under Other folder…, type a full path '
                'or click Browse….')
 # The clicks in the boxes that ask questions of their own while a question waits.
-ASKING_CHANGES = ('edit_ods', 'edit_labels', 'export_csv')
+ASKING_CHANGES = ('edit_ods', 'edit_labels', 'export_csv', 'do_pca')
 EDGES_HINT = ('Drag the edges on the plot, or type the times in the Time regions box '
               'above it, then click Continue.')
 OWN_VALUES_MARK = '  (own times)'  # after a file in the drop-down whose edges differ
@@ -4156,14 +4156,15 @@ class ViewerGui:
                          )
 
     # ---- strip_fits_setter -----------------------------------------------------------
-    def strip_fits_setter(self, names: List[str]) -> None:
+    def strip_fits_setter(self, fits: Dict[str, str]) -> None:
         """
         ---- Summary ----
         Method to give the settings strip the fits listed in its drop-down.
 
         ---- Inputs ----
-        names : List[str]
-            File names of the fits.
+        fits : Dict[str, str]
+            {file name: name shown} of the fits, in order
+            (spectral_decomposer.fit_titles_lister).
 
         ---- Globals read ----
         None.
@@ -4182,7 +4183,7 @@ class ViewerGui:
         None.
         """
 
-        self._events.put(('strip_fits', list(names)))
+        self._events.put(('strip_fits', dict(fits)))
 
     # ---- strip_library_setter --------------------------------------------------------
     def strip_library_setter(self, haems: List[Dict[str, str]]) -> None:

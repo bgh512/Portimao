@@ -9,6 +9,7 @@ from typing import Callable, List, Optional
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import group_assigner, hours_parser, run_name_lister
 from utils_shared.questions import (choice_asker,
+                                    guide_step_starter,
                                     info_printer,
                                     multi_asker,
                                     text_asker,
@@ -708,6 +709,7 @@ def summary_figure_asker(names: List[str],
     info_printer
     window_kind_asker
     windows_ensurer
+    guide_step_starter
     yes_no_asker
     """
 
@@ -723,6 +725,7 @@ def summary_figure_asker(names: List[str],
                                   None,
                                   ),
                                  ):
+        guide_step_starter(key)
         while True:
             result[key] = None
             answers[f'plot_{key}'] = False
@@ -738,12 +741,7 @@ def summary_figure_asker(names: List[str],
                  answers['fit_file'],
                  fit,
                  answers['decomposition_dataset'],
-                 ) = decomposition_asker(summaries,
-                                         defaults,
-                                         fits_folder,
-                                         forced=True,
-                                         depth=2,
-                                         )
+                 ) = decomposition_asker(summaries, defaults, fits_folder, depth=2)
                 if fit is None:
                     info_printer('No haem fit is available, so this figure is skipped.',
                                  depth=2,

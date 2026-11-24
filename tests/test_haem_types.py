@@ -18,7 +18,7 @@ from utils_shared.spectral_decomposer import fit_importer
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-# the order of the haems in fits/temp_fit_037v.csv, with a component of no known type
+# the order of the haems in the Rowan fit 11-2026, with a component of no known type
 FILE_ORDER = ['Cyt cc', 'Cyt b557', 'PC1', 'Cyt bH', 'Cyt bL', 'Cyt a605', 'Cyt a3']
 
 

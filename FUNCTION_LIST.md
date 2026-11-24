@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.21
+- **Version:** V2.22
 - **Date:** 24/11/2026
 
 ## Contents
@@ -104,7 +104,7 @@
     - [`_experiment_maker`](#_experiment_maker)
     - [`_preview_drawer`](#_preview_drawer)
     - [`test_side_by_side_draws_the_kept_plot_on_the_left`](#test_side_by_side_draws_the_kept_plot_on_the_left)
-    - [`test_overlaid_draws_the_kept_haems_dashed`](#test_overlaid_draws_the_kept_haems_dashed)
+    - [`test_overlaid_draws_the_old_faint_and_the_new_bold`](#test_overlaid_draws_the_old_faint_and_the_new_bold)
     - [`test_the_picture_puts_the_plot_in_use_on_the_right`](#test_the_picture_puts_the_plot_in_use_on_the_right)
     - [`test_the_switch_keeps_the_layout_and_redraws`](#test_the_switch_keeps_the_layout_and_redraws)
 - [`tests/test_dataset_settings.py`](#teststest_dataset_settingspy)
@@ -121,6 +121,7 @@
     - [`test_results_folder_outside_is_kept_whole`](#test_results_folder_outside_is_kept_whole)
     - [`test_regions_are_kept_with_the_dataset`](#test_regions_are_kept_with_the_dataset)
     - [`test_saved_haem_amounts_open_as_delta_d`](#test_saved_haem_amounts_open_as_delta_d)
+    - [`test_saved_old_names_open_with_the_new_ones`](#test_saved_old_names_open_with_the_new_ones)
     - [`test_settings_are_read_back`](#test_settings_are_read_back)
     - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
 - [`tests/test_delta_psi.py`](#teststest_delta_psipy)
@@ -130,7 +131,7 @@
     - [`test_numbers_that_cannot_be_used_are_refused`](#test_numbers_that_cannot_be_used_are_refused)
     - [`test_the_b_haems_are_found_by_name`](#test_the_b_haems_are_found_by_name)
     - [`test_the_numbers_the_program_starts_with`](#test_the_numbers_the_program_starts_with)
-    - [`test_the_kept_delta_psi_is_drawn_dashed`](#test_the_kept_delta_psi_is_drawn_dashed)
+    - [`test_the_kept_delta_psi_is_drawn_faint`](#test_the_kept_delta_psi_is_drawn_faint)
     - [`test_the_kept_regions_and_numbers_work_the_file_out`](#test_the_kept_regions_and_numbers_work_the_file_out)
     - [`test_the_panel_is_drawn_only_for_a_file_with_delta_psi`](#test_the_panel_is_drawn_only_for_a_file_with_delta_psi)
     - [`test_the_processing_keeps_delta_psi_when_switched_on`](#test_the_processing_keeps_delta_psi_when_switched_on)
@@ -237,7 +238,7 @@
     - [`test_haem_amounts_move_with_the_instrument`](#test_haem_amounts_move_with_the_instrument)
     - [`test_haem_amounts_fall_when_reduced`](#test_haem_amounts_fall_when_reduced)
     - [`test_haem_shapes_are_those_of_the_instrument`](#test_haem_shapes_are_those_of_the_instrument)
-    - [`test_valencia_background_is_the_instruments`](#test_valencia_background_is_the_instruments)
+    - [`test_palencia_background_is_the_instruments`](#test_palencia_background_is_the_instruments)
     - [`test_instrument_traces_fall_when_reduced`](#test_instrument_traces_fall_when_reduced)
 - [`tests/test_haem_library.py`](#teststest_haem_librarypy)
     - [`_dip_finder`](#_dip_finder)
@@ -248,6 +249,7 @@
     - [`test_preset_problems_are_refused`](#test_preset_problems_are_refused)
     - [`test_root_file_with_a_preset_name_is_not_offered`](#test_root_file_with_a_preset_name_is_not_offered)
     - [`test_standard_preset_keeps_its_haems`](#test_standard_preset_keeps_its_haems)
+    - [`test_fits_are_listed_by_their_names`](#test_fits_are_listed_by_their_names)
     - [`test_own_haems_are_built_from_the_library`](#test_own_haems_are_built_from_the_library)
     - [`test_built_fit_is_saved_as_a_fit_file`](#test_built_fit_is_saved_as_a_fit_file)
 - [`tests/test_haem_types.py`](#teststest_haem_typespy)
@@ -478,6 +480,7 @@
     - [`test_the_panels_are_oxygen_then_OCR_then_the_haems_a_b_c`](#test_the_panels_are_oxygen_then_ocr_then_the_haems_a_b_c)
     - [`test_the_shared_legend_leaves_the_OCR_out`](#test_the_shared_legend_leaves_the_ocr_out)
     - [`test_the_time_axis_covers_every_panel`](#test_the_time_axis_covers_every_panel)
+    - [`test_the_haem_panels_share_one_scale`](#test_the_haem_panels_share_one_scale)
 - [`tests/test_summary_maths.py`](#teststest_summary_mathspy)
     - [`_run_builder`](#_run_builder)
     - [`_spectra_experiment_builder`](#_spectra_experiment_builder)
@@ -543,6 +546,9 @@
     - [`test_keep_to_compare_keeps_the_regions_in_use`](#test_keep_to_compare_keeps_the_regions_in_use)
     - [`test_go_back_to_kept_puts_the_kept_one_back`](#test_go_back_to_kept_puts_the_kept_one_back)
     - [`test_save_fit_names_the_fit_in_use`](#test_save_fit_names_the_fit_in_use)
+    - [`test_do_pca_runs_only_in_the_haem_step`](#test_do_pca_runs_only_in_the_haem_step)
+    - [`test_haem_step_is_one_line_and_continue`](#test_haem_step_is_one_line_and_continue)
+    - [`test_scatters_have_names_and_textbook_formulas`](#test_scatters_have_names_and_textbook_formulas)
     - [`test_answers_shown_in_the_strip`](#test_answers_shown_in_the_strip)
     - [`test_ocr_view_and_the_new_box_values`](#test_ocr_view_and_the_new_box_values)
     - [`test_values_meant_for_the_strip`](#test_values_meant_for_the_strip)
@@ -868,6 +874,7 @@
     - [`experiment_drawer`](#experiment_drawer)
     - [`experiment_plotter`](#experiment_plotter)
     - [`experiment_title_builder`](#experiment_title_builder)
+    - [`haem_ylim_sharer`](#haem_ylim_sharer)
     - [`watermark_style_builder`](#watermark_style_builder)
 - [`utils_shared/journal_files.py`](#utils_sharedjournal_filespy)
     - [`_number_checker`](#_number_checker)
@@ -1022,6 +1029,7 @@
     - [`_headed_fit_reader`](#_headed_fit_reader)
     - [`_number_column_reader`](#_number_column_reader)
     - [`_preset_reader`](#_preset_reader)
+    - [`_preset_title_reader`](#_preset_title_reader)
     - [`_unit_scaler`](#_unit_scaler)
     - [`_wavelength_masker`](#_wavelength_masker)
     - [`answers_fit_loader`](#answers_fit_loader)
@@ -1038,6 +1046,8 @@
     - [`fit_importer`](#fit_importer)
     - [`fit_loader`](#fit_loader)
     - [`fit_names_lister`](#fit_names_lister)
+    - [`fit_titles_lister`](#fit_titles_lister)
+    - [`fit_title_maker`](#fit_title_maker)
     - [`fit_range_finder`](#fit_range_finder)
     - [`fit_scale_standardiser`](#fit_scale_standardiser)
     - [`haem_files_combiner`](#haem_files_combiner)
@@ -1179,7 +1189,6 @@
     - [`_addition_time_lister`](#_addition_time_lister)
     - [`_answers_previewer`](#_answers_previewer)
     - [`_component_namer`](#_component_namer)
-    - [`_decomposition_storer`](#_decomposition_storer)
     - [`_box_edit_runner`](#_box_edit_runner)
     - [`_export_asker`](#_export_asker)
     - [`_figure_starter`](#_figure_starter)
@@ -1226,6 +1235,8 @@
     - [`SettingsStrip`](#settingsstrip)
     - [`_page_journal_finder`](#_page_journal_finder)
     - [`form_answers_builder`](#form_answers_builder)
+    - [`formula_note_writer`](#formula_note_writer)
+    - [`formula_picture_maker`](#formula_picture_maker)
     - [`haem_form_choices_lister`](#haem_form_choices_lister)
     - [`haem_ticks_resolver`](#haem_ticks_resolver)
     - [`height_checker`](#height_checker)
@@ -4420,13 +4431,13 @@ at every spectrum: largest 2, average 2. Haem i then reaches from i (in use, at
 _preview_drawer
 ```
 
-#### `test_overlaid_draws_the_kept_haems_dashed`
+#### `test_overlaid_draws_the_old_faint_and_the_new_bold`
 
 ```text
 ---- Summary ----
 Main function to check the preview with a decomposition kept, overlaid: one plot,
-each haem panel with the haem in use and the kept one dashed over it, and the key
-of the dashed lines.
+each haem panel with the haem in use drawn bold and the kept one faint and thin
+under it, in the same colour, none dashed, and the key of the two.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
@@ -4454,16 +4465,17 @@ _preview_drawer
 
 ```text
 ---- Summary ----
-Main function to check the picture shown side by side: the kept plot on the left,
-a white gap, the plot in use on the right exactly as it is on its own, and the time
-axis of the plot in use moved into the whole picture, so the edges dragged, the
-arrows and the shading fall on the plot in use.
+Main function to check the picture shown side by side: the headings Old and New
+above, the kept plot on the left, a white gap, the plot in use on the right
+exactly as it is on its own, and the time axis of the plot in use moved into the
+whole picture, so the edges dragged, the arrows and the shading fall on the plot
+in use.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-SIDE_GAP_PX.
+SIDE_GAP_PX, SIDE_HEADING_PX.
 
 ---- Outputs ----
 None.
@@ -4472,9 +4484,10 @@ None.
 None.
 
 ---- Equations ----
-With the kept plot k pixels wide, the gap g, the plot in use n wide and h high, in
-a picture W = k + g + n wide and H high: x' = (k + g + x n) / W and
-y' = (H - h + y h) / H. The kept plot here is wider and taller, so both change.
+With the kept plot k pixels wide, the gap g, the plot in use n wide and h high,
+under headings t high, in a picture W = k + g + n wide and H high:
+x' = (k + g + x n) / W and y' = (H - t - h + y h) / H. The kept plot here is wider
+and taller, so both change.
 
 ---- Helpers ----
 None.
@@ -4883,6 +4896,34 @@ None.
 None.
 ```
 
+#### `test_saved_old_names_open_with_the_new_ones`
+
+```text
+---- Summary ----
+Main function to check that a dataset saved with the Valencia scatter opens with
+Palencia, one saved with the preset temp_fit_037v opens with the Rowan fit 11-2026,
+and the other answers, and other names, are left as they were.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+FILES, ANSWERS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_settings_are_read_back`
 
 ```text
@@ -5126,12 +5167,13 @@ s = 8.314462618 x (37 + 273.15) / 96485.33212 x 1000 = 26.72666 mV; at 25 °C,
 None.
 ```
 
-#### `test_the_kept_delta_psi_is_drawn_dashed`
+#### `test_the_kept_delta_psi_is_drawn_faint`
 
 ```text
 ---- Summary ----
 Main function to check the Δψ kept to compare with on the plot of one file: a
-second line in the Δψ panel, dashed and paler, the panel widened to hold it outside
+second line in the Δψ panel, faint and thin under the one in use, drawn bold, none
+dashed, the panel widened to hold it outside
 the ignored parts, and the gap between the two worked out by hand; and one
 sentence in place of the line for a file with no kept Δψ.
 
@@ -7039,7 +7081,7 @@ None.
 ---- Equations ----
 x = wl / 100 nm. scatter_1: 1/x; scatter_2: 1/x and 1/x^2; linear: x - 5.5;
 rowan_scatter: x - 5.5 and (x - 6)^2, a curve with its bottom off the middle;
-valencia: 1/x^2.
+palencia: 1/x^2.
 
 ---- Helpers ----
 None.
@@ -8182,11 +8224,11 @@ fits over, where our file has the haem too: +1 or -1 for the same shape.
 _instrument_fit_reader
 ```
 
-#### `test_valencia_background_is_the_instruments`
+#### `test_palencia_background_is_the_instruments`
 
 ```text
 ---- Summary ----
-Main function to check that our Valencia background can make the background shape
+Main function to check that our Palencia background can make the background shape
 of the instrument's own fit file, over the wavelengths the instrument fits.
 
 ---- Inputs ----
@@ -8461,8 +8503,8 @@ _preset_writer
 ---- Summary ----
 Main function to check that the standard fit, now a preset of the haem library,
 gives the five haems and α dips of the fit file it replaced, and that the cc of
-temp_fit_037v keeps the 35.2 OD/mM/cm of its old file, its preset giving it 2 haems
-per protein.
+the Rowan fit 11-2026 (once temp_fit_037v) keeps the 35.2 OD/mM/cm of its old file,
+its preset giving it 2 haems per protein.
 
 ---- Inputs ----
 None.
@@ -8481,6 +8523,35 @@ None.
 
 ---- Helpers ----
 _dip_finder
+```
+
+#### `test_fits_are_listed_by_their_names`
+
+```text
+---- Summary ----
+Main function to check the names the Fit list shows: a preset's own Name line, a
+preset without one and a fit file of the fits folder by the file name without
+.csv, in the order of the file names; the shipped Rowan fit 11-2026; and the fits
+not in the list (Your own haems, components found from the data) as they are.
+
+---- Inputs ----
+tmp_path : Path
+    Pytest's folder for this test, used as a fits folder.
+
+---- Globals read ----
+FITS_FOLDER, PRESETS_FOLDER_NAME, OWN_HAEMS_NAME; settings.STANDARD_FIT.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `test_own_haems_are_built_from_the_library`
@@ -13233,7 +13304,7 @@ ROOT, LIST_NAME (module constants).
 
 ---- Outputs ----
 List[Tuple[str, str]]
-    [(the row's number, such as '4.1.1.7', the text of the whole row)], in the
+    [(the row's number, such as '4.1.7', the text of the whole row)], in the
     order of the list.
 
 ---- Globals mutated ----
@@ -14482,11 +14553,16 @@ asked : Optional[List[str]]
     The haems the plot is asked to show; None asks for the four of the file.
 has_haems : bool
     False makes a file whose haems were not worked out.
+source : str
+    Key of schema.HAEM_KEYS the haem panels show ('delta_abs', 'abs', 'percent').
+steps : Optional[List[float]]
+    How far each haem, in the order of HAEMS_GIVEN, rises from 5 to 25 min, in a
+    straight line from its level i; None for haems that stay at i.
 **changed : object
     Answers that differ from the standard ones (plot_o2=False).
 
 ---- Globals read ----
-HAEMS_GIVEN, TIME_COLUMN.
+HAEMS_GIVEN, HAEM_KEYS, TIME_COLUMN.
 
 ---- Outputs ----
 list
@@ -14671,6 +14747,41 @@ None.
 
 ---- Helpers ----
 _plot_drawer
+```
+
+#### `test_the_haem_panels_share_one_scale`
+
+```text
+---- Summary ----
+Main function to check that the haem panels share one scale, so a haem that hardly
+changes looks small beside the others: in ΔD the same range on every panel; in
+absorbance the same height of range, around each haem; in % oxidised each its own.
+Worked out by hand.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The haems cc, bL, bH, a605 start at 0, 1, 2, 3 and rise by -5, 1, 0.2, 2 from 5 to
+25 min. Alone, each panel reaches 5 % of its change beyond it:
+cc (-5.25, 0.25), bL (0.95, 2.05), bH (1.99, 2.21), a605 (2.9, 5.1).
+ΔD: every panel from the lowest low to the highest high, (-5.25, 5.1).
+Absorbance: every panel 5.5 high (that of cc), around its own middle:
+cc -2.5 (-5.25, 0.25), bL 1.5 (-1.25, 4.25), bH 2.1 (-0.65, 4.85),
+a605 4 (1.25, 6.75).
+
+---- Helpers ----
+_plot_drawer
+haem_ylim_sharer
 ```
 
 ## `tests/test_summary_maths.py`
@@ -16581,6 +16692,97 @@ None
 
 ---- Globals mutated ----
 None. The stand-ins are undone after the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_do_pca_runs_only_in_the_haem_step`
+
+```text
+---- Summary ----
+Main function to check Do PCA in the Haem decomposition box: the strip tells the
+click only while it is listening; while the haem step waits the questions of the
+analysis are asked (stood in for); at any other step one sentence says where to
+go, and nothing else changes.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the showing of the strip and the terminal.
+
+---- Globals read ----
+PCA_CHANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The stand-ins are undone after the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_haem_step_is_one_line_and_continue`
+
+```text
+---- Summary ----
+Main function to check the haem step of the processing: one instruction, 4.1,
+answered with Continue, and no question about the fit. With no haems shown and
+Haem decomposition left unticked the run goes on without haems; a click on Do PCA
+while it waits makes the components of the whole dataset the fit in use; Do PCA
+is only carried out while the step waits. The plot, the later steps of the
+processing and the questions of the analysis are stood in for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the window, the plot, the terminal and the later steps.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. The stand-ins are undone after the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_scatters_have_names_and_textbook_formulas`
+
+```text
+---- Summary ----
+Main function to check the Scatter drop-down: the five scatters by their short
+names, Rowan scatter first; each has a formula that draws as a picture (so its
+fractions and powers are written as a textbook writes them) and a line saying what
+its letters are, w_mid only for Rowan scatter.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BACKGROUND_FORMULAS, BACKGROUND_SHORT_NAMES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
 
 ---- Equations ----
 None.
@@ -24575,14 +24777,17 @@ folder : Path
     The dataset folder (the folder of the .paf files).
 
 ---- Globals read ----
-SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RETIRED_HAEM_MODE_KEYS (module constants).
+SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RETIRED_HAEM_MODE_KEYS, RENAMED_ANSWERS
+(module constants).
 
 ---- Outputs ----
 dict
     {'export_folder': Optional[Path], 'files': dict, 'answers': dict}
     (DATA_FORMAT.md, dataset_settings). An empty dict when the dataset was never
     saved or its file cannot be read, so the standard settings are used. A haem
-    way of showing no longer offered (RETIRED_HAEM_MODES) is given as its successor.
+    way of showing no longer offered (RETIRED_HAEM_MODES) is given as its
+    successor, and an answer saved under an old name (RENAMED_ANSWERS) under its
+    new one.
 
 ---- Globals mutated ----
 None. Reads the file (side effect).
@@ -27221,6 +27426,7 @@ _vo2_ymax_calculator
 _window_drawer
 _ylim_calculator
 event_text_writer
+haem_ylim_sharer
 name_simplifier
 source_resolver
 time_getter
@@ -27294,6 +27500,41 @@ None.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+None.
+```
+
+#### `haem_ylim_sharer`
+
+```text
+---- Summary ----
+Main function to put the haem panels on one scale, so the size of a change can be
+compared between them: the same y range on every panel for ΔD, where every haem
+starts at 0; for absorbance, whose haems sit at different levels, the same height
+of range on every panel, each around its own haem.
+
+---- Inputs ----
+limits : List[Tuple[float, float]]
+    (low, high) each panel would have alone, in mOD (or mOD OD⁻¹).
+is_aligned : bool
+    True for ΔD (the same range on every panel), False for absorbance (the same
+    height of range, around each panel's own middle).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Tuple[float, float]]
+    (low, high) of each panel, in the order given.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+ΔD: low = smallest of the lows, high = largest of the highs, on every panel.
+Absorbance: height = largest (high - low); middle = (low + high) / 2 of each
+panel; limits = middle - height / 2 and middle + height / 2.
 
 ---- Helpers ----
 None.
@@ -32858,6 +33099,35 @@ the column name, and each line below names one file in its first cell.
 None.
 ```
 
+#### `_preset_title_reader`
+
+```text
+---- Summary ----
+Helper function to read the name a preset gives itself for the Fit list, from its
+"Name" heading line.
+
+---- Inputs ----
+path : Path
+    Preset file (DATA_FORMAT.md, "preset csv").
+
+---- Globals read ----
+PRESET_TITLE_LABEL (module constant).
+
+---- Outputs ----
+Optional[str]
+    The name, or None when the preset has no Name line or cannot be read (the
+    Fit list then shows its file name without .csv).
+
+---- Globals mutated ----
+None. Reads the file (side effect).
+
+---- Equations ----
+None. Only the heading lines, above the first empty line, are read.
+
+---- Helpers ----
+None.
+```
+
 #### `_unit_scaler`
 
 ```text
@@ -32984,7 +33254,7 @@ None.
 ---- Equations ----
 scatter_1: 1, 1/wl; scatter_2: 1, 1/wl, 1/wl^2 (scatter_background_builder);
 linear: 1, wl; rowan_scatter: 1, wl, (wl - centre)^2 with the centre halfway
-between the shortest and the longest wavelength; valencia: 1, 1/wl^2. Scaling a
+between the shortest and the longest wavelength; palencia: 1, 1/wl^2. Scaling a
 shape to run from 0 to 1 changes only the size of its amount, not the fit.
 
 ---- Helpers ----
@@ -33460,6 +33730,66 @@ List[str]
     with a preset's name is left out, as the preset is what that name loads (an
     old copy of the fit, kept in the Mac app's Portimao folder). Empty when there
     is nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `fit_titles_lister`
+
+```text
+---- Summary ----
+Main function to give each fit of the Fit list the name it is shown by: a
+preset's own Name line, or else its file name without .csv.
+
+---- Inputs ----
+fits_folder : Path
+    The fits folder.
+
+---- Globals read ----
+PRESETS_FOLDER_NAME (module constant).
+
+---- Outputs ----
+Dict[str, str]
+    {file name: name shown}, in the order of fit_names_lister.
+
+---- Globals mutated ----
+None. Reads the presets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_preset_title_reader
+fit_names_lister
+fit_title_maker
+```
+
+#### `fit_title_maker`
+
+```text
+---- Summary ----
+Main function to give the name a fit is shown by in the Fit list.
+
+---- Inputs ----
+fit_file : str
+    The answer 'fit_file': a file name, OWN_HAEMS_NAME or the description of
+    components found from the data.
+titles : Dict[str, str]
+    {file name: name shown}, as fit_titles_lister gives it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Its name in ``titles``, else the file name without .csv, else fit_file.
 
 ---- Globals mutated ----
 None.
@@ -34225,31 +34555,22 @@ path_cleaner
 
 ```text
 ---- Summary ----
-Main function to ask whether to decompose the spectra into haems and which fit to
-use: a fit file, or (when a pca_runner is given) components found from the data
-with a principal component analysis.
+Main function to ask which fit to decompose the spectra into haems with, for a
+figure that needs the haems when the run has none, and which spectrometer holds
+them when the files share several and the one saved is not among them.
 
 ---- Inputs ----
 summaries : List[dict]
     File summaries (DATA_FORMAT.md); the spectrometers in common are used.
 defaults : dict
-    Default answers (decompose, fit_file, decomposition_dataset).
+    Default answers (fit_file, decomposition_dataset).
 fits_folder : Path
     Folder holding the fit .csv files.
-forced : bool
-    True to skip the yes/no question (a figure that needs the haems was chosen).
 depth : int
     Numbering depth of the questions (1 = 3.1, 2 = 3.1.1).
-pca_runner : Optional[Callable]
-    Function (dataset, depth) that finds the components with a principal component
-    analysis and returns (fit file name, fit), or (None, None) when the user wants
-    a fit file instead. None leaves the option out.
-numbers : Optional[Dict[str, str]]
-    The questions' own numbers from QUESTION_FLOW.md, by 'decompose', 'fit' and
-    'spectrometer'; None numbers them in the order asked.
 
 ---- Globals read ----
-PCA_CHOICE (module constant).
+None.
 
 ---- Outputs ----
 tuple
@@ -34266,9 +34587,9 @@ None.
 choice_asker
 fit_loader
 fit_names_lister
+fit_titles_lister
 info_printer
 problem_teller
-yes_no_asker
 ```
 
 #### `delta_psi_asker`
@@ -39149,8 +39470,9 @@ None.
 Method to give the settings strip the fits listed in its drop-down.
 
 ---- Inputs ----
-names : List[str]
-    File names of the fits.
+fits : Dict[str, str]
+    {file name: name shown} of the fits, in order
+    (spectral_decomposer.fit_titles_lister).
 
 ---- Globals read ----
 None.
@@ -40922,9 +41244,10 @@ preview_info_builder
 ---- Summary ----
 Helper function to work one file out again with the kept decomposition (its fit,
 background, regions and numbers of delta psi, everything else as in use), draw its
-haem traces dashed over the haems in use in the same colours, widening a panel a
-kept trace would leave, and say how far apart the two are; its delta psi is drawn
-the same way over the delta psi in use. Its own warnings are left out, as they
+haem traces faint and thin under the haems in use, drawn bold, in the same colours,
+widening a panel a kept trace would leave (and the other haem panels with it, so
+they keep one scale), and say how far apart the two are; its delta psi is drawn
+the same way under the delta psi in use. Its own warnings are left out, as they
 repeat those of the decomposition in use.
 
 ---- Inputs ----
@@ -40949,11 +41272,12 @@ plot_config : dict
     HAEM_Y_MAX).
 
 ---- Globals read ----
-settings.Config, HAEM_KEYS, KEY_PREFIX, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
+settings.Config, HAEM_KEYS, KEY_PREFIX, KEPT_ALPHA, KEPT_MARGIN,
+KEPT_WIDTH_FACTOR, NEW_WIDTH_FACTOR, OVERLAID_KEY.
 
 ---- Outputs ----
 str
-    The notes: a KEY_PREFIX line for the dashed lines, a line with the largest
+    The notes: a KEY_PREFIX line for the faint and bold lines, a line with the largest
     and the average gap of each haem in both, and the note of the kept delta psi
     (_kept_psi_drawer) when delta psi is shown; or one sentence saying why the
     kept decomposition is not shown on this file.
@@ -40971,6 +41295,7 @@ pad = (max - min) x KEPT_MARGIN, and never shrinks.
 _kept_gap_teller
 _kept_processor
 _kept_psi_drawer
+haem_ylim_sharer
 name_simplifier
 problem_teller
 ```
@@ -41055,9 +41380,9 @@ experiment_data_processor
 
 ```text
 ---- Summary ----
-Helper function to draw the delta psi of the kept decomposition dashed and paler
-over the delta psi in use, widening the panel where the kept line would leave it,
-and say how far apart the two are.
+Helper function to draw the delta psi of the kept decomposition faint and thin
+under the delta psi in use, drawn bold, widening the panel where the kept line
+would leave it, and say how far apart the two are.
 
 ---- Inputs ----
 experiment : dict
@@ -41076,7 +41401,7 @@ ignore_end_min : float
     Minutes ignored at the end, left out when the panel is widened.
 
 ---- Globals read ----
-DELTA_PSI_COLUMN, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
+DELTA_PSI_COLUMN, KEPT_ALPHA, KEPT_MARGIN, KEPT_WIDTH_FACTOR, NEW_WIDTH_FACTOR.
 
 ---- Outputs ----
 str
@@ -41175,12 +41500,14 @@ problem go to the log (side effects).
 
 ---- Equations ----
 The y range of two matching panels reaches from the lower of their two bottoms to
-the higher of their two tops.
+the higher of their two tops; the haem panels then share one scale
+(haem_ylim_sharer), on both sides.
 
 ---- Helpers ----
 _kept_gap_teller
 _kept_processor
 _kept_psi_gap_teller
+haem_ylim_sharer
 experiment_plotter
 problem_teller
 ```
@@ -41586,16 +41913,18 @@ time_title_chooser
 ---- Summary ----
 Main function to turn a drawn preview into the picture the window shows, with where
 its time axis sits. A figure carrying a kept plot (kept_figure, side by side) gets
-the kept plot on the left and itself on the right, with a white gap between; the
-time axis is then that of the plot on the right, so the edges, the arrows and the
-shading of the window fall on the plot in use.
+the kept plot on the left and itself on the right, with a white gap between and
+the headings Old and New above them; the time axis is then that of the plot on the
+right, so the edges, the arrows and the shading of the window fall on the plot in
+use.
 
 ---- Inputs ----
 fig : Figure
     The drawn preview (preview_figure_builder).
 
 ---- Globals read ----
-settings.PREVIEW_DPI, SIDE_GAP_PX.
+settings.PREVIEW_DPI, SIDE_GAP_PX, SIDE_HEADINGS, SIDE_HEADING_PX,
+SIDE_HEADING_FONT_PX.
 
 ---- Outputs ----
 Tuple[bytes, Optional[TimeAxis]]
@@ -41607,9 +41936,9 @@ None.
 
 ---- Equations ----
 With the kept plot k pixels wide, the gap g and the plot in use n pixels wide in a
-picture W = k + g + n wide and H high (the plot in use at its top):
-x' = (k + g + x n) / W and y' = (H - h + y h) / H, with h the height of the plot
-in use and x, y the fractions within it.
+picture W = k + g + n wide and H high (the plot in use under a heading t high):
+x' = (k + g + x n) / W and y' = (H - t - h + y h) / H, with h the height of the
+plot in use and x, y the fractions within it.
 
 ---- Helpers ----
 time_axis_finder
@@ -42172,39 +42501,6 @@ text_asker
 yes_no_asker
 ```
 
-#### `_decomposition_storer`
-
-```text
----- Summary ----
-Helper function to keep what the fit questions decided as the fit in use, and show
-it in the settings strip. A run without haems keeps the name of the last fit, so
-the strip still offers it.
-
----- Inputs ----
-session : ViewerSession
-    The browser session; its fit is set.
-answers : dict
-    Answers dictionary (decompose, fit_file, decomposition_dataset are set).
-chosen : tuple
-    (decompose, fit_file, fit, dataset) as decomposition_asker returns it.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Changes ``answers`` and the session, and shows the strip (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_strip_shower
-```
-
 #### `_box_edit_runner`
 
 ```text
@@ -42670,7 +42966,7 @@ None.
 
 ---- Helpers ----
 built_fit_saver
-fit_names_lister
+fit_titles_lister
 info_printer
 problem_teller
 ```
@@ -43209,7 +43505,9 @@ of its own on the left or drawn dashed over the haems and over Δψ (the switch
 beside Keep new, kept in the answers), until one of the two is chosen (Keep new
 carries on with what is on the plot, Keep old puts the kept one back in use) or
 the haems are left out. A click on Save fit saves the haems ticked under Build a fit as a fit file of
-the name typed beside it. A new journal, width or height redraws only the figure
+the name typed beside it. A click on Do PCA asks the questions that find the
+components from the data while the haem step waits, and says where to go
+otherwise. A new journal, width or height redraws only the figure
 of each file, the one plot drawn at its size. A click on Export master saves the
 master page of the file shown while that figure is on the plot, and says when it
 can be saved otherwise.
@@ -43747,15 +44045,15 @@ region_files_lister
 ```text
 ---- Summary ----
 Main function to talk the user through the processing, with the plot redrawn after
-each answer: first the haem fit, then the oxidised and the reduced region of every
-file (when the haems are shown), then whether to work out Δψ (when it can be), and
-last the averaging windows, dragged on the plot (they are drawn in the plot only
-once that step is answered). The trim and ignore edges stay movable under Trim /
-Ignore in the Time regions box. A line points to the boxes above the plot at the
-start, and another to % oxidised once a file has both regions. The Haem
-decomposition box picks the fit and leaves the haems out, so the decomposition
-question only offers to find the components from the data instead. While those
-questions are asked the boxes are greyed out.
+each answer: first the haem fit, set in the Haem decomposition box until Continue
+(its Do PCA button asks the questions that find the components from the whole
+dataset, with the boxes greyed out meanwhile), then the oxidised and the reduced
+region of every file (when the haems are shown), then whether to work out Δψ (when
+it can be), and last the averaging windows, dragged on the plot (they are drawn in
+the plot only once that step is answered). The trim and ignore edges stay movable
+under Trim / Ignore in the Time regions box. A line says which fit the haems are
+worked out with at the start, and another points to % oxidised once a file has
+both regions. Haem decomposition unticked at Continue goes on without haems.
 
 ---- Inputs ----
 session : ViewerSession
@@ -43779,7 +44077,7 @@ regions : Optional[Dict[str, Dict[str, float]]]
     was answered in this run; None for regions not chosen.
 
 ---- Globals read ----
-settings.DELTA_PSI_LIMIT_ANSWERS.
+settings.DELTA_PSI_LIMIT_ANSWERS, HAEM_NUDGE.
 
 ---- Outputs ----
 Optional[Dict[str, Dict[str, float]]]
@@ -43797,18 +44095,15 @@ None.
 ---- Helpers ----
 _answers_previewer
 _windows_chooser
-_decomposition_storer
 _regions_chooser
 _strip_shower
-accept_asker
-decomposition_asker
 delta_psi_asker
-fit_names_lister
+enter_waiter
+fit_titles_lister
 info_printer
 pca_stage_runner
 preview_drawer
 region_files_lister
-yes_no_asker
 ```
 
 #### `region_files_lister`
@@ -43968,7 +44263,7 @@ active_gui_getter
 browser_stage_runner
 choice_asker
 details_stage_runner
-fit_names_lister
+fit_titles_lister
 heading_printer
 library_haems_lister
 info_printer
@@ -44345,11 +44640,13 @@ regions and the averaging windows, the one pressed having its edges on the plot
 (the window places their rows in the box). View: how the OCR is shown with its per
 OD box, how the haems are shown with theirs (the per OD boxes and Edit ODs only
 once OD values were entered), what the event labels show, their angle and Edit
-labels. Haem decomposition, with its tick as title: the fit, the background (the
-scatter), the spectrometer whose spectra hold the haems (shown when the files
-share more than one), a button that folds out a tick box for each haem of the
-library with a name box and Save fit under them (Build a fit), a button that keeps
-the decomposition in use to compare the next ones with (greyed while one is kept,
+labels. Haem decomposition, with its tick as title, in this order: the
+spectrometer whose spectra hold the haems (shown when the files share more than
+one), the background (the scatter) with a button that shows its formula, the fit
+(each shown by its name), a button that folds out a tick box for each haem of the
+library with a name box and Save fit under them (Build a fit) beside the button
+that finds the components from the data (Do PCA), and a button that keeps the
+decomposition in use to compare the next ones with (greyed while one is kept,
 with a line saying which one, and Keep old and Keep new under it to choose between
 the two). Δψ, with its tick as title (it can be clicked only while Δψ can be worked
 out): the midpoint of bH and of bL (written as in the figures) and the shift typed,
@@ -44384,6 +44681,7 @@ _edit_handler
 _fit_handler
 _fit_saver
 _form_handler
+_formula_toggler
 _haems_handler
 _height_handler
 _journal_handler
@@ -44393,6 +44691,7 @@ _more_toggler
 _ocr_handler
 _order_handler
 _paper_handler
+_pca_handler
 _per_od_handler
 _psi_handler
 _psi_tick_handler
@@ -44453,6 +44752,7 @@ _edit_handler
 _fit_handler
 _fit_saver
 _form_handler
+_formula_toggler
 _haems_handler
 _height_handler
 _journal_handler
@@ -44463,6 +44763,7 @@ _more_toggler
 _ocr_handler
 _order_handler
 _paper_handler
+_pca_handler
 _per_od_handler
 _psi_handler
 _psi_tick_handler
@@ -44756,6 +45057,33 @@ _change_reporter
 _size_refresher
 ```
 
+##### `_formula_toggler`
+
+```text
+---- Summary ----
+Method to show the formula of the scatter picked under the Scatter drop-down,
+or hide it again.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Shows or hides the formula (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_refresher
+```
+
 ##### `_haems_handler`
 
 ```text
@@ -45015,6 +45343,33 @@ _size_refresher
 psi_values_builder
 ```
 
+##### `_pca_handler`
+
+```text
+---- Summary ----
+Method to take a click on Do PCA. The box keeps nothing: the click is told as
+{PCA_CHANGE: True}, and the program asks the questions of the analysis.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PCA_CHANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the function given as on_change (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_ocr_handler`
 
 ```text
@@ -45142,7 +45497,8 @@ follow the journal, the width and the height are greyed for "None", the button
 that keeps a decomposition is greyed while no haems are shown, the button that
 goes back to the kept one and the line saying which one is kept show only
 while one is, the spectrometer shows only when
-there is a choice, the per OD box of the haems only when OD values were
+there is a choice, the formula of the scatter only while its button is pressed
+in, the fits by their names, the per OD box of the haems only when OD values were
 entered (greyed for % oxidised, which has no per OD), the ways of showing the
 OCR that can be used now, the Δψ row only
 while Δψ is worked out (its filled-in midpoints following the typed ones and
@@ -45153,7 +45509,7 @@ None.
 
 ---- Globals read ----
 HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIXES,
-NO_JOURNAL, NOTE_TEXT.
+NO_JOURNAL, NOTE_TEXT, BACKGROUND_FORMULAS.
 (BACK_TEXT and STOP_TEXT are set on their buttons once, when they are built.)
 
 ---- Outputs ----
@@ -45167,6 +45523,9 @@ None. Changes the widgets (side effect).
 None.
 
 ---- Helpers ----
+fit_title_maker
+formula_note_writer
+formula_picture_maker
 haem_form_choices_lister
 height_checker
 ocr_form_choices_lister
@@ -45339,8 +45698,9 @@ _size_refresher
 Method to give the drop-down of the fits its list. The fit shown stays.
 
 ---- Inputs ----
-names : List[str]
-    File names of the fits, as they are to be listed.
+fits : Dict[str, str]
+    {file name: name shown} of the fits, in the order they are to be listed
+    (spectral_decomposer.fit_titles_lister).
 
 ---- Globals read ----
 None.
@@ -45526,6 +45886,64 @@ Dict[str, Any]
     The answers to update: decomposition_dataset for the spectrometer, and
     haem_mode, haem_per_od, ocr_mode, label_mode and event_label_angle as given.
     Empty when the values hold none of them.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `formula_note_writer`
+
+```text
+---- Summary ----
+Main function to say under a scatter's formula what its letters are.
+
+---- Inputs ----
+background : str
+    A key of BACKGROUND_FORMULAS.
+
+---- Globals read ----
+FORMULA_NOTE.
+
+---- Outputs ----
+str
+    One line: what B, w and the b are, and w_mid for Rowan scatter.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `formula_picture_maker`
+
+```text
+---- Summary ----
+Main function to draw a scatter's formula as a textbook writes it (fractions with
+a bar, powers raised, the b with their numbers lowered), as a PNG with a clear
+background for the Haem decomposition box.
+
+---- Inputs ----
+background : str
+    A key of BACKGROUND_FORMULAS.
+colour : str
+    Colour of the letters.
+
+---- Globals read ----
+BACKGROUND_FORMULAS, FORMULA_DPI, FORMULA_FONT_PT.
+
+---- Outputs ----
+bytes
+    The PNG, cut to the formula.
 
 ---- Globals mutated ----
 None.

@@ -73,12 +73,12 @@ from utils_shared.spectral_decomposer import (answers_fit_loader,
                                               built_fit_saver,
                                               fit_describer,
                                               fit_names_lister,
+                                              fit_titles_lister,
                                               library_haems_lister,
                                               OWN_HAEMS_NAME,
                                               PRESETS_FOLDER_NAME,
                                               )
-from utils_shared.survey import (decomposition_asker,
-                                 delta_psi_asker,
+from utils_shared.survey import (delta_psi_asker,
                                  delta_psi_offer_checker,
                                  event_asker,
                                  IGNORE_LABEL,
@@ -122,6 +122,7 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        MASTER_CHANGE,
                                        OCR_FORM_TEXTS,
                                        PANEL_ORDER_CHANGE,
+                                       PCA_CHANGE,
                                        psi_answers_builder,
                                        psi_change_describer,
                                        SAVE_FIT_CHANGE,
@@ -146,7 +147,8 @@ LABEL_CHANGE_TEXTS = {'chamber': 'the concentration in the chamber (400 µM KCN)
 # how the kept decomposition is shown, as the terminal says it
 COMPARE_LAYOUT_WORDS = {'side': 'the kept one shows as a plot of its own, on the left '
                                 'of the plot in use',
-                        'overlaid': 'the kept lines show dashed over the plot in use',
+                        'overlaid': 'the kept lines show faint under the plot in use, '
+                                    'drawn bold',
                         }
 PCA_COMPONENTS_TITLE = 'PCA components'
 PCA_EXAMPLES_TITLE = 'PCA examples (smallest and largest residual)'
@@ -172,8 +174,8 @@ OD_KEY_LINES = ('OD          = measured OD of the sample',
                 'Volume (mL) = total volume of cells spun down',
                 'Dilution    = any dilution factor after additions',
                 )
-# The numbers of the haem fit questions of the processing, from QUESTION_FLOW.md 4.A.
-PROCESSING_FIT_NUMBERS = {'decompose': '4.1', 'fit': '4.1.1', 'spectrometer': '4.1.2'}
+HAEM_NUDGE = ('Change the fit, the scatter or the spectra in the Haem decomposition '
+              'box above the plot; press Continue when the haems look right.')
 TRIM_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
               'bars; press Continue when every experiment looks right.')
 # The boxes of the regions step, in the order of redox_regions.REGION_KEYS.
@@ -368,7 +370,7 @@ def _component_namer(result: dict, types: List[str], depth: int) -> List[str]:
     if not yes_no_asker('Do you want to name the components?',
                         False,
                         depth=depth,
-                        number='4.1.1.7',
+                        number='4.1.7',
                         ):
         return names
     seen: Dict[str, int] = {}
@@ -393,50 +395,9 @@ def _component_namer(result: dict, types: List[str], depth: int) -> List[str]:
                               suggestions[i],
                               depth=depth,
                               checker=name_checker,
-                              number='4.1.1.7',
+                              number='4.1.7',
                               ).strip()
     return names
-
-
-# ---- _decomposition_storer -----------------------------------------------------------
-def _decomposition_storer(session: ViewerSession, answers: dict, chosen: tuple) -> None:
-    """
-    ---- Summary ----
-    Helper function to keep what the fit questions decided as the fit in use, and show
-    it in the settings strip. A run without haems keeps the name of the last fit, so
-    the strip still offers it.
-
-    ---- Inputs ----
-    session : ViewerSession
-        The browser session; its fit is set.
-    answers : dict
-        Answers dictionary (decompose, fit_file, decomposition_dataset are set).
-    chosen : tuple
-        (decompose, fit_file, fit, dataset) as decomposition_asker returns it.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Changes ``answers`` and the session, and shows the strip (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _strip_shower
-    """
-
-    decompose, name, fit, dataset = chosen
-    answers.update({'decompose': decompose, 'decomposition_dataset': dataset})
-    if name:
-        answers['fit_file'] = name
-    session.fit = fit if decompose else None
-    _strip_shower(session, answers)
 
 
 # ---- _box_edit_runner ----------------------------------------------------------------
@@ -786,7 +747,7 @@ def _fit_file_saver(fit: dict,
                         'fits folder?',
                         True,
                         depth=depth,
-                        number='4.1.1.8',
+                        number='4.1.8',
                         ):
         return None
     default = f'pca_{count}_components_{window[0]:g}-{window[1]:g}nm'
@@ -802,7 +763,7 @@ def _fit_file_saver(fit: dict,
                                       default,
                                       depth=depth,
                                       checker=stem_checker,
-                                      number='4.1.1.9',
+                                      number='4.1.9',
                                       ),
                            )
         path = fits_folder / f'{stem}.csv'
@@ -816,7 +777,7 @@ def _fit_file_saver(fit: dict,
                                               f'want to replace it?',
                                               False,
                                               depth=depth,
-                                              number='4.1.1.9',
+                                              number='4.1.9',
                                               ):
             continue
         try:
@@ -1245,7 +1206,7 @@ def _own_fit_saver(session: ViewerSession,
 
     ---- Helpers ----
     built_fit_saver
-    fit_names_lister
+    fit_titles_lister
     info_printer
     problem_teller
     """
@@ -1260,7 +1221,7 @@ def _own_fit_saver(session: ViewerSession,
         info_printer(problem_teller('The fit was not saved', exc))
         return
     answers.update({'fit_file': path.name, 'haem_files': []})
-    session.window.strip_fits_setter(fit_names_lister(fits_folder))
+    session.window.strip_fits_setter(fit_titles_lister(fits_folder))
     info_printer(f'Saved the haems ticked as {path.name} in the fits folder. It is the '
                  'fit in use now, and in the Fit list from now on.',
                  )
@@ -2293,7 +2254,9 @@ def _strip_change_applier(session: ViewerSession,
     beside Keep new, kept in the answers), until one of the two is chosen (Keep new
     carries on with what is on the plot, Keep old puts the kept one back in use) or
     the haems are left out. A click on Save fit saves the haems ticked under Build a fit as a fit file of
-    the name typed beside it. A new journal, width or height redraws only the figure
+    the name typed beside it. A click on Do PCA asks the questions that find the
+    components from the data while the haem step waits, and says where to go
+    otherwise. A new journal, width or height redraws only the figure
     of each file, the one plot drawn at its size. A click on Export master saves the
     master page of the file shown while that figure is on the plot, and says when it
     can be saved otherwise.
@@ -2366,6 +2329,14 @@ def _strip_change_applier(session: ViewerSession,
     if SAVE_FIT_CHANGE in changes:
         _own_fit_saver(session, answers, fits_folder, str(changes[SAVE_FIT_CHANGE]))
         _strip_shower(session, answers)
+        return
+    if changes.get(PCA_CHANGE):
+        if session.pca_runner is not None:
+            session.pca_runner()
+        else:
+            info_printer('The components are found from the data in the haem step '
+                         '(4.1): go back to the processing to do it.',
+                         )
         return
 
     # ---- 1 The journal, the width and the height -------------------------------------
@@ -3354,14 +3325,14 @@ def pca_stage_runner(session: ViewerSession,
                              start,
                              minimum=0,
                              depth=depth,
-                             number='4.1.1.1',
+                             number='4.1.1',
                              )
         end = number_asker('Where should the spectral window end (nm)?',
                            max(end, start + 20.0),
                            minimum=start,
                            exclusive_minimum=True,
                            depth=depth,
-                           number='4.1.1.2',
+                           number='4.1.2',
                            )
         sets, problems = pca_spectra_gatherer(
             session,
@@ -3411,14 +3382,14 @@ def pca_stage_runner(session: ViewerSession,
                                      maximum=available,
                                      depth=depth,
                                      is_whole=True,
-                                     number='4.1.1.3',
+                                     number='4.1.3',
                                      ),
                         )
             rotate = yes_no_asker('Do you want to rotate the components so each is as '
                                   'peak-like as possible (varimax)?',
                                   rotate,
                                   depth=depth,
-                                  number='4.1.1.4',
+                                  number='4.1.4',
                                   )
             smoothing = number_asker('Over how many nm should the components be '
                                      'smoothed to remove their noise (0 for none)?',
@@ -3426,7 +3397,7 @@ def pca_stage_runner(session: ViewerSession,
                                      minimum=0,
                                      maximum=(end - start) / 4,
                                      depth=depth,
-                                     number='4.1.1.5',
+                                     number='4.1.5',
                                      )
 
             # ---- 2.2 Build, describe and draw them -----------------------------------
@@ -3471,10 +3442,10 @@ def pca_stage_runner(session: ViewerSession,
             choice = accept_asker('Do you accept these components?',
                                   [('count', 'change the number of components'),
                                    ('window', 'change the spectral window'),
-                                   ('fit', 'choose a fit file instead'),
+                                   ('fit', 'keep the fit in the box instead'),
                                    ],
                                   depth=depth,
-                                  number='4.1.1.6',
+                                  number='4.1.6',
                                   )
             if choice != 'count':
                 break
@@ -3625,15 +3596,15 @@ def processing_stage_runner(session: ViewerSession,
     """
     ---- Summary ----
     Main function to talk the user through the processing, with the plot redrawn after
-    each answer: first the haem fit, then the oxidised and the reduced region of every
-    file (when the haems are shown), then whether to work out Δψ (when it can be), and
-    last the averaging windows, dragged on the plot (they are drawn in the plot only
-    once that step is answered). The trim and ignore edges stay movable under Trim /
-    Ignore in the Time regions box. A line points to the boxes above the plot at the
-    start, and another to % oxidised once a file has both regions. The Haem
-    decomposition box picks the fit and leaves the haems out, so the decomposition
-    question only offers to find the components from the data instead. While those
-    questions are asked the boxes are greyed out.
+    each answer: first the haem fit, set in the Haem decomposition box until Continue
+    (its Do PCA button asks the questions that find the components from the whole
+    dataset, with the boxes greyed out meanwhile), then the oxidised and the reduced
+    region of every file (when the haems are shown), then whether to work out Δψ (when
+    it can be), and last the averaging windows, dragged on the plot (they are drawn in
+    the plot only once that step is answered). The trim and ignore edges stay movable
+    under Trim / Ignore in the Time regions box. A line says which fit the haems are
+    worked out with at the start, and another points to % oxidised once a file has
+    both regions. Haem decomposition unticked at Continue goes on without haems.
 
     ---- Inputs ----
     session : ViewerSession
@@ -3657,7 +3628,7 @@ def processing_stage_runner(session: ViewerSession,
         was answered in this run; None for regions not chosen.
 
     ---- Globals read ----
-    settings.DELTA_PSI_LIMIT_ANSWERS.
+    settings.DELTA_PSI_LIMIT_ANSWERS, HAEM_NUDGE.
 
     ---- Outputs ----
     Optional[Dict[str, Dict[str, float]]]
@@ -3675,18 +3646,15 @@ def processing_stage_runner(session: ViewerSession,
     ---- Helpers ----
     _answers_previewer
     _windows_chooser
-    _decomposition_storer
     _regions_chooser
     _strip_shower
-    accept_asker
-    decomposition_asker
     delta_psi_asker
-    fit_names_lister
+    enter_waiter
+    fit_titles_lister
     info_printer
     pca_stage_runner
     preview_drawer
     region_files_lister
-    yes_no_asker
     """
 
     guide_step_starter('haems')
@@ -3709,74 +3677,74 @@ def processing_stage_runner(session: ViewerSession,
                               details,
                               )
     session.redraw = redraw
-    def pca_finder(dataset: str, depth: int) -> Tuple[Optional[str], Optional[dict]]:
-        session.window.strip_state_setter(False)
-        try:
-            return pca_stage_runner(session,
-                                    answers,
-                                    defaults,
-                                    limits,
-                                    fits_folder,
-                                    dataset,
-                                    depth,
-                                    )
-        finally:
-            session.window.strip_fits_setter(fit_names_lister(fits_folder))
-            session.window.strip_state_setter(True)
-
-    # ---- 1 The haem fit --------------------------------------------------------------
-    # The strip is pointed to first, as it changes the decomposition at any time.
+    # Do PCA in the Haem decomposition box: the components of the whole dataset become
+    # the fit in use; choosing to keep the fit in the box changes nothing.
     common = set(summaries[0]['datasets'])
     for summary in summaries[1:]:
         common &= set(summary['datasets'])
-    info_printer('Use the Haem decomposition box above the plot to change the fit, the '
-                 'background'
-                 f"{' and the spectrometer (Spectra)' if len(common) > 1 else ''}, and "
-                 'Haems as in the View box for how the haems are shown; the plot is '
-                 'redrawn after each change.',
-                 )
+    def pca_finder() -> None:
+        if not common:
+            info_printer('The files have no spectrometer in common, so the components '
+                         'cannot be found from the data.',
+                         )
+            return
+        dataset = (answers.get('decomposition_dataset')
+                   if answers.get('decomposition_dataset') in common
+                   else sorted(common)[0]
+                   )
+        session.window.strip_state_setter(False)
+        try:
+            name, fit = pca_stage_runner(session,
+                                         answers,
+                                         defaults,
+                                         limits,
+                                         fits_folder,
+                                         dataset,
+                                         2,
+                                         )
+        finally:
+            session.window.strip_fits_setter(fit_titles_lister(fits_folder))
+            session.window.strip_state_setter(True)
+        if fit is not None:
+            answers.update({'decompose': True,
+                            'plot_haems': True,
+                            'fit_file': name,
+                            'haem_files': [],
+                            'decomposition_dataset': dataset,
+                            'haems': list(fit['haem_list']),
+                            },
+                           )
+            session.fit = fit
+            session.kept = None
+            info_printer(f'The haems are worked out with {name}.')
+        _strip_shower(session, answers)
+        redraw()
 
-    # ---- 1.1 Ask whether to decompose, when no haems are shown yet -------------------
+    # ---- 1 The haem fit, set in the Haem decomposition box ---------------------------
     if session.fit is None:
-        # the Haems box and the fit of the strip are the defaults
-        asked = dict(defaults,
-                     decompose=answers['decompose'],
-                     fit_file=answers['fit_file'],
-                     decomposition_dataset=answers['decomposition_dataset'],
-                     )
-        _decomposition_storer(session,
-                              answers,
-                              decomposition_asker(summaries,
-                                                  asked,
-                                                  fits_folder,
-                                                  pca_runner=pca_finder,
-                                                  numbers=PROCESSING_FIT_NUMBERS,
-                                                  ),
-                              )
+        info_printer(
+            'No haems are worked out yet: tick Haem decomposition to work them '
+            'out with the fit shown, or leave it unticked to go on without '
+            'haems.',
+            )
     else:
-        answers['decompose'] = True
         info_printer(
             'The haems are worked out with '
             f"{fit_describer(answers['fit_file'], answers.get('haem_files', []))}.",
             )
-
-    # ---- 1.2 Accept the fit or find the components from the data ---------------------
-    # The strip picks another fit and leaves the haems out.
-    while answers['decompose']:
-        redraw()
-        if accept_asker('Do you accept this decomposition?',
-                        [('pca', 'find the components from the data')],
-                        number='4.2',
-                        ) == 'yes':
-            break
-        name, fit = pca_finder(answers['decomposition_dataset'], 2)
-        if fit is not None:
-            answers.update({'decompose': True, 'fit_file': name})
-            session.fit = fit
-            _strip_shower(session, answers)
-    if not answers['decompose']:
-        session.fit = None
-        _strip_shower(session, answers)
+    redraw()
+    session.pca_runner = pca_finder
+    try:
+        enter_waiter('Edit the haem decomposition using the Haem decomposition box, '
+                     'press Continue when ready.',
+                     HAEM_NUDGE,
+                     number='4.1',
+                     )
+    finally:
+        session.pca_runner = None
+    # the box decides: haems with the fit in it while ticked, none while unticked
+    answers['decompose'] = session.fit is not None
+    _strip_shower(session, answers)
 
     # ---- 2 The oxidised and the reduced region ---------------------------------------
     # The regions go to the session at once, so the plots that follow and the boxes
@@ -4109,7 +4077,7 @@ def viewer_asker(summaries: List[dict],
     browser_stage_runner
     choice_asker
     details_stage_runner
-    fit_names_lister
+    fit_titles_lister
     heading_printer
     library_haems_lister
     info_printer
@@ -4147,7 +4115,7 @@ def viewer_asker(summaries: List[dict],
         answers['decomposition_dataset'] = dataset
 
     # ---- 2 Set up the settings strip -------------------------------------------------
-    window.strip_fits_setter(fit_names_lister(fits_folder))
+    window.strip_fits_setter(fit_titles_lister(fits_folder))
     window.strip_library_setter(library_haems_lister(fits_folder))
     _strip_shower(session, answers)
     window.strip_listener_setter(lambda changes: _strip_change_applier(session,

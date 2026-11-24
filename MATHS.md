@@ -53,44 +53,57 @@ Checked by: `test_one_spectrum_gives_its_amounts_back` in `tests/test_haem_decom
 
 ### 1.3 The background (the scatter)
 
-The sample is cloudy: the cells scatter light, which adds a smooth attenuation under the haem peaks, and it drifts during a run. The background of 1.2 stands for it. One of five backgrounds is chosen for the whole dataset, by the name the program shows:
+The sample is cloudy: the cells scatter light, which adds a smooth attenuation under the haem peaks, and it drifts during a run. The background of 1.2, written $B$ here, stands for it. One of five backgrounds is chosen for the whole dataset, by the name the program shows (the ⓘ button beside Scatter shows the same formula):
 
-```text
-Rowan scatter:                         background = b0 + b1 × w + b2 × (w − w_mid)²
-Valencia:                              background = b0 + b1 ÷ w²
-Flat + 1/wavelength:                   background = b0 + b1 ÷ w
-Flat + 1/wavelength + 1/wavelength²:   background = b0 + b1 ÷ w + b2 ÷ w²
-Straight line:                         background = b0 + b1 × w
-```
+Rowan scatter:
 
-- background: the attenuation that is not haem, at one wavelength (OD)
-- w: the wavelength (nm)
-- w_mid: the wavelength halfway between the shortest and the longest wavelength used (nm)
-- b0: the flat part, the same at every wavelength (OD)
-- b1, b2: the size of each other part (a slope, a curve, or a part that falls as the wavelength rises). The program finds b0, b1 and b2 together with the haem amounts of 1.2; they are not used afterwards
+$$B = b_0 + b_1\,w + b_2\,(w - w_{\mathrm{mid}})^2$$
+
+Palencia:
+
+$$B = b_0 + \frac{b_1}{w^2}$$
+
+Inverse:
+
+$$B = b_0 + \frac{b_1}{w}$$
+
+Inverse²:
+
+$$B = b_0 + \frac{b_1}{w} + \frac{b_2}{w^2}$$
+
+Linear:
+
+$$B = b_0 + b_1\,w$$
+
+- $B$: the background, the attenuation that is not haem, at one wavelength (OD)
+- $w$: the wavelength (nm)
+- $w_{\mathrm{mid}}$: the wavelength halfway between the shortest and the longest wavelength used (nm)
+- $b_0$: the flat part, the same at every wavelength (OD)
+- $b_1$, $b_2$: the size of each other part (a slope, a curve, or a part that falls as the wavelength rises). The program finds $b_0$, $b_1$ and $b_2$ together with the haem amounts of 1.2; they are not used afterwards
 
 Notes:
 
 - Rowan scatter is the standard one. It is the background of the lab's own chamber scripts, part for part: a flat level, a straight slope, and a curve around the middle wavelength, so it can bend.
-- Valencia is the background drawn in the instrument's own fit file, which follows 1 ÷ w² exactly.
+- Palencia (called Valencia before November 2026) is the background drawn in the instrument's own fit file, which follows $1/w^2$ exactly.
+- Linear and Inverse differ only a little over the wavelengths the fit uses (about 500 to 630 nm): $1/w$ bends slightly, and strays from a straight line by at most about 6 % of its change, in the middle.
 - b0, b1 and b2 are found again for every spectrum, so the background can change through the run. They may come out positive or negative.
 - The haem amounts depend on the background chosen, because the two are fitted together: what one background cannot follow is shared between the haems and what is left over.
 - A measured background that is not of the chosen form cannot be followed exactly: something is then left over (measured A − right-hand side of 1.2).
-- Inside the program each part other than the flat one is stretched to run from 0 to 1 over the wavelengths used. This changes the size of b1 and b2 only: the background fitted, and the haem amounts, are the same as with the equations above.
+- Inside the program each part other than the flat one is stretched to run from 0 to 1 over the wavelengths used. This changes the size of $b_1$ and $b_2$ only: the background fitted, and the haem amounts, are the same as with the equations above.
 
-Example: the wavelength is written in hundreds of nm, x = w ÷ 100, so 550 nm is x = 5.5. A spectrum is built from five haem shapes in the amounts 0.0001 to 0.0005 mM of 1.2, on this background:
+Example: the wavelength is written in hundreds of nm, $x = w/100$, so 550 nm is $x = 5.5$. A spectrum is built from five haem shapes in the amounts 0.0001 to 0.0005 mM of 1.2, on this background:
 
-```text
-background = 0.4 + 0.05 × (x − 5.5) + 0.05 × (x − 6)²
-```
+$$B = 0.4 + 0.05\,(x - 5.5) + 0.05\,(x - 6)^2$$
 
-- at 500 nm (x = 5): 0.4 + 0.05 × (−0.5) + 0.05 × 1 = 0.4 − 0.025 + 0.05 = 0.425 OD
-- at 550 nm (x = 5.5): 0.4 + 0 + 0.05 × 0.25 = 0.4125 OD
-- at 600 nm (x = 6): 0.4 + 0.05 × 0.5 + 0 = 0.425 OD
+- at 500 nm ($x = 5$): $B = 0.4 + 0.05 \times (-0.5) + 0.05 \times 1 = 0.4 - 0.025 + 0.05 = 0.425$ OD
+- at 550 nm ($x = 5.5$): $B = 0.4 + 0 + 0.05 \times 0.25 = 0.4125$ OD
+- at 600 nm ($x = 6$): $B = 0.4 + 0.05 \times 0.5 + 0 = 0.425$ OD
 
-It is a flat part, a slope and a curve, so Rowan scatter can follow it: the program gives back the five amounts and this background, with nothing left over. The same is done for each of the other four backgrounds, each with a flat part of 0.4 OD and 0.05 of each of its other parts (for Valencia, 0.4 + 0.05 ÷ x²: 0.4 + 0.05 ÷ 25 = 0.402 OD at 500 nm).
+It is a flat part, a slope and a curve, so Rowan scatter can follow it: the program gives back the five amounts and this background, with nothing left over. The same is done for each of the other four backgrounds, each with a flat part of 0.4 OD and 0.05 of each of its other parts. For Palencia at 500 nm:
 
-A second spectrum has the same haems on the Valencia background, 0.4 + 0.05 ÷ x², and is fitted with Rowan scatter, which cannot follow it exactly. The lines of the lab's chamber scripts, copied into the test, and the program give the same five amounts and the same leftover.
+$$B = 0.4 + \frac{0.05}{x^2} = 0.4 + \frac{0.05}{25} = 0.402 \text{ OD}$$
+
+A second spectrum has the same haems on the Palencia background, $B = 0.4 + \dfrac{0.05}{x^2}$, and is fitted with Rowan scatter, which cannot follow it exactly. The lines of the lab's chamber scripts, copied into the test, and the program give the same five amounts and the same leftover.
 
 Checked by: `test_each_background_gives_back_the_amounts`, `test_rowan_scatter_is_the_chamber_scripts_background` and `test_the_background_answered_is_the_one_used` in `tests/test_haem_decomposition.py`.
 

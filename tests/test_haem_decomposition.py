@@ -65,7 +65,7 @@ AMOUNTS = np.array([1.0, 2.0, 3.0, 4.0, 5.0]) * 1e-4
 OFFSET = 0.4  # a flat background under the haems (OD)
 SLOPE = 0.05  # size of the scatter background (OD)
 # the backgrounds the program offers, each fitted by a test of its own
-BACKGROUNDS = ('scatter_1', 'scatter_2', 'linear', 'rowan_scatter', 'valencia')
+BACKGROUNDS = ('scatter_1', 'scatter_2', 'linear', 'rowan_scatter', 'palencia')
 SEED = 0  # the one random seed, for the noise and amounts of the mixed spectra
 PEAKS_NM = (550.0, 605.0)  # where the two mixed shapes have their peaks
 WIDTHS_NM = (8.0, 10.0)
@@ -135,7 +135,7 @@ def _background_shape_builder(background: str, wavelengths: np.ndarray) -> list:
     ---- Equations ----
     x = wl / 100 nm. scatter_1: 1/x; scatter_2: 1/x and 1/x^2; linear: x - 5.5;
     rowan_scatter: x - 5.5 and (x - 6)^2, a curve with its bottom off the middle;
-    valencia: 1/x^2.
+    palencia: 1/x^2.
 
     ---- Helpers ----
     None.
@@ -146,7 +146,7 @@ def _background_shape_builder(background: str, wavelengths: np.ndarray) -> list:
             'scatter_2': [1.0 / x, 1.0 / x ** 2],
             'linear': [x - 5.5],
             'rowan_scatter': [x - 5.5, (x - 6.0) ** 2],
-            'valencia': [1.0 / x ** 2],
+            'palencia': [1.0 / x ** 2],
             }[background]
 
 

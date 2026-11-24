@@ -70,9 +70,9 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
     ('haems',
      'Experiment processing',
      'Haems',
-     'Change the fit, the background, the spectra and the haems shown in the Haem '
+     'Change the spectra, the scatter, the fit and the haems shown in the Haem '
      'decomposition box above the plot: the plot is redrawn after each change. To '
-     'compare two, click Keep to compare first.',
+     'compare two, click Keep to compare first. Press Continue when ready.',
      ),
     ('regions',
      'Experiment processing',
@@ -130,6 +130,7 @@ CHANGE_STEPS = {'edit_ods': 'od_values',
                 'spectra': 'haems',
                 'go_back': 'haems',
                 'save_fit': 'haems',
+                'do_pca': 'haems',
                 'delta_psi': 'delta_psi',
                 'psi_bH_mV': 'delta_psi',
                 'psi_bL_mV': 'delta_psi',

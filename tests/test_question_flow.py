@@ -349,7 +349,7 @@ def _row_reader() -> List[Tuple[str, str]]:
 
     ---- Outputs ----
     List[Tuple[str, str]]
-        [(the row's number, such as '4.1.1.7', the text of the whole row)], in the
+        [(the row's number, such as '4.1.7', the text of the whole row)], in the
         order of the list.
 
     ---- Globals mutated ----

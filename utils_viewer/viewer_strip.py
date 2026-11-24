@@ -3,16 +3,23 @@ The five boxes above the plot: Time regions, View, Haem decomposition, Δψ and 
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import base64
 import copy
+import io
 import math
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.event_concentrations import LABEL_MODES
 from utils_shared.questions import typed_number_reader
-from utils_shared.spectral_decomposer import (BACKGROUND_SHORT_NAMES,
+from utils_shared.spectral_decomposer import (BACKGROUND_FORMULAS,
+                                              BACKGROUND_SHORT_NAMES,
                                               fit_describer,
+                                              fit_title_maker,
                                               OWN_HAEMS_NAME,
                                               )
 from utils_shared.survey import JOURNAL_NAMES, TEMPERATURE_LIMITS_C
@@ -86,6 +93,18 @@ STOP_TEXT = 'Keep new'
 BACK_TEXT = 'Keep old'
 # What a click on BACK_TEXT is told as: a click, not a value the strip keeps.
 BACK_CHANGE = 'go_back'
+# The button that finds the components of the haem spectra from the whole dataset (a
+# principal component analysis), and what a click on it is told as: a click, not a
+# value the strip keeps.
+PCA_TEXT = 'Do PCA'
+PCA_CHANGE = 'do_pca'
+# The button beside the Scatter drop-down that shows the formula of the scatter picked,
+# written as a textbook writes it, and the size of that formula's letters (pt) and of
+# its picture (dots per inch).
+FORMULA_TEXT = 'ⓘ'
+FORMULA_FONT_PT = 11
+FORMULA_DPI = 100
+FORMULA_NOTE = 'w: wavelength (nm); b₀, b₁, b₂: found by the fit'
 # The button under Build a fit that saves the haems ticked as a fit file of their own,
 # and what a click on it is told as: {SAVE_FIT_CHANGE: the name typed beside it}, not a
 # value the strip keeps.
@@ -94,8 +113,8 @@ SAVE_FIT_CHANGE = 'save_fit'
 # How the kept decomposition is shown, in the order of the switch beside Keep new, with
 # its words, and the line saying which one is kept in each.
 COMPARE_LAYOUT_TEXTS = {'side': 'Side by side', 'overlaid': 'Overlaid'}
-KEPT_PREFIXES = {'side': 'Kept to compare (the plot on the left): ',
-                 'overlaid': 'Kept to compare (dashed on the plot): ',
+KEPT_PREFIXES = {'side': 'Kept to compare (Old, the plot on the left): ',
+                 'overlaid': 'Kept to compare (Old, faint on the plot): ',
                  }
 # The button that saves one page of the journal as a PDF with the figure of the file
 # shown on it, and what a click on it is told as: a click, not a value the strip keeps.
@@ -650,11 +669,13 @@ class SettingsStrip:
     (the window places their rows in the box). View: how the OCR is shown with its per
     OD box, how the haems are shown with theirs (the per OD boxes and Edit ODs only
     once OD values were entered), what the event labels show, their angle and Edit
-    labels. Haem decomposition, with its tick as title: the fit, the background (the
-    scatter), the spectrometer whose spectra hold the haems (shown when the files
-    share more than one), a button that folds out a tick box for each haem of the
-    library with a name box and Save fit under them (Build a fit), a button that keeps
-    the decomposition in use to compare the next ones with (greyed while one is kept,
+    labels. Haem decomposition, with its tick as title, in this order: the
+    spectrometer whose spectra hold the haems (shown when the files share more than
+    one), the background (the scatter) with a button that shows its formula, the fit
+    (each shown by its name), a button that folds out a tick box for each haem of the
+    library with a name box and Save fit under them (Build a fit) beside the button
+    that finds the components from the data (Do PCA), and a button that keeps the
+    decomposition in use to compare the next ones with (greyed while one is kept,
     with a line saying which one, and Keep old and Keep new under it to choose between
     the two). Δψ, with its tick as title (it can be clicked only while Δψ can be worked
     out): the midpoint of bH and of bL (written as in the figures) and the shift typed,
@@ -689,6 +710,7 @@ class SettingsStrip:
     _fit_handler
     _fit_saver
     _form_handler
+    _formula_toggler
     _haems_handler
     _height_handler
     _journal_handler
@@ -698,6 +720,7 @@ class SettingsStrip:
     _ocr_handler
     _order_handler
     _paper_handler
+    _pca_handler
     _per_od_handler
     _psi_handler
     _psi_tick_handler
@@ -764,6 +787,7 @@ class SettingsStrip:
         _fit_handler
         _fit_saver
         _form_handler
+        _formula_toggler
         _haems_handler
         _height_handler
         _journal_handler
@@ -774,6 +798,7 @@ class SettingsStrip:
         _ocr_handler
         _order_handler
         _paper_handler
+        _pca_handler
         _per_od_handler
         _psi_handler
         _psi_tick_handler
@@ -822,6 +847,7 @@ class SettingsStrip:
         self._has_baseline = False
         self._has_psi = False
         self._fit_names: List[str] = [self._values['fit_file']]
+        self._fit_titles: Dict[str, str] = {}
         self._haems_by_file: Dict[str, str] = {}
         self._tick_vars: Dict[str, Any] = {}
         self._tick_boxes: Dict[str, Any] = {}
@@ -952,29 +978,14 @@ class SettingsStrip:
                                      self._haems_handler,
                                      )
         haem_box = frame_maker(2, self._haems_box)
-        line = line_maker(haem_box)
-        tk.Label(line, text='Fit', bg=background).pack(side='left', padx=(0, 4))
-        self._fit_combo = ttk.Combobox(line,
-                                       state='readonly',
-                                       width=28,
-                                       values=[self._values['fit_file']],
-                                       )
-        self._fit_combo.set(self._values['fit_file'])
-        self._fit_combo.pack(side='left')
-        line = line_maker(haem_box)
-        tk.Label(line, text='Scatter', bg=background).pack(side='left', padx=(0, 4))
-        self._background_combo = ttk.Combobox(line,
-                                              state='readonly',
-                                              width=22,
-                                              values=list(
-                                                  BACKGROUND_SHORT_NAMES.values(),
-                                                  ),
-                                              )
-        self._background_combo.pack(side='left')
-        # the spectrometer, placed only when the files share more than one
+        # In order: Spectra (placed only when the files share more than one
+        # spectrometer), Scatter with the button of its formula, Fit, then Build a fit
+        # with Do PCA, and Keep to compare.
         self._spectra_line = line_maker(haem_box)
         tk.Label(self._spectra_line,
                  text='Spectra',
+                 width=7,
+                 anchor='w',
                  bg=background,
                  ).pack(side='left', padx=(0, 4))
         self._spectra_combo = ttk.Combobox(self._spectra_line,
@@ -982,20 +993,73 @@ class SettingsStrip:
                                            width=8,
                                            )
         self._spectra_combo.pack(side='left')
+        self._scatter_line = line_maker(haem_box)
+        tk.Label(self._scatter_line,
+                 text='Scatter',
+                 width=7,
+                 anchor='w',
+                 bg=background,
+                 ).pack(side='left', padx=(0, 4))
+        self._background_combo = ttk.Combobox(self._scatter_line,
+                                              state='readonly',
+                                              width=16,
+                                              values=list(
+                                                  BACKGROUND_SHORT_NAMES.values(),
+                                                  ),
+                                              )
+        self._background_combo.pack(side='left', padx=(0, 4))
+        self._formula_button = tk.Button(self._scatter_line,
+                                         text=FORMULA_TEXT,
+                                         command=self._formula_toggler,
+                                         padx=2,
+                                         pady=0,
+                                         )
+        self._formula_button.pack(side='left')
+        # the formula of the scatter picked, shown while the button is pressed in
+        self._is_formula_open = False
+        self._formula_pictures: Dict[str, Any] = {}
+        self._formula_line = tk.Frame(haem_box, bg=background)
+        self._formula_label = tk.Label(self._formula_line, bg=background)
+        self._formula_label.pack(anchor='w')
+        self._formula_note = tk.Label(self._formula_line,
+                                      text='',
+                                      bg=background,
+                                      fg=NOTE_TEXT,
+                                      justify='left',
+                                      wraplength=260,
+                                      )
+        self._formula_note.pack(anchor='w')
+        self._fit_line = line_maker(haem_box)
+        tk.Label(self._fit_line,
+                 text='Fit',
+                 width=7,
+                 anchor='w',
+                 bg=background,
+                 ).pack(side='left', padx=(0, 4))
+        self._fit_combo = ttk.Combobox(self._fit_line,
+                                       state='readonly',
+                                       width=24,
+                                       values=[self._values['fit_file']],
+                                       )
+        self._fit_combo.set(fit_title_maker(self._values['fit_file'], {}))
+        self._fit_combo.pack(side='left')
         upper = line_maker(haem_box)
         self._build_button = tk.Button(upper,
                                        text=BUILD_CLOSED_TEXT,
                                        command=self._build_toggler,
                                        )
         self._build_button.pack(side='left', padx=(0, 4))
-        self._compare_button = tk.Button(upper,
+        self._pca_button = tk.Button(upper, text=PCA_TEXT, command=self._pca_handler)
+        self._pca_button.pack(side='left', padx=(0, 4))
+        self._upper = upper
+        self._keep_line = line_maker(haem_box)
+        self._compare_button = tk.Button(self._keep_line,
                                          text=KEEP_TEXT,
                                          command=self._compare_handler,
                                          )
         self._compare_button.pack(side='left', padx=(0, 4))
-        self._upper = upper
-        # Keep old and Keep new, on a line under the buttons: _size_refresher places it
-        # only while a decomposition is kept.
+        # Keep old and Keep new, on a line under Keep to compare: _size_refresher
+        # places it only while a decomposition is kept.
         self._choose_line = tk.Frame(haem_box, bg=background)
         self._back_button = tk.Button(self._choose_line,
                                       text=BACK_TEXT,
@@ -1496,7 +1560,12 @@ class SettingsStrip:
         """
 
         before = dict(self._values)
-        self._values['fit_file'] = self._fit_combo.get()
+        index = self._fit_combo.current()
+        # the list shows each fit by its name; the value kept is its file name
+        self._values['fit_file'] = (self._fit_names[index]
+                                    if 0 <= index < len(self._fit_names)
+                                    else self._fit_combo.get()
+                                    )
         self._fit_combo.selection_clear()
         self._size_refresher()
         self._change_reporter(before)
@@ -1565,6 +1634,36 @@ class SettingsStrip:
         self._form_combo.selection_clear()
         self._size_refresher()
         self._change_reporter(before)
+
+    # ---- _formula_toggler ------------------------------------------------------------
+    def _formula_toggler(self) -> None:
+        """
+        ---- Summary ----
+        Method to show the formula of the scatter picked under the Scatter drop-down,
+        or hide it again.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Shows or hides the formula (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _size_refresher
+        """
+
+        self._is_formula_open = not self._is_formula_open
+        self._size_refresher()
 
     # ---- _haems_handler --------------------------------------------------------------
     def _haems_handler(self) -> None:
@@ -1889,6 +1988,36 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _pca_handler ----------------------------------------------------------------
+    def _pca_handler(self) -> None:
+        """
+        ---- Summary ----
+        Method to take a click on Do PCA. The box keeps nothing: the click is told as
+        {PCA_CHANGE: True}, and the program asks the questions of the analysis.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        PCA_CHANGE.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Calls the function given as on_change (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if self._is_enabled:
+            self._on_change({PCA_CHANGE: True})
+
     # ---- _ocr_handler ----------------------------------------------------------------
     def _ocr_handler(self, event: Any = None) -> None:
         """
@@ -2057,7 +2186,8 @@ class SettingsStrip:
         that keeps a decomposition is greyed while no haems are shown, the button that
         goes back to the kept one and the line saying which one is kept show only
         while one is, the spectrometer shows only when
-        there is a choice, the per OD box of the haems only when OD values were
+        there is a choice, the formula of the scatter only while its button is pressed
+        in, the fits by their names, the per OD box of the haems only when OD values were
         entered (greyed for % oxidised, which has no per OD), the ways of showing the
         OCR that can be used now, the Δψ row only
         while Δψ is worked out (its filled-in midpoints following the typed ones and
@@ -2068,7 +2198,7 @@ class SettingsStrip:
 
         ---- Globals read ----
         HAEM_FORM_TEXTS, OCR_FORM_TEXTS, LABEL_FORM_TEXTS, KEEP_TEXT, KEPT_PREFIXES,
-        NO_JOURNAL, NOTE_TEXT.
+        NO_JOURNAL, NOTE_TEXT, BACKGROUND_FORMULAS.
         (BACK_TEXT and STOP_TEXT are set on their buttons once, when they are built.)
 
         ---- Outputs ----
@@ -2082,6 +2212,9 @@ class SettingsStrip:
         None.
 
         ---- Helpers ----
+        fit_title_maker
+        formula_note_writer
+        formula_picture_maker
         haem_form_choices_lister
         height_checker
         ocr_form_choices_lister
@@ -2094,16 +2227,35 @@ class SettingsStrip:
         is_standard = values['journal'] == NO_JOURNAL
         self._haems.set(values['plot_haems'])
         is_own = values['fit_file'] == OWN_HAEMS_NAME
-        self._fit_combo.configure(values=self._fit_names + ([OWN_HAEMS_NAME]
-                                                            if is_own
-                                                            else []
-                                                            ),
-                                  )
-        self._fit_combo.set(values['fit_file'])
+        titles = [fit_title_maker(name, self._fit_titles) for name in self._fit_names]
+        self._fit_combo.configure(values=titles + ([OWN_HAEMS_NAME] if is_own else []))
+        self._fit_combo.set(fit_title_maker(values['fit_file'], self._fit_titles))
         if values['haem_background'] in self._backgrounds:
             self._background_combo.current(
                 self._backgrounds.index(values['haem_background']),
                 )
+        # the formula of the scatter in use, while its button is pressed in
+        self._formula_button.configure(relief='sunken'
+                                       if self._is_formula_open
+                                       else 'raised',
+                                       )
+        if self._is_formula_open and values['haem_background'] in BACKGROUND_FORMULAS:
+            name = values['haem_background']
+            if name not in self._formula_pictures:
+                self._formula_pictures[name] = self._tk.PhotoImage(
+                    master=self.frame,
+                    data=base64.b64encode(
+                        formula_picture_maker(name),
+                        ),
+                    )
+            self._formula_label.configure(image=self._formula_pictures[name])
+            self._formula_note.configure(text=formula_note_writer(name))
+            self._formula_line.pack(anchor='w',
+                                    pady=(0, 2),
+                                    after=self._scatter_line,
+                                    )
+        else:
+            self._formula_line.pack_forget()
         for name, variable in self._tick_vars.items():
             variable.set(name in values['haem_files'])
         self._journal_combo.current(self._journals.index(values['journal']))
@@ -2131,6 +2283,8 @@ class SettingsStrip:
         self._fit_combo.configure(state=choice_state)
         self._background_combo.configure(state=choice_state)
         self._build_button.configure(state=button_state)
+        self._pca_button.configure(state=button_state)
+        self._formula_button.configure(state=button_state)
         for box in self._tick_boxes.values():
             box.configure(state=button_state)
         self._fit_name_entry.configure(state=button_state)
@@ -2153,7 +2307,7 @@ class SettingsStrip:
                                          ),
                                  state='normal' if can_compare else 'disabled',
                                  )
-            self._choose_line.pack(anchor='w', pady=(0, 2), after=self._upper)
+            self._choose_line.pack(anchor='w', pady=(0, 2), after=self._keep_line)
         else:
             self._choose_line.pack_forget()
         if values['kept']:
@@ -2226,7 +2380,7 @@ class SettingsStrip:
         # The spectrometer only when there is a choice; the per OD boxes only once
         # every OD value is in.
         if len(self._spectra_names) > 1:
-            self._spectra_line.pack(anchor='w', pady=(0, 2), before=self._upper)
+            self._spectra_line.pack(anchor='w', pady=(0, 2), before=self._scatter_line)
         else:
             self._spectra_line.pack_forget()
         for box in (self._ocr_od_box, self._haem_od_box):
@@ -2477,14 +2631,15 @@ class SettingsStrip:
         self._size_refresher()
 
     # ---- fits_setter -----------------------------------------------------------------
-    def fits_setter(self, names: List[str]) -> None:
+    def fits_setter(self, fits: Dict[str, str]) -> None:
         """
         ---- Summary ----
         Method to give the drop-down of the fits its list. The fit shown stays.
 
         ---- Inputs ----
-        names : List[str]
-            File names of the fits, as they are to be listed.
+        fits : Dict[str, str]
+            {file name: name shown} of the fits, in the order they are to be listed
+            (spectral_decomposer.fit_titles_lister).
 
         ---- Globals read ----
         None.
@@ -2503,7 +2658,8 @@ class SettingsStrip:
         _size_refresher
         """
 
-        self._fit_names = list(names)
+        self._fit_names = list(fits)
+        self._fit_titles = dict(fits)
         self._size_refresher()
 
     # ---- library_setter --------------------------------------------------------------
@@ -2749,6 +2905,90 @@ def form_answers_builder(values: Dict[str, Any]) -> Dict[str, Any]:
         if name in values:
             answers[name] = values[name]
     return answers
+
+
+# ---- formula_note_writer -------------------------------------------------------------
+def formula_note_writer(background: str) -> str:
+    """
+    ---- Summary ----
+    Main function to say under a scatter's formula what its letters are.
+
+    ---- Inputs ----
+    background : str
+        A key of BACKGROUND_FORMULAS.
+
+    ---- Globals read ----
+    FORMULA_NOTE.
+
+    ---- Outputs ----
+    str
+        One line: what B, w and the b are, and w_mid for Rowan scatter.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    middle = ('; w_mid: the wavelength halfway along those used'
+              if background == 'rowan_scatter'
+              else ''
+              )
+    return f'B: the scatter (OD); {FORMULA_NOTE}{middle}.'
+
+
+# ---- formula_picture_maker -----------------------------------------------------------
+def formula_picture_maker(background: str, colour: str = 'black') -> bytes:
+    """
+    ---- Summary ----
+    Main function to draw a scatter's formula as a textbook writes it (fractions with
+    a bar, powers raised, the b with their numbers lowered), as a PNG with a clear
+    background for the Haem decomposition box.
+
+    ---- Inputs ----
+    background : str
+        A key of BACKGROUND_FORMULAS.
+    colour : str
+        Colour of the letters.
+
+    ---- Globals read ----
+    BACKGROUND_FORMULAS, FORMULA_DPI, FORMULA_FONT_PT.
+
+    ---- Outputs ----
+    bytes
+        The PNG, cut to the formula.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    fig = Figure(figsize=(4.0, 0.6), dpi=FORMULA_DPI)
+    fig.text(0.0,
+             0.5,
+             BACKGROUND_FORMULAS[background],
+             fontsize=FORMULA_FONT_PT,
+             color=colour,
+             va='center',
+             )
+    buffer = io.BytesIO()
+    fig.savefig(buffer,
+                format='png',
+                dpi=FORMULA_DPI,
+                transparent=True,
+                bbox_inches='tight',
+                pad_inches=0.02,
+                )
+    return buffer.getvalue()
 
 
 # ---- haem_form_choices_lister --------------------------------------------------------

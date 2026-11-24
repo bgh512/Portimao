@@ -19,6 +19,11 @@ SETTINGS_FILE_NAME = 'portimao_settings.json'
 # are no longer shown: a dataset saved showing them opens showing delta D.
 RETIRED_HAEM_MODES = {'conc': 'delta'}
 RETIRED_HAEM_MODE_KEYS = ('haem_mode', 'ho_haem_mode')
+# Answers saved under a name since changed, by answer: {old name: new name}. The Valencia
+# scatter is now Palencia, and the preset temp_fit_037v is now the Rowan fit 11-2026.
+RENAMED_ANSWERS = {'haem_background': {'valencia': 'palencia'},
+                   'fit_file': {'temp_fit_037v.csv': 'rowan_fit_11_2026.csv'},
+                   }
 
 
 # ---- HELPERS -------------------------------------------------------------------------
@@ -158,14 +163,17 @@ def dataset_settings_reader(folder: Path) -> dict:
         The dataset folder (the folder of the .paf files).
 
     ---- Globals read ----
-    SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RETIRED_HAEM_MODE_KEYS (module constants).
+    SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RETIRED_HAEM_MODE_KEYS, RENAMED_ANSWERS
+    (module constants).
 
     ---- Outputs ----
     dict
         {'export_folder': Optional[Path], 'files': dict, 'answers': dict}
         (DATA_FORMAT.md, dataset_settings). An empty dict when the dataset was never
         saved or its file cannot be read, so the standard settings are used. A haem
-        way of showing no longer offered (RETIRED_HAEM_MODES) is given as its successor.
+        way of showing no longer offered (RETIRED_HAEM_MODES) is given as its
+        successor, and an answer saved under an old name (RENAMED_ANSWERS) under its
+        new one.
 
     ---- Globals mutated ----
     None. Reads the file (side effect).
@@ -195,6 +203,11 @@ def dataset_settings_reader(folder: Path) -> dict:
     for key in RETIRED_HAEM_MODE_KEYS:
         if answers.get(key) in RETIRED_HAEM_MODES:
             answers[key] = RETIRED_HAEM_MODES[answers[key]]
+
+    # ---- 4 Read an answer saved under an old name as its new name --------------------
+    for key, renamed in RENAMED_ANSWERS.items():
+        if isinstance(answers.get(key), str) and answers[key] in renamed:
+            answers[key] = renamed[answers[key]]
     return {'export_folder': _export_folder_resolver(Path(folder),
                                                      values.get('export_folder'),
                                                      ),

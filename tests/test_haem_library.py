@@ -13,9 +13,12 @@ import pytest
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.spectral_decomposer import (answers_fit_loader,
+                                              built_fit_saver,
                                               fit_describer,
                                               fit_loader,
                                               fit_names_lister,
+                                              fit_title_maker,
+                                              fit_titles_lister,
                                               haem_name_plainer,
                                               HAEMS_FOLDER_NAME,
                                               library_haems_lister,
@@ -344,8 +347,8 @@ def test_standard_preset_keeps_its_haems() -> None:
     ---- Summary ----
     Main function to check that the standard fit, now a preset of the haem library,
     gives the five haems and α dips of the fit file it replaced, and that the cc of
-    temp_fit_037v keeps the 35.2 OD/mM/cm of its old file, its preset giving it 2 haems
-    per protein.
+    the Rowan fit 11-2026 (once temp_fit_037v) keeps the 35.2 OD/mM/cm of its old file,
+    its preset giving it 2 haems per protein.
 
     ---- Inputs ----
     None.
@@ -373,14 +376,79 @@ def test_standard_preset_keeps_its_haems() -> None:
         value, wavelength = _dip_finder(fit, i)
         assert value == pytest.approx(STANDARD_DIPS[name][0], abs=0.01), name
         assert wavelength == pytest.approx(STANDARD_DIPS[name][1], abs=0.1), name
-    latest = fit_loader(FITS_FOLDER, 'temp_fit_037v.csv')
+    latest = fit_loader(FITS_FOLDER, 'rowan_fit_11_2026.csv')
     cc = [haem_name_plainer(name) for name in latest['haem_list']].index('Cyt cc')
     assert _dip_finder(latest, cc)[0] == pytest.approx(-35.20, abs=0.01)
-    preset = (FITS_FOLDER / PRESETS_FOLDER_NAME / 'temp_fit_037v.csv').read_text(
+    preset = (FITS_FOLDER / PRESETS_FOLDER_NAME / 'rowan_fit_11_2026.csv').read_text(
         encoding='utf-8-sig',
         )
     assert 'Haem file,Haems per protein' in preset
     assert 'c1_037v.csv,2' in preset.splitlines()
+
+
+# ---- test_fits_are_listed_by_their_names ---------------------------------------------
+def test_fits_are_listed_by_their_names(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check the names the Fit list shows: a preset's own Name line, a
+    preset without one and a fit file of the fits folder by the file name without
+    .csv, in the order of the file names; the shipped Rowan fit 11-2026; and the fits
+    not in the list (Your own haems, components found from the data) as they are.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Pytest's folder for this test, used as a fits folder.
+
+    ---- Globals read ----
+    FITS_FOLDER, PRESETS_FOLDER_NAME, OWN_HAEMS_NAME; settings.STANDARD_FIT.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 A made-up fits folder -----------------------------------------------------
+    presets = tmp_path / PRESETS_FOLDER_NAME
+    presets.mkdir()
+    (presets / 'named_fit.csv').write_text('﻿Portimao preset,format 1\n'
+                                           'Name,My named fit\n'
+                                           'Holds,Two haems\n'
+                                           '\n'
+                                           'Haem file,Haems per protein\n'
+                                           'c1_myco.csv,1\n',
+                                           encoding='utf-8',
+                                           )
+    (presets / 'plain_fit.csv').write_text('Portimao preset,format 1\n'
+                                           '\n'
+                                           'Haem file,Haems per protein\n'
+                                           'c1_myco.csv,1\n',
+                                           encoding='utf-8',
+                                           )
+    (tmp_path / 'own_fit.csv').write_text('anything', encoding='utf-8')
+    assert fit_titles_lister(tmp_path) == {'named_fit.csv': 'My named fit',
+                                           'plain_fit.csv': 'plain_fit',
+                                           'own_fit.csv': 'own_fit',
+                                           }
+
+    # ---- 2 The shipped presets -------------------------------------------------------
+    shipped = fit_titles_lister(FITS_FOLDER)
+    assert list(shipped) == fit_names_lister(FITS_FOLDER)
+    assert shipped['rowan_fit_11_2026.csv'] == 'Rowan fit 11-2026'
+    assert shipped[settings.STANDARD_FIT] == 'bswitch_no2_mycobl_b557'
+    assert 'temp_fit_037v.csv' not in shipped
+
+    # ---- 3 The fits that are not in the list -----------------------------------------
+    assert fit_title_maker(OWN_HAEMS_NAME, shipped) == OWN_HAEMS_NAME
+    described = 'PCA, 3 components, 500-620 nm (not saved)'
+    assert fit_title_maker(described, shipped) == described
 
 
 # ---- test_own_haems_are_built_from_the_library ---------------------------------------
@@ -435,3 +503,63 @@ def test_own_haems_are_built_from_the_library(tmp_path: Path) -> None:
     _preset_writer(tmp_path / PRESETS_FOLDER_NAME / 'standard.csv', ['bH.csv'])
     assert answers_fit_loader(tmp_path, 'standard.csv', [])['haem_files'] == ['bH.csv']
     assert library_haems_lister(tmp_path / 'nothing') == []
+
+
+# ---- test_built_fit_is_saved_as_a_fit_file -------------------------------------------
+def test_built_fit_is_saved_as_a_fit_file(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check Save fit: the haems ticked are written as a fit file of the
+    name typed (with or without .csv) in the fits folder, offered in the fit list and
+    loading back as the same haems, in the order a, b, c, with the same values; no
+    name, no haem ticked, a preset's name or a name already used is refused with a
+    message, and the file already there is left as it was.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    HAEMS (module constant); OWN_HAEMS_NAME, PRESETS_FOLDER_NAME.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    value on the standard scale = value in OD/mM/cm / 1 000 000, read back unchanged.
+
+    ---- Helpers ----
+    _library_maker
+    _preset_writer
+    """
+
+    # ---- 1 Saved, offered and read back as the same haems ----------------------------
+    _library_maker(tmp_path)
+    built = answers_fit_loader(tmp_path, OWN_HAEMS_NAME, ['cc.csv', 'bH.csv'])
+    path = built_fit_saver(tmp_path, ' My fit.csv ', ['cc.csv', 'bH.csv'])
+    assert path == tmp_path / 'My fit.csv'
+    assert 'My fit.csv' in fit_names_lister(tmp_path)
+    loaded = fit_loader(tmp_path, 'My fit.csv')
+    names = [haem_name_plainer(name) for name in loaded['haem_list']]
+    assert names == ['Cyt bH', 'Cyt cc']
+    for i, name in enumerate(names):
+        pair = loaded['data'].iloc[:, [2 * i, 2 * i + 1]].dropna().to_numpy()
+        assert np.allclose(pair, np.array(HAEMS[name]) * [1.0, 1e-6], rtol=1e-12)
+        kept = built['data'].iloc[:, [2 * i, 2 * i + 1]].dropna().to_numpy()
+        assert np.allclose(pair, kept, rtol=1e-12)
+
+    # ---- 2 Refused, with the file there left alone -----------------------------------
+    _preset_writer(tmp_path / PRESETS_FOLDER_NAME / 'standard.csv', ['bH.csv'])
+    written = path.read_text(encoding='utf-8')
+    for name, files, words in (('', ['bH.csv'], 'Type a name'),
+                               ('mine', [], 'Tick the haems'),
+                               ('standard', ['bH.csv'], 'name of a preset'),
+                               ('My fit', ['bH.csv'], 'already a fit called My fit'),
+                               ):
+        with pytest.raises(ValueError, match=words):
+            built_fit_saver(tmp_path, name, files)
+    assert path.read_text(encoding='utf-8') == written
+    assert not (tmp_path / 'mine.csv').exists()

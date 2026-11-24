@@ -1,5 +1,6 @@
 ﻿Portimao preset,format 1
-Holds,"The haems of temp_fit_037v, the latest fit, each at the size that fit gives it"
+Name,Rowan fit 11-2026
+Holds,"The haems of the Rowan fit of November 2026 (once temp_fit_037v), each at the size that fit gives it"
 
 Haem file,Haems per protein
 c1_037v.csv,2

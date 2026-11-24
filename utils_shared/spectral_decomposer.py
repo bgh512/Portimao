@@ -14,7 +14,8 @@ import numpy as np
 import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.helpers import (haem_order_finder,
+from utils_shared.helpers import (file_name_sanitiser,
+                                  haem_order_finder,
                                   haem_type_finder,
                                   HAEM_TYPE_ORDER,
                                   name_simplifier,
@@ -75,7 +76,7 @@ FIT_NAMES_TEXT = ('In the figures the haem letters are in italics and a capital 
 HAEM_NAME_WORD = re.compile(r'([abcdo]{1,3})([A-Z]|[0-9]+)?')
 # The backgrounds a decomposition can fit under the haems, by name, with the words the
 # messages use; 'haem_background' in config.DEFAULT_ANSWERS names the standard one. The
-# Valencia one is the shape of the instrument's own fit file, which follows
+# Palencia one is the shape of the instrument's own fit file, which follows
 # 1/wavelength^2 exactly. Rowan scatter is the additive background of the lab's own
 # chamber scripts, term for term (tests/test_haem_decomposition.py checks it against
 # their lines).
@@ -84,16 +85,28 @@ BACKGROUND_LABELS = {'scatter_1': 'flat + 1/wavelength',
                      'linear': 'flat + straight line',
                      'rowan_scatter': 'flat + wavelength + (wavelength - centre)² '
                                       '(Rowan scatter)',
-                     'valencia': 'flat + 1/wavelength² (Valencia)',
+                     'palencia': 'flat + 1/wavelength² (Palencia)',
                      }
-# The same backgrounds in a few words, as the drop-down in the strip lists them, the
+# The same backgrounds as short names, as the drop-down in the strip lists them, the
 # standard first.
 BACKGROUND_SHORT_NAMES = {'rowan_scatter': 'Rowan scatter',
-                          'valencia': 'Valencia',
-                          'scatter_1': 'Flat + 1/wavelength',
-                          'scatter_2': 'Flat + 1/wavelength + 1/wavelength²',
-                          'linear': 'Straight line',
+                          'palencia': 'Palencia',
+                          'scatter_1': 'Inverse',
+                          'scatter_2': 'Inverse²',
+                          'linear': 'Linear',
                           }
+# Each background's formula as a textbook writes it (matplotlib mathtext), as MATHS.md
+# section 1.3 gives it: w the wavelength (nm), w_mid the one halfway along, b0 to b2
+# found by the fit.
+BACKGROUND_FORMULAS = {
+    'rowan_scatter': r'$B = b_0 + b_1\,w + b_2\,(w - w_{\mathrm{mid}})^2$',
+    'palencia': r'$B = b_0 + \dfrac{b_1}{w^2}$',
+    'scatter_1': r'$B = b_0 + \dfrac{b_1}{w}$',
+    'scatter_2': r'$B = b_0 + \dfrac{b_1}{w} + \dfrac{b_2}{w^2}$',
+    'linear': r'$B = b_0 + b_1\,w$',
+    }
+# The heading line of a preset that gives the name the Fit list shows for it.
+PRESET_TITLE_LABEL = 'Name'
 # The fit name of a set of library haems ticked in the strip, in place of a preset or a
 # fit file (not a file name, so it never clashes with one); the files are in the answer
 # 'haem_files'.
@@ -597,6 +610,47 @@ def _preset_reader(path: Path) -> List[str]:
     return names
 
 
+# ---- _preset_title_reader ------------------------------------------------------------
+def _preset_title_reader(path: Path) -> Optional[str]:
+    """
+    ---- Summary ----
+    Helper function to read the name a preset gives itself for the Fit list, from its
+    "Name" heading line.
+
+    ---- Inputs ----
+    path : Path
+        Preset file (DATA_FORMAT.md, "preset csv").
+
+    ---- Globals read ----
+    PRESET_TITLE_LABEL (module constant).
+
+    ---- Outputs ----
+    Optional[str]
+        The name, or None when the preset has no Name line or cannot be read (the
+        Fit list then shows its file name without .csv).
+
+    ---- Globals mutated ----
+    None. Reads the file (side effect).
+
+    ---- Equations ----
+    None. Only the heading lines, above the first empty line, are read.
+
+    ---- Helpers ----
+    None.
+    """
+
+    try:
+        lines = path.read_text(encoding='utf-8-sig').splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    for row in csv.reader(lines):
+        if not any(cell.strip() for cell in row):
+            break
+        if len(row) > 1 and row[0].strip().lower() == PRESET_TITLE_LABEL.lower():
+            return row[1].strip() or None
+    return None
+
+
 # ---- _unit_scaler --------------------------------------------------------------------
 def _unit_scaler(values: np.ndarray) -> np.ndarray:
     """
@@ -751,7 +805,7 @@ def background_builder(wavelengths: np.ndarray, background: str) -> np.ndarray:
     ---- Equations ----
     scatter_1: 1, 1/wl; scatter_2: 1, 1/wl, 1/wl^2 (scatter_background_builder);
     linear: 1, wl; rowan_scatter: 1, wl, (wl - centre)^2 with the centre halfway
-    between the shortest and the longest wavelength; valencia: 1, 1/wl^2. Scaling a
+    between the shortest and the longest wavelength; palencia: 1, 1/wl^2. Scaling a
     shape to run from 0 to 1 changes only the size of its amount, not the fit.
 
     ---- Helpers ----
@@ -775,7 +829,7 @@ def background_builder(wavelengths: np.ndarray, background: str) -> np.ndarray:
     line = _unit_scaler(wavelengths)
     shapes = {'linear': [line],
               'rowan_scatter': [line, _unit_scaler((line - 0.5) ** 2)],
-              'valencia': [_unit_scaler(1 / wavelengths ** 2)],
+              'palencia': [_unit_scaler(1 / wavelengths ** 2)],
               }[background]
     return np.column_stack([np.ones_like(wavelengths)] + shapes)
 
@@ -843,6 +897,79 @@ def basis_solver(basis: np.ndarray, spectra: np.ndarray) -> np.ndarray:
     if s[-1] <= s[0] * max(basis.shape) * np.finfo(float).eps:
         raise ValueError(unusable)
     return ((values @ u) / s) @ vt / lengths
+
+
+# ---- built_fit_saver -----------------------------------------------------------------
+def built_fit_saver(fits_folder: Path, name: str, haem_files: Sequence[str]) -> Path:
+    """
+    ---- Summary ----
+    Main function to save the haems ticked under Build a fit as a fit file of the
+    user's own in the fits folder, so it is offered in the Fit list from then on. A
+    name already used by a preset or a fit file is refused, so nothing is overwritten.
+
+    ---- Inputs ----
+    fits_folder : Path
+        The fits folder, holding the haems and presets folders and the user's own fit
+        files.
+    name : str
+        The name typed beside Save fit, with or without .csv.
+    haem_files : Sequence[str]
+        The library file names ticked (the answer 'haem_files').
+
+    ---- Globals read ----
+    FIT_UNITS, HAEMS_FOLDER_NAME, PRESETS_FOLDER_NAME (module constants).
+
+    ---- Outputs ----
+    Path
+        The file written. Raises ValueError, with a message for the user, when no
+        name is typed, no haem is ticked, the name is taken, or the haems cannot be
+        joined (haem_files_combiner).
+
+    ---- Globals mutated ----
+    None. Writes the file (side effect).
+
+    ---- Equations ----
+    None. The values are written in the unit the library files give them in, the
+    shapes oxidised minus reduced, as the decomposition uses them.
+
+    ---- Helpers ----
+    file_name_sanitiser
+    fit_file_writer
+    haem_files_combiner
+    """
+
+    # ---- 1 Check the name and the haems ----------------------------------------------
+    typed = name.strip()
+    stem = file_name_sanitiser(typed[:-4] if typed.lower().endswith('.csv') else typed,
+                               default='',
+                               )
+    if not stem:
+        raise ValueError('Type a name for the fit in the box beside Save fit.')
+    if not haem_files:
+        raise ValueError('Tick the haems of the fit under Build a fit, then save it.')
+    path = fits_folder / f'{stem}.csv'
+    if (fits_folder / PRESETS_FOLDER_NAME / path.name).is_file():
+        raise ValueError(f'{path.name} is the name of a preset. Type another name.')
+    if path.exists():
+        raise ValueError(f'There is already a fit called {path.name} in the fits '
+                         'folder. Type another name.',
+                         )
+
+    # ---- 2 Join the haems and write them ---------------------------------------------
+    fit = haem_files_combiner([fits_folder / HAEMS_FOLDER_NAME / file
+                               for file in haem_files
+                               ],
+                              )
+    unit = next((unit for unit, divisor in FIT_UNITS.items()
+                 if divisor == fit['scale_divisor']
+                 ),
+                'OD/mM/cm',
+                )
+    holds = ('Haems of the haem library, joined by Portimao: '
+             f"{', '.join(Path(file).stem for file in fit['haem_files'])}"
+             )
+    fits_folder.mkdir(parents=True, exist_ok=True)
+    return fit_file_writer(fit, path, unit, holds, 'oxidised minus reduced')
 
 
 # ---- data_filterer -------------------------------------------------------------------
@@ -1549,6 +1676,82 @@ def fit_names_lister(fits_folder: Path) -> List[str]:
     return presets + [name for name in name_sorter(fits_folder)
                       if name.lower() not in taken
                       ]
+
+
+# ---- fit_titles_lister ---------------------------------------------------------------
+def fit_titles_lister(fits_folder: Path) -> Dict[str, str]:
+    """
+    ---- Summary ----
+    Main function to give each fit of the Fit list the name it is shown by: a
+    preset's own Name line, or else its file name without .csv.
+
+    ---- Inputs ----
+    fits_folder : Path
+        The fits folder.
+
+    ---- Globals read ----
+    PRESETS_FOLDER_NAME (module constant).
+
+    ---- Outputs ----
+    Dict[str, str]
+        {file name: name shown}, in the order of fit_names_lister.
+
+    ---- Globals mutated ----
+    None. Reads the presets (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _preset_title_reader
+    fit_names_lister
+    fit_title_maker
+    """
+
+    presets = Path(fits_folder) / PRESETS_FOLDER_NAME
+    titles = {}
+    for name in fit_names_lister(Path(fits_folder)):
+        path = presets / name
+        titles[name] = ((_preset_title_reader(path) if path.is_file() else None) or
+                        fit_title_maker(name, {})
+                        )
+    return titles
+
+
+# ---- fit_title_maker -----------------------------------------------------------------
+def fit_title_maker(fit_file: str, titles: Dict[str, str]) -> str:
+    """
+    ---- Summary ----
+    Main function to give the name a fit is shown by in the Fit list.
+
+    ---- Inputs ----
+    fit_file : str
+        The answer 'fit_file': a file name, OWN_HAEMS_NAME or the description of
+        components found from the data.
+    titles : Dict[str, str]
+        {file name: name shown}, as fit_titles_lister gives it.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        Its name in ``titles``, else the file name without .csv, else fit_file.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if fit_file in titles:
+        return titles[fit_file]
+    text = str(fit_file)
+    return text[:-4] if text.lower().endswith('.csv') else text
 
 
 # ---- fit_range_finder ----------------------------------------------------------------

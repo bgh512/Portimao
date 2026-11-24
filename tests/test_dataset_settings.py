@@ -654,6 +654,46 @@ def test_saved_haem_amounts_open_as_delta_d(tmp_path: Path) -> None:
     assert answers == dict(ANSWERS, haem_mode='delta', ho_haem_mode='delta')
 
 
+# ---- test_saved_old_names_open_with_the_new_ones -------------------------------------
+def test_saved_old_names_open_with_the_new_ones(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a dataset saved with the Valencia scatter opens with
+    Palencia, one saved with the preset temp_fit_037v opens with the Rowan fit 11-2026,
+    and the other answers, and other names, are left as they were.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    FILES, ANSWERS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    old = dict(ANSWERS, haem_background='valencia', fit_file='temp_fit_037v.csv')
+    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, old)
+    answers = dataset_settings_reader(tmp_path)['answers']
+    assert answers == dict(ANSWERS,
+                           haem_background='palencia',
+                           fit_file='rowan_fit_11_2026.csv',
+                           )
+    kept = dict(ANSWERS, haem_background='linear', fit_file='OGfit.csv')
+    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, kept)
+    assert dataset_settings_reader(tmp_path)['answers'] == kept
+
+
 # ---- test_settings_are_read_back -----------------------------------------------------
 def test_settings_are_read_back(tmp_path: Path) -> None:
     """

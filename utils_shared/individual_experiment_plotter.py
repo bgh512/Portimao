@@ -618,9 +618,11 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
         return
 
     # ---- 2 Draw the windows that could not be calculated, when asked -----------------
+    # a window the user left out is not drawn: its place is left as a gap
     if config.get('SHOW_SKIPPED_WINDOWS'):
         for window in averages.get('skipped', {}).values():
-            _skipped_window_drawer(axes, window, config['SKIPPED_WINDOW_COLOUR'])
+            if not window.get('left_out'):
+                _skipped_window_drawer(axes, window, config['SKIPPED_WINDOW_COLOUR'])
 
     # ---- 3 Draw each window ----------------------------------------------------------
     for name, window in averages['windows'].items():
@@ -762,6 +764,7 @@ def experiment_drawer(fig: Figure,
     _window_drawer
     _ylim_calculator
     event_text_writer
+    haem_ylim_sharer
     name_simplifier
     source_resolver
     time_getter
@@ -805,7 +808,8 @@ def experiment_drawer(fig: Figure,
     _window_drawer(axes, experiment, config)
 
     # ---- 4 Draw each panel -----------------------------------------------------------
-    # Draw each panel.
+    # The y limits each haem panel would have alone, so the panels can share one scale.
+    haem_limits: List[Tuple[Axes, Tuple[float, float]]] = []
     for ax, panel in zip(axes, panels):
         ax.panel_key = panel['key']  # so the window can tell which panel is where
         if panel['type'] == 'oxygen':
@@ -920,6 +924,7 @@ def experiment_drawer(fig: Figure,
                                           )
                 if limits:
                     ax.set_ylim(*limits)
+                    haem_limits.append((ax, limits))
         if config['SHOW_LEGENDS'].get(panel['type'], True):
             # A haem panel's legend is just the word when it holds a single trace
             # (HAEM_LEGEND_TEXT_ONLY).
@@ -933,6 +938,16 @@ def experiment_drawer(fig: Figure,
                                                     {},
                                                     ).get(panel['type']),
                                 )
+
+    # ---- 4.1 One scale for the haem panels -------------------------------------------
+    # A haem that hardly changes then looks small beside the others. In % oxidised each
+    # haem runs over its own 0 to 100 %, so each panel keeps its own range.
+    if haem_source != 'percent' and len(haem_limits) > 1:
+        shared = haem_ylim_sharer([limits for _, limits in haem_limits],
+                                  str(haem_source).startswith('delta'),
+                                  )
+        for (ax, _), limits in zip(haem_limits, shared):
+            ax.set_ylim(*limits)
 
     # ---- 5 Format the axes -----------------------------------------------------------
     # Format axes. The panels share one time axis, so its limits default to the span
@@ -1184,6 +1199,54 @@ def experiment_title_builder(experiment: dict, config: dict) -> str:
     """
 
     return config['FIGURE_TITLE'].format(experiment_name=experiment['experiment_name'])
+
+
+# ---- haem_ylim_sharer ----------------------------------------------------------------
+def haem_ylim_sharer(limits: List[Tuple[float, float]],
+                     is_aligned: bool,
+                     ) -> List[Tuple[float, float]]:
+    """
+    ---- Summary ----
+    Main function to put the haem panels on one scale, so the size of a change can be
+    compared between them: the same y range on every panel for ΔD, where every haem
+    starts at 0; for absorbance, whose haems sit at different levels, the same height
+    of range on every panel, each around its own haem.
+
+    ---- Inputs ----
+    limits : List[Tuple[float, float]]
+        (low, high) each panel would have alone, in mOD (or mOD OD⁻¹).
+    is_aligned : bool
+        True for ΔD (the same range on every panel), False for absorbance (the same
+        height of range, around each panel's own middle).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Tuple[float, float]]
+        (low, high) of each panel, in the order given.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    ΔD: low = smallest of the lows, high = largest of the highs, on every panel.
+    Absorbance: height = largest (high - low); middle = (low + high) / 2 of each
+    panel; limits = middle - height / 2 and middle + height / 2.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if not limits:
+        return []
+    if is_aligned:
+        shared = (min(low for low, _ in limits), max(high for _, high in limits))
+        return [shared for _ in limits]
+    height = max(high - low for low, high in limits)
+    return [((low + high) / 2 - height / 2, (low + high) / 2 + height / 2)
+            for low, high in limits
+            ]
 
 
 # ---- watermark_style_builder ---------------------------------------------------------

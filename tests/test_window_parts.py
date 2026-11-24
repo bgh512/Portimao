@@ -21,7 +21,10 @@ import config as settings
 import utils_shared.survey as survey
 import utils_viewer.viewer_preview as viewer_preview
 import utils_viewer.viewer_stages as viewer_stages
-from utils_shared.spectral_decomposer import OWN_HAEMS_NAME
+from utils_shared.spectral_decomposer import (BACKGROUND_FORMULAS,
+                                              BACKGROUND_SHORT_NAMES,
+                                              OWN_HAEMS_NAME,
+                                              )
 from utils_shared.survey import (event_entries_builder,
                                  event_asker,
                                  IGNORE_LABEL,
@@ -34,6 +37,8 @@ from utils_viewer.viewer_preview import (_loaded_experiment_getter,
 from utils_viewer.viewer_stages import _answers_previewer
 from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        form_answers_builder,
+                                       formula_note_writer,
+                                       formula_picture_maker,
                                        haem_form_choices_lister,
                                        haem_ticks_resolver,
                                        height_checker,
@@ -42,6 +47,7 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        ocr_form_choices_lister,
                                        ocr_mode_builder,
                                        ocr_view_reader,
+                                       PCA_CHANGE,
                                        psi_answers_builder,
                                        psi_change_describer,
                                        psi_number_checker,
@@ -644,7 +650,7 @@ def test_the_decomposition_kept_to_compare() -> None:
                    }
     answers = {'fit_file': 'made_up.csv',
                'haem_files': [],
-               'haem_background': 'valencia',
+               'haem_background': 'palencia',
                'decomposition_dataset': 'Spectra',
                'journal': 'cell',
                'delta_psi': True,
@@ -660,11 +666,11 @@ def test_the_decomposition_kept_to_compare() -> None:
     assert kept['fit'] is fit
     assert kept['answers'] == {'fit_file': 'made_up.csv',
                                'haem_files': [],
-                               'haem_background': 'valencia',
+                               'haem_background': 'palencia',
                                'decomposition_dataset': 'Spectra',
                                **psi_numbers,
                                }
-    assert kept['text'] == ('made_up.csv with the Valencia background, its regions '
+    assert kept['text'] == ('made_up.csv with the Palencia background, its regions '
                             'and Δψ numbers'
                             )
 
@@ -677,10 +683,10 @@ def test_the_decomposition_kept_to_compare() -> None:
     # ---- 3 The words with delta psi off, with and without regions --------------------
     off = dict(answers, delta_psi=False)
     assert kept_decomposition_builder(off, fit, regions)['text'] == (
-        'made_up.csv with the Valencia background and its regions'
+        'made_up.csv with the Palencia background and its regions'
         )
     assert kept_decomposition_builder(off, fit, {})['text'] == (
-        'made_up.csv with the Valencia background'
+        'made_up.csv with the Palencia background'
         )
     assert kept_decomposition_builder(off, fit, {})['regions'] == {}
     own = dict(off,
@@ -818,7 +824,7 @@ def test_go_back_to_kept_puts_the_kept_one_back(monkeypatch: pytest.MonkeyPatch,
         session.fit = {'haem_list': ['bH', 'bL', 'c1']}
         session.regions['run1']['oxidised_end'] = 5.0
         answers.update({'fit_file': 'made_up.csv',
-                        'haem_background': 'valencia',
+                        'haem_background': 'palencia',
                         'psi_share': 0.6,
                         },
                        )
@@ -870,7 +876,7 @@ def test_go_back_to_kept_puts_the_kept_one_back(monkeypatch: pytest.MonkeyPatch,
     changer()
     viewer_stages._strip_change_applier(session, answers, Path('.'), {'compare': False})
     assert session.fit == {'haem_list': ['bH', 'bL', 'c1']}
-    assert answers['haem_background'] == 'valencia'
+    assert answers['haem_background'] == 'palencia'
     assert answers['psi_share'] == 0.6
     assert session.kept is None
 
@@ -988,6 +994,223 @@ def test_save_fit_names_the_fit_in_use(monkeypatch: pytest.MonkeyPatch,
     assert printed[-1].startswith('The fit was not saved')
 
 
+# ---- test_do_pca_runs_only_in_the_haem_step ------------------------------------------
+def test_do_pca_runs_only_in_the_haem_step(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    ---- Summary ----
+    Main function to check Do PCA in the Haem decomposition box: the strip tells the
+    click only while it is listening; while the haem step waits the questions of the
+    analysis are asked (stood in for); at any other step one sentence says where to
+    go, and nothing else changes.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the showing of the strip and the terminal.
+
+    ---- Globals read ----
+    PCA_CHANGE.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. The stand-ins are undone after the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The strip tells the click -------------------------------------------------
+    told: list = []
+    strip = SettingsStrip(MagicMock(), MagicMock(), MagicMock(), 'white', told.append)
+    strip._pca_handler()
+    assert told == []  # greyed out
+    strip.state_setter(True)
+    strip._pca_handler()
+    assert told == [{PCA_CHANGE: True}]
+
+    # ---- 2 In the haem step, then at another step ------------------------------------
+    monkeypatch.setattr(viewer_stages, '_strip_shower', lambda session, answers: None)
+    printed: list = []
+    monkeypatch.setattr(viewer_stages,
+                        'info_printer',
+                        lambda text, **kwargs: printed.append(text),
+                        )
+    session = ViewerSession(summaries=[], export_root=Path('.'), window=MagicMock())
+    session.redraw = MagicMock()
+    session.pca_runner = MagicMock()
+    answers = dict(settings.DEFAULT_ANSWERS)
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {PCA_CHANGE: True})
+    session.pca_runner.assert_called_once_with()
+    assert printed == []
+    session.pca_runner = None
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {PCA_CHANGE: True})
+    assert printed == ['The components are found from the data in the haem step '
+                       '(4.1): go back to the processing to do it.',
+                       ]
+    assert answers == settings.DEFAULT_ANSWERS
+    assert not session.redraw.called
+
+
+# ---- test_haem_step_is_one_line_and_continue -----------------------------------------
+def test_haem_step_is_one_line_and_continue(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    ---- Summary ----
+    Main function to check the haem step of the processing: one instruction, 4.1,
+    answered with Continue, and no question about the fit. With no haems shown and
+    Haem decomposition left unticked the run goes on without haems; a click on Do PCA
+    while it waits makes the components of the whole dataset the fit in use; Do PCA
+    is only carried out while the step waits. The plot, the later steps of the
+    processing and the questions of the analysis are stood in for.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the window, the plot, the terminal and the later steps.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. The stand-ins are undone after the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The stand-ins -------------------------------------------------------------
+    asked: list = []
+    clicks = {'pca': False}
+    def waiter(question: str, nudge: str, **kwargs: object) -> str:
+        asked.append((question, kwargs.get('number')))
+        if clicks['pca']:
+            session.pca_runner()
+        return ''
+    found = {'haem_list': ['PC1', 'PC2']}
+    pca_calls: list = []
+    def pca(*args: object) -> tuple:
+        pca_calls.append(args[5])  # the spectrometer
+        return 'my_pca.csv', found
+    for name, value in (('enter_waiter', waiter),
+                        ('pca_stage_runner', pca),
+                        ('guide_step_starter', lambda key: None),
+                        ('info_printer', lambda text, **kwargs: None),
+                        ('_strip_shower', lambda session, answers: None),
+                        ('_answers_previewer', lambda *args, **kwargs: None),
+                        ('preview_drawer', lambda *args, **kwargs: True),
+                        ('_regions_chooser', lambda *args, **kwargs: {}),
+                        ('region_files_lister', lambda *args, **kwargs: []),
+                        ('delta_psi_asker', lambda *args, **kwargs: False),
+                        ('_windows_chooser', lambda *args, **kwargs: None),
+                        ('fit_titles_lister', lambda folder: {}),
+                        ):
+        monkeypatch.setattr(viewer_stages, name, value)
+    summaries = [{'name': 'a.paf', 'datasets': ['Cyt', 'NADH']},
+                 {'name': 'b.paf', 'datasets': ['Cyt']},
+                 ]
+
+    # ---- 2 No haems shown and none wanted --------------------------------------------
+    session = ViewerSession(summaries=summaries,
+                            export_root=Path('.'),
+                            window=MagicMock(),
+                            )
+    answers = dict(settings.DEFAULT_ANSWERS, decompose=True, averaging=False)
+    viewer_stages.processing_stage_runner(session,
+                                          answers,
+                                          dict(answers),
+                                          {},
+                                          Path('.'),
+                                          {},
+                                          )
+    assert asked == [('Edit the haem decomposition using the Haem decomposition box, '
+                      'press Continue when ready.',
+                      '4.1',
+                      ),
+                     ]
+    assert answers['decompose'] is False and session.fit is None
+    assert session.pca_runner is None
+    assert pca_calls == []
+
+    # ---- 3 Do PCA while the step waits -----------------------------------------------
+    clicks['pca'] = True
+    session = ViewerSession(summaries=summaries,
+                            export_root=Path('.'),
+                            window=MagicMock(),
+                            )
+    answers = dict(settings.DEFAULT_ANSWERS,
+                   decomposition_dataset='NADH',
+                   averaging=False,
+                   )
+    viewer_stages.processing_stage_runner(session,
+                                          answers,
+                                          dict(answers),
+                                          {},
+                                          Path('.'),
+                                          {},
+                                          )
+    assert pca_calls == ['Cyt']  # the only spectrometer every file has
+    assert session.fit is found
+    assert answers['decompose'] is True and answers['fit_file'] == 'my_pca.csv'
+    assert answers['decomposition_dataset'] == 'Cyt'
+    assert answers['haems'] == ['PC1', 'PC2']
+    assert session.pca_runner is None
+
+
+# ---- test_scatters_have_names_and_textbook_formulas ----------------------------------
+def test_scatters_have_names_and_textbook_formulas() -> None:
+    """
+    ---- Summary ----
+    Main function to check the Scatter drop-down: the five scatters by their short
+    names, Rowan scatter first; each has a formula that draws as a picture (so its
+    fractions and powers are written as a textbook writes them) and a line saying what
+    its letters are, w_mid only for Rowan scatter.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    BACKGROUND_FORMULAS, BACKGROUND_SHORT_NAMES.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    assert list(BACKGROUND_SHORT_NAMES.values()) == ['Rowan scatter',
+                                                     'Palencia',
+                                                     'Inverse',
+                                                     'Inverse²',
+                                                     'Linear',
+                                                     ]
+    assert set(BACKGROUND_FORMULAS) == set(BACKGROUND_SHORT_NAMES)
+    assert r'\dfrac{b_1}{w^2}' in BACKGROUND_FORMULAS['palencia']
+    for name in BACKGROUND_FORMULAS:
+        picture = formula_picture_maker(name)
+        assert picture.startswith(b'\x89PNG'), name
+        note = formula_note_writer(name)
+        assert note.startswith('B: the scatter (OD); w: wavelength (nm)')
+        assert ('w_mid' in note) == (name == 'rowan_scatter')
+
+
 # ---- test_answers_shown_in_the_strip -------------------------------------------------
 def test_answers_shown_in_the_strip() -> None:
     """
@@ -1069,13 +1292,13 @@ def test_answers_shown_in_the_strip() -> None:
                   event_label_angle=30,
                   compare_layout='overlaid',
                   )
-    values = strip_values_builder(chosen, False, [], kept='made_up.csv, Valencia')
+    values = strip_values_builder(chosen, False, [], kept='made_up.csv, Palencia')
     assert values == {'plot_haems': False,
                       'fit_file': '',
                       'haem_background': 'linear',
                       'haem_files': [],
                       'compare': True,
-                      'kept': 'made_up.csv, Valencia',
+                      'kept': 'made_up.csv, Palencia',
                       'compare_layout': 'overlaid',
                       'spectra': 'NADH',
                       'haem_mode': 'percent',
@@ -1207,7 +1430,7 @@ def test_values_meant_for_the_strip() -> None:
                           },
                          )
     strip_values_checker({'journal': NO_JOURNAL})
-    strip_values_checker({'haem_background': 'valencia', 'haem_files': ['bL_og.csv']})
+    strip_values_checker({'haem_background': 'palencia', 'haem_files': ['bL_og.csv']})
     strip_values_checker({'spectra': 'NADH',
                           'haem_mode': 'percent',
                           'haem_per_od': False,

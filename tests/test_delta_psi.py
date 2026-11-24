@@ -382,12 +382,13 @@ def test_the_numbers_the_program_starts_with() -> None:
                                                                          )
 
 
-# ---- test_the_kept_delta_psi_is_drawn_dashed -----------------------------------------
-def test_the_kept_delta_psi_is_drawn_dashed() -> None:
+# ---- test_the_kept_delta_psi_is_drawn_faint ------------------------------------------
+def test_the_kept_delta_psi_is_drawn_faint() -> None:
     """
     ---- Summary ----
     Main function to check the Δψ kept to compare with on the plot of one file: a
-    second line in the Δψ panel, dashed and paler, the panel widened to hold it outside
+    second line in the Δψ panel, faint and thin under the one in use, drawn bold, none
+    dashed, the panel widened to hold it outside
     the ignored parts, and the gap between the two worked out by hand; and one
     sentence in place of the line for a file with no kept Δψ.
 
@@ -440,18 +441,18 @@ def test_the_kept_delta_psi_is_drawn_dashed() -> None:
         axes, _ = experiment_drawer(fig, fig.add_gridspec(1, 1)[0, 0], shown, config)
         return list(axes)
 
-    # ---- 2 The kept line is dashed and paler, and the gap is as worked out -----------
+    # ---- 2 The kept line is faint and thin, and the gap is as worked out -------------
     axes = drawer(in_use)
     low_before, high_before = axes[-1].get_ylim()
     assert high_before < 150.0
     note = _kept_psi_drawer(in_use, kept, axes, config, 0.0, 0.0)
     assert note == 'Gap to the kept Δψ, largest / average (mV): 20 / 11.7'
-    solid, dashed = axes[-1].get_lines()
-    assert not solid.is_dashed()
-    assert dashed.is_dashed()
-    assert dashed.get_alpha() == KEPT_ALPHA
-    assert dashed.get_color() == solid.get_color()
-    assert dashed.get_ydata()[2:].tolist() == [115.0, 110.0, 150.0, 140.0]
+    new, old = axes[-1].get_lines()
+    assert not new.is_dashed() and not old.is_dashed()
+    assert old.get_alpha() == KEPT_ALPHA
+    assert old.get_linewidth() < new.get_linewidth()
+    assert old.get_color() == new.get_color()
+    assert old.get_ydata()[2:].tolist() == [115.0, 110.0, 150.0, 140.0]
     low, high = axes[-1].get_ylim()
     assert low == low_before
     assert high == pytest.approx(152.0)

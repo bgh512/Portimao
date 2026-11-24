@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
@@ -26,7 +26,9 @@ from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_exporter import (experiment_workbook_exporter,
                                                          FULL_FOLDER,
                                                          )
-from utils_shared.individual_experiment_plotter import experiment_plotter
+from utils_shared.individual_experiment_plotter import (experiment_plotter,
+                                                        haem_ylim_sharer,
+                                                        )
 from utils_shared.paf_reader import experiment_paf_loader
 from utils_shared.pca_plotter import (pca_example_figure_builder,
                                       pca_figure_builder,
@@ -51,11 +53,18 @@ BROWSING_ANSWERS = {key: settings.DEFAULT_ANSWERS[key]
                     }
 _cache_lock = threading.Lock()
 KEY_PREFIX = 'Key: '
-# the dashes of the kept decomposition's haem traces: points of line, points of gap
-KEPT_DASHES = (4, 2)
-# how solid they are drawn (1 is solid): paler than the haems in use, so the two can be
-# told apart where a noisy trace hides its dashes
-KEPT_ALPHA = 0.55
+# Overlaid, the kept (old) decomposition is drawn faint and thin under the one in use
+# (new), drawn bold: how solid the old lines are (1 is solid), and the width of each
+# as a share of the usual line width.
+KEPT_ALPHA = 0.35
+KEPT_WIDTH_FACTOR = 0.7
+NEW_WIDTH_FACTOR = 1.8
+OVERLAID_KEY = 'faint = old (kept), bold = new'
+# the headings of the two plots side by side, the strip above them that holds the
+# headings, and the size of their letters, in pixels of the picture
+SIDE_HEADINGS = ('Old', 'New')
+SIDE_HEADING_PX = 30
+SIDE_HEADING_FONT_PX = 20
 # the share of a kept trace's range left free above and below it when a haem panel is
 # widened to hold it, as the panels leave around the haems in use
 KEPT_MARGIN = 0.05
@@ -151,6 +160,7 @@ class ViewerSession:
     base_redraw: Optional[Callable[[], bool]] = None
     tab_switcher: Optional[Callable[[str], None]] = None
     edit_runner: Optional[Callable[[str], None]] = None
+    pca_runner: Optional[Callable[[], None]] = None
 
 
 # ---- PREVIEW HELPERS -----------------------------------------------------------------
@@ -270,9 +280,10 @@ def _kept_haems_drawer(session: ViewerSession,
     ---- Summary ----
     Helper function to work one file out again with the kept decomposition (its fit,
     background, regions and numbers of delta psi, everything else as in use), draw its
-    haem traces dashed over the haems in use in the same colours, widening a panel a
-    kept trace would leave, and say how far apart the two are; its delta psi is drawn
-    the same way over the delta psi in use. Its own warnings are left out, as they
+    haem traces faint and thin under the haems in use, drawn bold, in the same colours,
+    widening a panel a kept trace would leave (and the other haem panels with it, so
+    they keep one scale), and say how far apart the two are; its delta psi is drawn
+    the same way under the delta psi in use. Its own warnings are left out, as they
     repeat those of the decomposition in use.
 
     ---- Inputs ----
@@ -297,11 +308,12 @@ def _kept_haems_drawer(session: ViewerSession,
         HAEM_Y_MAX).
 
     ---- Globals read ----
-    settings.Config, HAEM_KEYS, KEY_PREFIX, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
+    settings.Config, HAEM_KEYS, KEY_PREFIX, KEPT_ALPHA, KEPT_MARGIN,
+    KEPT_WIDTH_FACTOR, NEW_WIDTH_FACTOR, OVERLAID_KEY.
 
     ---- Outputs ----
     str
-        The notes: a KEY_PREFIX line for the dashed lines, a line with the largest
+        The notes: a KEY_PREFIX line for the faint and bold lines, a line with the largest
         and the average gap of each haem in both, and the note of the kept delta psi
         (_kept_psi_drawer) when delta psi is shown; or one sentence saying why the
         kept decomposition is not shown on this file.
@@ -319,6 +331,7 @@ def _kept_haems_drawer(session: ViewerSession,
     _kept_gap_teller
     _kept_processor
     _kept_psi_drawer
+    haem_ylim_sharer
     name_simplifier
     problem_teller
     """
@@ -358,16 +371,19 @@ def _kept_haems_drawer(session: ViewerSession,
         is_used = ((times >= np.nanmin(times) + (info['ignore_start'] or 0.0)) &
                    (times <= np.nanmax(times) - (info['ignore_end'] or 0.0))
                    )
-    for ax in axes:
-        for haem in getattr(ax, 'haem_names', []):
+    haem_axes = [ax for ax in axes if getattr(ax, 'haem_names', [])]
+    for ax in haem_axes:
+        # the new haems bold over the old ones, faint and thin
+        for line in ax.get_lines():
+            line.set_linewidth(plot_config['LINE_WIDTH'] * NEW_WIDTH_FACTOR)
+        for haem in ax.haem_names:
             if haem not in kept_columns:
                 continue
             values = value_getter(kept_table, kept_columns[haem])
             ax.plot(times,
                     values,
                     color=colours.get(haem),
-                    linewidth=plot_config['LINE_WIDTH'],
-                    dashes=KEPT_DASHES,
+                    linewidth=plot_config['LINE_WIDTH'] * KEPT_WIDTH_FACTOR,
                     alpha=KEPT_ALPHA,
                     zorder=2,
                     )
@@ -376,8 +392,15 @@ def _kept_haems_drawer(session: ViewerSession,
                 pad = (used.max() - used.min()) * KEPT_MARGIN
                 low, high = ax.get_ylim()
                 ax.set_ylim(min(low, used.min() - pad), max(high, used.max() + pad))
+    # a widened panel widens the others with it, so the haems keep one scale
+    if is_scaled and haem_source != 'percent' and len(haem_axes) > 1:
+        shared = haem_ylim_sharer([ax.get_ylim() for ax in haem_axes],
+                                  str(haem_source).startswith('delta'),
+                                  )
+        for ax, limits in zip(haem_axes, shared):
+            ax.set_ylim(*limits)
 
-    # ---- 3 Draw its delta psi dashed over the one in use -----------------------------
+    # ---- 3 Draw its delta psi faint under the one in use -----------------------------
     psi_note = _kept_psi_drawer(experiment,
                                 kept_experiment,
                                 axes,
@@ -387,10 +410,7 @@ def _kept_haems_drawer(session: ViewerSession,
                                 )
 
     # ---- 4 Say how far apart they are ------------------------------------------------
-    lines = _kept_gap_teller(new_table,
-                             kept_table,
-                             'dashed and paler = kept decomposition',
-                             )
+    lines = _kept_gap_teller(new_table, kept_table, OVERLAID_KEY)
     return '\n'.join(line for line in (*lines, psi_note) if line)
 
 
@@ -514,9 +534,9 @@ def _kept_psi_drawer(experiment: dict,
                      ) -> str:
     """
     ---- Summary ----
-    Helper function to draw the delta psi of the kept decomposition dashed and paler
-    over the delta psi in use, widening the panel where the kept line would leave it,
-    and say how far apart the two are.
+    Helper function to draw the delta psi of the kept decomposition faint and thin
+    under the delta psi in use, drawn bold, widening the panel where the kept line
+    would leave it, and say how far apart the two are.
 
     ---- Inputs ----
     experiment : dict
@@ -535,7 +555,7 @@ def _kept_psi_drawer(experiment: dict,
         Minutes ignored at the end, left out when the panel is widened.
 
     ---- Globals read ----
-    DELTA_PSI_COLUMN, KEPT_ALPHA, KEPT_DASHES, KEPT_MARGIN.
+    DELTA_PSI_COLUMN, KEPT_ALPHA, KEPT_MARGIN, KEPT_WIDTH_FACTOR, NEW_WIDTH_FACTOR.
 
     ---- Outputs ----
     str
@@ -567,14 +587,15 @@ def _kept_psi_drawer(experiment: dict,
                 'Δψ (it had no regions then, or the kept fit has no bH and bL).'
                 )
 
-    # ---- 2 Draw it dashed, and widen the panel to hold it ----------------------------
+    # ---- 2 Draw it faint and thin under the bold one, and widen the panel ------------
     times = time_getter(kept_table)
     values = np.asarray(value_getter(kept_table, DELTA_PSI_COLUMN), dtype=float)
+    for line in ax.get_lines():
+        line.set_linewidth(plot_config['LINE_WIDTH'] * NEW_WIDTH_FACTOR)
     ax.plot(times,
             values,
             color=plot_config['DELTA_PSI_COLOUR'],
-            linewidth=plot_config['LINE_WIDTH'],
-            dashes=KEPT_DASHES,
+            linewidth=plot_config['LINE_WIDTH'] * KEPT_WIDTH_FACTOR,
             alpha=KEPT_ALPHA,
             zorder=2,
             )
@@ -694,12 +715,14 @@ def _kept_side_drawer(session: ViewerSession,
 
     ---- Equations ----
     The y range of two matching panels reaches from the lower of their two bottoms to
-    the higher of their two tops.
+    the higher of their two tops; the haem panels then share one scale
+    (haem_ylim_sharer), on both sides.
 
     ---- Helpers ----
     _kept_gap_teller
     _kept_processor
     _kept_psi_gap_teller
+    haem_ylim_sharer
     experiment_plotter
     problem_teller
     """
@@ -744,12 +767,22 @@ def _kept_side_drawer(session: ViewerSession,
         (low, high), (kept_low, kept_high) = ax.get_ylim(), twin.get_ylim()
         for panel in (ax, twin):
             panel.set_ylim(min(low, kept_low), max(high, kept_high))
+    # the haem panels, on both sides, keep one scale
+    pairs = [(ax, matches[ax.panel_key])
+             for ax in axes
+             if getattr(ax, 'haem_names', []) and
+             matches.get(getattr(ax, 'panel_key', None)) is not None
+             ]
+    if haem_source != 'percent' and len(pairs) > 1:
+        shared = haem_ylim_sharer([ax.get_ylim() for ax, _ in pairs],
+                                  str(haem_source).startswith('delta'),
+                                  )
+        for (ax, twin), limits in zip(pairs, shared):
+            ax.set_ylim(*limits)
+            twin.set_ylim(*limits)
 
     # ---- 3 Say which is which and how far apart they are -----------------------------
-    lines = _kept_gap_teller(new_table,
-                             kept_table,
-                             'left = kept decomposition, right = in use',
-                             )
+    lines = _kept_gap_teller(new_table, kept_table, 'Old = kept, New = in use')
     if any(getattr(ax, 'is_delta_psi', False) for ax in axes):
         lines.append(_kept_psi_gap_teller(experiment, kept_experiment))
     return kept_fig, kept_axes, '\n'.join(lines)
@@ -1481,16 +1514,18 @@ def preview_picture_maker(fig: Figure) -> Tuple[bytes, Optional[TimeAxis]]:
     ---- Summary ----
     Main function to turn a drawn preview into the picture the window shows, with where
     its time axis sits. A figure carrying a kept plot (kept_figure, side by side) gets
-    the kept plot on the left and itself on the right, with a white gap between; the
-    time axis is then that of the plot on the right, so the edges, the arrows and the
-    shading of the window fall on the plot in use.
+    the kept plot on the left and itself on the right, with a white gap between and
+    the headings Old and New above them; the time axis is then that of the plot on the
+    right, so the edges, the arrows and the shading of the window fall on the plot in
+    use.
 
     ---- Inputs ----
     fig : Figure
         The drawn preview (preview_figure_builder).
 
     ---- Globals read ----
-    settings.PREVIEW_DPI, SIDE_GAP_PX.
+    settings.PREVIEW_DPI, SIDE_GAP_PX, SIDE_HEADINGS, SIDE_HEADING_PX,
+    SIDE_HEADING_FONT_PX.
 
     ---- Outputs ----
     Tuple[bytes, Optional[TimeAxis]]
@@ -1502,9 +1537,9 @@ def preview_picture_maker(fig: Figure) -> Tuple[bytes, Optional[TimeAxis]]:
 
     ---- Equations ----
     With the kept plot k pixels wide, the gap g and the plot in use n pixels wide in a
-    picture W = k + g + n wide and H high (the plot in use at its top):
-    x' = (k + g + x n) / W and y' = (H - h + y h) / H, with h the height of the plot
-    in use and x, y the fractions within it.
+    picture W = k + g + n wide and H high (the plot in use under a heading t high):
+    x' = (k + g + x n) / W and y' = (H - t - h + y h) / H, with h the height of the
+    plot in use and x, y the fractions within it.
 
     ---- Helpers ----
     time_axis_finder
@@ -1524,10 +1559,27 @@ def preview_picture_maker(fig: Figure) -> Tuple[bytes, Optional[TimeAxis]]:
     right = Image.open(io.BytesIO(buffer.getvalue())).convert('RGBA')
     left = Image.open(io.BytesIO(kept_buffer.getvalue())).convert('RGBA')
     offset = left.width + SIDE_GAP_PX
-    width, height = offset + right.width, max(left.height, right.height)
+    width = offset + right.width
+    height = SIDE_HEADING_PX + max(left.height, right.height)
     joined = Image.new('RGBA', (width, height), 'white')
-    joined.paste(left, (0, 0))
-    joined.paste(right, (offset, 0))
+    joined.paste(left, (0, SIDE_HEADING_PX))
+    joined.paste(right, (offset, SIDE_HEADING_PX))
+
+    # ---- 2.1 Old over the kept plot, New over the plot in use ------------------------
+    try:
+        font = ImageFont.load_default(size=SIDE_HEADING_FONT_PX)
+    except TypeError:  # a Pillow older than 10.1 has one size only
+        font = ImageFont.load_default()
+    draw = ImageDraw.Draw(joined)
+    for words, start, span in ((SIDE_HEADINGS[0], 0, left.width),
+                               (SIDE_HEADINGS[1], offset, right.width),
+                               ):
+        draw.text((start + span / 2, SIDE_HEADING_PX / 2),
+                  words,
+                  fill='black',
+                  font=font,
+                  anchor='mm',
+                  )
     picture = io.BytesIO()
     joined.save(picture, format='PNG')
     if time_axis is None:
@@ -1538,7 +1590,7 @@ def preview_picture_maker(fig: Figure) -> Tuple[bytes, Optional[TimeAxis]]:
         return (offset + share * right.width) / width
 
     def up(share: float) -> float:
-        return (height - right.height + share * right.height) / height
+        return (height - SIDE_HEADING_PX - right.height + share * right.height) / height
 
     return picture.getvalue(), replace(time_axis,
                                        left=across(time_axis.left),
