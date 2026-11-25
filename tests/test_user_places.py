@@ -101,6 +101,8 @@ def test_app_keeps_things_in_home_folder(tmp_path: Path) -> None:
     assert places.program_folder == tmp_path / 'inside_the_app'
     assert places.own_folder == own
     assert places.fits_folder == own / 'fits'
+    assert places.journals_folder == own / 'journals'
+    assert places.layouts_folder == own / 'layouts'
     assert places.last_answers_file == own / 'last_answers.json'
     assert places.logs_folder == own / 'logs'
 
@@ -150,6 +152,54 @@ def test_app_never_overwrites_a_fit(tmp_path: Path) -> None:
                 )
 
 
+# ---- test_app_never_overwrites_a_journal_file ----------------------------------------
+def test_app_never_overwrites_a_journal_file(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the app makes its journals folder, copies in the
+    journal file that is missing and leaves one the user changed as it is, also when
+    it starts again.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _app_places_maker
+    user_folder_preparer
+    """
+
+    places = _app_places_maker(tmp_path)
+    shipped = places.program_folder / 'journals'
+    shipped.mkdir()
+    (shipped / 'nature.json').write_text('shipped nature')
+    (shipped / 'cell.json').write_text('shipped cell')
+    places.journals_folder.mkdir(parents=True)
+    (places.journals_folder / 'nature.json').write_text('changed by the user')
+    (places.journals_folder / 'mine.json').write_text('the user own journal')
+    for _ in range(2):  # a second start must change nothing
+        user_folder_preparer(places)
+        assert ((places.journals_folder / 'nature.json').read_text()
+                == 'changed by the user'
+                )
+        assert (places.journals_folder / 'cell.json').read_text() == 'shipped cell'
+        assert ((places.journals_folder / 'mine.json').read_text()
+                == 'the user own journal'
+                )
+
+
 # ---- test_source_keeps_things_in_program_folder --------------------------------------
 def test_source_keeps_things_in_program_folder(tmp_path: Path) -> None:
     """
@@ -185,6 +235,8 @@ def test_source_keeps_things_in_program_folder(tmp_path: Path) -> None:
     assert not places.is_app
     assert places.own_folder == tmp_path
     assert places.fits_folder == tmp_path / 'fits'
+    assert places.journals_folder == tmp_path / 'journals'
+    assert places.layouts_folder == tmp_path / 'layouts'
     assert places.last_answers_file == tmp_path / 'last_answers.json'
     assert places.logs_folder == tmp_path / 'logs'
     user_folder_preparer(places)

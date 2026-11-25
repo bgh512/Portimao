@@ -5,7 +5,7 @@ Tests of the plots and workbooks saved once the processing and figure of each fi
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import io
 from pathlib import Path
-from typing import Callable, Iterator, List, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import pytest
@@ -14,6 +14,7 @@ from matplotlib.figure import Figure
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 import main as program
+from utils_shared.figure_page import FigurePage
 from utils_shared.questions import UserQuitError
 from utils_shared.run_logging import details_place_setter
 
@@ -144,25 +145,18 @@ def _context_builder(export_root: Path) -> dict:
 
 # ---- _questions_stander --------------------------------------------------------------
 def _questions_stander(monkeypatch: pytest.MonkeyPatch,
-                       later_fit: Optional[dict] = None,
-                       adds_windows: bool = False,
                        starts: bool = True,
                        ) -> List[int]:
     """
     ---- Summary ----
     Helper function to stand in for every question of everything_asker, the window and
     the saving of the plots and workbooks, so only its own steps run: the questions
-    about each file give the three made-up files and one fit, and the saver names
-    every file as saved.
+    about each file give the three made-up files and one fit, the page of the dataset
+    figure is built with nothing on it, and the saver names every file as saved.
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
         Pytest's tool for the stand-ins.
-    later_fit : Optional[dict]
-        Fit the summary figure questions change to; None keeps the fit of the plots.
-    adds_windows : bool
-        True when a multi-experiment figure asks for the averaging windows, which are
-        then set up.
     starts : bool
         The answer to "Do you want to start?".
 
@@ -204,12 +198,6 @@ def _questions_stander(monkeypatch: pytest.MonkeyPatch,
         if saved_workbooks is not None:
             saved_workbooks[:] = NAMES
 
-    def multi_asker(*args: object) -> Tuple[None, None]:
-        windows_adder: Callable[[], bool] = args[5]
-        if adds_windows:
-            assert windows_adder() is True
-        return None, None
-
     stand_ins = {'viewer_asker': lambda *args: (limits,
                                                 fit,
                                                 {name: {} for name in NAMES},
@@ -217,16 +205,8 @@ def _questions_stander(monkeypatch: pytest.MonkeyPatch,
                                                 {},
                                                 False,
                                                 ),
-                 'region_files_lister': lambda *args: [],
-                 'multi_figure_checker_builder': lambda *args: None,
-                 'multi_experiment_asker': multi_asker,
-                 'summary_figure_asker': lambda *args: (later_fit or fit,
-                                                        {'time_response': None,
-                                                         'haem_ocr': None,
-                                                         },
-                                                        ),
+                 'page_stage_runner': lambda *args: FigurePage(),
                  'yes_no_asker': lambda *args, **kwargs: starts,
-                 'windows_stage_runner': lambda *args: True,
                  'experiment_files_saver': files_saver,
                  'guide_step_starter': lambda *args: None,
                  'active_gui_getter': lambda: None,
@@ -770,10 +750,8 @@ def test_the_plots_are_saved_after_the_file_questions(tmp_path: Path,
     ---- Summary ----
     Main function to check when the questions save the plots and when the run draws
     them again: saved once after the questions about each file, and not drawn again in
-    the run; saved a second time when a later figure adds the averaging windows, and
-    still not drawn again; drawn again in the run when a later figure changes the fit;
-    and named as saved when the run is cancelled at its last question. Every question,
-    the window and the saving are stood in for.
+    the run; and named as saved when the run is cancelled at its last question. Every
+    question, the window and the saving are stood in for.
 
     ---- Inputs ----
     tmp_path : Path
@@ -819,17 +797,7 @@ def test_the_plots_are_saved_after_the_file_questions(tmp_path: Path,
     assert flags_reader() == [True, True, True]
     assert len(saves) == 1
 
-    # ---- 2 Averaging windows added by a later figure: saved again, not drawn again ---
-    saves = _questions_stander(monkeypatch, adds_windows=True)
-    assert flags_reader() == [True, True, True]
-    assert len(saves) == 2
-
-    # ---- 3 The fit changed by a later figure: drawn again in the run -----------------
-    saves = _questions_stander(monkeypatch, later_fit={'haem_list': ['b'], 'data': 1})
-    assert flags_reader() == [False, False, False]
-    assert len(saves) == 1
-
-    # ---- 4 Cancelled at the last question: the saved plots are named -----------------
+    # ---- 2 Cancelled at the last question: the saved plots are named -----------------
     _questions_stander(monkeypatch, starts=False)
     saved_plots: List[str] = []
     with pytest.raises(UserQuitError):

@@ -51,10 +51,7 @@ FIRST_QUESTIONS = {'data_folder': '1.1',
                    'windows': '4.6',
                    'figure': '5.1',
                    'export': '5.9',
-                   'side_by_side': '6.1',
-                   'grid': '6.3',
-                   'time_response': '7.1',
-                   'haem_ocr': '7.2',
+                   'page': '6.1',
                    'start': '9.1',
                    }
 
@@ -224,7 +221,7 @@ def test_steps_and_stages() -> None:
     assert [s for i, s in enumerate(stages) if i == 0 or s != stages[i - 1]] == list(
         GUIDE_STAGES,
         )
-    assert len(set(GUIDE_KEYS)) == len(GUIDE_KEYS) == 20
+    assert len(set(GUIDE_KEYS)) == len(GUIDE_KEYS) == 17
     assert list(FIRST_QUESTIONS) == list(GUIDE_KEYS)
     numbers = [tuple(int(n) for n in FIRST_QUESTIONS[key].split('.'))
                for key in GUIDE_KEYS
@@ -242,8 +239,7 @@ def test_every_step_is_started() -> None:
     """
     ---- Summary ----
     Main function to check that every step the code starts is a step of the guide,
-    written out as its key, and that every step of the guide is started somewhere
-    (the two summary figures by their keys in custom_questions.py).
+    written out as its key, and that every step of the guide is started somewhere.
 
     ---- Inputs ----
     None.
@@ -267,8 +263,6 @@ def test_every_step_is_started() -> None:
 
     started = _started_steps_finder()
     assert set(started) <= set(GUIDE_KEYS)
-    custom = (ROOT / 'utils_custom' / 'custom_questions.py').read_text(encoding='utf-8')
-    started += [key for key in ('time_response', 'haem_ocr') if f"('{key}'," in custom]
     assert set(started) == set(GUIDE_KEYS)
 
 
@@ -324,7 +318,8 @@ def test_steps_move_on_and_fold() -> None:
     assert stages[1] == 'Set-up'
     assert stages[2] == 'Experiment processing  ·  steps 10–13'
     assert stages[3] == 'Experiment export  ·  steps 14–15'
-    assert stages[-1] == 'Dataset export  ·  step 20'
+    assert stages[-2] == 'Dataset figures  ·  step 16'
+    assert stages[-1] == 'Dataset export  ·  step 17'
     assert [row['is_open'] for row in stage_rows] == [False, True] + [False] * 4
     open_row = next(row for row in state.row_lister() if row.get('status') == 'open')
     assert open_row['text'] == ' 9  Event labels' and open_row['mark'] == '▸'

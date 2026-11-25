@@ -267,6 +267,8 @@ Everything goes into the results folder you chose:
 | `<experiment>/<experiment>.xlsx` and figure files | One workbook and one figure per experiment, written once its processing and figure are accepted (the experiment export). If you used an export button in the trimming step, the workbook is first written then (the trimmed data, your labels, OD values and edges) and the experiment export writes it again with its results added |
 | `<experiment>/<spectrometer>_<kind>.csv` | The spectra (transmission, intensity, attenuation), if you chose them with an export button of the trimming step or in the experiment export: wavelengths down, one column per spectrum |
 | `<experiment>/full/` | Only for a file you trimmed, if you exported with Export full + trimmed csv: the same workbook (and spectra, if chosen) for the whole recording |
+| `dataset_figure_<journal>.pdf` | The dataset figure built on the page in Build a figure, at exactly its printed size, with text you can still change in a drawing program (the fonts are in the file). Written when the page holds at least one plot |
+| `dataset_figure_master_<journal>.pdf` | The same figure on one page of the journal, with a box where its legend goes and grey lines where the text of the paper goes, as for Export master |
 | `2x2_comparison.*` | Four experiments in a 2x2 grid |
 | `ocr_and_haem_response.*` | Baseline OCR bars, OCR response and haem response (`.png`, `.svg`) |
 | `ocr_and_haem_response.xlsx` | Run values, averages, SEM and every significance test, written so the maths can be checked by hand |

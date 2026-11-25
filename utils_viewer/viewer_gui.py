@@ -20,7 +20,8 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tupl
 from PIL import Image
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.helpers import panel_order_mover
+from utils_shared.figure_page import FigurePage
+from utils_shared.helpers import panel_order_mover, program_version_reader
 from utils_shared.output_capture import CapturedOutput, output_capturer
 from utils_shared.questions import (answer_request_setter,
                                     COLOUR_QUESTION,
@@ -31,16 +32,20 @@ from utils_shared.questions import (answer_request_setter,
                                     )
 from utils_shared.run_logging import details_writer
 from utils_shared.user_notices import problem_shower
+from utils_shared.user_places import LAUNCH_LOG_NAME, user_places_finder
 from utils_viewer.viewer_edges import (EdgeChoice,
                                        EdgeOverlay,
                                        HANDLE_BAND_PX,
                                        own_value_lister,
                                        )
+from utils_viewer.viewer_flag import dev_copy_checker, FLAG_BUTTON_TEXT, flag_starter
 from utils_viewer.viewer_guide import (AnswerArea,
                                        CARD_BACKGROUND,
+                                       GUIDE_STEPS,
                                        GuidePanel,
                                        GuideState,
                                        )
+from utils_viewer.viewer_page import PageBuilder
 from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          PreviewSpec,
                                          TimeAxis,
@@ -77,6 +82,7 @@ SECTION_FOREGROUND = ansi_style_updater({'fg': None, 'bold': False, 'italic': Fa
                                         COLOUR_SECTION[2:-1],
                                         )['fg']
 GUIDE_FONT_POINTS = 12
+FLAG_GUIDE_LINES = 40  # the guide's last lines kept in a flag's note
 
 MONO_FONTS =('Menlo', 'Consolas', 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New')
 # the plain font of what is typed in the tables, easier to read than the typewriter one
@@ -262,6 +268,8 @@ class ViewerGui:
     _nav_state_setter
     _navigator
     _opened_teller
+    _page_form_shower
+    _page_layout_setter
     _pane_writer
     _panel_arrow_checker
     _panel_arrow_clicker
@@ -290,6 +298,9 @@ class ViewerGui:
     formula_sender
     input_reader
     output_capturer
+    page_hider
+    page_kept_reader
+    page_shower
     pictures_publisher
     run
     saved_plot_publisher
@@ -1312,7 +1323,8 @@ class ViewerGui:
             'step' (a step of the guide starts), 'formula' (a formula for the
             terminal), 'spec', 'session', 'pictures', 'extra',
             'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
-            'strip_library', 'strip_state', 'busy',
+            'strip_library', 'strip_state', 'busy', 'page' (the page of a dataset
+            figure shown, or taken away with None),
             'table_show', 'table_hide', 'closed' or 'finished'. The "Plotting data …"
             sign of 'busy' stays until the next question, preview or picture shown.
             With close_after_s, 'finished' also closes the window after that time.
@@ -1342,11 +1354,14 @@ class ViewerGui:
         _keys_shower
         _nav_state_setter
         _navigator
+        _page_layout_setter
         _pane_writer
         _picture_shower
         _table_layout_setter
         AnswerArea.request_shower
         GuideState.step_starter
+        PageBuilder.closer
+        PageBuilder.opener
         """
 
         kind = event[0]
@@ -1457,6 +1472,15 @@ class ViewerGui:
         elif kind == 'busy':
             self._is_busy = True
             self._picture_shower()
+        elif kind == 'page':
+            # the page of a dataset figure takes the place of the boxes and the plot
+            # while it is built
+            if event[1] is not None:
+                self._page_layout_setter(True)
+                self._page.opener(event[1], event[2])
+            else:
+                self._page.closer()
+                self._page_layout_setter(False)
         elif kind == 'table_show':
             self._table_opener(event[1])
         elif kind == 'table_hide':
@@ -1685,6 +1709,54 @@ class ViewerGui:
         files = self._names[:self._file_count]
         if name in files and files.index(name) != self._index:
             self._navigator(files.index(name))
+
+    # ---- _flag_taker -----------------------------------------------------------------
+    def _flag_taker(self) -> None:
+        """
+        ---- Summary ----
+        Method to answer the developer's Flag button: a picture of the window, then a
+        box for the comment, with what is on screen (the version, the file shown, the
+        step the program waits at and the guide's last lines).
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        FLAG_GUIDE_LINES (module constant); GUIDE_STEPS, LAUNCH_LOG_NAME (imported
+        constants).
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Saves the flag's picture and opens its box (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        flag_starter
+        program_version_reader
+        """
+
+        places = user_places_finder()
+        step = ''
+        if self._guide.current is not None:
+            _, stage, name, _ = GUIDE_STEPS[self._guide.current]
+            step = f'{stage}: {name}'
+        lines = self._text.get('1.0', 'end').rstrip().splitlines()
+        details = {'version': program_version_reader(places.program_folder),
+                   'file': self._names[self._index] if self._names else '',
+                   'step': step,
+                   'guide_text': '\n'.join(lines[-FLAG_GUIDE_LINES:]),
+                   }
+        flag_starter(self._tk,
+                     self._root,
+                     places.program_folder,
+                     details,
+                     places.logs_folder / LAUNCH_LOG_NAME,
+                     )
 
     # ---- _formula_writer -------------------------------------------------------------
     def _formula_writer(self, formula: str) -> None:
@@ -2337,6 +2409,96 @@ class ViewerGui:
             Path(opened).write_text('', encoding='utf-8')
         except OSError:  # the launcher's small window then closes after its longest wait
             pass
+
+    # ---- _page_form_shower -----------------------------------------------------------
+    def _page_form_shower(self, is_shown: bool) -> None:
+        """
+        ---- Summary ----
+        Method to show the form of the page of a dataset figure in the open step, in
+        place of its text, or the text again.
+
+        ---- Inputs ----
+        is_shown : bool
+            True for the form, False for the text.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if is_shown:
+            self._text.pack_forget()
+            self._text_scroll.pack_forget()
+            self._page.form.pack(side='top', fill='both', expand=True)
+        else:
+            self._page.form.pack_forget()
+            self._text_scroll.pack(side='right', fill='y')
+            self._text.pack(side='left', fill='both', expand=True)
+
+    # ---- _page_layout_setter ---------------------------------------------------------
+    def _page_layout_setter(self, is_on: bool) -> None:
+        """
+        ---- Summary ----
+        Method to put the strip, the note line and the plot area of the page of a
+        dataset figure in place of the file controls, the boxes and the plot, or to
+        put those back.
+
+        ---- Inputs ----
+        is_on : bool
+            True while the page is built.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        page = self._page
+        if is_on:
+            for widget in (self._controls,
+                           self._strip.frame,
+                           self._strip.switch_frame,
+                           self._canvas,
+                           ):
+                widget.pack_forget()
+            page.strip.pack(side='top', anchor='w', padx=8, pady=(8, 0))
+            page.note.pack(side='top', fill='x', padx=8, pady=(4, 0))
+            page.canvas.pack(side='top', fill='both', expand=True, padx=8, pady=8)
+            return
+        for widget in (page.strip, page.note, page.canvas):
+            widget.pack_forget()
+        self._controls.pack(side='top', pady=(8, 0), before=self._help)
+        self._strip.frame.pack(side='top', pady=(6, 0), before=self._help)
+        self._strip.switch_frame.pack(side='top',
+                                      fill='x',
+                                      padx=6,
+                                      pady=(2, 0),
+                                      before=self._help,
+                                      )
+        self._canvas.pack(side='top', fill='both', expand=True, padx=8, pady=8)
 
     # ---- _pane_writer ----------------------------------------------------------------
     def _pane_writer(self, text: str, kind: str = 'out') -> None:
@@ -3394,7 +3556,8 @@ class ViewerGui:
         Method to build the guide on the left: the lines of the steps and the card of
         the open step, with its messages, the table (hidden until a table is asked
         for), the answers, the symbols (shown where text is typed), the hint and the
-        Help button (greyed out until the Help box is made); and on the right the file
+        Help button (greyed out until the Help box is made), with Flag beside it on the
+        developer's copy only; and on the right the file
         controls, under them the plot with the overlay of its edges, then the settings
         strip and the edges row (hidden until edges are dragged).
 
@@ -3422,6 +3585,7 @@ class ViewerGui:
         _edges_refresher
         _every_file_taker
         _file_follower
+        _flag_taker
         _guide_line_clicker
         _history_stepper
         _message_shower
@@ -3437,9 +3601,11 @@ class ViewerGui:
         _typed_edge_taker
         AnswerArea
         AnswerTable
+        dev_copy_checker
         EdgeOverlay
         EdgeRow
         GuidePanel
+        PageBuilder
         SettingsStrip
         """
 
@@ -3553,6 +3719,12 @@ class ViewerGui:
         # greyed out until the Help box is made
         self._help_button = ttk.Button(row, text='Help', width=6, state='disabled')
         self._help_button.pack(side='right', padx=(0, 10))
+        if dev_copy_checker(user_places_finder().program_folder):
+            ttk.Button(row,
+                       text=FLAG_BUTTON_TEXT,
+                       width=6,
+                       command=self._flag_taker,
+                       ).pack(side='right', padx=(0, 6))
         row.pack(fill='x', pady=(2, 8))
         bottom.pack(side='bottom', fill='x')
         self._bottom = bottom
@@ -3569,6 +3741,7 @@ class ViewerGui:
                                   self._file_follower,
                                   next((f for f in SANS_FONTS if f in families), None),
                                   )
+        self._text_scroll = scroll
         scroll.pack(side='right', fill='y')
         self._text.pack(side='left', fill='both', expand=True)
         self._text_box.pack(side='top', fill='both', expand=True)
@@ -3654,6 +3827,17 @@ class ViewerGui:
                                   self._edges_refresher,
                                   on_untick=self._every_file_unticker,
                                   )
+        # the page of a dataset figure, in place of the file controls, the boxes and
+        # the plot while it is built, with the form of a plot in place of the text
+        self._controls = controls
+        self._page = PageBuilder(tk,
+                                 ttk,
+                                 right,
+                                 self._text_box,
+                                 (self._family, self._size),
+                                 PLOT_BACKGROUND,
+                                 self._page_form_shower,
+                                 )
         self._previous_button = ttk.Button(controls,
                                            text='< Prev',
                                            width=7,
@@ -4021,6 +4205,79 @@ class ViewerGui:
 
         with output_capturer() as buffer:
             yield buffer
+
+    # ---- page_hider ------------------------------------------------------------------
+    def page_hider(self) -> FigurePage:
+        """
+        ---- Summary ----
+        Method to end the building of the page of a dataset figure and give the page
+        as placed (PageBuilder.page_reader); the file controls, the boxes and the plot
+        come back. It is called from the question thread once the step is answered.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        FigurePage
+            The page.
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        PageBuilder.page_reader
+        """
+
+        page = self._page.page_reader()
+        self._events.put(('page', None, None))
+        return page
+
+    # ---- page_kept_reader ------------------------------------------------------------
+    def page_kept_reader(self) -> FigurePage:
+        """
+        Method to give the page of a dataset figure as it was last saved as a
+        template, loaded from one, or started. See PageBuilder.kept_reader.
+        """
+
+        return self._page.kept_reader()
+
+    # ---- page_shower -----------------------------------------------------------------
+    def page_shower(self, page: FigurePage, folder: Path) -> None:
+        """
+        ---- Summary ----
+        Method to start building the page of a dataset figure in the window. It is
+        called from the question thread.
+
+        ---- Inputs ----
+        page : FigurePage
+            The page to start from.
+        folder : Path
+            The layouts folder, where templates are saved and read.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the page for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('page', page, folder))
 
     # ---- pictures_publisher ----------------------------------------------------------
     def pictures_publisher(self, pictures: List[Tuple[str, bytes]]) -> None:

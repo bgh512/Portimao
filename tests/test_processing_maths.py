@@ -696,7 +696,7 @@ def test_a_file_with_both_regions_gets_percent_oxidised(monkeypatch: pytest.Monk
                         lambda data: (500.0, 630.0),
                         )
 
-    def processor(regions: Optional[dict]) -> dict:
+    def processor(regions: Optional[dict], plot_haems: bool = True) -> dict:
         experiment = {'experiment_name': 'made_up',
                       'CcO2': pd.DataFrame({TIME_COLUMN: times, 'Measured O2': 0.0}),
                       'VoO2': pd.DataFrame({TIME_COLUMN: times, 'VoO2': 1.0}),
@@ -713,7 +713,7 @@ def test_a_file_with_both_regions_gets_percent_oxidised(monkeypatch: pytest.Monk
                 }
         answers = dict(settings.DEFAULT_ANSWERS,
                        decompose=True,
-                       plot_haems=True,
+                       plot_haems=plot_haems,
                        haem_mode='percent',
                        haem_per_od=False,
                        )
@@ -742,6 +742,7 @@ def test_a_file_with_both_regions_gets_percent_oxidised(monkeypatch: pytest.Monk
     expected = np.where(times < 10, 100.0, np.where(times < 20, 75.0, 0.0))
     assert np.allclose(percent, expected)
     assert processed['haem_source'] == 'percent'
+    assert processed['plotted_haem_source'] == 'percent'
 
     # ---- 3 No regions, or only one: shown as delta D ---------------------------------
     for missing in (None, dict(regions, reduced_start=30.0)):
@@ -749,6 +750,10 @@ def test_a_file_with_both_regions_gets_percent_oxidised(monkeypatch: pytest.Monk
         assert 'haem_levels' not in processed['experiment']
         assert 'haem_percent' not in processed['experiment']
         assert processed['haem_source'] == 'delta_abs'
+        assert processed['plotted_haem_source'] == 'delta_abs'
+
+    # ---- 4 The haems switched off the plot: none is drawn ----------------------------
+    assert processor(regions, plot_haems=False)['plotted_haem_source'] is None
 
 
 # ---- test_average_that_does_not_fit --------------------------------------------------

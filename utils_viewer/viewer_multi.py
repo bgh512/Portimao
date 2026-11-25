@@ -93,10 +93,9 @@ def _kept_builder(names: List[str],
             processed = experiment_data_processor(info, cfg, fit)
             context['_processed'][key] = processed
         experiment = processed['experiment']
-        haem_panels = answers['plot_haems'] and 'haem_conc' in experiment
         kept[name] = {'experiment': experiment,
                       'vo2_source': processed['vo2_source'],
-                      'haem_source': processed['haem_source'] if haem_panels else None,
+                      'haem_source': processed['plotted_haem_source'],
                       'prepared': experiment_preparer(experiment,
                                                       info['custom'],
                                                       answers,

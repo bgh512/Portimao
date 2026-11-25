@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.29
+- **Version:** V2.30
 - **Date:** 25/11/2026
 
 ## Contents
@@ -43,6 +43,7 @@
 - [`main.py`](#mainpy)
     - [`cancel_sentence_builder`](#cancel_sentence_builder)
     - [`comparison_maker`](#comparison_maker)
+    - [`dataset_figure_saver`](#dataset_figure_saver)
     - [`everything_asker`](#everything_asker)
     - [`experiment_file_saver`](#experiment_file_saver)
     - [`experiment_files_saver`](#experiment_files_saver)
@@ -204,6 +205,20 @@
     - [`test_text_fitted_to_the_journal`](#test_text_fitted_to_the_journal)
     - [`test_journal_with_no_largest_text`](#test_journal_with_no_largest_text)
     - [`test_lines_kept_to_what_the_journal_takes`](#test_lines_kept_to_what_the_journal_takes)
+- [`tests/test_figure_page.py`](#teststest_figure_pagepy)
+    - [`_page_maker`](#_page_maker)
+    - [`test_a_new_page_is_two_columns_and_0_8_tall`](#test_a_new_page_is_two_columns_and_0_8_tall)
+    - [`test_a_plot_is_refused_over_another_or_past_the_edge`](#test_a_plot_is_refused_over_another_or_past_the_edge)
+    - [`test_a_plot_taken_off_and_placed_again`](#test_a_plot_taken_off_and_placed_again)
+    - [`test_letters_in_reading_order`](#test_letters_in_reading_order)
+    - [`test_the_page_drawn_off_screen`](#test_the_page_drawn_off_screen)
+    - [`test_a_template_saved_and_read_back`](#test_a_template_saved_and_read_back)
+    - [`test_a_template_with_a_file_name_is_not_saved`](#test_a_template_with_a_file_name_is_not_saved)
+    - [`test_a_broken_template_is_refused`](#test_a_broken_template_is_refused)
+    - [`test_an_empty_page_saves_no_figure`](#test_an_empty_page_saves_no_figure)
+    - [`test_the_figure_pdf_has_its_printed_size`](#test_the_figure_pdf_has_its_printed_size)
+    - [`test_the_figure_pdf_keeps_its_text`](#test_the_figure_pdf_keeps_its_text)
+    - [`test_the_run_saves_the_figure_and_its_master_page`](#test_the_run_saves_the_figure_and_its_master_page)
 - [`tests/test_file_names.py`](#teststest_file_namespy)
     - [`test_dots_and_spaces_at_the_ends_go`](#test_dots_and_spaces_at_the_ends_go)
     - [`test_forbidden_characters_become_underscores`](#test_forbidden_characters_become_underscores)
@@ -412,6 +427,18 @@
     - [`test_ocr_settings_fit_the_rate_traces`](#test_ocr_settings_fit_the_rate_traces)
     - [`test_example_ocr_agrees`](#test_example_ocr_agrees)
     - [`test_our_ocr_stays_fixed`](#test_our_ocr_stays_fixed)
+- [`tests/test_page_builder.py`](#teststest_page_builderpy)
+    - [`test_a_point_on_the_page_gives_its_cell`](#test_a_point_on_the_page_gives_its_cell)
+    - [`test_a_drag_becomes_a_plot`](#test_a_drag_becomes_a_plot)
+    - [`test_where_a_plot_and_its_buttons_are`](#test_where_a_plot_and_its_buttons_are)
+    - [`test_the_cells_in_words`](#test_the_cells_in_words)
+    - [`test_the_page_fits_the_plot_area`](#test_the_page_fits_the_plot_area)
+    - [`test_a_page_is_fitted_to_the_journals`](#test_a_page_is_fitted_to_the_journals)
+    - [`test_the_templates_are_listed`](#test_the_templates_are_listed)
+    - [`test_a_plot_being_changed_is_kept`](#test_a_plot_being_changed_is_kept)
+    - [`test_the_step_that_builds_the_page`](#test_the_step_that_builds_the_page)
+    - [`test_when_the_template_offer_is_made`](#test_when_the_template_offer_is_made)
+    - [`test_the_template_offer_saves_the_page`](#test_the_template_offer_saves_the_page)
 - [`tests/test_panel_order.py`](#teststest_panel_orderpy)
     - [`_figure_drawer`](#_figure_drawer)
     - [`test_a_click_on_an_arrow_changes_the_order_kept_and_redraws`](#test_a_click_on_an_arrow_changes_the_order_kept_and_redraws)
@@ -865,6 +892,24 @@
     - [`panel_letter_adder`](#panel_letter_adder)
     - [`stack_legend_drawer`](#stack_legend_drawer)
     - [`text_extent_calculator`](#text_extent_calculator)
+- [`utils_shared/figure_page.py`](#utils_sharedfigure_pagepy)
+    - [`FigurePageError`](#figurepageerror)
+    - [`PagePlot`](#pageplot)
+    - [`FigurePage`](#figurepage)
+    - [`_cells_lister`](#_cells_lister)
+    - [`_placement_problem_finder`](#_placement_problem_finder)
+    - [`_roles_checker`](#_roles_checker)
+    - [`_template_plot_reader`](#_template_plot_reader)
+    - [`figure_file_namer`](#figure_file_namer)
+    - [`figure_page_drawer`](#figure_page_drawer)
+    - [`figure_page_exporter`](#figure_page_exporter)
+    - [`panel_letters_finder`](#panel_letters_finder)
+    - [`plot_lifter`](#plot_lifter)
+    - [`plot_placer`](#plot_placer)
+    - [`plot_remover`](#plot_remover)
+    - [`template_path_finder`](#template_path_finder)
+    - [`template_reader`](#template_reader)
+    - [`template_saver`](#template_saver)
 - [`utils_shared/helpers.py`](#utils_sharedhelperspy)
     - [`concentration_formatter`](#concentration_formatter)
     - [`excel_sheet_namer`](#excel_sheet_namer)
@@ -1201,6 +1246,19 @@
     - [`_kept_builder`](#_kept_builder)
     - [`_pictures_builder`](#_pictures_builder)
     - [`multi_figure_checker_builder`](#multi_figure_checker_builder)
+- [`utils_viewer/viewer_page.py`](#utils_viewerviewer_pagepy)
+    - [`PageBuilder`](#pagebuilder)
+    - [`cells_describer`](#cells_describer)
+    - [`drag_plot_maker`](#drag_plot_maker)
+    - [`page_box_finder`](#page_box_finder)
+    - [`page_cell_finder`](#page_cell_finder)
+    - [`page_journal_fitter`](#page_journal_fitter)
+    - [`page_offer_checker`](#page_offer_checker)
+    - [`page_picture_maker`](#page_picture_maker)
+    - [`plot_box_finder`](#plot_box_finder)
+    - [`plot_button_finder`](#plot_button_finder)
+    - [`plot_buttons_placer`](#plot_buttons_placer)
+    - [`template_names_lister`](#template_names_lister)
 - [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
     - [`PreviewSpec`](#previewspec)
     - [`TimeAxis`](#timeaxis)
@@ -1266,12 +1324,14 @@
     - [`_strip_change_applier`](#_strip_change_applier)
     - [`_strip_shower`](#_strip_shower)
     - [`_table_filler`](#_table_filler)
+    - [`_template_offer_asker`](#_template_offer_asker)
     - [`_unfit_windows_lister`](#_unfit_windows_lister)
     - [`_windows_chooser`](#_windows_chooser)
     - [`_windows_choice_builder`](#_windows_choice_builder)
     - [`_windows_keeper`](#_windows_keeper)
     - [`browser_stage_runner`](#browser_stage_runner)
     - [`details_stage_runner`](#details_stage_runner)
+    - [`page_stage_runner`](#page_stage_runner)
     - [`pca_stage_runner`](#pca_stage_runner)
     - [`plots_stage_runner`](#plots_stage_runner)
     - [`processing_stage_runner`](#processing_stage_runner)
@@ -2541,6 +2601,41 @@ problem_shower
 warning_shower
 ```
 
+#### `dataset_figure_saver`
+
+```text
+---- Summary ----
+Main function to save the dataset figure built on the page: the figure as a PDF of
+its printed size, with text that can still be changed, then its master page, the
+figure on a page of its journal. A page with no plot saves nothing. A file that
+cannot be saved is said in one sentence and the run goes on.
+
+---- Inputs ----
+page : FigurePage
+    The page as built in the Build a figure step.
+export_root : Path
+    Results folder.
+
+---- Globals read ----
+settings.JOURNAL_SPECS; FIGURE_NAME (imported).
+
+---- Outputs ----
+List[Path]
+    The files saved: none, the figure, or the figure and its master page.
+
+---- Globals mutated ----
+None. Writes the two PDFs and prints the outcome; the details of a problem go to
+the log (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+figure_page_exporter
+master_page_exporter
+problem_shower
+```
+
 #### `everything_asker`
 
 ```text
@@ -2575,10 +2670,11 @@ saved_workbooks : Optional[List[str]]
 PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
 
 ---- Outputs ----
-Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
+Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]],
+      FigurePage]
     (answers, per-experiment info dictionaries, fit, side-by-side comparison
-    settings or None, names of the 2x2 grid experiments or None). Raises
-    UserQuitError if the user declines to start.
+    settings or None, names of the 2x2 grid experiments or None, the page of the
+    dataset figure as built). Raises UserQuitError if the user declines to start.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal; writes last_answers.json through
@@ -2599,14 +2695,9 @@ file_settings_merger
 haem_name_formatter
 journal_answers_fitter
 last_answers_saver
-multi_experiment_asker
-multi_figure_checker_builder
-region_files_lister
+page_stage_runner
 section_starter
-special_figures_maker
-summary_figure_asker
 viewer_asker
-windows_stage_runner
 yes_no_asker
 ```
 
@@ -2927,6 +3018,7 @@ None.
 ---- Helpers ----
 cancel_sentence_builder
 comparison_maker
+dataset_figure_saver
 everything_asker
 experiment_processor
 files_asker
@@ -6187,17 +6279,12 @@ _summaries_builder
 ---- Summary ----
 Helper function to stand in for every question of everything_asker, the window and
 the saving of the plots and workbooks, so only its own steps run: the questions
-about each file give the three made-up files and one fit, and the saver names
-every file as saved.
+about each file give the three made-up files and one fit, the page of the dataset
+figure is built with nothing on it, and the saver names every file as saved.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
     Pytest's tool for the stand-ins.
-later_fit : Optional[dict]
-    Fit the summary figure questions change to; None keeps the fit of the plots.
-adds_windows : bool
-    True when a multi-experiment figure asks for the averaging windows, which are
-    then set up.
 starts : bool
     The answer to "Do you want to start?".
 
@@ -6478,10 +6565,8 @@ None.
 ---- Summary ----
 Main function to check when the questions save the plots and when the run draws
 them again: saved once after the questions about each file, and not drawn again in
-the run; saved a second time when a later figure adds the averaging windows, and
-still not drawn again; drawn again in the run when a later figure changes the fit;
-and named as saved when the run is cancelled at its last question. Every question,
-the window and the saving are stood in for.
+the run; and named as saved when the run is cancelled at its last question. Every
+question, the window and the saving are stood in for.
 
 ---- Inputs ----
 tmp_path : Path
@@ -7273,6 +7358,401 @@ figure, between 0.5 and 1.5 pt: 0.2 pt becomes 0.5 pt, 3 pt becomes 1.5 pt and
 None.
 ```
 
+## `tests/test_figure_page.py`
+
+Tests of the page of a dataset figure: plots placed on the grid, refused over another
+
+### PAGE MAKERS
+
+#### `_page_maker`
+
+```text
+---- Summary ----
+Helper function to make a page of four plots: a standard experiment over the top
+left two rows and three columns, a bar chart top right, the legend below it and a
+drawing along the bottom row, placed out of reading order.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+FigurePage
+    The page; its plots in the order placed: drawing, bar chart, standard
+    experiment, legend.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_a_new_page_is_two_columns_and_0_8_tall`
+
+```text
+---- Summary ----
+Main function to check the size of a new page, drawn for Nature and for Science.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Nature: 183 mm wide for two columns, 170 mm tallest; 183 / 25.4 = 7.205 in and
+170 x 0.8 / 25.4 = 5.354 in. Science: 121 mm for two columns, 199 mm tallest;
+121 / 25.4 = 4.764 in and 199 x 0.8 / 25.4 = 6.268 in.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_plot_is_refused_over_another_or_past_the_edge`
+
+```text
+---- Summary ----
+Main function to check that a plot is refused over a plot already there (named by
+its letter, or the legend by its name), past the edge of the grid, of no cells, or
+of an unknown type, and that the page is left as it was.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_maker
+```
+
+#### `test_a_plot_taken_off_and_placed_again`
+
+```text
+---- Summary ----
+Main function to check ✎ and ✕: a plot taken off frees its cells, keeps its type
+and roles, and can be placed over its old cells made larger; Cancel puts it back as
+it was; a removed plot is gone.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_maker
+```
+
+#### `test_letters_in_reading_order`
+
+```text
+---- Summary ----
+Main function to check the letters: by each plot's top left cell, left to right
+then down, whatever the order the plots were placed in, none on the legend; and
+the letters follow when a plot is removed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Plots placed: drawing (row 5), bar chart (row 0, column 3), standard experiment
+(row 0, column 0), legend (row 2). Reading order: standard experiment a, bar chart
+b, drawing c. Without the standard experiment: bar chart a, drawing b.
+
+---- Helpers ----
+_page_maker
+```
+
+#### `test_the_page_drawn_off_screen`
+
+```text
+---- Summary ----
+Main function to check the page as drawn: a grey stand-in named by its plot type
+over the cells of each plot, and the letters bold at the journal's size, at the
+top left of their plots, lower case for Nature and upper case for a journal that
+asks for it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The standard experiment takes columns 0 to 2 and rows 0 and 1: its axes lie inside
+x 0 to 0.5 and y 1 - 2 / 6 = 0.667 to 1. The bar chart lies inside x 0.5 to 1.
+
+---- Helpers ----
+_page_maker
+```
+
+#### `test_a_template_saved_and_read_back`
+
+```text
+---- Summary ----
+Main function to check a template: saved under a cleaned name with the page size,
+each plot's type, cells and roles and no file names; read back into the same page,
+also from the layouts folder of another dataset; not written over unless asked.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_maker
+```
+
+#### `test_a_template_with_a_file_name_is_not_saved`
+
+```text
+---- Summary ----
+Main function to check that a plot whose roles name a file of the dataset stops
+the template being saved, and that no file is written.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_broken_template_is_refused`
+
+```text
+---- Summary ----
+Main function to check that a file that is not a template, one of another version,
+one with a page size that cannot be read, and one whose plots overlap, run past the
+grid or name a file are each refused with one sentence naming the file.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_an_empty_page_saves_no_figure`
+
+```text
+---- Summary ----
+Main function to check a page with no plot: the saving of the PDF refuses it in
+one sentence, and the run saves nothing and says nothing.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+capsys : pytest.CaptureFixture
+    What is shown on screen.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_figure_pdf_has_its_printed_size`
+
+```text
+---- Summary ----
+Main function to check the PDF of a page for Nature and for Science: its name, its
+folder (made when missing) and that its one page is exactly the printed size of
+the figure, worked out by hand.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A PDF measures its page in points of 1/72 in. Nature, two columns and 0.8 of the
+tallest: 183 mm by 170 x 0.8 = 136 mm, so 183 / 25.4 x 72 = 518.7 by
+136 / 25.4 x 72 = 385.5 points. Science, two columns and 0.8: 121 mm by
+199 x 0.8 = 159.2 mm, so 121 / 25.4 x 72 = 343.0 by 159.2 / 25.4 x 72 = 451.3
+points.
+
+---- Helpers ----
+_page_maker
+```
+
+#### `test_the_figure_pdf_keeps_its_text`
+
+```text
+---- Summary ----
+Main function to check that the PDF of a page holds its fonts as TrueType (PDF
+font type 42), whatever the font type set elsewhere, so the text stays text and
+can be changed in a drawing program; and that nothing in it is a picture.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_maker
+```
+
+#### `test_the_run_saves_the_figure_and_its_master_page`
+
+```text
+---- Summary ----
+Main function to check what the run does with a page that holds plots: the figure
+and its master page are saved in the results folder, the master page on the
+journal's page (A4 for Nature, which gives none), and each is named on screen; a
+master page that is open in another program gives one plain sentence, with the
+words of Python in the log only, and the figure is still saved; a figure that
+cannot be saved gives its sentence and no master page is tried.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the saving that fails.
+capsys : pytest.CaptureFixture
+    What is shown on screen.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A4 is 210 / 25.4 x 72 = 595.3 by 297 / 25.4 x 72 = 841.9 points.
+
+---- Helpers ----
+_page_maker
+```
+
 ## `tests/test_file_names.py`
 
 Tests of the one rule that cleans every file name the program writes.
@@ -7481,8 +7961,7 @@ None.
 ```text
 ---- Summary ----
 Main function to check that every step the code starts is a step of the guide,
-written out as its key, and that every step of the guide is started somewhere
-(the two summary figures by their keys in custom_questions.py).
+written out as its key, and that every step of the guide is started somewhere.
 
 ---- Inputs ----
 None.
@@ -12887,6 +13366,316 @@ traces : dict
 ---- Globals read ----
 PAF_FILE, FIXED_ROWS, FIXED_FALL, FIXED_LEAK, FIXED_OCR, FIXED_DECIMALS (module
 constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_page_builder.py`
+
+Tests of the page of a dataset figure in the window, without the window: the cell under a point, a drag as a plot, where a plot and its buttons are, the page fitted to the plot area and to the journals, the templates listed and the step that builds the page.
+
+### MAIN FUNCTIONS
+
+#### `test_a_point_on_the_page_gives_its_cell`
+
+```text
+---- Summary ----
+Main function to check the cell under a point, worked out by hand: inside the
+page, off the page (none), and off the page at the end of a drag (the nearest).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BOX (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+column = floor((x - 100) / 100); row = floor((y - 50) / 50).
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_drag_becomes_a_plot`
+
+```text
+---- Summary ----
+Main function to check that a drag gives the rectangle between its two cells
+whichever way it went, one cell for a click, and keeps the roles given.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_where_a_plot_and_its_buttons_are`
+
+```text
+---- Summary ----
+Main function to check where the cells of a plot are in the plot area, where its
+✎ and ✕ sit (18 px squares, 4 px from the top right corner and from each other)
+and which button a click finds, worked out by hand.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BOX (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_cells_in_words`
+
+```text
+---- Summary ----
+Main function to check the words of the form for the cells of a plot, counted
+from 1.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_page_fits_the_plot_area`
+
+```text
+---- Summary ----
+Main function to check the dots per inch that fit a page in the plot area, worked
+out by hand, and the picture drawn with them.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A page of 8 x 6 in in an area of 1000 x 600 px: 0.96 x min(125, 100) = 96 dpi.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_page_is_fitted_to_the_journals`
+
+```text
+---- Summary ----
+Main function to check a page read from a template against made-up journals: one
+that fits is left alone, a journal that is gone becomes the standard journal, and
+a width the journal lacks becomes two columns, or its first width, each said in a
+sentence.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_templates_are_listed`
+
+```text
+---- Summary ----
+Main function to check the templates offered from the layouts folder: its .json
+files by name, A to Z whatever their case, and none for a folder that is missing.
+
+---- Inputs ----
+tmp_path : Path
+    The layouts folder for the test.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_plot_being_changed_is_kept`
+
+```text
+---- Summary ----
+Main function to check the page read while a plot is off the page for ✎ (Continue
+with its form still open, or Cancel): the plot is where it was, with its letter,
+and a new plot whose form is still open is left out. The window is not made.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_step_that_builds_the_page`
+
+```text
+---- Summary ----
+Main function to check the Build a figure step: it starts its step of the guide,
+shows an empty page with the layouts folder, asks 6.1 and gives the page the
+window holds once Continue is clicked; without a window it gives an empty page
+and asks nothing. The window and the question are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    The layouts folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for the stand-ins.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_when_the_template_offer_is_made`
+
+```text
+---- Summary ----
+Main function to check when a built page is offered to be saved as a template:
+only with a plot on it, and only when it is not the page last saved as a template,
+loaded from one, or started from; and that the page in the window keeps track of
+that page. The window is not made.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_template_offer_saves_the_page`
+
+```text
+---- Summary ----
+Main function to check the offer made once the page is built: nothing is asked
+for a page that has not changed; No to 6.2 saves nothing; Yes asks the name (6.3)
+and writes the template, which reads back as the page; a name already there is
+asked about (6.4), where No asks the name again and Yes writes over it. The
+questions are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    The layouts folder for the test.
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for the stand-ins.
+
+---- Globals read ----
+None.
 
 ---- Outputs ----
 None.
@@ -27066,6 +27855,467 @@ unrotated text width and height and a is the rotation angle.
 None.
 ```
 
+## `utils_shared/figure_page.py`
+
+The page of a dataset figure: plots placed on a grid over a journal page, their letters,
+
+### CLASSES
+
+#### `FigurePageError`
+
+```text
+---- Summary ----
+A plot that cannot go where it was put, or a template that cannot be saved or used;
+the message is one plain sentence for the user.
+
+---- Attributes ----
+None.
+
+---- Globals read ----
+None.
+
+---- Methods ----
+None.
+```
+
+#### `PagePlot`
+
+```text
+---- Summary ----
+One plot of a dataset figure: its plot type, the rectangle of grid cells it takes
+and the roles it was given.
+Detailed structure can be found in DATA_FORMAT.md.
+```
+
+#### `FigurePage`
+
+```text
+---- Summary ----
+The page of a dataset figure: the journal and size it is drawn at, and its plots in
+the order they were placed.
+Detailed structure can be found in DATA_FORMAT.md.
+```
+
+### PAGE HELPERS
+
+#### `_cells_lister`
+
+```text
+---- Summary ----
+Helper function to list the grid cells a plot takes.
+
+---- Inputs ----
+plot : PagePlot
+    The plot.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Set[Tuple[int, int]]
+    {(row, column), ...}, counted from 0 at the top left.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_placement_problem_finder`
+
+```text
+---- Summary ----
+Helper function to find why a plot cannot go on a page: an unknown plot type, a
+rectangle that is not inside the grid, or one over a plot already there.
+
+---- Inputs ----
+page : FigurePage
+    The page as it is.
+plot : PagePlot
+    The plot to place.
+
+---- Globals read ----
+GRID_COLUMNS, GRID_ROWS, PLOT_TYPES.
+
+---- Outputs ----
+Optional[str]
+    One plain sentence, or None when the plot fits.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_cells_lister
+panel_letters_finder
+```
+
+### TEMPLATE HELPERS
+
+#### `_roles_checker`
+
+```text
+---- Summary ----
+Helper function to check the roles of a plot: names and values in words, and no
+value that is a file of the dataset, so a template can be used on another dataset.
+
+---- Inputs ----
+roles : Any
+    The roles, as given or as read from a file.
+
+---- Globals read ----
+FILE_NAME_PATTERN.
+
+---- Outputs ----
+Optional[str]
+    One plain sentence, or None when the roles can be kept.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_template_plot_reader`
+
+```text
+---- Summary ----
+Helper function to read one plot of a template file.
+
+---- Inputs ----
+entry : Any
+    The plot as read from the file: {"type", "cells": {"row", "column", "rows",
+    "columns"}, "roles"}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+PagePlot
+    The plot. Raises FigurePageError with one plain sentence when it cannot be
+    read.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_roles_checker
+```
+
+### MAIN FUNCTIONS
+
+#### `figure_file_namer`
+
+```text
+---- Summary ----
+Main function to name the PDF of the dataset figure for a journal.
+
+---- Inputs ----
+journal : str
+    The journal as the settings name it (a key of config.JOURNAL_SPECS).
+
+---- Globals read ----
+FIGURE_NAME.
+
+---- Outputs ----
+str
+    'dataset_figure_<journal>.pdf', cleaned by the rule every file name goes
+    through.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+file_name_sanitiser
+```
+
+#### `figure_page_drawer`
+
+```text
+---- Summary ----
+Main function to draw a page at its printed size, off screen: each plot a grey
+stand-in with the name of its plot type, over the cells it takes, with its letter
+in bold at its top left.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+spec : dict
+    What the page's journal asks (config.JOURNAL_SPECS entry).
+
+---- Globals read ----
+GRID_COLUMNS, GRID_ROWS, MM_PER_INCH, PLOT_GAP_MM, PLOT_TYPES, STAND_IN_EDGE,
+STAND_IN_GREY.
+
+---- Outputs ----
+Tuple[Figure, Dict[int, Axes]]
+    (the figure, {place of the plot in page.plots: its axes}). Raises ValueError
+    for a width the journal does not have or a height outside (0, 1].
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A plot of cells (row r, column c, n_rows, n_columns) covers the figure fractions
+x from c / 6 to (c + n_columns) / 6 and y from 1 - (r + n_rows) / 6 to 1 - r / 6;
+its axes are that rectangle less PLOT_GAP_MM on each side and the height of its
+letter at the top.
+
+---- Helpers ----
+figure_size_calculator
+font_family_lister
+panel_letters_finder
+```
+
+#### `figure_page_exporter`
+
+```text
+---- Summary ----
+Main function to save a page as a PDF of exactly its printed size: drawn as lines
+and text, not as a picture, with its fonts embedded so the text can still be
+changed in a drawing program.
+
+---- Inputs ----
+page : FigurePage
+    The page; it must hold at least one plot.
+spec : dict
+    What the page's journal asks (config.JOURNAL_SPECS entry).
+folder : Path
+    Folder the PDF is saved in; it is made when missing.
+
+---- Globals read ----
+PDF_FONT_TYPE.
+
+---- Outputs ----
+Tuple[Path, Figure]
+    (the PDF that was saved, the figure as drawn, for its master page). Raises
+    FigurePageError for a page with no plot, and OSError when the PDF cannot be
+    written (a PermissionError when it is open in another program).
+
+---- Globals mutated ----
+None. Writes the PDF (side effect).
+
+---- Equations ----
+The PDF's page is the figure: width of the journal for the page's columns, height
+the page's share of the journal's tallest figure (figure_size_calculator), in
+points of 1/72 in.
+
+---- Helpers ----
+figure_file_namer
+figure_page_drawer
+```
+
+#### `panel_letters_finder`
+
+```text
+---- Summary ----
+Main function to give each plot of a page its letter, a, b, c... in reading order:
+by the top left cell of each plot, left to right along a row of the grid, then the
+next row down. The legend has none.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+
+---- Globals read ----
+LETTERS, UNLETTERED_TYPES.
+
+---- Outputs ----
+Dict[int, str]
+    {place of the plot in page.plots: its letter, in lower case}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `plot_lifter`
+
+```text
+---- Summary ----
+Main function to take a plot off a page, so its cells are free again: to be placed
+again elsewhere (✎, with plot_placer and the new cells) or put back (Cancel).
+
+---- Inputs ----
+page : FigurePage
+    The page.
+index : int
+    Place of the plot in page.plots.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[FigurePage, PagePlot]
+    (the page without the plot, the plot with its type and roles kept). Raises
+    IndexError for a plot that is not on the page.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `plot_placer`
+
+```text
+---- Summary ----
+Main function to put a plot on a page, as a rectangle of grid cells that none of
+the other plots take.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+plot : PagePlot
+    The plot, with its cells.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+FigurePage
+    The page with the plot added last. Raises FigurePageError with one plain
+    sentence for an unknown plot type, a rectangle past the grid or one over
+    another plot.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_placement_problem_finder
+```
+
+#### `plot_remover`
+
+```text
+Main function to take a plot off a page for good (✕). See plot_lifter.
+```
+
+#### `template_path_finder`
+
+```text
+---- Summary ----
+Main function to give the file a template of a given name is saved in, so the
+window can ask before one of the same name is written over.
+
+---- Inputs ----
+folder : Path
+    The layouts folder (UserPlaces.layouts_folder).
+name : str
+    The template's name as the user typed it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    <folder>/<name, made safe for a file name>.json.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+file_name_sanitiser
+```
+
+#### `template_reader`
+
+```text
+---- Summary ----
+Main function to read a template file into a page.
+
+---- Inputs ----
+path : Path
+    The template file.
+
+---- Globals read ----
+TEMPLATE_KIND, TEMPLATE_VERSION.
+
+---- Outputs ----
+FigurePage
+    The page. Raises FigurePageError with one plain sentence when the file cannot
+    be read, is not a template of a version this program knows, or holds a plot
+    that cannot be placed; OSError passes through.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_template_plot_reader
+plot_placer
+```
+
+#### `template_saver`
+
+```text
+---- Summary ----
+Main function to save a page as a template: its size, and each plot's type, cells
+and roles, never a file of the dataset, so it can be used on another dataset.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+folder : Path
+    The layouts folder (UserPlaces.layouts_folder); made when missing.
+name : str
+    The template's name as the user typed it.
+may_replace : bool
+    True to write over a template of the same name.
+
+---- Globals read ----
+TEMPLATE_KIND, TEMPLATE_VERSION.
+
+---- Outputs ----
+Path
+    The file written, <folder>/<name>.json. Raises FigurePageError with one plain
+    sentence for a role that names a file, or a template of that name already
+    there without may_replace; OSError passes through.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_roles_checker
+template_path_finder
+```
+
 ## `utils_shared/helpers.py`
 
 Small, generic utilities shared by several modules.
@@ -37111,8 +38361,8 @@ Where the program keeps the user's own things: the program folder from source, a
 ```text
 ---- Summary ----
 Where the program's own files are, and where the user's own things are kept: the
-fits, the journal files, the folder used last, the logs and the data folders offered
-by number.
+fits, the journal files, the templates of the dataset figures, the folder used
+last, the logs and the data folders offered by number.
 Detailed structure can be found in DATA_FORMAT.md.
 ```
 
@@ -37219,9 +38469,10 @@ _launch_log_shortener
 
 ```text
 ---- Summary ----
-Main function to make the Mac app's own folder, with its fits, journals and logs
-folders, and to copy in each fit and each journal file that comes with the program
-and is not there yet, the haem library and the presets in their own folders. A
+Main function to make the Mac app's own folder, with its fits, journals, layouts
+and logs folders, and to copy in each fit, journal file and template that comes
+with the program and is not there yet, the haem library and the presets in their
+own folders. A
 file already there is never overwritten, so the user's changes are kept. Run from
 source, nothing is done: everything stays in the program folder.
 
@@ -37230,13 +38481,13 @@ places : UserPlaces
     Where the user's things are kept (user_places_finder).
 
 ---- Globals read ----
-FITS_FOLDER_NAME, JOURNALS_FOLDER_NAME (module constants).
+FITS_FOLDER_NAME, JOURNALS_FOLDER_NAME, LAYOUTS_FOLDER_NAME (module constants).
 
 ---- Outputs ----
 None
-    Nothing. Raises OSError when the folders cannot be made; a fit or a journal
-    file that cannot be copied is left out (the journal is then read from the
-    program's own copy).
+    Nothing. Raises OSError when the folders cannot be made; a fit, a journal
+    file or a template that cannot be copied is left out (the journal is then read
+    from the program's own copy).
 
 ---- Globals mutated ----
 None. Makes folders and copies files (side effects).
@@ -37267,8 +38518,8 @@ program_folder : Optional[Path]
     find it (inside the app, or the folder above utils_shared).
 
 ---- Globals read ----
-FITS_FOLDER_NAME, JOURNALS_FOLDER_NAME, LAST_ANSWERS_NAME, LOGS_FOLDER_NAME,
-OWN_FOLDER_NAME (module constants); sys.frozen and sys._MEIPASS (set by the app).
+FITS_FOLDER_NAME, JOURNALS_FOLDER_NAME, LAST_ANSWERS_NAME, LAYOUTS_FOLDER_NAME,
+LOGS_FOLDER_NAME, OWN_FOLDER_NAME (module constants); sys.frozen and sys._MEIPASS (set by the app).
 
 ---- Outputs ----
 UserPlaces
@@ -38643,6 +39894,8 @@ _message_shower
 _nav_state_setter
 _navigator
 _opened_teller
+_page_form_shower
+_page_layout_setter
 _pane_writer
 _panel_arrow_checker
 _panel_arrow_clicker
@@ -38671,6 +39924,9 @@ extra_publisher
 formula_sender
 input_reader
 output_capturer
+page_hider
+page_kept_reader
+page_shower
 pictures_publisher
 run
 saved_plot_publisher
@@ -39337,7 +40593,8 @@ event : tuple
     'step' (a step of the guide starts), 'formula' (a formula for the
     terminal), 'spec', 'session', 'pictures', 'extra',
     'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
-    'strip_library', 'strip_state', 'busy',
+    'strip_library', 'strip_state', 'busy', 'page' (the page of a dataset
+    figure shown, or taken away with None),
     'table_show', 'table_hide', 'closed' or 'finished'. The "Plotting data …"
     sign of 'busy' stays until the next question, preview or picture shown.
     With close_after_s, 'finished' also closes the window after that time.
@@ -39367,11 +40624,14 @@ _image_receiver
 _keys_shower
 _nav_state_setter
 _navigator
+_page_layout_setter
 _pane_writer
 _picture_shower
 _table_layout_setter
 AnswerArea.request_shower
 GuideState.step_starter
+PageBuilder.closer
+PageBuilder.opener
 ```
 
 ##### `_every_file_taker`
@@ -39924,6 +41184,63 @@ None
 
 ---- Globals mutated ----
 None. Writes an empty file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_page_form_shower`
+
+```text
+---- Summary ----
+Method to show the form of the page of a dataset figure in the open step, in
+place of its text, or the text again.
+
+---- Inputs ----
+is_shown : bool
+    True for the form, False for the text.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_page_layout_setter`
+
+```text
+---- Summary ----
+Method to put the strip, the note line and the plot area of the page of a
+dataset figure in place of the file controls, the boxes and the plot, or to
+put those back.
+
+---- Inputs ----
+is_on : bool
+    True while the page is built.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
 
 ---- Equations ----
 None.
@@ -40606,6 +41923,7 @@ dev_copy_checker
 EdgeOverlay
 EdgeRow
 GuidePanel
+PageBuilder
 SettingsStrip
 ```
 
@@ -40897,6 +42215,71 @@ None.
 
 ---- Helpers ----
 output_capturer
+```
+
+##### `page_hider`
+
+```text
+---- Summary ----
+Method to end the building of the page of a dataset figure and give the page
+as placed (PageBuilder.page_reader); the file controls, the boxes and the plot
+come back. It is called from the question thread once the step is answered.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+FigurePage
+    The page.
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+PageBuilder.page_reader
+```
+
+##### `page_kept_reader`
+
+```text
+Method to give the page of a dataset figure as it was last saved as a
+template, loaded from one, or started. See PageBuilder.kept_reader.
+```
+
+##### `page_shower`
+
+```text
+---- Summary ----
+Method to start building the page of a dataset figure in the window. It is
+called from the question thread.
+
+---- Inputs ----
+page : FigurePage
+    The page to start from.
+folder : Path
+    The layouts folder, where templates are saved and read.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the page for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ##### `pictures_publisher`
@@ -42812,6 +44195,1364 @@ _pictures_builder
 accept_asker
 active_gui_getter
 info_printer
+```
+
+## `utils_viewer/viewer_page.py`
+
+The page of a dataset figure in the window: the page in the plot area, its strip, and the form of a plot on the left.
+
+### CLASSES
+
+#### `PageBuilder`
+
+```text
+---- Summary ----
+The page of a dataset figure while it is built: its strip (the page size, the
+plot types and the templates), a line for what was done or refused, the page drawn
+in the plot area with its grid, and the form of a plot that takes the place of the
+guide's text. It runs on the window thread; the window packs its frames.
+
+---- Attributes ----
+page : FigurePage
+    The page as placed so far, without the plot whose form is open.
+strip : Any
+    The frame of the strip, above the page.
+note : Any
+    The line under the strip.
+canvas : Any
+    The plot area the page is drawn in.
+form : Any
+    The frame of the form, packed by the window in place of the guide's text.
+
+---- Globals read ----
+The colour and size constants (module constants); settings.JOURNAL_SPECS.
+
+---- Methods ----
+__init__
+_button_taker
+_canvas_drawer
+_form_clearer
+_form_closer
+_form_opener
+_height_taker
+_journal_taker
+_load_form_shower
+_load_taker
+_loader
+_mover
+_note_setter
+_plot_cancel_taker
+_plot_done_taker
+_plot_form_shower
+_presser
+_redraw_asker
+_releaser
+_replace_form_shower
+_save_form_shower
+_saver
+_size_controls_setter
+_template_list_setter
+_type_button_taker
+_type_list_taker
+_width_taker
+closer
+kept_reader
+opener
+page_reader
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the strip, the note line, the plot area and the form, none of
+them packed.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+ttk : Any
+    The tkinter.ttk module.
+right : Any
+    The right side of the window, which holds the strip and the plot area.
+card : Any
+    The card of the open step on the left, which holds the form.
+fonts : Tuple[str, int]
+    (family, size) of the guide's text.
+background : str
+    The colour behind the plot area.
+on_form : Callable[[bool], None]
+    Called with True when the form is to take the place of the guide's text,
+    and with False when the text comes back.
+
+---- Globals read ----
+FIRST_TYPES, PLOT_TYPES, TYPES_PER_ROW, settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_height_taker
+_journal_taker
+_load_taker
+_mover
+_presser
+_redraw_asker
+_releaser
+_save_form_shower
+_type_button_taker
+_width_taker
+```
+
+##### `_button_taker`
+
+```text
+---- Summary ----
+Method to take a click on ✎ or ✕ of a plot: ✎ takes the plot off the page and
+opens its form, ✕ removes it.
+
+---- Inputs ----
+kind : str
+    'edit' (✎) or 'remove' (✕).
+index : int
+    Place of the plot in page.plots.
+
+---- Globals read ----
+PLOT_TYPES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_note_setter
+_plot_form_shower
+panel_letters_finder
+plot_lifter
+plot_remover
+```
+
+##### `_canvas_drawer`
+
+```text
+---- Summary ----
+Method to draw the page in the plot area as large as it fits: the page with
+its stand-ins and letters (with the plot whose form is open), the grid over
+it, the open plot outlined in blue, the old cells of a plot being changed in
+grey dashes, and ✎ and ✕ on each placed plot.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+The colour and size constants (module constants); settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area (side effect).
+
+---- Equations ----
+See page_box_finder.
+
+---- Helpers ----
+page_box_finder
+page_picture_maker
+photo_maker
+plot_box_finder
+plot_buttons_placer
+```
+
+##### `_form_clearer`
+
+```text
+---- Summary ----
+Method to empty the form, so it can be filled for another use.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Destroys the widgets of the form (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_form_closer`
+
+```text
+---- Summary ----
+Method to close the form, so the guide's text comes back on the left.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_clearer
+```
+
+##### `_form_opener`
+
+```text
+---- Summary ----
+Method to fill the form with its title and a line of words, open it in place
+of the guide's text, and give the frame its fields and buttons go in.
+
+---- Inputs ----
+mode : str
+    'plot', 'save', 'replace' or 'load'.
+title : str
+    The title of the form.
+words : str
+    A line under the title; empty for none.
+
+---- Globals read ----
+FORM_QUIET, FORM_TITLE.
+
+---- Outputs ----
+Any
+    The frame under the title.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_clearer
+```
+
+##### `_height_taker`
+
+```text
+---- Summary ----
+Method to take the height typed in the strip: a share of the journal's page,
+which redraws the page; a height that cannot be used is said on the note line.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_note_setter
+height_checker
+```
+
+##### `_journal_taker`
+
+```text
+---- Summary ----
+Method to take the journal picked in the strip: the page takes its page and
+widths, keeping its width when the journal has it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_size_controls_setter
+page_journal_fitter
+```
+
+##### `_load_form_shower`
+
+```text
+---- Summary ----
+Method to ask, in the form, before a template takes the place of the plots on
+the page.
+
+---- Inputs ----
+name : str
+    The template's name.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_closer
+_form_opener
+_loader
+```
+
+##### `_load_taker`
+
+```text
+---- Summary ----
+Method to take a click on Load template: the template picked is loaded, after
+asking when the page already has plots.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+NO_TEMPLATES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_load_form_shower
+_loader
+_note_setter
+```
+
+##### `_loader`
+
+```text
+---- Summary ----
+Method to load a template in place of the page: a template that cannot be used
+is said on the note line and the page stays as it was; a journal or width the
+journals here do not have is changed, and the note line says so.
+
+---- Inputs ----
+name : str
+    The template's name (its file name without .json).
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_form_closer
+_note_setter
+_size_controls_setter
+page_journal_fitter
+template_reader
+```
+
+##### `_mover`
+
+```text
+---- Summary ----
+Method to follow a drag across the page: the rectangle of cells from where it
+started to the cell under the mouse is drawn, green where it can go and red
+over another plot.
+
+---- Inputs ----
+event : Any
+    The Tk motion event.
+
+---- Globals read ----
+DRAG_FREE_COLOUR, DRAG_TAKEN_COLOUR.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the plot area (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+drag_plot_maker
+page_cell_finder
+plot_box_finder
+plot_placer
+```
+
+##### `_note_setter`
+
+```text
+---- Summary ----
+Method to write one line under the strip: what was done, or in red why it
+could not be.
+
+---- Inputs ----
+text : str
+    The sentence.
+is_problem : bool
+    True for a red line.
+
+---- Globals read ----
+NOTE_COLOUR, PROBLEM_COLOUR.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_plot_cancel_taker`
+
+```text
+---- Summary ----
+Method to take Cancel in the form of a plot: a new plot goes, and a plot
+changed with ✎ goes back to its cells and plot type.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_form_closer
+_note_setter
+plot_placer
+```
+
+##### `_plot_done_taker`
+
+```text
+---- Summary ----
+Method to take Done in the form of a plot: the plot is placed on the page.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PLOT_TYPES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_form_closer
+_note_setter
+panel_letters_finder
+plot_placer
+```
+
+##### `_plot_form_shower`
+
+```text
+---- Summary ----
+Method to open the form of the plot whose form is open: its plot type, the
+cells it takes, and Done and Cancel.
+
+---- Inputs ----
+title : str
+    The title of the form ("New plot", "Change plot b").
+
+---- Globals read ----
+FIRST_TYPES, FORM_QUIET, FORM_TEXT, PLOT_TYPES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_opener
+_plot_cancel_taker
+_plot_done_taker
+_type_list_taker
+cells_describer
+```
+
+##### `_presser`
+
+```text
+---- Summary ----
+Method to take a press on the page: on ✎ or ✕ of a plot, that button; on a
+cell, the start of a drag.
+
+---- Inputs ----
+event : Any
+    The Tk press event.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_button_taker
+_note_setter
+page_cell_finder
+plot_button_finder
+```
+
+##### `_redraw_asker`
+
+```text
+---- Summary ----
+Method to draw the page again shortly after the plot area is resized, once for
+a run of resizes.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+REDRAW_DELAY_MS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Schedules the drawing (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+```
+
+##### `_releaser`
+
+```text
+---- Summary ----
+Method to end a drag across the page: the rectangle becomes the cells of the
+plot whose form is open, or of a new plot of the plot type picked (the first
+one when none is), and its form opens. A rectangle over another plot is
+refused on the note line.
+
+---- Inputs ----
+event : Any
+    The Tk release event.
+
+---- Globals read ----
+FIRST_TYPES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_note_setter
+_plot_form_shower
+cells_describer
+drag_plot_maker
+page_cell_finder
+plot_placer
+```
+
+##### `_replace_form_shower`
+
+```text
+---- Summary ----
+Method to ask, in the form, before a template of the same name is written over.
+
+---- Inputs ----
+name : str
+    The name typed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_opener
+_save_form_shower
+_saver
+template_path_finder
+```
+
+##### `_save_form_shower`
+
+```text
+---- Summary ----
+Method to take a click on Save template: the form asks for the template's name,
+with Save and Cancel.
+
+---- Inputs ----
+name : str
+    The name to start the box with.
+problem : str
+    A sentence in red under the box; empty for none.
+
+---- Globals read ----
+FORM_PROBLEM.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_closer
+_form_opener
+_note_setter
+_saver
+```
+
+##### `_saver`
+
+```text
+---- Summary ----
+Method to save the page as a template under the name typed, asking first when
+one of that name is there; a template that cannot be saved is said in the form.
+
+---- Inputs ----
+name : str
+    The name typed.
+may_replace : bool
+    True once the user has said to write over the one of that name.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the template file and changes the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_closer
+_note_setter
+_replace_form_shower
+_save_form_shower
+_template_list_setter
+template_path_finder
+template_saver
+```
+
+##### `_size_controls_setter`
+
+```text
+---- Summary ----
+Method to show the page's journal, width and height in the strip.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+height_checker
+width_choices_lister
+```
+
+##### `_template_list_setter`
+
+```text
+---- Summary ----
+Method to fill the list of templates from the layouts folder, with Load
+template greyed when there is none.
+
+---- Inputs ----
+picked : Optional[str]
+    The template to show picked; None for the first.
+
+---- Globals read ----
+NO_TEMPLATES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+template_names_lister
+```
+
+##### `_type_button_taker`
+
+```text
+---- Summary ----
+Method to take a plot-type button of the strip: it becomes the plot type of
+the plot whose form is open, or of the next plot dragged.
+
+---- Inputs ----
+key : str
+    The plot type, such as 'P7'.
+
+---- Globals read ----
+PICKED_RELIEF, PLOT_TYPES, UNPICKED_RELIEF.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_note_setter
+```
+
+##### `_type_list_taker`
+
+```text
+---- Summary ----
+Method to take the plot type picked in the form.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+```
+
+##### `_width_taker`
+
+```text
+---- Summary ----
+Method to take the width picked in the strip, which redraws the page.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+```
+
+##### `closer`
+
+```text
+---- Summary ----
+Method to end the building once the step is answered: a form still open is
+cancelled, so the page is as page_reader gave it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_closer
+plot_placer
+```
+
+##### `kept_reader`
+
+```text
+---- Summary ----
+Method to give the page as it was last saved as a template, loaded from one,
+or started, so the step can tell whether the page has changed since. It may be
+called from the question thread once the step is answered.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+FigurePage
+    That page.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `opener`
+
+```text
+---- Summary ----
+Method to start building a page: its size in the strip, the templates of the
+layouts folder in their list, and the page drawn.
+
+---- Inputs ----
+page : FigurePage
+    The page to start from.
+folder : Path
+    The layouts folder, where templates are saved and read.
+
+---- Globals read ----
+PAGE_HINT; settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canvas_drawer
+_note_setter
+_size_controls_setter
+_template_list_setter
+page_journal_fitter
+```
+
+##### `page_reader`
+
+```text
+---- Summary ----
+Method to give the page as placed: a plot whose form is still open is left out,
+and a plot changed with ✎ is where it was. It may be called from the question
+thread once the step is answered.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+FigurePage
+    The page.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+plot_placer
+```
+
+### MAIN FUNCTIONS
+
+#### `cells_describer`
+
+```text
+---- Summary ----
+Main function to say in words which cells of the grid a plot takes, counted from 1
+at the top left.
+
+---- Inputs ----
+plot : PagePlot
+    The plot.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Such as 'rows 1 to 2, columns 3 to 6 (8 cells)' or 'row 1, column 1 (1 cell)'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `drag_plot_maker`
+
+```text
+---- Summary ----
+Main function to turn a drag from one cell to another into a plot: the rectangle
+with those two cells at opposite corners, whichever way the drag went.
+
+---- Inputs ----
+start : Tuple[int, int]
+    (row, column) where the drag started, from 0 at the top left.
+end : Tuple[int, int]
+    (row, column) where it ended.
+plot_type : str
+    The plot type, such as 'P1'.
+roles : Dict[str, str]
+    The roles of the plot (kept when a plot is dragged again).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+PagePlot
+    The plot.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+row = min(start row, end row); n_rows = |end row - start row| + 1; the same for
+the columns.
+
+---- Helpers ----
+None.
+```
+
+#### `page_box_finder`
+
+```text
+---- Summary ----
+Main function to find the dots per inch that draw a page as large as it fits in
+the plot area, its shape kept.
+
+---- Inputs ----
+area_px : Tuple[int, int]
+    (width, height) of the plot area in pixels.
+size_in : Tuple[float, float]
+    (width, height) of the page in inches, at its printed size.
+
+---- Globals read ----
+PAGE_SHARE, SMALLEST_DPI.
+
+---- Outputs ----
+float
+    The dots per inch, at least SMALLEST_DPI.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+dpi = PAGE_SHARE x min(area width / page width, area height / page height).
+
+---- Helpers ----
+None.
+```
+
+#### `page_cell_finder`
+
+```text
+---- Summary ----
+Main function to find the cell of the grid under a point of the plot area.
+
+---- Inputs ----
+x, y : float
+    The point, in pixels of the plot area.
+box : Tuple[float, float, float, float]
+    (left, top, width, height) of the page drawn, in pixels.
+is_clamped : bool
+    True to give the nearest cell for a point off the page (the end of a drag).
+
+---- Globals read ----
+GRID_COLUMNS, GRID_ROWS.
+
+---- Outputs ----
+Optional[Tuple[int, int]]
+    (row, column) from 0 at the top left; None for a point off the page unless
+    is_clamped.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+column = floor((x - left) / width x GRID_COLUMNS); row = floor((y - top) / height
+x GRID_ROWS).
+
+---- Helpers ----
+None.
+```
+
+#### `page_journal_fitter`
+
+```text
+---- Summary ----
+Main function to fit a page to the journals there are: a journal not in the
+journals folder becomes the standard journal, and a width the journal does not
+have becomes two columns, or its first width.
+
+---- Inputs ----
+page : FigurePage
+    The page, as made or as read from a template.
+specs : Dict[str, dict]
+    The journals (config.JOURNAL_SPECS); the standard journal is among them.
+
+---- Globals read ----
+STANDARD_COLUMNS, STANDARD_JOURNAL.
+
+---- Outputs ----
+Tuple[FigurePage, Optional[str]]
+    (the page fitted, one or two plain sentences on what was changed, or None).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `page_offer_checker`
+
+```text
+---- Summary ----
+Main function to say whether to offer, once the page is built, to save it as a
+template: only when it holds a plot and is not the page last saved as a template,
+loaded from one, or started from.
+
+---- Inputs ----
+page : FigurePage
+    The page as built.
+kept : FigurePage
+    The page as it was last saved, loaded or started (PageBuilder.kept_reader).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True to offer.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `page_picture_maker`
+
+```text
+---- Summary ----
+Main function to draw a page as a picture for the plot area, off screen.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+spec : dict
+    What the page's journal asks (config.JOURNAL_SPECS entry).
+dpi : float
+    Dots per inch (page_box_finder).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Image.Image
+    The picture, in RGB.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+figure_page_drawer
+```
+
+#### `plot_box_finder`
+
+```text
+---- Summary ----
+Main function to find where the cells of a plot are in the plot area.
+
+---- Inputs ----
+plot : PagePlot
+    The plot.
+box : Tuple[float, float, float, float]
+    (left, top, width, height) of the page drawn, in pixels.
+
+---- Globals read ----
+GRID_COLUMNS, GRID_ROWS.
+
+---- Outputs ----
+Tuple[float, float, float, float]
+    (x0, y0, x1, y1) in pixels, top left then bottom right.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+x0 = left + column / GRID_COLUMNS x width; x1 = left + (column + n_columns) /
+GRID_COLUMNS x width; the same down the rows.
+
+---- Helpers ----
+None.
+```
+
+#### `plot_button_finder`
+
+```text
+---- Summary ----
+Main function to find the ✎ or ✕ button under a point of the plot area.
+
+---- Inputs ----
+x, y : float
+    The point, in pixels of the plot area.
+page : FigurePage
+    The page.
+box : Tuple[float, float, float, float]
+    (left, top, width, height) of the page drawn, in pixels.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Tuple[str, int]]
+    ('edit' or 'remove', place of the plot in page.plots), or None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+plot_buttons_placer
+```
+
+#### `plot_buttons_placer`
+
+```text
+---- Summary ----
+Main function to place the ✎ and ✕ buttons of a plot in the top right corner of
+its cells, ✕ in the corner and ✎ left of it.
+
+---- Inputs ----
+plot : PagePlot
+    The plot.
+box : Tuple[float, float, float, float]
+    (left, top, width, height) of the page drawn, in pixels.
+
+---- Globals read ----
+BUTTON_GAP_PX, BUTTON_PX.
+
+---- Outputs ----
+Dict[str, Tuple[float, float, float, float]]
+    {'edit': (x0, y0, x1, y1), 'remove': (x0, y0, x1, y1)} in pixels.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+plot_box_finder
+```
+
+#### `template_names_lister`
+
+```text
+---- Summary ----
+Main function to list the templates in the layouts folder by name, A to Z.
+
+---- Inputs ----
+folder : Path
+    The layouts folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    The names (file names without .json); empty when the folder is missing or
+    cannot be read.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_viewer/viewer_preview.py`
@@ -45377,6 +48118,48 @@ confirm_waiter
 table_problem_teller
 ```
 
+#### `_template_offer_asker`
+
+```text
+---- Summary ----
+Helper function to offer, once the page of a dataset figure is built, to save it
+as a template for another dataset, and to save it under the name typed. Nothing
+is asked for a page with no plot, or one already saved as a template or loaded
+from one and not changed since. A template of the same name is written over only
+after asking.
+
+---- Inputs ----
+page : FigurePage
+    The page as built.
+kept : FigurePage
+    The page as it was last saved as a template, loaded from one, or started.
+layouts_folder : Path
+    The layouts folder, where templates are saved.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Path]
+    The template file written, or None when nothing was saved.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and writes the template file; the
+details of a problem go to the log (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+page_offer_checker
+problem_teller
+template_path_finder
+template_saver
+text_asker
+yes_no_asker
+```
+
 #### `_unfit_windows_lister`
 
 ```text
@@ -45667,6 +48450,42 @@ od_scaling_asker
 preview_drawer
 saved_values_reader
 temperature_asker
+```
+
+#### `page_stage_runner`
+
+```text
+---- Summary ----
+Main function to build the page of a dataset figure in the window (Build a figure,
+6.1): the page starts empty, plots are placed by dragging across its grid, and a
+template can be loaded or saved; Continue ends the step, after the offer to save
+a page that was changed as a template.
+
+---- Inputs ----
+layouts_folder : Path
+    The layouts folder (UserPlaces.layouts_folder), where templates are saved and
+    read.
+
+---- Globals read ----
+PAGE_NUDGE.
+
+---- Outputs ----
+FigurePage
+    The page as placed; an empty page when there is no window.
+
+---- Globals mutated ----
+None. Changes the window, and writes a template when one is asked for (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_template_offer_asker
+active_gui_getter
+enter_waiter
+guide_step_starter
+info_printer
 ```
 
 #### `pca_stage_runner`

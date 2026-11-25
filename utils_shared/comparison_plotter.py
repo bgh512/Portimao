@@ -22,12 +22,6 @@ from utils_shared.individual_experiment_plotter import (experiment_drawer,
                                                         )
 
 
-# ---- CONSTANTS -----------------------------------------------------------------------
-# white space between the two plots, beyond what their labels need (in multiples of the
-# layout pad)
-GAP_EXTRA_PT_PER_PAD = 8
-
-
 # ---- COMPARISON PLOTTER HELPERS ------------------------------------------------------
 
 
@@ -117,6 +111,7 @@ def comparison_figure_plotter(first: dict,
                               export_root: Path,
                               figure_size: Tuple[float, float],
                               spec: dict,
+                              gap_extra_pads: float,
                               share_time_axis: bool = True,
                               ) -> str:
     """
@@ -130,19 +125,22 @@ def comparison_figure_plotter(first: dict,
     second : dict
         Experiment drawn on the right (panel b).
     config : dict
-        Individual-experiment plot settings (config.py); uses LAYOUT_PAD_PT, FIGURE_DPI,
-        TITLE_GAP_PT and TIGHT_BBOX.
+        Individual-experiment plot settings (config.py); uses LAYOUT_PAD_PT and
+        FIGURE_DPI.
     export_root : Path
         Results folder.
     figure_size : Tuple[float, float]
         (width, height) of the whole figure in inches.
     spec : dict
         Journal specification (config.JOURNAL_SPECS entry).
+    gap_extra_pads : float
+        White space between the two plots beyond what their labels need, in multiples
+        of LAYOUT_PAD_PT (config.COMPARISON_GAP_PADS).
     share_time_axis : bool
         True gives both plots the same time range.
 
     ---- Globals read ----
-    GAP_EXTRA_PT_PER_PAD (module constant).
+    None.
 
     ---- Outputs ----
     str
@@ -187,15 +185,18 @@ def comparison_figure_plotter(first: dict,
         # Margins, then a gap wide enough for the right plot's y labels and the left
         # plot's event labels plus clear white space.
         for _ in range(3):
-            figure_canvas_fitter(fig, pad, None, config['TITLE_GAP_PT'])
+            figure_canvas_fitter(fig,
+                                 pad,
+                                 line_limits_pt=config.get('LINE_LIMITS_PT'),
+                                 )
             _, a_right = _overhang_calculator(fig, members_a, axes_a[0])
             b_left, _ = _overhang_calculator(fig, members_b, axes_b[0])
             params = fig.subplotpars
             extent_pt = (params.right - params.left) * width_pt
-            gap_pt = a_right + b_left + GAP_EXTRA_PT_PER_PAD * pad
+            gap_pt = a_right + b_left + gap_extra_pads * pad
             grid.update(wspace=gap_space_calculator(gap_pt, extent_pt, 2))
-        figure_canvas_fitter(fig, pad, None, config['TITLE_GAP_PT'])
-        letter_case = spec.get('panel_letter_case', 'upper')
+        figure_canvas_fitter(fig, pad)
+        letter_case = spec.get('panel_letter_case', 'lower')
         note = (None, watermark_style_builder(config))
         panel_letter_adder(fig,
                            [('a',
@@ -212,17 +213,16 @@ def comparison_figure_plotter(first: dict,
                            spec['panel_letter_pt'],
                            case=letter_case,
                            )
-        figure_canvas_fitter(fig, pad, None, config['TITLE_GAP_PT'])
-        stem = file_name_sanitiser(f"{first['experiment_name']}_vs_"
+        figure_canvas_fitter(fig, pad, line_limits_pt=config.get('LINE_LIMITS_PT'))
+        stem =file_name_sanitiser(f"{first['experiment_name']}_vs_"
                                    f"{second['experiment_name']}",
-                                   )
+                                  )
         figure_saver(fig,
                      Path(export_root),
                      stem,
                      ('svg', 'png'),
                      figure_size,
                      config['FIGURE_DPI'],
-                     tight=config['TIGHT_BBOX'],
                      )
         return stem
     finally:

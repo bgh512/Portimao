@@ -498,6 +498,30 @@ Defined in `utils_viewer/viewer_edges.py`. Created by a step that lets the user 
 | `unmarked_fields` | Tuple[str, ...] | | | `()` | Fields that never make the drop-down mark a file as having values of its own (the averaging step: `settled_picked`, `quick_picked`) |
 | `pick_lister` | Optional[Callable] | | | `None` | `(file name, values) -> ([(field, value, words, is_picked)], note)`: buttons beside the toggles, a click setting the field to the value on the file shown, the one picked in bold, and a note after them. In the averaging step `averaging.window_pick_lister`: Baseline 1 2 ... while "Adjust region manually" is on, setting `settled_picked`. None: no buttons |
 
+#### `FigurePage`
+
+Defined in `utils_shared/figure_page.py`. The page of a dataset figure; each change (`plot_placer`, `plot_lifter`, `plot_remover`) gives a new page. Drawn off screen by `figure_page_drawer`, saved by `template_saver` and read by `template_reader`.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `journal` | str | | | `'nature'` | The journal the page is drawn for (a key of `config.JOURNAL_SPECS`) |
+| `columns` | float | | columns | `2` | The width, as a key of the journal's `'widths_mm'` |
+| `height` | float | | fraction of the tallest figure | `0.8` | The height, above 0 and at most 1 |
+| `plots` | Tuple[PagePlot, ...] | (n_plots,) | | `()` | The plots in the order they were placed; their letters come from where they sit (`panel_letters_finder`): a, b, c… by each plot's top left cell, left to right then down, none on the legend (P16) |
+
+#### `PagePlot`
+
+Defined in `utils_shared/figure_page.py`. One plot of a `FigurePage`, a rectangle of cells of the 6 × 6 grid that no other plot takes; row 0 and column 0 are the top left cell.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `plot_type` | str | | | | The plot type, `'P1'` to `'P20'` (`PLOT_TYPES`) |
+| `row` | int | | grid cells | | The top row it takes, 0 to 5 |
+| `column` | int | | grid cells | | The left column it takes, 0 to 5 |
+| `n_rows` | int | | grid cells | `1` | How many rows it takes |
+| `n_columns` | int | | grid cells | `1` | How many columns it takes |
+| `roles` | Dict[str, str] | | | `{}` | What the plot shows, as roles (`{'group_1': 'Split'}`, `{'experiment': 'Group 1, first label, replicate 1'}`), never a file of the dataset |
+
 #### `PreviewSpec`
 
 Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every file is drawn with the same spec.
@@ -523,6 +547,7 @@ Defined in `utils_shared/user_places.py`. Created by `user_places_finder` when `
 | `own_folder` | Path | | | | The user's own folder; the data folders directly inside it are offered by number at question 1.1. The program folder, or `~/Portimao` in the app |
 | `fits_folder` | Path | | | | `<own_folder>/fits`: the haem library (`haems/`), the presets (`presets/`), the user's own fit files, and where fits saved from the components go. In the app, each file of the program's fits folder that is missing (subfolders included) is copied in at every start; one already there is never overwritten |
 | `journals_folder` | Path | | | | `<own_folder>/journals`: one `journal file` per journal. In the app, each file of the program's journals folder that is missing is copied in at every start; one already there is never overwritten, and a journal whose file is missing here is read from the program's own copy |
+| `layouts_folder` | Path | | | | `<own_folder>/layouts`: one `figure template` per file. In the app, each template that comes with the program and is missing is copied in at every start; one already there is never overwritten |
 | `last_answers_file` | Path | | | | `<own_folder>/last_answers.json` (`last_answers`) |
 | `logs_folder` | Path | | | | `<own_folder>/logs`: the self-test log and, in the app, the launch log and the update log |
 | `is_app` | bool | | | | True when running as the Mac app |
@@ -840,12 +865,40 @@ What one journal asks of a figure. Read by `journal_specs_loader` (`utils_shared
 
 Refused, with the reason in one sentence: a file that is not readable JSON; a missing `name`, width, tallest figure, smallest text, panel letter size or picture sharpness; a number that is not above 0; a largest text under the smallest, or a thickest line under the thinnest; a page smaller than the largest figure. With no usable `nature.json`, the numbers for Nature kept in the program (`STANDARD_SPEC`) are used.
 
+#### `figure template`
+
+The layout of a dataset figure, to use again on any dataset. Written by `template_saver` and read by `template_reader` (`utils_shared/figure_page.py`).
+
+| Property | Value |
+|---|---|
+| File type | JSON |
+| Encoding | UTF-8 |
+| Location and name | `layouts/<name>.json` in the user's own folder (`UserPlaces.layouts_folder`); the name as the user typed it, cleaned by `file_name_sanitiser`. A template of the same name is written over only when the user says so |
+
+| Name | Type | Units | Description |
+|---|---|---|---|
+| `kind` | text | | Always `"Portimao figure template"` |
+| `version` | whole number | | `1` |
+| `journal`, `columns`, `height` | text, number, number | columns, fraction of the tallest figure | The page size (`FigurePage`) |
+| `plots` | list | | One entry per plot, in the order placed: `{"type": "P9", "cells": {"row": 0, "column": 3, "rows": 2, "columns": 3}, "roles": {"group_1": "Split"}}` (`PagePlot`) |
+
+Refused, with the reason in one sentence naming the file: a file that is not readable JSON or not of this kind; another version; a page size that cannot be read; a plot with no cells, of an unknown type, past the edge of the grid or over another plot; a role that names a file (ending in `.paf`, `.csv`, `.xlsx`, `.txt`, `.bin`, `.fit` or `.json`, or holding a folder). A page with such a role is not saved.
+
+#### `dataset figure`
+
+| Property | Value |
+|---|---|
+| File type | PDF, one page of exactly the figure's printed size: the journal's width for the page's columns, and the page's share of the journal's tallest figure |
+| Location and name | `<results folder>/dataset_figure_<journal>.pdf`, written in the run by `figure_page_exporter` (`utils_shared/figure_page.py`) for a page with at least one plot, and written over at each run |
+
+Drawn as lines and text, not as a picture; the fonts are embedded as TrueType (PDF font type 42), so the text can still be changed in a drawing program.
+
 #### `master page`
 
 | Property | Value |
 |---|---|
 | File type | PDF, one page of the journal's page size (A4 when the journal file gives none) |
-| Location and name | `<results folder>/<experiment>_master_<journal>.pdf`, written by `master_page_exporter` (`utils_shared/master_page_exporter.py`) for a click on *Export master* in the strip |
+| Location and name | `<results folder>/<experiment>_master_<journal>.pdf`, written by `master_page_exporter` (`utils_shared/master_page_exporter.py`) for a click on *Export master* in the strip; `<results folder>/dataset_figure_master_<journal>.pdf` for the dataset figure, written in the run by `dataset_figure_saver` (`main.py`) |
 
 The figure of the file as a picture of 600 dots per inch at its printed size, starting at the top left of the text area; under it a box reading "Figure legend"; the journal's columns filled with grey lines standing for text; one small line at the top naming the journal, the page size, the file and the size of the figure. The margin at the sides, top and bottom is (page width - widest figure) / 2 (`master_page_layout_builder`).
 

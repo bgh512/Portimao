@@ -21,7 +21,6 @@ from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_custom.custom_questions import summary_figure_asker
 from utils_custom.custom_runner import (exemplar_runner,
                                         experiment_preparer,
                                         ocr_and_haem_response_runner,
@@ -32,12 +31,13 @@ from utils_shared.comparison_plotter import comparison_figure_plotter
 from utils_shared.dataset_settings import dataset_settings_saver, file_settings_merger
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_layout import figure_size_calculator
+from utils_shared.figure_page import FIGURE_NAME, figure_page_exporter, FigurePage
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.journal_files import journal_answers_fitter
+from utils_shared.master_page_exporter import master_page_exporter
 from utils_shared.output_capture import output_capturer
-from utils_shared.questions import (guide_step_getter,
-                                    guide_step_starter,
+from utils_shared.questions import (guide_step_starter,
                                     info_printer,
                                     section_starter,
                                     UserQuitError,
@@ -53,23 +53,15 @@ from utils_shared.run_logging import (details_place_setter,
                                       settings_logger,
                                       )
 from utils_shared.spectral_decomposer import BACKGROUND_SHORT_NAMES, fit_describer
-from utils_shared.survey import (files_asker,
-                                 haem_name_formatter,
-                                 JOURNAL_NAMES,
-                                 multi_experiment_asker,
-                                 )
+from utils_shared.survey import files_asker, haem_name_formatter, JOURNAL_NAMES
 from utils_shared.user_notices import problem_shower, warning_shower
 from utils_shared.user_places import (app_output_logger,
                                       user_folder_preparer,
                                       user_places_finder,
                                       )
 from utils_viewer.viewer_gui import active_gui_getter, gui_runner, GuiUnavailableError
-from utils_viewer.viewer_multi import multi_figure_checker_builder
 from utils_viewer.viewer_preview import preview_info_builder
-from utils_viewer.viewer_stages import (region_files_lister,
-                                        viewer_asker,
-                                        windows_stage_runner,
-                                        )
+from utils_viewer.viewer_stages import page_stage_runner, viewer_asker
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -231,6 +223,71 @@ def comparison_maker(comparison: dict,
         plt.close('all')
 
 
+# ---- dataset_figure_saver ------------------------------------------------------------
+def dataset_figure_saver(page: FigurePage, export_root: Path) -> List[Path]:
+    """
+    ---- Summary ----
+    Main function to save the dataset figure built on the page: the figure as a PDF of
+    its printed size, with text that can still be changed, then its master page, the
+    figure on a page of its journal. A page with no plot saves nothing. A file that
+    cannot be saved is said in one sentence and the run goes on.
+
+    ---- Inputs ----
+    page : FigurePage
+        The page as built in the Build a figure step.
+    export_root : Path
+        Results folder.
+
+    ---- Globals read ----
+    settings.JOURNAL_SPECS; FIGURE_NAME (imported).
+
+    ---- Outputs ----
+    List[Path]
+        The files saved: none, the figure, or the figure and its master page.
+
+    ---- Globals mutated ----
+    None. Writes the two PDFs and prints the outcome; the details of a problem go to
+    the log (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    figure_page_exporter
+    master_page_exporter
+    problem_shower
+    """
+
+    # ---- 1 The figure ----------------------------------------------------------------
+    if not page.plots:
+        return []
+    print('\nDataset figure')
+    spec = settings.JOURNAL_SPECS[page.journal]
+    try:
+        path, figure = figure_page_exporter(page, spec, export_root)
+    except Exception as exc:  # the figure must not lose the rest of the run
+        problem_shower('  The dataset figure was not saved', exc)
+        return []
+    width_in, height_in = figure.get_size_inches()
+    print(f"  Saved {path.name} ({spec['name']}, {width_in * 25.4:.0f} x "
+          f'{height_in * 25.4:.0f} mm)',
+          )
+
+    # ---- 2 Its master page -----------------------------------------------------------
+    try:
+        master = master_page_exporter(figure,
+                                      spec,
+                                      page.journal,
+                                      FIGURE_NAME,
+                                      export_root,
+                                      )
+    except Exception as exc:  # the figure itself is saved
+        problem_shower('  The master page of the dataset figure was not saved', exc)
+        return [path]
+    print(f'  Saved {master.name} (the figure on a page of the journal)')
+    return [path, master]
+
+
 # ---- everything_asker ----------------------------------------------------------------
 def everything_asker(folder: Path,
                      summaries: List[dict],
@@ -244,6 +301,7 @@ def everything_asker(folder: Path,
                                 Optional[dict],
                                 Optional[dict],
                                 Optional[List[str]],
+                                FigurePage,
                                 ]:
     """
     ---- Summary ----
@@ -277,10 +335,11 @@ def everything_asker(folder: Path,
     PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
 
     ---- Outputs ----
-    Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]]]
+    Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]],
+          FigurePage]
         (answers, per-experiment info dictionaries, fit, side-by-side comparison
-        settings or None, names of the 2x2 grid experiments or None). Raises
-        UserQuitError if the user declines to start.
+        settings or None, names of the 2x2 grid experiments or None, the page of the
+        dataset figure as built). Raises UserQuitError if the user declines to start.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal; writes last_answers.json through
@@ -301,14 +360,9 @@ def everything_asker(folder: Path,
     haem_name_formatter
     journal_answers_fitter
     last_answers_saver
-    multi_experiment_asker
-    multi_figure_checker_builder
-    region_files_lister
+    page_stage_runner
     section_starter
-    special_figures_maker
-    summary_figure_asker
     viewer_asker
-    windows_stage_runner
     yes_no_asker
     """
 
@@ -344,12 +398,6 @@ def everything_asker(folder: Path,
                       export_root,
                       exported,
                       )
-    # the files with an oxidised and a reduced region: their haems have a % oxidised
-    percent_names = region_files_lister(summaries,
-                                        limits,
-                                        regions,
-                                        answers.get('decomposition_dataset'),
-                                        )
 
     # ---- 2.2 Save the plot and the workbook of every file ----------------------------
     # The figures are finalised and the export chosen (5.9, which wrote the whole
@@ -379,49 +427,15 @@ def everything_asker(folder: Path,
     saved_workbooks = [] if saved_workbooks is None else saved_workbooks
     experiment_files_saver(context, saved_plots, active_gui_getter(), saved_workbooks)
 
-    # ---- 2.3 Multi-experiment plots --------------------------------------------------
-    checker = multi_figure_checker_builder(context,
-                                           {'comparison': comparison_maker,
-                                            'special': special_figures_maker,
-                                            },
-                                           )
-    # A figure that needs the averaging windows when none are set up offers the window
-    # step of the processing; the files processed for a preview are then out of date,
-    # and so are the saved plots and workbooks, which show the windows.
-    def windows_adder() -> bool:
-        context.pop('_processed', None)
-        asking = guide_step_getter()
-        is_set_up = windows_stage_runner(context)
-        if asking is not None:  # the guide goes back to the figure that asked
-            guide_step_starter(asking)
-        if is_set_up:
-            experiment_files_saver(context,
-                                   saved_plots,
-                                   active_gui_getter(),
-                                   saved_workbooks,
-                                   )
-        return is_set_up
-    section_starter('Dataset figures: several experiments')
-    comparison, exemplar_names = multi_experiment_asker(summaries,
-                                                        answers,
-                                                        defaults,
-                                                        plotted,
-                                                        checker,
-                                                        windows_adder,
-                                                        )
-
-    # ---- 2.4 Experiment summaries ----------------------------------------------------
-    section_starter('Dataset figures: summaries')
-    fit, custom = summary_figure_asker(names,
-                                       answers,
-                                       defaults,
-                                       summaries,
-                                       fit,
-                                       PLACES.fits_folder,
-                                       checker,
-                                       percent_names,
-                                       windows_adder,
-                                       )
+    # ---- 2.3 Dataset figures ---------------------------------------------------------
+    # The figure builder takes the place of the fixed figures (side by side, the 2x2
+    # grid, the time response, the haem and OCR response), whose questions are no
+    # longer asked; the page is exported with the dataset figures.
+    section_starter('Dataset figures: build a figure')
+    page = page_stage_runner(PLACES.layouts_folder)
+    comparison, exemplar_names = None, None
+    custom = {'time_response': None, 'haem_ocr': None}
+    answers['plot_time_response'] = answers['plot_haem_ocr'] = False
 
     # ---- 3 Read the experiments ------------------------------------------------------
     experiments = []
@@ -566,6 +580,12 @@ def everything_asker(folder: Path,
                       else 'every table, written when the run starts'
                       )
     print(f'  Workbooks:        {workbooks_text}{spectra_text}')
+    if page.plots:
+        count = len(page.plots)
+        print(f"  Dataset figure:   {count} plot{'' if count == 1 else 's'}, "
+              f'{JOURNAL_NAMES[page.journal]}, {page.columns:g} column(s), height '
+              f'{page.height:g}; saved as a PDF with its master page',
+              )
 
     # ---- 5 Confirm the start ---------------------------------------------------------
     if not yes_no_asker('Do you want to start?', True, number='9.1'):
@@ -589,7 +609,7 @@ def everything_asker(folder: Path,
               f'written to), so this dataset will start from the standard settings '
               f'next time.',
               )
-    return answers, experiments, fit, comparison, exemplar_names
+    return answers, experiments, fit, comparison, exemplar_names, page
 
 
 # ---- experiment_file_saver -----------------------------------------------------------
@@ -1167,6 +1187,7 @@ def program_runner() -> int:
     ---- Helpers ----
     cancel_sentence_builder
     comparison_maker
+    dataset_figure_saver
     everything_asker
     experiment_processor
     files_asker
@@ -1220,6 +1241,7 @@ def program_runner() -> int:
              fit,
              comparison,
              exemplar_names,
+             page,
              ) = everything_asker(folder,
                                   summaries,
                                   export_root,
@@ -1263,6 +1285,7 @@ def program_runner() -> int:
         if comparison:
             comparison_maker(comparison, kept, cfg, export_root)
         special_figures_maker(kept, cfg, fit, export_root, exemplar_names)
+        dataset_figure_saver(page, export_root)
         minutes, seconds = divmod(time.perf_counter() - start, 60)
         print(f'\nFinished {len(experiments) - len(failed)} of {len(experiments)} '
               f'file(s) in {int(minutes)} min {seconds:.0f} s.',

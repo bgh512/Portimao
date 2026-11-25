@@ -105,10 +105,12 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
      'The plot and the workbook of each file were written here, with the spectra as '
      'csv files when you chose them.',
      ),
-    ('side_by_side', 'Dataset figures', 'Side by side', 'The figure of two experiments side by side was chosen here.'),
-    ('grid', 'Dataset figures', '2x2 grid', 'The 2x2 grid of four experiments was chosen here.'),
-    ('time_response', 'Dataset figures', 'Time response', 'The time response figure was chosen here.'),
-    ('haem_ocr', 'Dataset figures', 'Haem and OCR response', 'The haem and OCR response figure was chosen here.'),
+    ('page',
+     'Dataset figures',
+     'Build a figure',
+     'The page of the dataset figure was built here: drag across the grid to place a '
+     'plot, ✎ to change one and ✕ to remove it.',
+     ),
     ('start', 'Dataset export', 'Summary and start', 'The summary of your answers is shown here, before the run starts.'),
     )
 GUIDE_STAGES = tuple(dict.fromkeys(stage for _, stage, _, _ in GUIDE_STEPS))

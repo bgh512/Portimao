@@ -1,60 +1,71 @@
 ---
 name: chunk-done
-description: Close a chunk of _USER_REVIEW/TODO.md once the user accepts it as built - delete it and its row in the Order table, mark next every row it unblocks, ask about any file it shares with another open chunk, add the session's new words to the glossary, and give the release line (which takes only this chunk's files) and the next chunk's prompt, each in its own code block.
+description: Close a chunk of _USER_REVIEW/TODO.md once the user accepts it as built - work from its Closing note, ask about any file it shares with another open chunk, run the release its Order table row names (only this chunk's files; a major line is given for the user to type), or note that its files already went out, then have small helpers delete the chunk, update the Order table and add the new words to the glossary, and list each next row's prompt to copy.
 argument-hint: "[chunk, e.g. A4]"
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Edit, Agent
+allowed-tools: Read, Grep, Glob, Edit, Agent, Bash(git release --minor *), Bash(git release --hotfix *), Bash(git status --porcelain *), Bash(git log -1 *), PowerShell(git release --minor *), PowerShell(git release --hotfix *), PowerShell(git status --porcelain *), PowerShell(git log -1 *)
 ---
 
 # Close a finished chunk
 
 The user has accepted a chunk of `_USER_REVIEW/TODO.md` as built. The chunk to close: $ARGUMENTS
 
-With no chunk named, close the one this session was started on (its prompt names it). If the conversation does not say which, ask and change nothing.
+With no chunk named, close the one this session was started on (its prompt names it). If the conversation does not say which, ask and change nothing. The session is usually fresh (the user typed `/clear` first): work from the to-do alone, above all the chunk's Closing note.
 
 ## 1 Before changing anything
 
 - Plan mode is on: change nothing, and say "Plan mode is on: press Shift+Tab to leave it, then type /chunk-done again."
-- Grep the to-do's headings, then read only the Order table, the chunk and the parts the reply needs. Read them just before editing: another session may be editing the to-do at the same time.
+- Grep the to-do's headings, then read only the Order table, the chunk and the parts the reply needs. Read them just before anything changes: another session may be editing the to-do at the same time.
 - The chunk is not in the to-do: say so and change nothing.
-- The chunk runs over several sessions (it says "one per session", or its prompt picks the work "this session"): ask whether the whole chunk is finished, and change nothing until the user says.
-- The chunk still has items under "Provisional (ideas; ask before building):" that the user has not answered: ask about each (it was done here, give it its own chunk later, or back to Ideas), and change nothing until the user says. Then, before deleting the chunk, put each where the user said: its own chunk goes under "Later (order to be decided)" as one line; back to Ideas goes under its topic in "# Ideas" of `_USER_REVIEW/scratchpad.md`.
+- The chunk has no Closing note (the line `Closing note:` at its end): its last session has not finished, or the chunk runs over several sessions. Ask whether the whole chunk is finished, with its mini chunks, and change nothing until the user says. If it is, ask for the release summary in one line, or offer one from the chunk's title.
+- The chunk still has items under "Provisional (ideas; ask before building):" that the user has not answered: ask about each (it was done here, give it its own chunk later, or back to Ideas), and change nothing until the user says. Each answer goes to the helper in step 4.
 
-## 2 Change the to-do
+## 2 The chunk's files
 
-- Delete the chunk: its heading (`#### A4 ...`) and everything under it up to the next heading, its Prompt, Release and Close blocks, steps, provisional items and checks included.
-- In the Order table (columns Now, Step, Who, Waits for):
-    - Delete the chunk's row.
-    - Take the chunk out of every other row's "Waits for". A cell left with nothing in it becomes "–".
-    - Put `**next**` in the Now cell of every row whose "Waits for" is "–" (rows already marked keep it).
-- A row for one of the user's own tasks (Who: You, linked to the chunk it holds up) goes only when the user says the task is done; then take its name out of the "Waits for" cells too, and its "Before this, you:" line from the chunk.
-- Never edit between the style guide's marker lines (`<!-- >>> style guide ... -->` to `<!-- <<< style guide -->`): the sync keeps that text up to date.
-- Change nothing else. No chunk is renumbered here: letters change only when a set moves or a chunk is split, never in this command. The user may be typing the release in the terminal meanwhile, so touch nothing but the to-do, the glossary, for an idea sent back the scratch pad, and for a file that waits (step 3) this chunk's own list.
-- The chunk was the last of its set: ask whether the set's heading and notes go too.
-
-## 3 The chunk's files
-
-The chunk's release takes only the files on its list, `_USER_REVIEW/logs/chunks/<letter>.txt`, which the hooks write: one file per line, a file Claude edited as its name alone, any other as its name, a tab, then `seen during the turn` or `unsure`. Skip this step for "Release: none".
+The chunk's release takes only the files on its list, `_USER_REVIEW/logs/chunks/<letter>.txt`, which the hooks write: one file per line, a file Claude edited as its name alone, any other as its name, a tab, then `seen during the turn` or `unsure`. Skip this step when the Order table's Release cell says none.
 
 - Read this chunk's list, and the list of every other chunk still in the to-do (Glob `_USER_REVIEW/logs/chunks/*.txt`; a list whose chunk is not in the to-do is left over, so ignore it).
-- A file that is also on another chunk's list, or is marked `unsure`, may hold another tab's unfinished work. Ask about each in plain words, numbered from Q1, and give no release line until the user answers:
+- Already released: run `git status --porcelain -- <each file on the list>`. Nothing on the list has a change left (every file went out with other releases): skip the questions below and step 3; run `git log -1 --format=%s -- <the files>` for the version that took them last, and the reply says "already released in V<version>".
+- A file that is also on another chunk's list, or is marked `unsure`, may hold another tab's unfinished work. Ask about each in plain words, numbered from Q1, and release nothing and change nothing else until the user answers:
     - on another list: "B13 also changed shell.js: release it now with B13's part, or wait for B13?"
     - `unsure`: "shell.js changed while another tab was working: is it this chunk's (release it now), or does it wait?"
 - "Wait": take that file's line out of this chunk's list with Edit, and nothing else. The file then goes out with the other chunk's release.
 - "Release it now": leave the list as it is.
-- There is no list (the session's first prompt named no chunk): say so in one line, and give the release line without `--chunk`, with the warning that it takes every change in the folder.
+- There is no list (the session's first prompt named no chunk): say so in one line; the release is then given to the user (step 3), without `--chunk`, with the warning that it takes every change in the folder.
 
-## 4 The glossary
+## 3 The release
 
-After the to-do is changed, start the `glossary-keeper` agent with the technical words this session used with the user: the project's own words, and any workflow or tool word the user asked about or used in a way that seemed off. One short line of meaning per word, as it was used here. No such words: skip this step.
+The kind of release is the chunk's Release cell in the Order table (minor, hotfix, major or none); the Release block gives the command's shape when the cell is missing. The summary is the one in the Closing note; fill any placeholder left from it, or ask and release nothing until the user answers. The line ends with `--chunk <letter>` (unless step 2 found no list). Release none, or already released: skip this step.
+
+- minor or hotfix, with a list from step 2: run it yourself, typing `/chunk-done` was the user's yes. Run it alone, in exactly one of these forms (the command hook lets nothing else through), with the longest timeout the shell allows (10 minutes), as a project's release hook may build files:
+    - `git release --minor "<summary>" --chunk <letter>`
+    - `git release --hotfix "<summary>" --chunk <letter> --yes`
+
+  The summary is in double quotes, with no `"`, `$`, backtick or backslash in it, and does not start with `/` (Git Bash on Windows would turn it into a folder path): write "chunk-done ..." rather than "/chunk-done ...".
+    - The output says `committed V<version>`: keep the version for the reply and go on.
+    - Anything else (an error, no network, nothing to commit, nothing to release): leave the chunk in the to-do, skip steps 4 and 5, and say in one plain sentence what went wrong and what to do, from the release's own last lines.
+- Anything else: major, no list, a condition this session cannot settle ("only if anything was fixed"), or another command (such as `git guide release`): run nothing; the reply gives the line for the user to type.
+
+## 4 The helpers
+
+Hand the edits to two small helpers, started together with the Agent tool and `model: haiku`, and wait for both. Give each exactly what to do; neither decides anything.
+
+- **The to-do:** a `general-purpose` agent, told to read `_USER_REVIEW/TODO.md` just before editing it and to make only these edits with Edit:
+    - Delete the chunk: its heading (`#### A4 ...`) and everything under it up to the next heading, its Prompt, Release and Close blocks, steps, mini chunks, provisional items, checks and Closing note included.
+    - In the Order table, delete the chunk's row, take the chunk out of every other row's "Waits for" (a cell left empty becomes "–"), and put `**next**` in the Now cell of every row whose "Waits for" is "–" (rows already marked keep theirs, `**next\***` included).
+    - Each provisional item the user answered in step 1: its own chunk goes under "Later (order to be decided)" as one line; back to Ideas goes under its topic in "# Ideas" of `_USER_REVIEW/scratchpad.md`.
+    - Never edit between the style guide's marker lines (`<!-- >>> style guide ... -->` to `<!-- <<< style guide -->`), renumber no chunk, and change nothing else.
+- **The glossary:** the `glossary-keeper` agent, given the new words from the Closing note with what each meant. It takes only two kinds: computer science words the user met (hook, agent, class, function...) and words the project defined (a precise term it fixes, or an abbreviation); an obvious phrase is left out. No such words: skip this helper.
+
+A row for one of the user's own tasks goes only when the user says the task is done: then tell the to-do helper to take it out, its name from the "Waits for" cells and its line from the chunk's "Before this, you:". The chunk was the last of its thread: ask whether the thread's heading and notes go too, and tell the helper only once the user says.
 
 ## 5 Reply
 
-The working rules' report, with the two blocks under Questions for you:
+The working rules' report:
 
-- **Done:** one line: the chunk closed and the rows now marked next. A second line for the words `glossary-keeper` added, if any.
+- **Done:** one line: the chunk closed and the version released (`Released V3.4 with --minor, only A4's files`), or "already released in V3.3". A second line for the words the glossary took, if any. A release that stopped: the chunk is still open, and why.
 - **Questions for you:**
-    - The release line, in its own `text` block: the one given for this chunk at the end of its session, if this conversation holds it; otherwise the command in the chunk's Release block. Fill a placeholder (`<part>`) from what the session built, or ask. A condition on the Release line ("only if anything was fixed") goes in a few words above the block. "Release: none": say "No release for A4." instead of the block. The line ends with `--chunk <letter>` (add it when the Release block lacks it, unless step 3 found no list). When step 3 found nothing shared, say above the block: "The release takes only this chunk's files; you can /clear at once."
-    - The next prompt, in its own `text` block, under the line "Type /clear, check that plan mode shows (Shift+Tab), then paste this prompt.": the Prompt block of the first row in the Order table marked **next** whose Who is Claude or Claude with you. Then one line naming any rows marked **next** whose Who is You, with what the user does there.
-    - Anything asked in steps 1 to 3, numbered from Q1.
+    - Only when step 3 ran nothing (and the files were not already released): the release line, in its own `text` block. A condition goes in a few words above the block. Release none: say "No release for A4." instead of the block.
+    - Unless the release stopped, under the line "Type /clear, check that plan mode shows (Shift+Tab), then paste a prompt.": each row now marked **next** or **next\*** whose Who is Claude or Claude with you, as its step's name and then its Prompt block in its own `text` block (for a chunk split into mini chunks, the first mini chunk not yet done). Rows marked **next\*** say which device they share. Then one line naming the rows marked **next** whose Who is You, with what the user does in each.
+    - Anything asked in steps 1 to 4, numbered from Q1.
 - **Status:** Ready.

@@ -1313,7 +1313,7 @@ def multi_experiment_asker(summaries: List[dict],
 
     # ---- 1 Two experiments side by side ----------------------------------------------
     if len(summaries) >= 2:
-        guide_step_starter('side_by_side')
+        guide_step_starter('page')  # the dataset figures are one step of the guide
     while True:
         comparison = None
         answers['plot_comparison'] = False
@@ -1351,7 +1351,7 @@ def multi_experiment_asker(summaries: List[dict],
 
     # ---- 2 Four experiments in a 2x2 grid --------------------------------------------
     if len(summaries) >= 4:
-        guide_step_starter('grid')
+        guide_step_starter('page')
     while True:
         exemplar_names = None
         answers['plot_exemplar'] = False

@@ -167,7 +167,6 @@
             "Bash(git push:*)",
             "Bash(git merge:*)",
             "Bash(git rebase:*)",
-            "Bash(git release:*)",
             "Bash(git hotfix:*)",
             "Bash(git tag:*)",
             "Bash(git reset --hard:*)",
@@ -175,7 +174,6 @@
             "PowerShell(git push *)",
             "PowerShell(git merge *)",
             "PowerShell(git rebase *)",
-            "PowerShell(git release *)",
             "PowerShell(git hotfix *)",
             "PowerShell(git tag *)",
             "PowerShell(git reset --hard *)",
@@ -203,7 +201,9 @@
             "Bash(find * -fprint*)",
             "Bash(find * -fls *)",
             "Bash(git guide:*)",
-            "PowerShell(git guide *)"
+            "PowerShell(git guide *)",
+            "Bash(git release --major:*)",
+            "PowerShell(git release --major *)"
         ],
         "blockReadsOutsideWorkingDirectories": true,
         "blockWritesOutsideWorkingDirectories": true,

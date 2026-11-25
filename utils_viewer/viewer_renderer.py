@@ -3,7 +3,6 @@ The background thread of the experiment browser window that draws the previews.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-import io
 import threading
 from typing import Callable, List, Optional, Tuple
 
@@ -13,7 +12,7 @@ from utils_shared.user_notices import problem_teller
 from utils_viewer.viewer_preview import (kept_file_lister,
                                          PreviewSpec,
                                          preview_figure_builder,
-                                         time_axis_finder,
+                                         preview_picture_maker,
                                          TimeAxis,
                                          ViewerSession,
                                          )
@@ -33,7 +32,7 @@ class PreviewRenderer(threading.Thread):
     None public.
 
     ---- Globals read ----
-    settings.PREVIEW_DPI, settings.WINDOW_KEPT_FILES.
+    settings.WINDOW_KEPT_FILES.
 
     ---- Methods ----
     __init__
@@ -148,7 +147,7 @@ class PreviewRenderer(threading.Thread):
             Name of the file.
 
         ---- Globals read ----
-        settings.PREVIEW_DPI.
+        None.
 
         ---- Outputs ----
         Tuple[Optional[bytes], str, Optional[TimeAxis]]
@@ -165,17 +164,16 @@ class PreviewRenderer(threading.Thread):
 
         ---- Helpers ----
         preview_figure_builder
+        preview_picture_maker
         problem_teller
-        time_axis_finder
         """
 
         try:
             figure, notes = preview_figure_builder(self._session, spec, name)
             if figure is None:
                 return None, notes, None
-            buffer = io.BytesIO()
-            figure.savefig(buffer, format='png', dpi=settings.PREVIEW_DPI)
-            return buffer.getvalue(), notes, time_axis_finder(figure)
+            picture, time_axis = preview_picture_maker(figure)
+            return picture, notes, time_axis
         except Exception as exc:  # a preview problem must never stop the questions
             return None, problem_teller(f'Preview not drawn for {name}', exc), None
 

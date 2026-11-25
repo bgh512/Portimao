@@ -8,14 +8,23 @@ from typing import Any, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 from matplotlib.axes import Axes
+from matplotlib.collections import Collection
 from matplotlib.figure import Figure
-from matplotlib.font_manager import FontProperties
+from matplotlib.font_manager import findfont, FontProperties
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from matplotlib.textpath import TextPath
 from matplotlib.transforms import ScaledTranslation
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 MM_PER_INCH = 25.4
+# what the user is told each text size of the figures is (figure_style_builder's
+# 'fonts'), in the warning about a journal's text sizes; panel letters follow the journal
+TEXT_NAMES = {'tick': 'tick labels and legends',
+              'label': 'axis titles',
+              'title': 'panel titles',
+              }
 
 
 # ---- FIGURE LAYOUT HELPERS -----------------------------------------------------------
@@ -64,12 +73,16 @@ def figure_canvas_fitter(fig: Figure,
                          suptitle_gap_pt: float = 0.0,
                          iterations: int = 8,
                          tolerance_pt: float = 0.2,
+                         line_limits_pt: Optional[Tuple[Optional[float],
+                                                        Optional[float],
+                                                        ]] = None,
                          ) -> None:
     """
     ---- Summary ----
     Main function to set the figure margins so that everything drawn sits a fixed
     padding inside the figure edge, whatever the figure size, font size or label
-    lengths.
+    lengths. Every figure is fitted here before it is shown or saved, so this is also
+    where its lines are kept to the widths the journal takes.
 
     ---- Inputs ----
     fig : Figure
@@ -85,6 +98,9 @@ def figure_canvas_fitter(fig: Figure,
         Maximum number of fitting passes.
     tolerance_pt : float
         Stop when no margin moves by more than this many points.
+    line_limits_pt : Optional[Tuple[Optional[float], Optional[float]]]
+        (thinnest, thickest) line the journal takes in points, as in
+        figure_style_builder()['line_limits']; None to leave the lines as drawn.
 
     ---- Globals read ----
     None.
@@ -95,8 +111,8 @@ def figure_canvas_fitter(fig: Figure,
         contents leave no room for the axes.
 
     ---- Globals mutated ----
-    None. Changes the subplot margins of ``fig`` and the layout flag and position of
-    ``suptitle`` (side effect).
+    None. Changes the line widths and the subplot margins of ``fig`` and the layout
+    flag and position of ``suptitle`` (side effect).
 
     ---- Equations ----
     Each margin = (pad + width of the decoration outside the axes) / figure size,
@@ -104,7 +120,12 @@ def figure_canvas_fitter(fig: Figure,
 
     ---- Helpers ----
     _renderer_getter
+    figure_lines_fitter
     """
+
+    # ---- 0 Keep the lines to the journal's widths ------------------------------------
+    if line_limits_pt is not None:
+        figure_lines_fitter(fig, *line_limits_pt)
 
     # ---- 1 Measure the figure --------------------------------------------------------
     width_pt, height_pt = (float(v) * 72.0 for v in fig.get_size_inches())
@@ -190,14 +211,89 @@ def figure_finisher(fig: Figure,
     """
 
     pad, gap = config['EDGE_PAD_PT'], config['TITLE_GAP_PT']
-    figure_canvas_fitter(fig, pad, suptitle, gap)
+    limits = config.get('LINE_LIMITS_PT')
+    figure_canvas_fitter(fig, pad, suptitle, gap, line_limits_pt=limits)
     if config['PANEL_LETTERS'] and panels:
         panel_letter_adder(fig,
                            panels,
                            config['PANEL_LETTER_FONT_SIZE'],
                            config['PANEL_LETTER_CASE'],
                            )
-        figure_canvas_fitter(fig, pad, suptitle, gap)
+        figure_canvas_fitter(fig, pad, suptitle, gap, line_limits_pt=limits)
+
+
+# ---- figure_lines_fitter -------------------------------------------------------------
+def figure_lines_fitter(fig: Figure,
+                        thinnest_pt: Optional[float],
+                        thickest_pt: Optional[float],
+                        ) -> int:
+    """
+    ---- Summary ----
+    Main function to keep every line drawn in a figure between the thinnest and the
+    thickest line a journal takes, whatever width it was drawn with: the data lines,
+    the axes and their ticks, the edges of markers, boxes, shadings and legends. A
+    width of 0 (no line) is left alone.
+
+    ---- Inputs ----
+    fig : Figure
+        Matplotlib figure, with everything drawn in it.
+    thinnest_pt : Optional[float]
+        Thinnest line the journal takes in points; None when it gives none.
+    thickest_pt : Optional[float]
+        Thickest line the journal takes in points; None when it gives none.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    int
+        How many widths were changed.
+
+    ---- Globals mutated ----
+    None. Changes the line widths of ``fig`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    line_width_fitter
+    """
+
+    if thinnest_pt is None and thickest_pt is None:
+        return 0
+    changed = 0
+    for artist in fig.findobj():
+        # ---- 1 Lines: their own width, and the edge of their markers (the ticks) -----
+        if isinstance(artist, Line2D):
+            for getter, setter in ((artist.get_linewidth, artist.set_linewidth),
+                                   (artist.get_markeredgewidth,
+                                    artist.set_markeredgewidth,
+                                    ),
+                                   ):
+                width = float(getter())
+                fitted = line_width_fitter(width, thinnest_pt, thickest_pt)
+                if fitted != width:
+                    setter(fitted)
+                    changed += 1
+
+        # ---- 2 Groups of lines and shapes: one width each ----------------------------
+        elif isinstance(artist, Collection):
+            widths = [float(width) for width in artist.get_linewidths()]
+            fitted = [line_width_fitter(width, thinnest_pt, thickest_pt)
+                      for width in widths
+                      ]
+            if fitted != widths:
+                artist.set_linewidths(fitted)
+                changed += 1
+
+        # ---- 3 Shapes: the width of their edge ---------------------------------------
+        elif isinstance(artist, Patch):
+            width = float(artist.get_linewidth())
+            fitted = line_width_fitter(width, thinnest_pt, thickest_pt)
+            if fitted != width:
+                artist.set_linewidth(fitted)
+                changed += 1
+    return changed
 
 
 # ---- figure_size_calculator ----------------------------------------------------------
@@ -262,7 +358,10 @@ def figure_style_builder(spec: dict,
     spec : dict
         Journal specification (config.JOURNAL_SPECS entry).
     base_font_pt : float
-        Axis-label size in points; tick labels are 1 pt smaller and titles 1 pt larger.
+        Axis-label size wanted, in points; tick labels are 1 pt smaller and titles 1 pt
+        larger. It is moved to fit the journal: at least spec['font_min_pt'] + 1 and,
+        where that leaves room, at most spec['font_max_pt'] - 1 (no upper limit for a
+        journal whose font_max_pt is None).
     spacing : float
         Tightness of all paddings and gaps: 1.0 is the default, 1.2 is 20 % looser, 0.8
         is 20 % tighter.
@@ -277,74 +376,91 @@ def figure_style_builder(spec: dict,
     dict
         Style dictionary with 'fonts' {tick, label, title, panel_letter} and the points
         values unit, tick_length, tick_pad, label_pad, title_pad, edge_pad, title_gap,
-        event_label_offset, line_width, axes_line_width and thin_line_width.
+        event_label_offset, line_width, axes_line_width and thin_line_width, and
+        'line_limits' (thinnest, thickest), the line widths the journal takes in
+        points, None where it gives none.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
+    base_font_pt = max(min(base_font_pt, font_max_pt - 1), font_min_pt + 1) (6 pt
+    stays 6 for 5 to 7 pt and becomes 7 for 6 to 8 pt);
     unit = base_font_pt x spacing; every padding is a multiple of unit (for example
     title_pad = 0.8 x unit); axes_line_width = 0.65 x line_width_pt; thin_line_width =
-    0.5 x line_width_pt.
+    0.5 x line_width_pt; each line width is then kept between the journal's thinnest
+    and thickest line (0.75, 0.49 and 0.38 pt become 0.75, 0.5 and 0.5 pt for a
+    journal whose thinnest line is 0.5 pt).
 
     ---- Helpers ----
-    None.
+    line_width_fitter
     """
 
-    # ---- 1 Calculate the base unit ---------------------------------------------------
+    # ---- 1 Fit the text to the journal -----------------------------------------------
+    # The smallest text is 1 pt under the axis titles and the largest 1 pt over, so the
+    # axis titles are moved until both are inside what the journal takes; the paddings
+    # follow, as they are multiples of the same size. A journal whose range is narrower
+    # than 2 pt keeps its smallest text legal (figure_style_checker names the rest).
+    # A journal that gives no largest text only lifts text that is too small.
+    low, high = spec['font_min_pt'], spec.get('font_max_pt')
+    if high is not None:
+        base_font_pt = min(base_font_pt, high - 1.0)
+    base_font_pt = max(base_font_pt, low + 1.0)
+
+    # ---- 2 Calculate the base unit ---------------------------------------------------
     unit = base_font_pt * spacing
 
-    # ---- 2 Build the style -----------------------------------------------------------
+    # ---- 3 Build the style -----------------------------------------------------------
+    limits = (spec.get('line_min_pt'), spec.get('line_max_pt'))
     return {'fonts': {'tick': base_font_pt - 1.0,
                       'label': base_font_pt,
                       'title': base_font_pt + 1.0,
                       'panel_letter': spec['panel_letter_pt'],
                       },
-            'unit': unit,                          # the padding unit in points
+            'unit': unit,  # the padding unit in points
             'tick_length': 0.5 * unit,
             'tick_pad': 0.5 * unit,
             'label_pad': 0.5 * unit,
             'title_pad': 0.8 * unit,
             # whitespace between the content and the edge of the figure
             'edge_pad': 0.5 * unit,
-            'title_gap': 1.0 * unit,               # figure title to content
+            'title_gap': 1.0 * unit,  # figure title to content
             'event_label_offset': 0.8 * unit,
-            'line_width': line_width_pt,
-            'axes_line_width': round(0.65 * line_width_pt, 3),
-            'thin_line_width': round(0.5 * line_width_pt, 3),
+            'line_width': line_width_fitter(line_width_pt, *limits),
+            'axes_line_width': line_width_fitter(round(0.65 * line_width_pt, 3),
+                                                 *limits,
+                                                 ),
+            'thin_line_width': line_width_fitter(round(0.5 * line_width_pt, 3),
+                                                 *limits,
+                                                 ),
+            # the thinnest and the thickest line the journal takes (None: no limit),
+            # for the lines drawn with a width of their own (figure_lines_fitter)
+            'line_limits': limits,
             }
 
 
 # ---- figure_style_checker ------------------------------------------------------------
-def figure_style_checker(journal: str,
-                         spec: dict,
-                         fonts: dict,
-                         size_inches: Tuple[float, float],
-                         label: str = '',
-                         ) -> List[str]:
+def figure_style_checker(spec: dict, fonts: dict) -> List[str]:
     """
     ---- Summary ----
-    Main function to list warnings for fonts outside the journal range or a figure
-    taller than the journal allows.
+    Main function to list, one plain sentence each, the kinds of text of the figures
+    that are smaller or larger than the journal asks for. The height of a figure needs
+    no check: it is chosen as a part of the tallest figure the journal takes.
 
     ---- Inputs ----
-    journal : str
-        Journal name, used in the warning text.
     spec : dict
-        Journal specification (config.JOURNAL_SPECS entry).
+        Journal specification (config.JOURNAL_SPECS entry); its 'name', 'font_min_pt'
+        and 'font_max_pt' are used (a font_max_pt of None: no text is too large).
     fonts : dict
-        Font sizes in points keyed by role, as in make_style()['fonts'].
-    size_inches : Tuple[float, float]
-        (width, height) of the figure in inches.
-    label : str
-        Text put in front of each warning.
+        Font sizes in points keyed by role, as in figure_style_builder()['fonts'].
 
     ---- Globals read ----
-    MM_PER_INCH (module constant).
+    TEXT_NAMES (module constant).
 
     ---- Outputs ----
     List[str]
-        Warning messages; empty when the style fits the journal.
+        Warning sentences, in the order of TEXT_NAMES; empty when the text fits the
+        journal.
 
     ---- Globals mutated ----
     None.
@@ -356,27 +472,60 @@ def figure_style_checker(journal: str,
     None.
     """
 
-    # ---- 1 Check the font sizes ------------------------------------------------------
+    # ---- 1 Check each kind of text ---------------------------------------------------
     warnings = []
-    low, high = spec['font_min_pt'], spec['font_max_pt']
-    outside = {name: value
-               for name, value in fonts.items()
-               if name != 'panel_letter' and not low <= value <= high
-               }
-    if outside:
-        warnings.append(f"{label}text sizes {outside} are outside {journal}'s {low:g}-"
-                        f'{high:g} pt range.',
-                        )
-
-    # ---- 2 Check the figure height ---------------------------------------------------
-    height_mm = size_inches[1] * MM_PER_INCH
-    if height_mm > spec['max_height_mm'] + 0.5:
-        warnings.append(f'{label}height {height_mm:.0f} mm is more than the '
-                        f"{spec['max_height_mm']} mm {journal} allows when the "
-                        f'legend sits under the figure (a full page is '
-                        f"{spec['page_height_mm']} mm).",
-                        )
+    low, high = spec['font_min_pt'], spec.get('font_max_pt')
+    for role, text_name in TEXT_NAMES.items():
+        size = fonts[role]
+        if size < low:
+            warnings.append(f'The {text_name} of the figures ({size:g} pt) are smaller '
+                            f"than the {low:g} pt {spec['name']} asks for.",
+                            )
+        elif high is not None and size > high:
+            warnings.append(f'The {text_name} of the figures ({size:g} pt) are larger '
+                            f"than the {high:g} pt {spec['name']} allows.",
+                            )
     return warnings
+
+
+# ---- font_family_lister --------------------------------------------------------------
+def font_family_lister(families: List[str]) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to list the fonts of a figure that are on this computer, in the
+    order given, so a character the first font cannot draw (a subscript, a raised
+    minus) is drawn in the next one that can.
+
+    ---- Inputs ----
+    families : List[str]
+        Font names, the wanted one first and the fallbacks after it.
+
+    ---- Globals read ----
+    None. Reads the list of installed fonts (side effect).
+
+    ---- Outputs ----
+    List[str]
+        The names that are installed, in the same order; a name given twice is kept
+        once. ['sans-serif'] when none is, which is the plotting library's own font.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    installed = []
+    for family in dict.fromkeys(families):
+        try:
+            findfont(family, fallback_to_default=False)
+        except ValueError:  # that font is not on this computer
+            continue
+        installed.append(family)
+    return installed or ['sans-serif']
 
 
 # ---- gap_space_calculator ------------------------------------------------------------
@@ -420,6 +569,53 @@ def gap_space_calculator(gap_pt: float, extent_pt: float, n: int) -> float:
                          ' figure or a smaller font/spacing.',
                          )
     return gap_pt * n / room
+
+
+# ---- line_width_fitter ---------------------------------------------------------------
+def line_width_fitter(width_pt: float,
+                      thinnest_pt: Optional[float],
+                      thickest_pt: Optional[float],
+                      ) -> float:
+    """
+    ---- Summary ----
+    Main function to keep a line width between the thinnest and the thickest line a
+    journal takes.
+
+    ---- Inputs ----
+    width_pt : float
+        Line width in points; 0 means no line and stays 0.
+    thinnest_pt : Optional[float]
+        Thinnest line the journal takes in points; None when it gives none.
+    thickest_pt : Optional[float]
+        Thickest line the journal takes in points; None when it gives none.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        The width, lifted to thinnest_pt or lowered to thickest_pt where it was
+        outside them.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    width = min(max(width_pt, thinnest_pt), thickest_pt) for a width above 0 (0.375 pt
+    becomes 0.5 pt with a thinnest line of 0.5 pt; 2.6 pt becomes 1.5 pt with a
+    thickest line of 1.5 pt).
+
+    ---- Helpers ----
+    None.
+    """
+
+    if not width_pt > 0:
+        return width_pt
+    if thinnest_pt is not None:
+        width_pt = max(width_pt, thinnest_pt)
+    if thickest_pt is not None:
+        width_pt = min(width_pt, thickest_pt)
+    return width_pt
 
 
 # ---- panel_letter_adder --------------------------------------------------------------
@@ -553,8 +749,8 @@ def stack_legend_drawer(axes: List[Axes],
     axes : List[Axes]
         Axes of the stack, top first.
     config : dict
-        Settings; uses LEGEND_FONT_SIZE, LEGEND_FRAME, LEGEND_FRAME_LINE_WIDTH
-        (optional) and VO2_LABEL (optional).
+        Settings; uses LEGEND_FONT_SIZE, LEGEND_FRAME and LEGEND_FRAME_LINE_WIDTH
+        (optional).
     bottom : Optional[Axes]
         Lowest axes of the span to centre on (for example the bottom row of a grid of
         stacks), or None for the stack itself.
@@ -584,10 +780,10 @@ def stack_legend_drawer(axes: List[Axes],
     # ---- 1 Collect the lines ---------------------------------------------------------
     handles, labels = [], []
     for ax in axes:
-        if ax.get_ylabel().startswith('OCR'):
+        if getattr(ax, 'is_ocr', False):
             continue
         for handle, label in zip(*ax.get_legend_handles_labels()):
-            if label != config.get('VO2_LABEL') and not label.startswith('_'):
+            if not label.startswith('_'):
                 handles.append(handle)
                 labels.append(label)
     if not handles:

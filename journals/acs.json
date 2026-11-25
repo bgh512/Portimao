@@ -1,0 +1,18 @@
+{
+    "name": "ACS journals",
+    "widths_mm": {"1": 84.7, "2": 177.8},
+    "tallest_figure_mm": 232.8,
+    "smallest_text_pt": 4.5,
+    "largest_text_pt": null,
+    "panel_letter_pt": 8,
+    "panel_letter_case": "upper",
+    "fonts": ["Helvetica", "Arial"],
+    "thinnest_line_pt": 0.5,
+    "thickest_line_pt": null,
+    "picture_dpi": 300,
+    "page_mm": [214.3, 282.5],
+    "read_at": ["https://researcher-resources.acs.org/publish/author_guidelines/pdf?coden=bichaw",
+                "two example papers (ACS Infectious Diseases, ACS Medicinal Chemistry Letters)"],
+    "confirmed": "2026-11-23, by hand from the Biochemistry author guidelines (Appendix 2, Preparing Graphics): 1 column up to 240 points (3.33 in), 2 columns up to 504 points (7 in), the tallest figure of 660 points (9.167 in), which includes the caption, lettering no smaller than 4.5 points, Helvetica or Arial, lines of at least 0.5 point and 300 dpi for colour art. 2026-11-25, from two example papers: the page of 214.3 x 282.5 mm in both, and bold capital panel letters in both.",
+    "notes": "The guide gives no largest text, so none is checked. Not confirmed: the size of the panel letters (8 pt; the example papers print them at about 9 pt)."
+}

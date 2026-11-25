@@ -2,9 +2,17 @@
 Tests of the tidy form of an event label, and that the figures can draw its symbols.
 """
 
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
+import io
+import warnings
+
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import matplotlib
+import pytest
 from matplotlib import font_manager
+from matplotlib.figure import Figure
 from matplotlib.ft2font import FT2Font
+from matplotlib.lines import Line2D
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
@@ -179,6 +187,46 @@ def test_number_and_unit_get_a_space() -> None:
     assert label_tidier('8ug ml') == '8 µg mL'
     assert label_tidier('100uM KCN') == '100 µM KCN'
     assert label_tidier('2mM azide') == '2 mM azide'
+
+
+# ---- test_symbols_are_drawn_by_the_figure_settings -----------------------------------
+@pytest.mark.parametrize('journal', sorted(settings.JOURNAL_SPECS))
+def test_symbols_are_drawn_by_the_figure_settings(journal: str) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a figure drawn with the program's own settings draws
+    every symbol: a character the journal's font lacks (Arial has no subscripts and no
+    raised minus) is taken from the next font, not drawn as an empty box.
+
+    ---- Inputs ----
+    journal : str
+        Key of the journal whose figure settings are used.
+
+    ---- Globals read ----
+    SYMBOLS, SUPERSCRIPT_TABLE (imported); settings.DEFAULT_ANSWERS.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    text = ''.join(SYMBOLS) + ''.join(chr(c) for c in SUPERSCRIPT_TABLE.values())
+    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS, journal=journal))
+    with matplotlib.rc_context(cfg.RC_PARAMS), warnings.catch_warnings():
+        # the plotting library warns of each character it draws as an empty box
+        warnings.simplefilter('error')
+        fig = Figure()
+        fig.text(0.5, 0.5, text)
+        fig.legend(handles=[Line2D([], [], label=text)])
+        fig.savefig(io.BytesIO(), format='png')
 
 
 # ---- test_symbols_can_be_drawn_in_the_figures ----------------------------------------

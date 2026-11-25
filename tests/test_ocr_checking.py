@@ -294,6 +294,9 @@ def test_wrong_sum_is_caught() -> None:
     message = ocr_check_describer(check, 'run1.paf')
     assert message.startswith('run1.paf: ')
     assert PART_LABELS['sum'] in message
+    # a per is a power of -1 in the sentence, never a slash
+    assert '(off by 5 µM min⁻¹, 0.001 µM min⁻¹ allowed)' in message
+    assert 'µM/min' not in message
 
 
 # ---- test_wrong_leak_is_caught -------------------------------------------------------

@@ -29,6 +29,11 @@ from utils_shared.helpers import (file_name_sanitiser,
                                   panel_name_teller,
                                   panel_order_merger,
                                   )
+from utils_shared.figure_page import (FigurePage,
+                                      FigurePageError,
+                                      template_path_finder,
+                                      template_saver,
+                                      )
 from utils_shared.master_page_exporter import master_page_exporter
 from utils_shared.individual_experiment_exporter import (size_describer,
                                                          spectra_size_estimator,
@@ -107,6 +112,7 @@ from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          ViewerSession,
                                          )
 from utils_viewer.viewer_gui import active_gui_getter
+from utils_viewer.viewer_page import page_offer_checker
 from utils_viewer.viewer_guide import (EXPORT_BUTTONS,
                                        EXPORT_FULL_CHANGE,
                                        EXPORT_TRIMMED_CHANGE,
@@ -219,6 +225,8 @@ EXPORT_CHOICES = (('summary', 'Export the summary'),
                   ('trimmed', 'Export the summary and the trimmed csv'),
                   ('full', 'Export the summary and the trimmed and full csv'),
                   )
+PAGE_NUDGE = ('Build the figure on the page on the right; click Continue when it is '
+              'ready.')
 WINDOW_NUDGE = ('Type the numbers of the averaging regions in the Time regions box '
                 'above the plot, or drag the edges of a region; press Continue when '
                 'the regions look right.')
@@ -2752,6 +2760,88 @@ def _table_filler(session: ViewerSession,
         window.table_hider()
 
 
+# ---- _template_offer_asker -----------------------------------------------------------
+def _template_offer_asker(page: FigurePage,
+                          kept: FigurePage,
+                          layouts_folder: Path,
+                          ) -> Optional[Path]:
+    """
+    ---- Summary ----
+    Helper function to offer, once the page of a dataset figure is built, to save it
+    as a template for another dataset, and to save it under the name typed. Nothing
+    is asked for a page with no plot, or one already saved as a template or loaded
+    from one and not changed since. A template of the same name is written over only
+    after asking.
+
+    ---- Inputs ----
+    page : FigurePage
+        The page as built.
+    kept : FigurePage
+        The page as it was last saved as a template, loaded from one, or started.
+    layouts_folder : Path
+        The layouts folder, where templates are saved.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[Path]
+        The template file written, or None when nothing was saved.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal and writes the template file; the
+    details of a problem go to the log (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    page_offer_checker
+    problem_teller
+    template_path_finder
+    template_saver
+    text_asker
+    yes_no_asker
+    """
+
+    if not page_offer_checker(page, kept):
+        return None
+    if not yes_no_asker('Do you want to save this page as a template, to load it for '
+                        'another dataset?',
+                        False,
+                        number='6.2',
+                        ):
+        return None
+    def name_checker(text: Optional[str]) -> Optional[str]:
+        return None if (text or '').strip() else 'Type a name for the template.'
+    while True:
+        name = text_asker('What should the template be called?',
+                          checker=name_checker,
+                          number='6.3',
+                          ).strip()
+        path = template_path_finder(layouts_folder, name)
+        if path.exists() and not yes_no_asker(f'A template called {path.stem} is '
+                                              f'already there. Do you want to replace '
+                                              f'it?',
+                                              False,
+                                              number='6.4',
+                                              ):
+            continue
+        try:
+            saved = template_saver(page, layouts_folder, name, may_replace=True)
+        except FigurePageError as exc:  # its message is one plain sentence
+            info_printer(str(exc))
+            return None
+        except OSError as exc:
+            info_printer(problem_teller('The template could not be saved', exc))
+            return None
+        info_printer(f'Saved the template {saved.stem} in {layouts_folder}. It is in '
+                     f'the list beside Load template from now on.',
+                     )
+        return saved
+
+
 # ---- _unfit_windows_lister -----------------------------------------------------------
 def _unfit_windows_lister(spans: List[Tuple[str, float, float, Optional[str]]],
                           quick: List[Tuple[str, float, float, Optional[str]]],
@@ -3369,6 +3459,65 @@ def details_stage_runner(session: ViewerSession,
         saved[name] = dict(saved.get(name) or {}, events=events)
     redraw()
     return details
+
+
+# ---- page_stage_runner ---------------------------------------------------------------
+def page_stage_runner(layouts_folder: Path) -> FigurePage:
+    """
+    ---- Summary ----
+    Main function to build the page of a dataset figure in the window (Build a figure,
+    6.1): the page starts empty, plots are placed by dragging across its grid, and a
+    template can be loaded or saved; Continue ends the step, after the offer to save
+    a page that was changed as a template.
+
+    ---- Inputs ----
+    layouts_folder : Path
+        The layouts folder (UserPlaces.layouts_folder), where templates are saved and
+        read.
+
+    ---- Globals read ----
+    PAGE_NUDGE.
+
+    ---- Outputs ----
+    FigurePage
+        The page as placed; an empty page when there is no window.
+
+    ---- Globals mutated ----
+    None. Changes the window, and writes a template when one is asked for (side
+    effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _template_offer_asker
+    active_gui_getter
+    enter_waiter
+    guide_step_starter
+    info_printer
+    """
+
+    guide_step_starter('page')
+    window = active_gui_getter()
+    if window is None:  # the page is built only in the window
+        return FigurePage()
+    info_printer('The page on the right is the journal page at its printed size, with '
+                 'a grid of 6 × 6 cells. Pick a plot type in the strip above it, then '
+                 'drag across the cells it should take; its form opens here.',
+                 )
+    info_printer('Load template puts a layout saved before on the page; Save template '
+                 'keeps this one for later.',
+                 )
+    window.page_shower(FigurePage(), layouts_folder)
+    enter_waiter('Drag across the grid to place each plot. When the page is ready, '
+                 'click Continue.',
+                 PAGE_NUDGE,
+                 number='6.1',
+                 )
+    kept = window.page_kept_reader()
+    page = window.page_hider()
+    _template_offer_asker(page, kept, layouts_folder)
+    return page
 
 
 # ---- pca_stage_runner ----------------------------------------------------------------

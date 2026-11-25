@@ -725,7 +725,7 @@ def summary_figure_asker(names: List[str],
                                   None,
                                   ),
                                  ):
-        guide_step_starter(key)
+        guide_step_starter('page')  # the dataset figures are one step of the guide
         while True:
             result[key] = None
             answers[f'plot_{key}'] = False

@@ -31,7 +31,10 @@ from utils_custom.spectral_difference import (difference_spectrum_calculator,
 from utils_custom.time_response_exporter import time_response_exporter
 from utils_custom.time_response_plotter import time_response_figure_plotter
 from utils_custom.triplicate_averager import triplicate_averager
-from utils_shared.averaging import experiment_averages_calculator, window_kind_picker
+from utils_shared.averaging import (experiment_averages_calculator,
+                                    window_kind_picker,
+                                    window_plan_finder,
+                                    )
 from utils_shared.user_notices import problem_shower, warning_shower
 
 
@@ -77,6 +80,7 @@ def _ocr_and_haem_response_preparer(experiment: dict,
     source_selector
     warning_shower
     window_kind_picker
+    window_plan_finder
     """
 
     # ---- 1 Check the inputs ----------------------------------------------------------
@@ -95,22 +99,23 @@ def _ocr_and_haem_response_preparer(experiment: dict,
     # The figure reads one kind of window, the quick ones under the names of the
     # settled ones.
     prepared = dict(experiment)
-    final_gap = answers['final_gap_minutes']
+    plan = window_plan_finder(answers, experiment['experiment_name'])
     is_quick = answers['ho_window_kind'] == 'quick'
     experiment_averages_calculator(prepared,
-                                   window_minutes=answers['window_minutes'],
-                                   gap_minutes=answers['gap_minutes'],
-                                   final_window_gap_minutes=final_gap,
+                                   window_minutes=plan['window_minutes'],
+                                   gap_minutes=plan['gap_minutes'],
+                                   final_window_gap_minutes=plan['final_gap_minutes'],
                                    vo2_source=vo2_source,
                                    haem_source=haem_source,
                                    baseline_minimum_seconds=(
                                        settings.BASELINE_MINIMUM_SECONDS
                                    ),
-                                   quick_minutes=answers['quick_minutes']
+                                   quick_minutes=plan['quick_minutes']
                                    if is_quick
                                    else None,
-                                   delay_minutes=answers['delay_minutes'],
+                                   delay_minutes=plan['delay_minutes'],
                                    is_settled=not is_quick,
+                                   each_window=plan['each_window'],
                                    )
     prepared['averages'] = window_kind_picker(prepared['averages'],
                                               answers['ho_window_kind'],
@@ -160,6 +165,7 @@ def _time_response_preparer(experiment: dict,
     difference_spectrum_calculator
     difference_spectrum_decomposer
     spectral_averager
+    window_plan_finder
     """
 
     # ---- 1 Copy and label the experiment ---------------------------------------------
@@ -167,16 +173,18 @@ def _time_response_preparer(experiment: dict,
     prepared['group'] = group
 
     # ---- 2 Average the spectra -------------------------------------------------------
+    plan = window_plan_finder(answers, experiment['experiment_name'])
     spectral_averager(prepared,
                       answers['decomposition_dataset'],
                       'attenuation',
-                      answers['window_minutes'],
-                      answers['gap_minutes'],
-                      answers['final_gap_minutes'],
+                      plan['window_minutes'],
+                      plan['gap_minutes'],
+                      plan['final_gap_minutes'],
                       None,
                       answers['tr_window_kind'],
-                      answers['quick_minutes'],
-                      answers['delay_minutes'],
+                      plan['quick_minutes'],
+                      plan['delay_minutes'],
+                      plan['each_window'],
                       )
 
     # ---- 3 Calculate and decompose the difference spectrum ---------------------------

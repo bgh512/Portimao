@@ -1,0 +1,18 @@
+{
+    "name": "Cell",
+    "widths_mm": {"1": 85, "1.5": 114, "2": 174},
+    "tallest_figure_mm": 200,
+    "smallest_text_pt": 6,
+    "largest_text_pt": 8,
+    "panel_letter_pt": 8,
+    "panel_letter_case": "upper",
+    "fonts": ["Arial"],
+    "thinnest_line_pt": 0.5,
+    "thickest_line_pt": 1.5,
+    "picture_dpi": 300,
+    "page_mm": [212.7, 276.2],
+    "read_at": ["https://www.cell.com/information-for-authors/figure-guidelines",
+                "two example papers (Cell, Cell Metabolism)"],
+    "confirmed": "2026-11-23, by hand from the guide: the widths of the two-column formats, the tallest figure (it recommends at most 16.5 x 20 cm), text of about 6 to 8 pt, capital panel letters, only Arial, lines of 0.5 to 1.5 pt and at least 300 dpi for colour figures. 2026-11-25, from two example papers: the page of 212.7 x 276.2 mm in both, and bold capital panel letters in both.",
+    "notes": "Cell Metabolism's own table gives 84 mm for 1 column: 85 mm from Cell's guide is kept. Not confirmed: the size of the panel letters (8 pt; the example papers print them at about 9 pt)."
+}

@@ -447,6 +447,39 @@ def logging_stopper(session: Optional[dict]) -> None:
             session['closed'] = True
 
 
+# ---- run_log_path_getter -------------------------------------------------------------
+def run_log_path_getter() -> Optional[Path]:
+    """
+    ---- Summary ----
+    Main function to give the file of the run's log while a run is being logged.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    _details_targets (module state).
+
+    ---- Outputs ----
+    Optional[Path]
+        The log file, or None while no run is being logged (before the results folder
+        is chosen, or after the run).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    session = _details_targets['session']
+    if session is None or session['closed']:
+        return None
+    return session['log_path']
+
+
 # ---- settings_logger -----------------------------------------------------------------
 def settings_logger(session: Optional[dict], settings: dict) -> None:
     """

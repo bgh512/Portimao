@@ -15,6 +15,8 @@ from typing import Optional, TextIO
 # ---- CONSTANTS -----------------------------------------------------------------------
 OWN_FOLDER_NAME = 'Portimao'  # the app's own folder, in the home folder
 FITS_FOLDER_NAME = 'fits'
+JOURNALS_FOLDER_NAME = 'journals'  # what each journal asks of a figure, one file each
+LAYOUTS_FOLDER_NAME = 'layouts'  # the templates of the dataset figures, one file each
 LOGS_FOLDER_NAME = 'logs'
 LAST_ANSWERS_NAME = 'last_answers.json'
 LAUNCH_LOG_NAME = 'launch.log'  # the name the launcher gives its log, so both read alike
@@ -32,13 +34,16 @@ class UserPlaces:
     """
     ---- Summary ----
     Where the program's own files are, and where the user's own things are kept: the
-    fits, the folder used last, the logs and the data folders offered by number.
+    fits, the journal files, the templates of the dataset figures, the folder used
+    last, the logs and the data folders offered by number.
     Detailed structure can be found in DATA_FORMAT.md.
     """
 
     program_folder: Path
     own_folder: Path
     fits_folder: Path
+    journals_folder: Path
+    layouts_folder: Path
     last_answers_file: Path
     logs_folder: Path
     is_app: bool
@@ -181,23 +186,25 @@ def launch_log_opener(path: Path, max_bytes: int = LAUNCH_LOG_MAX_BYTES) -> Text
 def user_folder_preparer(places: UserPlaces) -> None:
     """
     ---- Summary ----
-    Main function to make the Mac app's own folder, with its fits and logs folders, and
-    to copy in each fit that comes with the program and is not there yet, the haem
-    library and the presets in their own folders. A fit already there is never
-    overwritten, so the user's changes are kept. Run from source, nothing is done:
-    everything stays in the program folder.
+    Main function to make the Mac app's own folder, with its fits, journals, layouts
+    and logs folders, and to copy in each fit, journal file and template that comes
+    with the program and is not there yet, the haem library and the presets in their
+    own folders. A
+    file already there is never overwritten, so the user's changes are kept. Run from
+    source, nothing is done: everything stays in the program folder.
 
     ---- Inputs ----
     places : UserPlaces
         Where the user's things are kept (user_places_finder).
 
     ---- Globals read ----
-    FITS_FOLDER_NAME (module constant).
+    FITS_FOLDER_NAME, JOURNALS_FOLDER_NAME, LAYOUTS_FOLDER_NAME (module constants).
 
     ---- Outputs ----
     None
-        Nothing. Raises OSError when the folders cannot be made; a fit that cannot be
-        copied is left out.
+        Nothing. Raises OSError when the folders cannot be made; a fit, a journal
+        file or a template that cannot be copied is left out (the journal is then read
+        from the program's own copy).
 
     ---- Globals mutated ----
     None. Makes folders and copies files (side effects).
@@ -212,17 +219,23 @@ def user_folder_preparer(places: UserPlaces) -> None:
     if not places.is_app:
         return
     places.fits_folder.mkdir(parents=True, exist_ok=True)
+    places.journals_folder.mkdir(parents=True, exist_ok=True)
+    places.layouts_folder.mkdir(parents=True, exist_ok=True)
     places.logs_folder.mkdir(parents=True, exist_ok=True)
-    shipped = places.program_folder / FITS_FOLDER_NAME
-    for fit in sorted(shipped.rglob('*.csv')):
-        target = places.fits_folder / fit.relative_to(shipped)
-        if target.exists():
-            continue
-        try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(fit, target)
-        except OSError:  # that fit is not offered; the others still are
-            continue
+    for name, own, pattern in ((FITS_FOLDER_NAME, places.fits_folder, '*.csv'),
+                               (JOURNALS_FOLDER_NAME, places.journals_folder, '*.json'),
+                               (LAYOUTS_FOLDER_NAME, places.layouts_folder, '*.json'),
+                               ):
+        shipped = places.program_folder / name
+        for source in sorted(shipped.rglob(pattern)):
+            target = own / source.relative_to(shipped)
+            if target.exists():
+                continue
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            except OSError:  # that file is not copied; the others still are
+                continue
 
 
 # ---- user_places_finder --------------------------------------------------------------
@@ -247,8 +260,8 @@ def user_places_finder(is_app: Optional[bool] = None,
         find it (inside the app, or the folder above utils_shared).
 
     ---- Globals read ----
-    FITS_FOLDER_NAME, LAST_ANSWERS_NAME, LOGS_FOLDER_NAME, OWN_FOLDER_NAME (module
-    constants); sys.frozen and sys._MEIPASS (set by the app).
+    FITS_FOLDER_NAME, JOURNALS_FOLDER_NAME, LAST_ANSWERS_NAME, LAYOUTS_FOLDER_NAME,
+    LOGS_FOLDER_NAME, OWN_FOLDER_NAME (module constants); sys.frozen and sys._MEIPASS (set by the app).
 
     ---- Outputs ----
     UserPlaces
@@ -278,6 +291,8 @@ def user_places_finder(is_app: Optional[bool] = None,
     return UserPlaces(program_folder=program_folder,
                       own_folder=own_folder,
                       fits_folder=own_folder / FITS_FOLDER_NAME,
+                      journals_folder=own_folder / JOURNALS_FOLDER_NAME,
+                      layouts_folder=own_folder / LAYOUTS_FOLDER_NAME,
                       last_answers_file=own_folder / LAST_ANSWERS_NAME,
                       logs_folder=own_folder / LOGS_FOLDER_NAME,
                       is_app=is_app,

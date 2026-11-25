@@ -14,7 +14,11 @@ import pandas as pd
 TIME_COLUMN = 'Time (min)'
 SPECTRUM_INDEX_COLUMN = 'spectrum_index'
 # Source names used in the config -> experiment dictionary keys.
-VO2_KEYS = {'raw': 'VoO2', 'od': 'VoO2_OD', 'percent': 'VoO2_percent'}
+VO2_KEYS = {'raw': 'VoO2',
+            'od': 'VoO2_OD',
+            'percent': 'VoO2_percent',
+            'baseline': 'VoO2_baseline',
+            }
 HAEM_KEYS = {'raw': 'haem_conc',
              'od': 'haem_OD',
              'percent': 'haem_percent',

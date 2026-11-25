@@ -1,0 +1,18 @@
+{
+    "name": "Science",
+    "widths_mm": {"1": 57, "2": 121, "3": 184},
+    "tallest_figure_mm": 199,
+    "smallest_text_pt": 5,
+    "largest_text_pt": 7,
+    "panel_letter_pt": 10,
+    "panel_letter_case": "upper",
+    "fonts": ["Helvetica", "Arial"],
+    "thinnest_line_pt": 0.5,
+    "thickest_line_pt": null,
+    "picture_dpi": 300,
+    "page_mm": [209.6, 266.7],
+    "read_at": ["https://www.science.org/content/page/instructions-preparing-initial-manuscript",
+                "https://advertising.science.org/wp-content/uploads/2025/12/2026-Science-Print-Specifications_Product_final.pdf"],
+    "confirmed": "2026-11-23, by hand from the guide: the widths (Science prints in three columns), text of about 7 pt and not smaller than 5 pt, the panel letters (10 pt, bold, capital), lines of at least 0.5 pt and Helvetica. The page size (8 1/4 x 10 1/2 in) is from its advert sheet.",
+    "notes": "Not confirmed: the tallest figure (199 mm)."
+}

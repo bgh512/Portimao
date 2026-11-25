@@ -3,13 +3,13 @@ Event-window spectral averages, their difference spectrum and its decomposition.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-from typing import Optional
+from typing import Dict, Optional
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.averaging import kind_span_lister
+from utils_shared.averaging import kind_span_lister, LEFT_OUT_PROBLEM
 from utils_shared.spectral_decomposer import spectrum_decomposer
 from utils_shared.user_notices import warning_shower
 
@@ -189,11 +189,14 @@ def spectral_averager(experiment: dict,
                       kind: str = 'settled',
                       quick_minutes: float = 0.5,
                       delay_minutes: float = 0.0,
+                      each_window: Optional[Dict[str, dict]] = None,
                       ) -> dict:
     """
     ---- Summary ----
     Main function to average the chosen spectra in each event window: the baseline,
-    then the settled or the quick window of each addition.
+    then the settled or the quick window of each addition, each with its own length,
+    gap or start where it has them. A window the user left out is skipped without a
+    warning.
 
     ---- Inputs ----
     experiment : dict
@@ -218,9 +221,12 @@ def spectral_averager(experiment: dict,
     delay_minutes : float
         How long after its addition each quick window starts, in minutes; used for
         the quick kind.
+    each_window : Optional[Dict[str, dict]]
+        The windows of this file set on their own (DATA_FORMAT.md, each_window), as
+        window_plan_finder gives them; None for none.
 
     ---- Globals read ----
-    None.
+    LEFT_OUT_PROBLEM (imported).
 
     ---- Outputs ----
     dict
@@ -282,11 +288,14 @@ def spectral_averager(experiment: dict,
                                   final_window_gap_minutes,
                                   quick_minutes,
                                   delay_minutes,
+                                  each_window,
                                   )
 
     # ---- 3 Average the spectra in each window ----------------------------------------
-    windows, skipped = {}, {}
+    windows, skipped, left_out = {}, {}, set()
     for window_name, start, end, problem in boundaries:
+        if problem == LEFT_OUT_PROBLEM:
+            left_out.add(window_name)
         if problem is not None:
             skipped[window_name] = problem.rstrip('.')
             continue
@@ -303,7 +312,8 @@ def spectral_averager(experiment: dict,
                                 else np.full(selected.shape[1], np.nan),
                                 }
     for window_name, reason in skipped.items():
-        warning_shower(f'  Averaging window {window_name} skipped: {reason}.')
+        if window_name not in left_out:
+            warning_shower(f'  Averaging window {window_name} skipped: {reason}.')
 
     # ---- 4 Store the result ----------------------------------------------------------
     final_name, penultimate_name = boundaries[-1][0], boundaries[-2][0]
@@ -321,6 +331,7 @@ def spectral_averager(experiment: dict,
                 'kind': kind,
                 'quick_minutes': quick_minutes,
                 'delay_minutes': delay_minutes,
+                'each_window': dict(each_window or {}),
                 }
     roles = {'penultimate': penultimate_name, 'final': final_name}
     wavelengths = np.asarray(dataset['wavelengths'], dtype=float)
