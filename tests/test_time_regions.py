@@ -501,8 +501,8 @@ def test_export_csv_in_the_trim_step(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_the_figure_step_asks_only_continue(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     ---- Summary ----
-    Main function to check the figure of each file: one Continue (5.1) is asked and
-    nothing else; the oxygen and the OCR are plotted whatever the dataset was saved
+    Main function to check the figure of each file (Finalise figures): one
+    instruction (5.1) with its button named Export is asked and nothing else; the oxygen and the OCR are plotted whatever the dataset was saved
     with, every haem of the fit is, and the angle of the labels is the one in use. The
     plot and the question are stood in for.
 
@@ -529,7 +529,7 @@ def test_the_figure_step_asks_only_continue(monkeypatch: pytest.MonkeyPatch) -> 
 
     asked = []
     def waiter(question: str, nudge: str, **kwargs: Any) -> str:
-        asked.append((question, kwargs.get('number')))
+        asked.append((question, kwargs.get('number'), kwargs.get('go_words')))
         return ''
     def refused(*args: Any, **kwargs: Any) -> None:
         raise AssertionError('no other question is asked')
@@ -555,10 +555,13 @@ def test_the_figure_step_asks_only_continue(monkeypatch: pytest.MonkeyPatch) -> 
                    )
     defaults = dict(answers, event_label_angle=45.0)
     assert viewer_stages.plots_stage_runner(session, answers, defaults, {}, {})
-    assert asked == [('Change the figure in the boxes above the plot, then click '
-                      'Continue.',
-                      '5.1',
-                      ),
+    assert asked == [(
+        'Use the arrows to change the order of the panels, or change '
+        'earlier settings. When ready, click Export to choose which files '
+        'to export.',
+        '5.1',
+        'Export',
+        ),
                      ]
     assert answers['plot_o2'] and answers['plot_ocr'] and answers['plot_haems']
     assert answers['haems'] == ['a', 'b', 'c']

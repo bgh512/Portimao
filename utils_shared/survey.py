@@ -2075,53 +2075,6 @@ def size_asker(answers: dict,
                                            )
 
 
-# ---- spectra_export_asker ------------------------------------------------------------
-def spectra_export_asker(has_spectra: bool, default: bool) -> bool:
-    """
-    ---- Summary ----
-    Main function to ask, at the end of the experiment export, whether the workbook
-    of each experiment is written with its spectra as csv files (5.9). It is not asked
-    when an export button of the trimming step wrote them already: one line says so, and
-    they are not written a second time.
-
-    ---- Inputs ----
-    has_spectra : bool
-        True when an export button of the trimming step wrote the spectra as csv files.
-    default : bool
-        The answer Enter gives.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    bool
-        True when the spectra are to be written as csv files with the workbooks.
-
-    ---- Globals mutated ----
-    None. Reads from and prints to the terminal (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    info_printer
-    yes_no_asker
-    """
-
-    if has_spectra:
-        info_printer(
-            'The spectra were exported as csv files with an export button of '
-            'the trimming step, so they are not written again; the workbook of '
-            'each experiment lists them.',
-            )
-        return False
-    return yes_no_asker('Do you want to export the spectra as csv files too (large, '
-                        'and it takes a while)?',
-                        default,
-                        number='5.9',
-                        )
-
-
 # ---- temperature_asker ---------------------------------------------------------------
 def temperature_asker(answers: dict, defaults: dict) -> None:
     """

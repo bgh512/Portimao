@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.27
+- **Version:** V2.28
 - **Date:** 25/11/2026
 
 ## Contents
@@ -273,15 +273,16 @@
     - [`test_haems_are_coloured_by_type`](#test_haems_are_coloured_by_type)
 - [`tests/test_import_export.py`](#teststest_import_exportpy)
     - [`_experiment_maker`](#_experiment_maker)
-    - [`_metadata_reader`](#_metadata_reader)
+    - [`_limits_maker`](#_limits_maker)
     - [`_session_maker`](#_session_maker)
     - [`test_size_in_words`](#test_size_in_words)
     - [`test_spectra_size_by_hand`](#test_spectra_size_by_hand)
     - [`test_workbook_size_by_hand`](#test_workbook_size_by_hand)
     - [`test_each_choice_writes_its_files`](#test_each_choice_writes_its_files)
-    - [`test_spectra_asked_once`](#test_spectra_asked_once)
     - [`test_trimmed_and_whole_go_to_their_folders`](#test_trimmed_and_whole_go_to_their_folders)
     - [`test_new_edges_export_again`](#test_new_edges_export_again)
+    - [`test_workbook_lists_the_quick_csv_files`](#test_workbook_lists_the_quick_csv_files)
+    - [`test_export_step_offers_and_writes`](#test_export_step_offers_and_writes)
 - [`tests/test_journal_files.py`](#teststest_journal_filespy)
     - [`_journal_writer`](#_journal_writer)
     - [`test_shipped_journal_files_are_read`](#test_shipped_journal_files_are_read)
@@ -876,10 +877,12 @@
     - [`_processing_table_builder`](#_processing_table_builder)
     - [`_sheet_table_builder`](#_sheet_table_builder)
     - [`_spectral_csv_exporter`](#_spectral_csv_exporter)
+    - [`_spectral_file_lister`](#_spectral_file_lister)
     - [`_spectral_list_reader`](#_spectral_list_reader)
     - [`averages_table_builder`](#averages_table_builder)
     - [`experiment_workbook_exporter`](#experiment_workbook_exporter)
     - [`size_describer`](#size_describer)
+    - [`spectra_csv_exporter`](#spectra_csv_exporter)
     - [`spectra_size_estimator`](#spectra_size_estimator)
     - [`workbook_size_estimator`](#workbook_size_estimator)
 - [`utils_shared/individual_experiment_plotter.py`](#utils_sharedindividual_experiment_plotterpy)
@@ -1119,7 +1122,6 @@
     - [`results_folder_resolver`](#results_folder_resolver)
     - [`saved_values_reader`](#saved_values_reader)
     - [`size_asker`](#size_asker)
-    - [`spectra_export_asker`](#spectra_export_asker)
     - [`temperature_asker`](#temperature_asker)
     - [`trim_layout_finder`](#trim_layout_finder)
     - [`trim_limits_builder`](#trim_limits_builder)
@@ -1213,7 +1215,9 @@
     - [`_answers_previewer`](#_answers_previewer)
     - [`_component_namer`](#_component_namer)
     - [`_box_edit_runner`](#_box_edit_runner)
-    - [`_export_asker`](#_export_asker)
+    - [`_export_sizes_teller`](#_export_sizes_teller)
+    - [`_export_chooser`](#_export_chooser)
+    - [`_quick_exporter`](#_quick_exporter)
     - [`_figure_starter`](#_figure_starter)
     - [`_fit_file_saver`](#_fit_file_saver)
     - [`_kept_restorer`](#_kept_restorer)
@@ -2522,8 +2526,8 @@ warning_shower
 Main function to ask every question of the run after the files, in numbered
 sections (trimming and ignoring, analysis, plots, summary figures, export), and to
 build the per-file information. The plot and the workbook of every file are saved
-as soon as its processing and figure are accepted, after asking whether the
-spectra are written too, so the later sections show the plot.
+as soon as the figures are finalised and the export chosen (5.9), with the spectra
+when chosen, so the later sections show the plot.
 
 ---- Inputs ----
 folder : Path
@@ -2578,7 +2582,6 @@ multi_figure_checker_builder
 region_files_lister
 section_starter
 special_figures_maker
-spectra_export_asker
 summary_figure_asker
 viewer_asker
 windows_stage_runner
@@ -9120,7 +9123,7 @@ None.
 
 ## `tests/test_import_export.py`
 
-Tests of the export at the end of the import: the size of each choice, what each writes and where, and when the run asks for the spectra again.
+Tests of the spectra exports: the size of each part, what the quick export of the trim step and the Export step (5.9) write and where, and the workbook that lists the csv files.
 
 ### HELPERS
 
@@ -9158,22 +9161,25 @@ None.
 None.
 ```
 
-#### `_metadata_reader`
+#### `_limits_maker`
 
 ```text
 ---- Summary ----
-Helper function to read the Metadata sheet of a workbook as {field: value}.
+Helper function to build the trim and ignore limits of the two made-up files, with
+nothing ignored.
 
 ---- Inputs ----
-path : Path
-    The workbook.
+run1_trim : tuple
+    (trim start, trim end) of run1 in minutes, None for no trim.
+run2_trim : tuple
+    The same for run2.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 dict
-    {field: value} of the Metadata sheet.
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}}.
 
 ---- Globals mutated ----
 None.
@@ -9311,10 +9317,10 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check what each of the four choices of the export writes for a
-trimmed file and for one not trimmed: the whole recording only with the "full"
-choices, the spectra csv files only with the "raw CSVs" choices, beside each
-workbook written and cut as its workbook is.
+Main function to check what each choice of a spectra export writes for a trimmed
+file and for one not trimmed: only csv files, never a workbook; the trimmed spectra
+with 'trimmed' and 'full', the whole recording's only for the trimmed file with
+'full' and 'full_only', each cut as its name says.
 
 ---- Inputs ----
 tmp_path : Path
@@ -9323,7 +9329,7 @@ monkeypatch : pytest.MonkeyPatch
     Used to stand in for the reading of the files.
 
 ---- Globals read ----
-EVENTS (module constant); EXPORT_PARTS.
+CSV_NAME, EVENTS (module constants); EXPORT_PARTS.
 
 ---- Outputs ----
 None.
@@ -9336,45 +9342,18 @@ A spectrum a minute from 0 to 10 min: 11 spectra in the whole recording, 7 kept
 from 2 to 8 min; a csv file has one column more, the wavelengths.
 
 ---- Helpers ----
+_limits_maker
 _session_maker
-```
-
-#### `test_spectra_asked_once`
-
-```text
----- Summary ----
-Main function to check that the run asks for the spectra csv files only when the
-export of the import did not write them: asked, it gives the answer; not asked, it
-says why in one line and the run writes none.
-
----- Inputs ----
-monkeypatch : pytest.MonkeyPatch
-    Used to stand in for the question and the message.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
 ```
 
 #### `test_trimmed_and_whole_go_to_their_folders`
 
 ```text
 ---- Summary ----
-Main function to check where the export of the import writes with the whole
-recordings chosen: a trimmed file's trimmed data in its own folder, with the edges,
-OD values and labels, and its whole recording in full/ without the edges; a file
-not trimmed has no full/.
+Main function to check where the quick export writes with the whole recordings
+chosen: a trimmed file's trimmed spectra in its own folder, on the clock of the
+trimmed data, and its whole recording's in full/ on the clock of the recording; a
+file not trimmed has no full/.
 
 ---- Inputs ----
 tmp_path : Path
@@ -9383,7 +9362,7 @@ monkeypatch : pytest.MonkeyPatch
     Used to stand in for the reading of the files.
 
 ---- Globals read ----
-EVENTS (module constant).
+CSV_NAME, EVENTS (module constants).
 
 ---- Outputs ----
 None.
@@ -9392,10 +9371,11 @@ None.
 None.
 
 ---- Equations ----
-Kept from 2 to 8 min of a point a minute: 7 points, the addition at 5 - 2 = 3 min.
+Kept from 2 to 8 min of a spectrum a minute: 7 spectra, at 0 to 6 min on the
+trimmed clock.
 
 ---- Helpers ----
-_metadata_reader
+_limits_maker
 _session_maker
 ```
 
@@ -9403,9 +9383,9 @@ _session_maker
 
 ```text
 ---- Summary ----
-Main function to check the export once the edges change: a whole recording already
-written is left as it is, a file that has just become trimmed gets one, and a file
-no longer trimmed loses the one written for it.
+Main function to check the quick export once the edges change: a whole recording
+already written is left as it is, a file that has just become trimmed gets one,
+and a file no longer trimmed loses the one written for it.
 
 ---- Inputs ----
 tmp_path : Path
@@ -9414,7 +9394,68 @@ monkeypatch : pytest.MonkeyPatch
     Used to stand in for the reading of the files.
 
 ---- Globals read ----
-EVENTS (module constant).
+CSV_NAME, EVENTS (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Trimmed from 3 to 8 min: 6 spectra, 7 columns with the wavelengths.
+
+---- Helpers ----
+_limits_maker
+_session_maker
+```
+
+#### `test_workbook_lists_the_quick_csv_files`
+
+```text
+---- Summary ----
+Main function to check that a workbook written after the quick export, without
+writing the spectra again, lists the csv files the quick export left beside it,
+with their number of wavelengths and spectra.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+CSV_NAME (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The made-up file: 3 wavelengths, 11 spectra.
+
+---- Helpers ----
+_experiment_maker
+```
+
+#### `test_export_step_offers_and_writes`
+
+```text
+---- Summary ----
+Main function to check the Export step (5.9): the three choices with a file
+trimmed and the first two with none, the last answer highlighted, the answers it
+stores, and that only the third writes the whole recordings' csv files at once
+(the rest is written with the workbooks). The question, the messages and the
+export are stood in for.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+monkeypatch : pytest.MonkeyPatch
+    Used to stand in for the question, the messages and the export.
+
+---- Globals read ----
+None.
 
 ---- Outputs ----
 None.
@@ -9426,7 +9467,7 @@ None.
 None.
 
 ---- Helpers ----
-_metadata_reader
+_limits_maker
 _session_maker
 ```
 
@@ -15980,8 +16021,8 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check the figure of each file: one Continue (5.1) is asked and
-nothing else; the oxygen and the OCR are plotted whatever the dataset was saved
+Main function to check the figure of each file (Finalise figures): one
+instruction (5.1) with its button named Export is asked and nothing else; the oxygen and the OCR are plotted whatever the dataset was saved
 with, every haem of the fit is, and the angle of the labels is the one in use. The
 plot and the question are stood in for.
 
@@ -27389,6 +27430,37 @@ None.
 None.
 ```
 
+#### `_spectral_file_lister`
+
+```text
+---- Summary ----
+Helper function to list the spectral CSV files already in a folder with no
+workbook that lists them (written by the quick export of the trim step), reading
+only the first line of each for its number of spectra.
+
+---- Inputs ----
+folder : Path
+    The folder of the workbook about to be written; it may not exist.
+
+---- Globals read ----
+SPECTRAL_CSV_TYPES, SPECTRAL_FILE_COLUMN (module constants).
+
+---- Outputs ----
+List[dict]
+    The records of _spectral_csv_exporter, one per CSV file found, by name; the
+    number of wavelengths is the number of lines after the heading. Empty when
+    there are none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Timepoints = columns of the heading - 1 (the wavelength column).
+
+---- Helpers ----
+None.
+```
+
 #### `_spectral_list_reader`
 
 ```text
@@ -27489,7 +27561,8 @@ subfolder : str
 keeps_spectra_list : bool
     True, with ``spectra`` False, lists again the spectral CSV files the workbook
     being replaced listed and that are still beside it (those written earlier in
-    the same run), without writing them again.
+    the same run), or with no such workbook the CSV files in its folder, without
+    writing them again.
 
 ---- Globals read ----
 DATA_SHEETS, HAEM_VIEW_TEXTS, METADATA_TEXTS,
@@ -27511,6 +27584,7 @@ _frame_writer
 _processing_table_builder
 _sheet_table_builder
 _spectral_csv_exporter
+_spectral_file_lister
 _spectral_list_reader
 averages_table_builder
 file_name_sanitiser
@@ -27542,6 +27616,42 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+#### `spectra_csv_exporter`
+
+```text
+---- Summary ----
+Main function to write only the spectral CSV files of one experiment, with no
+workbook, into <output_dir>/<name>/ (or a folder inside it, such as the full/ of a
+trimmed experiment's whole recording).
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md, with its raw spectra.
+output_dir : Path
+    Results folder.
+subfolder : str
+    Folder inside the experiment's folder to write into (FULL_FOLDER); '' for the
+    experiment's folder itself.
+
+---- Globals read ----
+SPECTRAL_FILE_COLUMN (module constant).
+
+---- Outputs ----
+List[Path]
+    Paths of the CSV files written. Raises ValueError when a spectrum length does
+    not match the wavelengths.
+
+---- Globals mutated ----
+None. Creates the folder and the CSV files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_spectral_csv_exporter
+file_name_sanitiser
 ```
 
 #### `spectra_size_estimator`
@@ -31024,7 +31134,8 @@ default : object
     What Enter gives: 'y' or 'n'; the number of a choice (from 1); the numbers of
     the choices ticked at first; the folder highlighted at first; None for none.
 value : Optional[str]
-    What the typing box starts with ('number', 'text', 'folder').
+    What the typing box starts with ('number', 'text', 'folder'), or the words of
+    the button that goes on ('continue'; None for Continue).
 
 ---- Globals read ----
 _answer_requester (module state).
@@ -31608,8 +31719,9 @@ retry_teller
 ---- Summary ----
 Main function to give a numbered instruction that is carried out in the window (on
 the plot or in the boxes above it) and wait until Continue (Enter with the answer
-box empty) or one of the extra buttons is clicked. Anything else typed is answered
-with ``nudge`` and the instruction goes on waiting.
+box empty), or the button named in its place, or one of the extra buttons is
+clicked. Anything else typed is answered with ``nudge`` and the instruction goes
+on waiting.
 
 ---- Inputs ----
 question : str
@@ -31624,13 +31736,16 @@ number : Optional[str]
 extras : Sequence[Tuple[str, str]]
     (answer, words) of each button shown above Continue, such as ('export',
     'Export trimmed csv'); empty for Continue alone.
+go_words : Optional[str]
+    The words of the button that goes on, such as 'Export'; None for Continue.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 str
-    '' for Continue, or the answer of the extra button clicked.
+    '' for Continue (or the button in its place), or the answer of the extra
+    button clicked.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect); advances the question
@@ -36087,39 +36202,6 @@ None.
 _columns_text_builder
 choice_asker
 number_asker
-```
-
-#### `spectra_export_asker`
-
-```text
----- Summary ----
-Main function to ask, at the end of the experiment export, whether the workbook
-of each experiment is written with its spectra as csv files (5.9). It is not asked
-when an export button of the trimming step wrote them already: one line says so, and
-they are not written a second time.
-
----- Inputs ----
-has_spectra : bool
-    True when an export button of the trimming step wrote the spectra as csv files.
-default : bool
-    The answer Enter gives.
-
----- Globals read ----
-None.
-
----- Outputs ----
-bool
-    True when the spectra are to be written as csv files with the workbooks.
-
----- Globals mutated ----
-None. Reads from and prints to the terminal (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-info_printer
-yes_no_asker
 ```
 
 #### `temperature_asker`
@@ -41981,12 +42063,12 @@ Detailed structure can be found in DATA_FORMAT.md.
 
 ```text
 ---- Summary ----
-Helper function to export the imported data of one file, read once: for a trimmed
-file, when the choice asks for it, the whole recording into the full folder of its
-results folder, then the data kept by the trimming (all of it for a file not
-trimmed) into its results folder, with the OD values and labels entered. A file
-that is no longer trimmed loses the whole recording written for it earlier in this
-run, as it has nothing called full.
+Helper function to write the spectra of one file as csv files, read once: for a
+trimmed file, when the choice asks for it, the whole recording's into the full
+folder of its results folder, then, when the choice asks for it, those of the data
+kept by the trimming (all of it for a file not trimmed) into its results folder.
+No workbook is written. A file that is no longer trimmed loses the whole recording
+written for it earlier in this run, as it has nothing called full.
 
 ---- Inputs ----
 session : ViewerSession
@@ -41998,7 +42080,7 @@ limits : dict
 details : dict
     {file name: {OD, volume, dilution_factor, events}}; may lack the file.
 choice : str
-    A key of EXPORT_PARTS: 'summary', 'summary_full', 'spectra' or 'spectra_full'.
+    A key of EXPORT_PARTS: 'trimmed', 'full' or 'full_only'.
 keep_full : bool
     True leaves a whole recording already written in this run as it is (the edges
     changed, and the whole recording does not depend on them).
@@ -42011,7 +42093,7 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Reads the file, writes or removes the exported files and records the whole
+None. Reads the file, writes or removes the csv files and records the whole
 recordings written in session.full_exports (side effects).
 
 ---- Equations ----
@@ -42020,8 +42102,8 @@ None.
 ---- Helpers ----
 experiment_data_processor
 experiment_trimmer
-experiment_workbook_exporter
 preview_info_builder
+spectra_csv_exporter
 ```
 
 #### `_kept_haems_drawer`
@@ -42405,12 +42487,11 @@ None.
 
 ```text
 ---- Summary ----
-Main function to export the imported data of every file (or of the files named), so
-it can be plotted outside the program: in each file's results folder the workbook
-of the data kept by the trimming (the oxygen, OCR, events with their labels, and the
-OD values and edges); for a trimmed file the whole recording in its full folder, if
-chosen; the spectra as csv files beside each workbook, if chosen. No haem
-decomposition, OD scaling or averaging is applied; the ignored parts are left in.
+Main function to write the spectra of every file (or of the files named) as csv
+files, so they can be used outside the program: in each file's results folder
+those of the data kept by the trimming, if chosen; for a trimmed file those of the
+whole recording in its full folder, if chosen. No workbook is written, and the
+ignored parts are left in.
 
 ---- Inputs ----
 session : ViewerSession
@@ -42420,9 +42501,9 @@ limits : dict
 details : dict
     {file name: {OD, volume, dilution_factor, events}} (details_stage_runner).
 choice : str
-    A key of EXPORT_PARTS: 'summary' (the workbook of the trimmed data),
-    'summary_full' (and the whole recording of a trimmed file), 'spectra' (the
-    trimmed data with its spectra) or 'spectra_full' (both, each with its spectra).
+    A key of EXPORT_PARTS: 'trimmed' (the spectra of the trimmed data), 'full'
+    (and those of the whole recording of a trimmed file) or 'full_only' (the
+    whole recording's alone).
 names : Optional[List[str]]
     Files to export; None for every file.
 keep_full : bool
@@ -42438,10 +42519,9 @@ List[str]
     The problems: a file that could not be exported is named in them and left out.
 
 ---- Globals mutated ----
-None. Reads the files, writes <results>/<file>/<file>.xlsx (and, as chosen, full/
-inside it for a trimmed file and the spectra), and notes the results folder in
-session.exported
-once something is written (side effects).
+None. Reads the files, writes the csv files in <results>/<file>/ (and, as chosen,
+in full/ inside it for a trimmed file), and notes the results folder in
+session.exported once something is written (side effects).
 
 ---- Equations ----
 None.
@@ -43348,17 +43428,98 @@ od_gaps_finder
 trim_limits_builder
 ```
 
-#### `_export_asker`
+#### `_export_sizes_teller`
 
 ```text
 ---- Summary ----
-Helper function to export the files of each experiment now, from one of the two
-export buttons of the trim step, so they can be plotted outside the program: the
-workbook of the trimmed data, with the whole recording of each trimmed file too
-from "Export full + trimmed csv". One yes or no question asks whether to write the
-spectra as csv files too, with the size of both worked out for these files; Enter
-gives the last answer, or no the first time. The choice and the limits exported
-are kept in the session; the guide stays where it is.
+Helper function to put in words how large the files of an export would be for
+these files: the workbooks, the spectra of the trimmed data and those of the whole
+recording of the trimmed files.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (the file summaries).
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+
+---- Globals read ----
+settings.SPECTRA_CSV_BYTES, settings.WORKBOOK_POINT_BYTES.
+
+---- Outputs ----
+Tuple[str, str, str]
+    ('about 0.9 MB' or the like, for the workbooks, the trimmed spectra and the
+    whole recordings' spectra), from size_describer.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See workbook_size_estimator and spectra_size_estimator.
+
+---- Helpers ----
+size_describer
+spectra_size_estimator
+workbook_size_estimator
+```
+
+#### `_export_chooser`
+
+```text
+---- Summary ----
+Helper function to ask the Export step (5.9) once the figures are finalised: the
+summary (the plot and the workbook of each file, always written), with the spectra
+csv files of the trimmed data, or with those and the whole recording's too (only
+offered when a file is trimmed), each with its size. The whole recordings' csv
+files are written at once, but not those the quick export of the trim step wrote
+already; the plots, the workbooks and the trimmed csv files are written after
+(main.experiment_files_saver).
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, results folder, the whole recordings written).
+answers : dict
+    Answers dictionary; export_choice and export_spectra are stored in it.
+defaults : dict
+    Default answers; export_choice is the one highlighted.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+details : Dict[str, dict]
+    OD values and events of every file.
+
+---- Globals read ----
+EXPORT_CHOICES, WARNING_COLOUR (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Asks in the terminal, writes the csv files of the whole recordings and
+stores the answers in ``answers`` (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_export_sizes_teller
+choice_asker
+import_data_exporter
+info_printer
+progress_clearer
+progress_printer
+text_colourer
+```
+
+#### `_quick_exporter`
+
+```text
+---- Summary ----
+Helper function to write the spectra of each file as csv files now, from one of the
+two export buttons of the trim step: those of the trimmed data, with those of the
+whole recording of each trimmed file too from "Export full + trimmed csv". No
+workbook is written and nothing is asked; one line gives the size first. The
+choice and the limits exported are kept in the session; the guide stays where it
+is.
 
 ---- Inputs ----
 session : ViewerSession
@@ -43371,31 +43532,26 @@ with_full : bool
     True to write the whole recording of each trimmed file too.
 
 ---- Globals read ----
-WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES,
-settings.WORKBOOK_POINT_BYTES; EXPORT_PARTS.
+WARNING_COLOUR (module constant).
 
 ---- Outputs ----
 None
     Nothing.
 
 ---- Globals mutated ----
-None. Reads from and prints to the terminal, writes the files and sets
+None. Prints to the terminal, writes the csv files and sets
 session.export_choice and session.export_limits (side effects).
 
 ---- Equations ----
-Size of the workbooks = the trimmed workbooks, + the whole recordings' workbooks
-with ``with_full``; size of the spectra likewise.
+Size = the trimmed spectra, + the whole recordings' spectra with ``with_full``.
 
 ---- Helpers ----
+_export_sizes_teller
 import_data_exporter
 info_printer
 progress_clearer
 progress_printer
-size_describer
-spectra_size_estimator
 text_colourer
-workbook_size_estimator
-yes_no_asker
 ```
 
 #### `_figure_starter`
@@ -44794,8 +44950,8 @@ Main function to show the figure saved for each file, drawn as it will be saved
 from the standard settings or the ones last saved for the dataset, with the oxygen,
 the OCR and, while Haem decomposition is ticked, every haem of the fit. The boxes
 above the plot change how the OCR, the haems and the labels are shown, the angle
-of the labels, the journal and the size, each redrawing the figure; Continue
-accepts it.
+of the labels, the journal and the size, each redrawing the figure, and the arrows
+the order of the panels (Finalise figures, 5.1); Export accepts it.
 
 ---- Inputs ----
 session : ViewerSession
@@ -44949,8 +45105,9 @@ region_span_reader
 Main function to run the trimming step on the standard plot of the whole recording
 of every file: the trimmed and ignored edges are dragged on the plot or typed in
 the Time regions box above it, under the key of their colours, and Continue
-accepts them; the two export buttons write the files with the edges as they are
-(Export full + trimmed csv with the whole recording of each trimmed file too), and
+accepts them; the two export buttons write the spectra as csv files with the edges
+as they are (Export full + trimmed csv with the whole recording of each trimmed
+file too), and
 the step waits again. When the step is
 opened again, the limits it had stay on the plot as red dashed lines. The limits
 are then listed and the trimmed data is drawn. The haems are those of the
@@ -45006,11 +45163,12 @@ Main function to ask the questions of the experiment browser: the file browser,
 trimming and ignoring, the OD values and the event labels (which end the import),
 the processing (the haem fit, the trim and ignore times again if wanted, the
 oxidised and reduced regions, which start where they were saved with the dataset,
-the averaging) and the individual figures. The standard plot of every file (oxygen,
-OCR and the haems of the dataset's fit) is shown first, with no question asked. The
-plot window is redrawn after each answer, and at the end any step can be gone back
-to. The settings strip can be changed while these questions wait (except those of
-the components found from the data); it is greyed out afterwards.
+the averaging), the finalised figures and what to export. The standard plot of
+every file (oxygen, OCR and the haems of the dataset's fit) is shown first, with no
+question asked. The plot window is redrawn after each answer; an earlier step is
+opened from the guide. The settings strip can be changed while these questions
+wait (except those of the components found from the data); it is greyed out
+afterwards.
 
 ---- Inputs ----
 summaries : List[dict]
@@ -45041,31 +45199,29 @@ Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool, Dict[str, dict], b
     values and events of every file, whether the figure of each file has at least
     one panel, the oxidised and reduced region of every file as _regions_chooser
     gives them (those saved with the dataset when the step was not asked), and
-    whether the export of the import wrote the spectra as csv files.
+    whether the quick export of the trim step wrote the spectra of the trimmed
+    data as csv files with the trim edges in use.
 
 ---- Globals mutated ----
-None. Stores the answers in ``answers``, reads from and prints to the terminal,
-draws and closes the plot window, sets up the settings strip, writes the export
-when one is chosen and adds to ``exported`` (side effects).
+None. Stores the answers in ``answers`` (export_choice and export_spectra among
+them), reads from and prints to the terminal, draws and closes the plot window,
+sets up the settings strip, writes the csv files of the quick export and of the
+whole recordings when chosen and adds to ``exported`` (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
-_export_refresher
+_export_chooser
+_quick_exporter
 _standard_fit_loader
 _strip_change_applier
 _strip_shower
 active_gui_getter
 browser_stage_runner
-choice_asker
 details_stage_runner
 fit_titles_lister
-heading_printer
 library_haems_lister
-info_printer
-numbering_getter
-numbering_setter
 plots_stage_runner
 processing_stage_runner
 section_starter

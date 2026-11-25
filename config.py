@@ -142,6 +142,10 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'ex_watermark': True,
                    'ex_size_mode': 'default',
                    'export_spectra': False,
+                   # what the Export step (5.9) writes besides the plot and workbook of
+                   # each file: 'summary' nothing more, 'trimmed' the spectra csv files,
+                   # 'full' those and the whole recording's
+                   'export_choice': 'summary',
                    # special figures (see utils_custom): time response, and haem and OCR
                    # response
                    'plot_time_response': False,

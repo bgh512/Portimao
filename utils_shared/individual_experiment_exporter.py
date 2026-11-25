@@ -501,6 +501,56 @@ def _spectral_csv_exporter(experiment: dict, folder: Path) -> List[dict]:
     return records
 
 
+# ---- _spectral_file_lister -----------------------------------------------------------
+def _spectral_file_lister(folder: Path) -> List[dict]:
+    """
+    ---- Summary ----
+    Helper function to list the spectral CSV files already in a folder with no
+    workbook that lists them (written by the quick export of the trim step), reading
+    only the first line of each for its number of spectra.
+
+    ---- Inputs ----
+    folder : Path
+        The folder of the workbook about to be written; it may not exist.
+
+    ---- Globals read ----
+    SPECTRAL_CSV_TYPES, SPECTRAL_FILE_COLUMN (module constants).
+
+    ---- Outputs ----
+    List[dict]
+        The records of _spectral_csv_exporter, one per CSV file found, by name; the
+        number of wavelengths is the number of lines after the heading. Empty when
+        there are none.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Timepoints = columns of the heading - 1 (the wavelength column).
+
+    ---- Helpers ----
+    None.
+    """
+
+    records = []
+    for data_key, file_suffix in SPECTRAL_CSV_TYPES:
+        for path in sorted(Path(folder).glob(f'*_{file_suffix}.csv')):
+            try:
+                with path.open(encoding='utf-8') as handle:
+                    heading = handle.readline()
+                    n_wavelengths = sum(1 for _ in handle)
+            except (OSError, UnicodeDecodeError):
+                continue  # not a file of ours: left out of the list
+            records.append({'Dataset': path.name[:-len(f'_{file_suffix}.csv')],
+                            'Data type': data_key,
+                            SPECTRAL_FILE_COLUMN: path.name,
+                            'Wavelengths': n_wavelengths,
+                            'Timepoints': max(heading.count(','), 0),
+                            },
+                           )
+    return records
+
+
 # ---- _spectral_list_reader -----------------------------------------------------------
 def _spectral_list_reader(workbook_path: Path) -> List[dict]:
     """
@@ -717,7 +767,8 @@ def experiment_workbook_exporter(experiment: dict,
     keeps_spectra_list : bool
         True, with ``spectra`` False, lists again the spectral CSV files the workbook
         being replaced listed and that are still beside it (those written earlier in
-        the same run), without writing them again.
+        the same run), or with no such workbook the CSV files in its folder, without
+        writing them again.
 
     ---- Globals read ----
     DATA_SHEETS, HAEM_VIEW_TEXTS, METADATA_TEXTS,
@@ -739,6 +790,7 @@ def experiment_workbook_exporter(experiment: dict,
     _processing_table_builder
     _sheet_table_builder
     _spectral_csv_exporter
+    _spectral_file_lister
     _spectral_list_reader
     averages_table_builder
     file_name_sanitiser
@@ -753,7 +805,10 @@ def experiment_workbook_exporter(experiment: dict,
     if spectra:
         spectral_records = _spectral_csv_exporter(experiment, folder)
     elif keeps_spectra_list:
-        spectral_records = _spectral_list_reader(output_path)
+        # the quick export of the trim step writes the CSV files with no workbook
+        spectral_records = (_spectral_list_reader(output_path) or
+                            _spectral_file_lister(folder)
+                            )
     else:
         spectral_records = []
 
@@ -966,6 +1021,54 @@ def size_describer(size_bytes: float) -> str:
         if size_bytes >= scale:
             return f"about {float(f'{size_bytes / scale:.2g}'):g} {unit}"
     return 'under 1 MB'
+
+
+# ---- spectra_csv_exporter ------------------------------------------------------------
+def spectra_csv_exporter(experiment: dict,
+                         output_dir: Path,
+                         subfolder: str = '',
+                         ) -> List[Path]:
+    """
+    ---- Summary ----
+    Main function to write only the spectral CSV files of one experiment, with no
+    workbook, into <output_dir>/<name>/ (or a folder inside it, such as the full/ of a
+    trimmed experiment's whole recording).
+
+    ---- Inputs ----
+    experiment : dict
+        Experiment dictionary, as defined in DATA_FORMAT.md, with its raw spectra.
+    output_dir : Path
+        Results folder.
+    subfolder : str
+        Folder inside the experiment's folder to write into (FULL_FOLDER); '' for the
+        experiment's folder itself.
+
+    ---- Globals read ----
+    SPECTRAL_FILE_COLUMN (module constant).
+
+    ---- Outputs ----
+    List[Path]
+        Paths of the CSV files written. Raises ValueError when a spectrum length does
+        not match the wavelengths.
+
+    ---- Globals mutated ----
+    None. Creates the folder and the CSV files (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _spectral_csv_exporter
+    file_name_sanitiser
+    """
+
+    name = file_name_sanitiser(experiment.get('experiment_name', 'experiment'))
+    folder = Path(output_dir) / name
+    if subfolder:
+        folder = folder / subfolder
+    folder.mkdir(parents=True, exist_ok=True)
+    records = _spectral_csv_exporter(experiment, folder)
+    return [folder / str(record[SPECTRAL_FILE_COLUMN]) for record in records]
 
 
 # ---- spectra_size_estimator ----------------------------------------------------------

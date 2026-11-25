@@ -1,5 +1,5 @@
 """
-Tests of the export at the end of the import: the size of the spectra and where each file goes.
+Tests of the spectra exports: the size of each part, what the quick export of the trim step and the Export step (5.9) write and where, and the workbook that lists the csv files.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -14,11 +14,18 @@ import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import utils_viewer.viewer_preview as viewer_preview
-from utils_shared.individual_experiment_exporter import (size_describer,
+import utils_viewer.viewer_stages as viewer_stages
+from utils_shared.individual_experiment_exporter import (experiment_workbook_exporter,
+                                                         size_describer,
+                                                         spectra_csv_exporter,
                                                          spectra_size_estimator,
+                                                         workbook_size_estimator,
                                                          )
 from utils_shared.schema import TIME_COLUMN
-from utils_viewer.viewer_preview import import_data_exporter, ViewerSession
+from utils_viewer.viewer_preview import (EXPORT_PARTS,
+                                         import_data_exporter,
+                                         ViewerSession,
+                                         )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -33,6 +40,8 @@ EVENTS = [{'datapoint': 6,
            'concentration_uM': 100.0,
            },
           ]
+# the csv file of the transmission spectra of the made-up spectrometer
+CSV_NAME = 'Cyt_transmiss.csv'
 
 
 # ---- HELPERS -------------------------------------------------------------------------
@@ -43,8 +52,8 @@ def _experiment_maker(info: dict, cfg: object, fit: object) -> dict:
     """
     ---- Summary ----
     Helper function to stand in for the reading of a file: a made-up recording of 0 to
-    10 min, one point a minute, with the OD values and events it is given, as the
-    processing hands them back.
+    10 min, one point and one spectrum of three wavelengths a minute, with the OD
+    values and events it is given, as the processing hands them back.
 
     ---- Inputs ----
     info : dict
@@ -60,7 +69,7 @@ def _experiment_maker(info: dict, cfg: object, fit: object) -> dict:
     ---- Outputs ----
     dict
         {'experiment': experiment} (DATA_FORMAT.md), the oxygen and OCR tables equal to
-        twice the time.
+        twice the time, and the transmission spectra of one spectrometer, Cyt, all 1.
 
     ---- Globals mutated ----
     None.
@@ -84,30 +93,39 @@ def _experiment_maker(info: dict, cfg: object, fit: object) -> dict:
                 'notes': '',
                 }
     metadata.update({key: info[key] for key in OD_KEYS if key in info})
+    spectra = {'Cyt': {'wavelengths': np.array([500.0, 510.0, 520.0]),
+                       'time': times.copy(),
+                       'spectrum_indices': np.arange(len(times)),
+                       'transmission': np.ones((len(times), 3)),
+                       },
+               }
     return {'experiment': dict(tables,
                                experiment_name=info['name'],
                                metadata=metadata,
-                               raw_spectra={},
+                               raw_spectra=spectra,
                                ),
             }
 
 
-# ---- _metadata_reader ----------------------------------------------------------------
-def _metadata_reader(path: Path) -> dict:
+# ---- _limits_maker -------------------------------------------------------------------
+def _limits_maker(run1_trim: tuple, run2_trim: tuple) -> dict:
     """
     ---- Summary ----
-    Helper function to read the Metadata sheet of a workbook as {field: value}.
+    Helper function to build the trim and ignore limits of the two made-up files, with
+    nothing ignored.
 
     ---- Inputs ----
-    path : Path
-        The workbook.
+    run1_trim : tuple
+        (trim start, trim end) of run1 in minutes, None for no trim.
+    run2_trim : tuple
+        The same for run2.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     dict
-        {field: value} of the Metadata sheet.
+        {file name: {trim_start, trim_end, ignore_start, ignore_end}}.
 
     ---- Globals mutated ----
     None.
@@ -119,8 +137,13 @@ def _metadata_reader(path: Path) -> dict:
     None.
     """
 
-    sheet = pd.read_excel(path, sheet_name='Metadata')
-    return dict(zip(sheet['Field'], sheet['Value']))
+    return {name: {'trim_start': start,
+                   'trim_end': end,
+                   'ignore_start': 0.0,
+                   'ignore_end': 0.0,
+                   }
+            for name, (start, end) in (('run1', run1_trim), ('run2', run2_trim))
+            }
 
 
 # ---- _session_maker ------------------------------------------------------------------
@@ -258,24 +281,19 @@ def test_spectra_size_by_hand() -> None:
     assert found == pytest.approx((12_000.0, 15_000.0))
 
 
-# ---- test_trimmed_and_whole_go_to_their_folders --------------------------------------
-def test_trimmed_and_whole_go_to_their_folders(tmp_path: Path,
-                                               monkeypatch: pytest.MonkeyPatch,
-                                               ) -> None:
+# ---- test_workbook_size_by_hand ------------------------------------------------------
+def test_workbook_size_by_hand() -> None:
     """
     ---- Summary ----
-    Main function to check where the export of the import writes: a trimmed file's
-    trimmed data in its own folder, with the edges, OD values and labels, and its whole
-    recording in full/ without the edges; a file not trimmed has no full/.
+    Main function to check the size of the workbooks against sums worked out by hand:
+    a file trimmed at both ends, one not trimmed, and one whose number of data points
+    is not known.
 
     ---- Inputs ----
-    tmp_path : Path
-        Empty folder from pytest.
-    monkeypatch : pytest.MonkeyPatch
-        Used to stand in for the reading of the files.
+    None.
 
     ---- Globals read ----
-    EVENTS (module constant).
+    None.
 
     ---- Outputs ----
     None.
@@ -284,61 +302,137 @@ def test_trimmed_and_whole_go_to_their_folders(tmp_path: Path,
     None.
 
     ---- Equations ----
-    Kept from 2 to 8 min of a point a minute: 7 points, the addition at 5 - 2 = 3 min.
+    At 10 bytes a data point:
+    run1: 60 min kept from 10 to 40, so half of 600 points x 10 = 3 000 trimmed; the
+    whole 600 x 10 = 6 000.
+    run2: not trimmed, 200 x 10 = 2 000 trimmed and nothing whole.
+    run3: no number of points, so nothing.
+    Together 5 000 trimmed and 6 000 whole.
 
     ---- Helpers ----
-    _metadata_reader
+    None.
+    """
+
+    summaries = [{'name': 'run1', 'duration_min': 60.0, 'frames': 600},
+                 {'name': 'run2', 'duration_min': 20.0, 'frames': 200},
+                 {'name': 'run3', 'duration_min': 20.0},
+                 ]
+    limits = {'run1': {'trim_start': 10.0, 'trim_end': 40.0},
+              'run2': {'trim_start': None, 'trim_end': None},
+              }
+    assert workbook_size_estimator(summaries, limits, 10.0) == (5_000.0, 6_000.0)
+    assert workbook_size_estimator(summaries, {}, 10.0) == (8_000.0, 0.0)
+
+
+# ---- test_each_choice_writes_its_files -----------------------------------------------
+def test_each_choice_writes_its_files(tmp_path: Path,
+                                      monkeypatch: pytest.MonkeyPatch,
+                                      ) -> None:
+    """
+    ---- Summary ----
+    Main function to check what each choice of a spectra export writes for a trimmed
+    file and for one not trimmed: only csv files, never a workbook; the trimmed spectra
+    with 'trimmed' and 'full', the whole recording's only for the trimmed file with
+    'full' and 'full_only', each cut as its name says.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+    monkeypatch : pytest.MonkeyPatch
+        Used to stand in for the reading of the files.
+
+    ---- Globals read ----
+    CSV_NAME, EVENTS (module constants); EXPORT_PARTS.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    A spectrum a minute from 0 to 10 min: 11 spectra in the whole recording, 7 kept
+    from 2 to 8 min; a csv file has one column more, the wavelengths.
+
+    ---- Helpers ----
+    _limits_maker
     _session_maker
     """
 
-    # ---- 1 Export a trimmed and an untrimmed file ------------------------------------
+    limits = _limits_maker((2.0, 8.0), (None, None))
+    details = {'run1': {'events': EVENTS}, 'run2': {'events': EVENTS}}
+    assert EXPORT_PARTS == {'trimmed': (True, False),
+                            'full': (True, True),
+                            'full_only': (False, True),
+                            }
+    for choice, (with_trimmed, with_full) in EXPORT_PARTS.items():
+        root = tmp_path / choice
+        session = _session_maker(root, monkeypatch)
+        assert import_data_exporter(session, limits, details, choice) == []
+        trimmed, whole = root / 'run1', root / 'run1' / 'full'
+
+        # never a workbook
+        assert list(root.rglob('*.xlsx')) == []
+        # the trimmed spectra, cut to the trim edges
+        assert (trimmed / CSV_NAME).is_file() == with_trimmed
+        assert (root / 'run2' / CSV_NAME).is_file() == with_trimmed
+        if with_trimmed:
+            assert pd.read_csv(trimmed / CSV_NAME).shape == (3, 8)
+            assert pd.read_csv(root / 'run2' / CSV_NAME).shape == (3, 12)
+        # the whole recording only for the trimmed file
+        assert (whole / CSV_NAME).is_file() == with_full
+        assert not (root / 'run2' / 'full').exists()
+        if with_full:
+            assert pd.read_csv(whole / CSV_NAME).shape == (3, 12)
+
+
+# ---- test_trimmed_and_whole_go_to_their_folders --------------------------------------
+def test_trimmed_and_whole_go_to_their_folders(tmp_path: Path,
+                                               monkeypatch: pytest.MonkeyPatch,
+                                               ) -> None:
+    """
+    ---- Summary ----
+    Main function to check where the quick export writes with the whole recordings
+    chosen: a trimmed file's trimmed spectra in its own folder, on the clock of the
+    trimmed data, and its whole recording's in full/ on the clock of the recording; a
+    file not trimmed has no full/.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+    monkeypatch : pytest.MonkeyPatch
+        Used to stand in for the reading of the files.
+
+    ---- Globals read ----
+    CSV_NAME, EVENTS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Kept from 2 to 8 min of a spectrum a minute: 7 spectra, at 0 to 6 min on the
+    trimmed clock.
+
+    ---- Helpers ----
+    _limits_maker
+    _session_maker
+    """
+
     root = tmp_path / 'results'
     session = _session_maker(root, monkeypatch)
-    limits = {'run1': {'trim_start': 2.0,
-                       'trim_end': 8.0,
-                       'ignore_start': 1.0,
-                       'ignore_end': 0.5,
-                       },
-              'run2': {'trim_start': None,
-                       'trim_end': None,
-                       'ignore_start': 1.0,
-                       'ignore_end': 0.0,
-                       },
-              }
-    details = {'run1': {'OD': 0.5,
-                        'volume': 1.0,
-                        'dilution_factor': 2.0,
-                        'events': EVENTS,
-                        },
-               'run2': {'events': EVENTS},
-               }
-    assert import_data_exporter(session, limits, details, 'summary') == []
+    limits = _limits_maker((2.0, 8.0), (None, None))
+    details = {'run1': {'events': EVENTS}, 'run2': {'events': EVENTS}}
+    assert import_data_exporter(session, limits, details, 'full') == []
     assert session.exported == [root]
-
-    # ---- 2 The trimmed data, with the edges, OD values and labels --------------------
-    trimmed = root / 'run1' / 'run1.xlsx'
-    assert len(pd.read_excel(trimmed, sheet_name='CcO2')) == 7
-    metadata = _metadata_reader(trimmed)
-    assert float(metadata['trimmed_before_minutes']) == 2.0
-    assert float(metadata['trimmed_after_minutes']) == 8.0
-    assert float(metadata['ignore_first_minutes']) == 1.0
-    assert float(metadata['ignore_last_minutes']) == 0.5
-    assert float(metadata['OD']) == 0.5
-    events = pd.read_excel(trimmed, sheet_name='Events')
-    assert list(events['label']) == ['KCN']
-    assert list(events['time_min']) == [3.0]
-
-    # ---- 3 The whole recording, without the edges ------------------------------------
-    whole = root / 'run1' / 'full' / 'run1.xlsx'
-    assert len(pd.read_excel(whole, sheet_name='CcO2')) == 11
-    metadata = _metadata_reader(whole)
-    assert 'trimmed_before_minutes' not in metadata
-    assert 'ignore_first_minutes' not in metadata
-    assert float(metadata['dilution_factor']) == 2.0
-    assert list(pd.read_excel(whole, sheet_name='Events')['time_min']) == [5.0]
-
-    # ---- 4 Nothing called full for a file not trimmed --------------------------------
-    assert (root / 'run2' / 'run2.xlsx').is_file()
+    trimmed = pd.read_csv(root / 'run1' / CSV_NAME)
+    assert list(trimmed.columns)[:2] == ['Wavelength (nm)', '0 min']
+    assert list(trimmed.columns)[-1] == '6 min'
+    whole = pd.read_csv(root / 'run1' / 'full' / CSV_NAME)
+    assert list(whole.columns)[1] == '0 min' and list(whole.columns)[-1] == '10 min'
+    assert (root / 'run2' / CSV_NAME).is_file()
     assert not (root / 'run2' / 'full').exists()
 
 
@@ -348,9 +442,9 @@ def test_new_edges_export_again(tmp_path: Path,
                                 ) -> None:
     """
     ---- Summary ----
-    Main function to check the export once the edges change: a whole recording already
-    written is left as it is, a file that has just become trimmed gets one, and a file
-    no longer trimmed loses the one written for it.
+    Main function to check the quick export once the edges change: a whole recording
+    already written is left as it is, a file that has just become trimmed gets one,
+    and a file no longer trimmed loses the one written for it.
 
     ---- Inputs ----
     tmp_path : Path
@@ -359,7 +453,111 @@ def test_new_edges_export_again(tmp_path: Path,
         Used to stand in for the reading of the files.
 
     ---- Globals read ----
-    EVENTS (module constant).
+    CSV_NAME, EVENTS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Trimmed from 3 to 8 min: 6 spectra, 7 columns with the wavelengths.
+
+    ---- Helpers ----
+    _limits_maker
+    _session_maker
+    """
+
+    # ---- 1 Export with run1 trimmed --------------------------------------------------
+    root = tmp_path / 'results'
+    session = _session_maker(root, monkeypatch)
+    details = {'run1': {'events': EVENTS}, 'run2': {'events': EVENTS}}
+    limits = _limits_maker((2.0, 8.0), (None, None))
+    assert import_data_exporter(session, limits, details, 'full') == []
+    whole = root / 'run1' / 'full' / CSV_NAME
+    whole.write_bytes(b'left as it is')
+
+    # ---- 2 New edges on run1 leave its whole recording alone -------------------------
+    limits['run1'] = dict(limits['run1'], trim_start=3.0)
+    assert import_data_exporter(session,
+                                limits,
+                                details,
+                                'full',
+                                names=['run1'],
+                                keep_full=True,
+                                ) == []
+    assert whole.read_bytes() == b'left as it is'
+    assert pd.read_csv(root / 'run1' / CSV_NAME).shape == (3, 7)
+
+    # ---- 3 run2 trimmed now gets a whole recording; run1 untrimmed loses its own -----
+    limits['run1'] = dict(limits['run1'], trim_start=None, trim_end=None)
+    limits['run2'] = dict(limits['run2'], trim_end=9.0)
+    assert import_data_exporter(session, limits, details, 'full', keep_full=True) == []
+    assert not (root / 'run1' / 'full').exists()
+    assert (root / 'run2' / 'full' / CSV_NAME).is_file()
+    assert pd.read_csv(root / 'run1' / CSV_NAME).shape == (3, 12)
+
+
+# ---- test_workbook_lists_the_quick_csv_files -----------------------------------------
+def test_workbook_lists_the_quick_csv_files(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a workbook written after the quick export, without
+    writing the spectra again, lists the csv files the quick export left beside it,
+    with their number of wavelengths and spectra.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    CSV_NAME (module constant).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The made-up file: 3 wavelengths, 11 spectra.
+
+    ---- Helpers ----
+    _experiment_maker
+    """
+
+    experiment = _experiment_maker({'name': 'run1'}, None, None)['experiment']
+    written = spectra_csv_exporter(experiment, tmp_path)
+    assert written == [tmp_path / 'run1' / CSV_NAME]
+    assert list((tmp_path / 'run1').glob('*.xlsx')) == []
+    experiment_workbook_exporter(experiment, tmp_path, keeps_spectra_list=True)
+    listed = pd.read_excel(tmp_path / 'run1' / 'run1.xlsx', sheet_name='Spectral data')
+    assert list(listed['CSV file']) == [CSV_NAME]
+    assert list(listed['Wavelengths']) == [3]
+    assert list(listed['Timepoints']) == [11]
+
+
+# ---- test_export_step_offers_and_writes ----------------------------------------------
+def test_export_step_offers_and_writes(tmp_path: Path,
+                                       monkeypatch: pytest.MonkeyPatch,
+                                       ) -> None:
+    """
+    ---- Summary ----
+    Main function to check the Export step (5.9): the three choices with a file
+    trimmed and the first two with none, the last answer highlighted, the answers it
+    stores, and that only the third writes the whole recordings' csv files at once
+    (the rest is written with the workbooks). The question, the messages and the
+    export are stood in for.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+    monkeypatch : pytest.MonkeyPatch
+        Used to stand in for the question, the messages and the export.
+
+    ---- Globals read ----
+    None.
 
     ---- Outputs ----
     None.
@@ -371,51 +569,52 @@ def test_new_edges_export_again(tmp_path: Path,
     None.
 
     ---- Helpers ----
-    _metadata_reader
+    _limits_maker
     _session_maker
     """
 
-    # ---- 1 Export with run1 trimmed --------------------------------------------------
-    root = tmp_path / 'results'
-    session = _session_maker(root, monkeypatch)
-    details = {'run1': {'events': EVENTS}, 'run2': {'events': EVENTS}}
-    limits = {'run1': {'trim_start': 2.0,
-                       'trim_end': 8.0,
-                       'ignore_start': 0.0,
-                       'ignore_end': 0.0,
-                       },
-              'run2': {'trim_start': None,
-                       'trim_end': None,
-                       'ignore_start': 0.0,
-                       'ignore_end': 0.0,
-                       },
-              }
-    assert import_data_exporter(session, limits, details, 'summary') == []
-    whole = root / 'run1' / 'full' / 'run1.xlsx'
-    whole.write_bytes(b'left as it is')
+    asked, exports = [], []
+    picked = {'answer': 'full'}
+    def chooser(question: str, options: list, default: str, **kwargs: object) -> str:
+        asked.append(([key for key, _ in options], default, kwargs.get('number')))
+        return picked['answer']
+    def exporter(_session: object,
+                 _limits: dict,
+                 _details: dict,
+                 choice: str,
+                 **_: object,
+                 ) -> list:
+        exports.append(choice)
+        return []
+    for name, stand_in in (('choice_asker', chooser),
+                           ('import_data_exporter', exporter),
+                           ('info_printer', lambda *args, **kwargs: None),
+                           ('guide_step_starter', lambda *args: None),
+                           ('progress_clearer', lambda *args: None),
+                           ):
+        monkeypatch.setattr(viewer_stages, name, stand_in)
+    session = _session_maker(tmp_path, monkeypatch)
 
-    # ---- 2 New edges on run1 leave its whole recording alone -------------------------
-    limits['run1'] = dict(limits['run1'], trim_start=3.0)
-    assert import_data_exporter(session,
-                                limits,
-                                details,
-                                'summary',
-                                names=['run1'],
-                                keep_full=True,
-                                ) == []
-    assert whole.read_bytes() == b'left as it is'
-    trimmed = root / 'run1' / 'run1.xlsx'
-    assert float(_metadata_reader(trimmed)['trimmed_before_minutes']) == 3.0
+    # ---- 1 A file trimmed: three choices, the third writes the full csv files --------
+    answers = {}
+    viewer_stages._export_chooser(session,
+                                  answers,
+                                  {'export_choice': 'trimmed'},
+                                  _limits_maker((2.0, 8.0), (None, None)),
+                                  {},
+                                  )
+    assert asked[-1] == (['summary', 'trimmed', 'full'], 'trimmed', '5.9')
+    assert answers == {'export_choice': 'full', 'export_spectra': True}
+    assert exports == ['full_only']
 
-    # ---- 3 run2 trimmed now gets a whole recording; run1 untrimmed loses its own -----
-    limits['run1'] = dict(limits['run1'], trim_start=None, trim_end=None)
-    limits['run2'] = dict(limits['run2'], trim_end=9.0)
-    assert import_data_exporter(session,
-                                limits,
-                                details,
-                                'summary',
-                                keep_full=True,
-                                ) == []
-    assert not (root / 'run1' / 'full').exists()
-    assert (root / 'run2' / 'full' / 'run2.xlsx').is_file()
-    assert 'trimmed_before_minutes' not in _metadata_reader(trimmed)
+    # ---- 2 No file trimmed: no third choice; a saved third falls back to the first ---
+    picked['answer'] = 'summary'
+    viewer_stages._export_chooser(session,
+                                  answers,
+                                  {'export_choice': 'full'},
+                                  _limits_maker((None, None), (None, None)),
+                                  {},
+                                  )
+    assert asked[-1] == (['summary', 'trimmed'], 'summary', '5.9')
+    assert answers == {'export_choice': 'summary', 'export_spectra': False}
+    assert exports == ['full_only']

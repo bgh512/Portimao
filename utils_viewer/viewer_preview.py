@@ -29,8 +29,8 @@ from utils_shared.difference_spectra import (difference_decomposer,
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_layout import figure_canvas_fitter
 from utils_shared.helpers import name_simplifier
-from utils_shared.individual_experiment_exporter import (experiment_workbook_exporter,
-                                                         FULL_FOLDER,
+from utils_shared.individual_experiment_exporter import (FULL_FOLDER,
+                                                         spectra_csv_exporter,
                                                          )
 from utils_shared.individual_experiment_plotter import (experiment_plotter,
                                                         haem_ylim_sharer,
@@ -80,13 +80,13 @@ SIDE_BY_SIDE = 'side'
 # the white gap between the two plots shown side by side, in pixels of the picture
 SIDE_GAP_PX = 16
 IGNORE_COLOUR = '#8c8c8c'  # grey; also the ignored parts in the trimming step (viewer_edges)
-# What each choice of the export of the import writes beside the workbook of the trimmed
-# data: (the whole recording of a trimmed file in its full folder, the spectra as csv
-# files beside every workbook written).
-EXPORT_PARTS = {'summary': (False, False),
-                'summary_full': (True, False),
-                'spectra': (False, True),
-                'spectra_full': (True, True),
+# What each choice of a spectra export writes, as csv files with no workbook: (the
+# spectra of the trimmed data, those of the whole recording of a trimmed file in its
+# full folder). The trim step's quick export offers 'trimmed' and 'full'; the Export
+# step (5.9) uses 'full_only', as it writes the trimmed spectra with the workbooks.
+EXPORT_PARTS = {'trimmed': (True, False),
+                'full': (True, True),
+                'full_only': (False, True),
                 }
 
 
@@ -182,12 +182,12 @@ def _file_exporter(session: ViewerSession,
                    ) -> None:
     """
     ---- Summary ----
-    Helper function to export the imported data of one file, read once: for a trimmed
-    file, when the choice asks for it, the whole recording into the full folder of its
-    results folder, then the data kept by the trimming (all of it for a file not
-    trimmed) into its results folder, with the OD values and labels entered. A file
-    that is no longer trimmed loses the whole recording written for it earlier in this
-    run, as it has nothing called full.
+    Helper function to write the spectra of one file as csv files, read once: for a
+    trimmed file, when the choice asks for it, the whole recording's into the full
+    folder of its results folder, then, when the choice asks for it, those of the data
+    kept by the trimming (all of it for a file not trimmed) into its results folder.
+    No workbook is written. A file that is no longer trimmed loses the whole recording
+    written for it earlier in this run, as it has nothing called full.
 
     ---- Inputs ----
     session : ViewerSession
@@ -199,7 +199,7 @@ def _file_exporter(session: ViewerSession,
     details : dict
         {file name: {OD, volume, dilution_factor, events}}; may lack the file.
     choice : str
-        A key of EXPORT_PARTS: 'summary', 'summary_full', 'spectra' or 'spectra_full'.
+        A key of EXPORT_PARTS: 'trimmed', 'full' or 'full_only'.
     keep_full : bool
         True leaves a whole recording already written in this run as it is (the edges
         changed, and the whole recording does not depend on them).
@@ -212,7 +212,7 @@ def _file_exporter(session: ViewerSession,
         Nothing.
 
     ---- Globals mutated ----
-    None. Reads the file, writes or removes the exported files and records the whole
+    None. Reads the file, writes or removes the csv files and records the whole
     recordings written in session.full_exports (side effects).
 
     ---- Equations ----
@@ -221,37 +221,18 @@ def _file_exporter(session: ViewerSession,
     ---- Helpers ----
     experiment_data_processor
     experiment_trimmer
-    experiment_workbook_exporter
     preview_info_builder
+    spectra_csv_exporter
     """
 
-    # ---- 1 Read the whole recording, with the OD values and labels -------------------
+    # ---- 1 Take away a whole recording no longer wanted ------------------------------
     name = summary['name']
     own = limits.get(name) or {}
     start, end = own.get('trim_start'), own.get('trim_end')
     is_trimmed = start is not None or end is not None
-    with_full, with_spectra = EXPORT_PARTS[choice]
-    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS,
-                               decompose=False,
-                               normalise_od=False,
-                               averaging=False,
-                               export_spectra=with_spectra,
-                               ),
-                          )
-    experiment = experiment_data_processor(preview_info_builder(summary, {}, details),
-                                           cfg,
-                                           None,
-                                           )['experiment']
-
-    # ---- 2 Write the whole recording, or take away one no longer wanted --------------
+    with_trimmed, with_full = EXPORT_PARTS[choice]
     earlier = session.full_exports.get(name)
-    if is_trimmed and with_full and not (keep_full and earlier):
-        session.full_exports[name] = experiment_workbook_exporter(experiment,
-                                                                  session.export_root,
-                                                                  spectra=with_spectra,
-                                                                  subfolder=FULL_FOLDER,
-                                                                  )
-    elif not is_trimmed and earlier:
+    if not is_trimmed and earlier:
         for path in earlier:
             path.unlink(missing_ok=True)
         try:
@@ -259,16 +240,33 @@ def _file_exporter(session: ViewerSession,
         except OSError:
             pass  # something else is in it, which is left alone
         del session.full_exports[name]
+    needs_full = is_trimmed and with_full and not (keep_full and earlier)
+    if not (with_trimmed or needs_full):
+        return
 
-    # ---- 3 Trim, then write the data used --------------------------------------------
-    if is_trimmed:
-        experiment_trimmer(experiment, start_time=start, end_time=end)
-    experiment['metadata'].update(
-        {'ignore_first_minutes': own.get('ignore_start') or 0.0,
-         'ignore_last_minutes': own.get('ignore_end') or 0.0,
-         },
-        )
-    experiment_workbook_exporter(experiment, session.export_root, spectra=with_spectra)
+    # ---- 2 Read the whole recording, with its spectra --------------------------------
+    cfg = settings.Config(dict(settings.DEFAULT_ANSWERS,
+                               decompose=False,
+                               normalise_od=False,
+                               averaging=False,
+                               export_spectra=True,
+                               ),
+                          )
+    experiment = experiment_data_processor(preview_info_builder(summary, {}, details),
+                                           cfg,
+                                           None,
+                                           )['experiment']
+
+    # ---- 3 Write the whole recording, then the trimmed part --------------------------
+    if needs_full:
+        session.full_exports[name] = spectra_csv_exporter(experiment,
+                                                          session.export_root,
+                                                          FULL_FOLDER,
+                                                          )
+    if with_trimmed:
+        if is_trimmed:
+            experiment_trimmer(experiment, start_time=start, end_time=end)
+        spectra_csv_exporter(experiment, session.export_root)
 
 
 # ---- _kept_haems_drawer --------------------------------------------------------------
@@ -977,12 +975,11 @@ def import_data_exporter(session: ViewerSession,
                          ) -> List[str]:
     """
     ---- Summary ----
-    Main function to export the imported data of every file (or of the files named), so
-    it can be plotted outside the program: in each file's results folder the workbook
-    of the data kept by the trimming (the oxygen, OCR, events with their labels, and the
-    OD values and edges); for a trimmed file the whole recording in its full folder, if
-    chosen; the spectra as csv files beside each workbook, if chosen. No haem
-    decomposition, OD scaling or averaging is applied; the ignored parts are left in.
+    Main function to write the spectra of every file (or of the files named) as csv
+    files, so they can be used outside the program: in each file's results folder
+    those of the data kept by the trimming, if chosen; for a trimmed file those of the
+    whole recording in its full folder, if chosen. No workbook is written, and the
+    ignored parts are left in.
 
     ---- Inputs ----
     session : ViewerSession
@@ -992,9 +989,9 @@ def import_data_exporter(session: ViewerSession,
     details : dict
         {file name: {OD, volume, dilution_factor, events}} (details_stage_runner).
     choice : str
-        A key of EXPORT_PARTS: 'summary' (the workbook of the trimmed data),
-        'summary_full' (and the whole recording of a trimmed file), 'spectra' (the
-        trimmed data with its spectra) or 'spectra_full' (both, each with its spectra).
+        A key of EXPORT_PARTS: 'trimmed' (the spectra of the trimmed data), 'full'
+        (and those of the whole recording of a trimmed file) or 'full_only' (the
+        whole recording's alone).
     names : Optional[List[str]]
         Files to export; None for every file.
     keep_full : bool
@@ -1010,10 +1007,9 @@ def import_data_exporter(session: ViewerSession,
         The problems: a file that could not be exported is named in them and left out.
 
     ---- Globals mutated ----
-    None. Reads the files, writes <results>/<file>/<file>.xlsx (and, as chosen, full/
-    inside it for a trimmed file and the spectra), and notes the results folder in
-    session.exported
-    once something is written (side effects).
+    None. Reads the files, writes the csv files in <results>/<file>/ (and, as chosen,
+    in full/ inside it for a trimmed file), and notes the results folder in
+    session.exported once something is written (side effects).
 
     ---- Equations ----
     None.

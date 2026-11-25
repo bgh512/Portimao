@@ -94,15 +94,15 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
      ),
     ('figure',
      'Experiment export',
-     'Figure',
-     'Change the journal, the width and the height in the Figure box above the plot: '
-     'the figure of each file is redrawn at its size.',
+     'Finalise figures',
+     'Use the arrows to change the order of the panels, and the Figure box above the '
+     "plot to set the figure to a journal's standard: the figure of each file is "
+     'redrawn at its size.',
      ),
-    ('go_back', 'Experiment export', 'Go back or save', 'Going back to a stage, or saving the plot of each file, was chosen here.'),
-    ('workbooks',
+    ('export',
      'Experiment export',
-     'Workbooks',
-     'The workbook and the plot of each file were written here, with the spectra as '
+     'Export',
+     'The plot and the workbook of each file were written here, with the spectra as '
      'csv files when you chose them.',
      ),
     ('side_by_side', 'Dataset figures', 'Side by side', 'The figure of two experiments side by side was chosen here.'),
@@ -148,8 +148,8 @@ CHANGE_STEPS = {'edit_ods': 'od_values',
                 }
 # The buttons a step keeps when it is opened again from a later one: (what a click is
 # told as, its words). A click is told as {change: True}, as a change in the boxes is.
-# The trim step's two export buttons write the trimmed data, or that and the whole
-# recording of each trimmed file.
+# The trim step's two export buttons write the spectra of the trimmed data as csv files,
+# or those and the whole recording's of each trimmed file.
 EXPORT_FULL_TEXT = 'Export full + trimmed csv'
 EXPORT_FULL_CHANGE = 'export_full'
 EXPORT_TRIMMED_TEXT = 'Export trimmed csv'
@@ -1449,7 +1449,9 @@ class AnswerArea:
             # the extra buttons of the step (the two export buttons) sit above Continue
             for answer, words in request['options'] or []:
                 made(words, answer, words, False).pack(side='top', fill='x', pady=2)
-            made('Continue', '', 'Continue', True).pack(side='top', fill='x', pady=2)
+            # a step may name its button for what it does (Export)
+            words = request.get('value') or 'Continue'
+            made(words, '', words, True).pack(side='top', fill='x', pady=2)
         elif kind == 'yesno':
             for answer, words in (('y', 'Yes'), ('n', 'No')):
                 made(words, answer, words, request['default'] == answer).pack(

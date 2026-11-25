@@ -86,7 +86,8 @@ def _answer_announcer(kind: str,
         What Enter gives: 'y' or 'n'; the number of a choice (from 1); the numbers of
         the choices ticked at first; the folder highlighted at first; None for none.
     value : Optional[str]
-        What the typing box starts with ('number', 'text', 'folder').
+        What the typing box starts with ('number', 'text', 'folder'), or the words of
+        the button that goes on ('continue'; None for Continue).
 
     ---- Globals read ----
     _answer_requester (module state).
@@ -886,13 +887,15 @@ def enter_waiter(question: str,
                  depth: int = 1,
                  number: Optional[str] = None,
                  extras: Sequence[Tuple[str, str]] = (),
+                 go_words: Optional[str] = None,
                  ) -> str:
     """
     ---- Summary ----
     Main function to give a numbered instruction that is carried out in the window (on
     the plot or in the boxes above it) and wait until Continue (Enter with the answer
-    box empty) or one of the extra buttons is clicked. Anything else typed is answered
-    with ``nudge`` and the instruction goes on waiting.
+    box empty), or the button named in its place, or one of the extra buttons is
+    clicked. Anything else typed is answered with ``nudge`` and the instruction goes
+    on waiting.
 
     ---- Inputs ----
     question : str
@@ -907,13 +910,16 @@ def enter_waiter(question: str,
     extras : Sequence[Tuple[str, str]]
         (answer, words) of each button shown above Continue, such as ('export',
         'Export trimmed csv'); empty for Continue alone.
+    go_words : Optional[str]
+        The words of the button that goes on, such as 'Export'; None for Continue.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     str
-        '' for Continue, or the answer of the extra button clicked.
+        '' for Continue (or the button in its place), or the answer of the extra
+        button clicked.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect); advances the question
@@ -932,7 +938,7 @@ def enter_waiter(question: str,
 
     depth = _number_depth_finder(number, depth)
     indent = _question_printer(question, depth, number=number)
-    _answer_announcer('continue', list(extras))
+    _answer_announcer('continue', list(extras), value=go_words)
     answers = {answer for answer, _ in extras}
     while True:
         answer = _input_reader(question, indent)

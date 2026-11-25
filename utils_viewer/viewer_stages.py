@@ -48,11 +48,8 @@ from utils_shared.questions import (accept_asker,
                                     confirm_waiter,
                                     enter_waiter,
                                     guide_step_starter,
-                                    heading_printer,
                                     info_printer,
                                     number_asker,
-                                    numbering_getter,
-                                    numbering_setter,
                                     progress_clearer,
                                     progress_printer,
                                     section_starter,
@@ -158,7 +155,7 @@ PCA_EXAMPLES_TITLE = 'PCA examples (smallest and largest residual)'
 STAGE_TITLES = {'trim': 'Import: trimming and ignoring',
                 'details': 'Set-up: OD values, temperature and event labels',
                 'processing': 'Experiment processing',
-                'plots': 'Experiment export: the figure of each file',
+                'plots': 'Experiment export: finalise figures and export',
                 }
 # The boxes of the trimming step, in the order of survey.TRIM_KEYS.
 TRIM_FIELDS = [('trim_start', 'Trim before'),
@@ -213,8 +210,15 @@ QUICK_SWITCH = ('quick_is_on', 'Quick windows')
 WINDOW_OPTIONS = [('each_is_on', 'Adjust region manually')]
 WINDOW_KEY_TEXT = ('gold = baseline, blue = window, grey = left out or not picked, red '
                    'hatched = a window that does not fit')
-FIGURE_NUDGE = ('Change the figure in the boxes above the plot; press Enter with this box '
-                'empty when it looks right.')
+FIGURE_NUDGE = ('Change the figure in the boxes above the plot, or the order of the '
+                'panels with the arrows; click Export when it looks right.')
+# The answers of the Export step (5.9): the summary is the plot and the workbook of each
+# file; the csv files are the spectra, of the trimmed data and of the whole recording
+# of each trimmed file ('full', offered only when a file is trimmed).
+EXPORT_CHOICES = (('summary', 'Export the summary'),
+                  ('trimmed', 'Export the summary and the trimmed csv'),
+                  ('full', 'Export the summary and the trimmed and full csv'),
+                  )
 WINDOW_NUDGE = ('Type the numbers of the windows in the Time regions box above the '
                 'plot, or drag the edges of a window; press Continue when the windows '
                 'look right.')
@@ -523,21 +527,166 @@ def _box_edit_runner(session: ViewerSession,
         session.redraw()
 
 
-# ---- _export_asker -------------------------------------------------------------------
-def _export_asker(session: ViewerSession,
-                  limits: Dict[str, dict],
-                  details: Dict[str, dict],
-                  with_full: bool,
-                  ) -> None:
+# ---- _export_sizes_teller ------------------------------------------------------------
+def _export_sizes_teller(session: ViewerSession,
+                         limits: Dict[str, dict],
+                         ) -> Tuple[str, str, str]:
     """
     ---- Summary ----
-    Helper function to export the files of each experiment now, from one of the two
-    export buttons of the trim step, so they can be plotted outside the program: the
-    workbook of the trimmed data, with the whole recording of each trimmed file too
-    from "Export full + trimmed csv". One yes or no question asks whether to write the
-    spectra as csv files too, with the size of both worked out for these files; Enter
-    gives the last answer, or no the first time. The choice and the limits exported
-    are kept in the session; the guide stays where it is.
+    Helper function to put in words how large the files of an export would be for
+    these files: the workbooks, the spectra of the trimmed data and those of the whole
+    recording of the trimmed files.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (the file summaries).
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+
+    ---- Globals read ----
+    settings.SPECTRA_CSV_BYTES, settings.WORKBOOK_POINT_BYTES.
+
+    ---- Outputs ----
+    Tuple[str, str, str]
+        ('about 0.9 MB' or the like, for the workbooks, the trimmed spectra and the
+        whole recordings' spectra), from size_describer.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    See workbook_size_estimator and spectra_size_estimator.
+
+    ---- Helpers ----
+    size_describer
+    spectra_size_estimator
+    workbook_size_estimator
+    """
+
+    sheets = workbook_size_estimator(session.summaries,
+                                     limits,
+                                     settings.WORKBOOK_POINT_BYTES,
+                                     )[0]
+    trimmed, full = spectra_size_estimator(session.summaries,
+                                           limits,
+                                           settings.SPECTRA_CSV_BYTES,
+                                           )
+    return size_describer(sheets), size_describer(trimmed), size_describer(full)
+
+
+# ---- _export_chooser -----------------------------------------------------------------
+def _export_chooser(session: ViewerSession,
+                    answers: dict,
+                    defaults: dict,
+                    limits: Dict[str, dict],
+                    details: Dict[str, dict],
+                    ) -> None:
+    """
+    ---- Summary ----
+    Helper function to ask the Export step (5.9) once the figures are finalised: the
+    summary (the plot and the workbook of each file, always written), with the spectra
+    csv files of the trimmed data, or with those and the whole recording's too (only
+    offered when a file is trimmed), each with its size. The whole recordings' csv
+    files are written at once, but not those the quick export of the trim step wrote
+    already; the plots, the workbooks and the trimmed csv files are written after
+    (main.experiment_files_saver).
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (files, results folder, the whole recordings written).
+    answers : dict
+        Answers dictionary; export_choice and export_spectra are stored in it.
+    defaults : dict
+        Default answers; export_choice is the one highlighted.
+    limits : Dict[str, dict]
+        Trim and ignore limits of every file.
+    details : Dict[str, dict]
+        OD values and events of every file.
+
+    ---- Globals read ----
+    EXPORT_CHOICES, WARNING_COLOUR (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Asks in the terminal, writes the csv files of the whole recordings and
+    stores the answers in ``answers`` (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _export_sizes_teller
+    choice_asker
+    import_data_exporter
+    info_printer
+    progress_clearer
+    progress_printer
+    text_colourer
+    """
+
+    # ---- 1 Ask what to export, with the size of each part ----------------------------
+    guide_step_starter('export')
+    sheets, trimmed, full = _export_sizes_teller(session, limits)
+    is_any_trimmed = any((own.get('trim_start') is not None or
+                          own.get('trim_end') is not None
+                          )
+                         for own in limits.values()
+                         )
+    info_printer(f'The summary is the plot and the workbook of each file ({sheets}). '
+                 f'The csv files are the spectra: large (the trimmed {trimmed}'
+                 + (f', the full {full}' if is_any_trimmed else '')
+                 + '), and they take a while to write.',
+                 )
+    options = [(key, words)
+               for key, words in EXPORT_CHOICES
+               if key != 'full' or is_any_trimmed
+               ]
+    default = defaults.get('export_choice')
+    if default not in [key for key, _ in options]:
+        default = 'summary'
+    choice = choice_asker('What do you want to export?',
+                          options,
+                          default,
+                          number='5.9',
+                          )
+    answers['export_choice'] = choice
+    answers['export_spectra'] = choice != 'summary'
+
+    # ---- 2 Write the whole recordings' csv files -------------------------------------
+    if choice != 'full':
+        return
+    problems = import_data_exporter(
+        session,
+        limits,
+        details,
+        'full_only',
+        keep_full=True,
+        progress=lambda n, total: progress_printer(f'Writing the full csv files of file '
+                                                   f'{n} of {total} ...',
+                                                   ),
+    )
+    progress_clearer()
+    for problem in problems:
+        info_printer(text_colourer(f'Not exported: {problem}', WARNING_COLOUR), depth=2)
+
+
+# ---- _quick_exporter -----------------------------------------------------------------
+def _quick_exporter(session: ViewerSession,
+                    limits: Dict[str, dict],
+                    details: Dict[str, dict],
+                    with_full: bool,
+                    ) -> None:
+    """
+    ---- Summary ----
+    Helper function to write the spectra of each file as csv files now, from one of the
+    two export buttons of the trim step: those of the trimmed data, with those of the
+    whole recording of each trimmed file too from "Export full + trimmed csv". No
+    workbook is written and nothing is asked; one line gives the size first. The
+    choice and the limits exported are kept in the session; the guide stays where it
+    is.
 
     ---- Inputs ----
     session : ViewerSession
@@ -550,60 +699,47 @@ def _export_asker(session: ViewerSession,
         True to write the whole recording of each trimmed file too.
 
     ---- Globals read ----
-    WARNING_COLOUR (module constant); settings.SPECTRA_CSV_BYTES,
-    settings.WORKBOOK_POINT_BYTES; EXPORT_PARTS.
+    WARNING_COLOUR (module constant).
 
     ---- Outputs ----
     None
         Nothing.
 
     ---- Globals mutated ----
-    None. Reads from and prints to the terminal, writes the files and sets
+    None. Prints to the terminal, writes the csv files and sets
     session.export_choice and session.export_limits (side effects).
 
     ---- Equations ----
-    Size of the workbooks = the trimmed workbooks, + the whole recordings' workbooks
-    with ``with_full``; size of the spectra likewise.
+    Size = the trimmed spectra, + the whole recordings' spectra with ``with_full``.
 
     ---- Helpers ----
+    _export_sizes_teller
     import_data_exporter
     info_printer
     progress_clearer
     progress_printer
-    size_describer
-    spectra_size_estimator
     text_colourer
-    workbook_size_estimator
-    yes_no_asker
     """
 
-    # ---- 1 Ask about the spectra, with the size of each part -------------------------
-    sheets_bytes = workbook_size_estimator(session.summaries,
-                                           limits,
-                                           settings.WORKBOOK_POINT_BYTES,
-                                           )
-    spectra_bytes = spectra_size_estimator(session.summaries,
-                                           limits,
-                                           settings.SPECTRA_CSV_BYTES,
-                                           )
-    sheets = sheets_bytes[0] + (sheets_bytes[1] if with_full else 0.0)
-    spectra = spectra_bytes[0] + (spectra_bytes[1] if with_full else 0.0)
-    if with_full and sheets_bytes[1] <= 0:
+    # ---- 1 Say how large it is -------------------------------------------------------
+    _, trimmed, full = _export_sizes_teller(session, limits)
+    is_any_trimmed = any((own.get('trim_start') is not None or
+                          own.get('trim_end') is not None
+                          )
+                         for own in limits.values()
+                         )
+    if with_full and not is_any_trimmed:
         info_printer('No file is trimmed, so this writes the same as Export trimmed '
                      'csv.',
                      )
-    info_printer(f'A workbook is written for each file ({size_describer(sheets)}). '
-                 f'The spectra as csv files are large ({size_describer(spectra)}) and '
-                 'take a while to write.',
+    sizes = f'the trimmed {trimmed}' + (f', the full {full}'
+                                        if with_full and is_any_trimmed
+                                        else ''
+                                        )
+    info_printer(f'Writing the spectra of each file as csv files ({sizes}); this '
+                 'takes a while.',
                  )
-    was_spectra = EXPORT_PARTS.get(session.export_choice, (False, False))[1]
-    with_spectra = yes_no_asker('Do you want the spectra as csv files too?',
-                                was_spectra,
-                                number='3.4',
-                                )
-    choice = (('spectra' if with_spectra else 'summary') +
-              ('_full' if with_full else '')
-              )
+    choice = 'full' if with_full else 'trimmed'
 
     # ---- 2 Export --------------------------------------------------------------------
     problems = import_data_exporter(
@@ -618,15 +754,16 @@ def _export_asker(session: ViewerSession,
         info_printer(text_colourer(f'Not exported: {problem}', WARNING_COLOUR), depth=2)
     session.export_choice = choice
     session.export_limits = {name: dict(values) for name, values in limits.items()}
-    full_text = ('; the whole recording of a trimmed file is in the full folder inside '
-                 'its own'
-                 if EXPORT_PARTS[choice][0]
+    full_text = ('; those of the whole recording of a trimmed file are in the full '
+                 'folder inside its own'
+                 if with_full and is_any_trimmed
                  else ''
                  )
     info_printer(
-        f'Exported {len(session.summaries) - len(problems)} file(s) to '
-        f'{session.export_root}, one folder each{full_text}. Nothing is scaled '
-        f'by OD, decomposed or averaged, and the ignored parts are included.',
+        f'Exported the spectra of {len(session.summaries) - len(problems)} file(s) to '
+        f'{session.export_root}, one folder each{full_text}. The ignored parts are '
+        f'included. The plot and the workbook of each file are written at Export, '
+        f'after Finalise figures.',
         depth=2,
         )
 
@@ -3490,8 +3627,8 @@ def plots_stage_runner(session: ViewerSession,
     from the standard settings or the ones last saved for the dataset, with the oxygen,
     the OCR and, while Haem decomposition is ticked, every haem of the fit. The boxes
     above the plot change how the OCR, the haems and the labels are shown, the angle
-    of the labels, the journal and the size, each redrawing the figure; Continue
-    accepts it.
+    of the labels, the journal and the size, each redrawing the figure, and the arrows
+    the order of the panels (Finalise figures, 5.1); Export accepts it.
 
     ---- Inputs ----
     session : ViewerSession
@@ -3533,14 +3670,8 @@ def plots_stage_runner(session: ViewerSession,
 
     # ---- 1 Start from the standard or saved settings ---------------------------------
     guide_step_starter('figure')
-    info_printer('The figure saved for each file is drawn with the standard settings, '
-                 'or with the ones last saved for this dataset. Change only what you '
-                 'want different; you can look at every file before accepting it.',
-                 )
-    info_printer('How the OCR, the haems and the labels are shown are in the View box '
-                 'above the plot, the journal and the size in the Figure box; each '
-                 'change redraws the figure.',
-                 tight=True,
+    info_printer("Use the Figure box above the plot to set the figure to a journal's "
+                 'standard.',
                  )
     # % oxidised is offered when at least one file has both regions.
     include_percent = bool(region_files_lister(session.summaries,
@@ -3577,9 +3708,11 @@ def plots_stage_runner(session: ViewerSession,
 
     # ---- 2 Change the figure in the boxes until Continue -----------------------------
     redraw()
-    enter_waiter('Change the figure in the boxes above the plot, then click Continue.',
+    enter_waiter('Use the arrows to change the order of the panels, or change earlier '
+                 'settings. When ready, click Export to choose which files to export.',
                  FIGURE_NUDGE,
                  number='5.1',
+                 go_words='Export',
                  )
     return is_plotted()
 
@@ -3901,8 +4034,9 @@ def trim_stage_runner(session: ViewerSession,
     Main function to run the trimming step on the standard plot of the whole recording
     of every file: the trimmed and ignored edges are dragged on the plot or typed in
     the Time regions box above it, under the key of their colours, and Continue
-    accepts them; the two export buttons write the files with the edges as they are
-    (Export full + trimmed csv with the whole recording of each trimmed file too), and
+    accepts them; the two export buttons write the spectra as csv files with the edges
+    as they are (Export full + trimmed csv with the whole recording of each trimmed
+    file too), and
     the step waits again. When the step is
     opened again, the limits it had stay on the plot as red dashed lines. The limits
     are then listed and the trimmed data is drawn. The haems are those of the
@@ -3978,8 +4112,8 @@ def trim_stage_runner(session: ViewerSession,
                  'every experiment; it unticks itself when the next one is shown.',
                  )
     if exporter is not None:
-        info_printer('The export buttons write the data of every experiment with these '
-                     'times, to plot it outside Portimao.',
+        info_printer('The export buttons write the spectra of every experiment as csv '
+                     'files with these times; Continue skips them.',
                      tight=True,
                      )
     _step_edges_shower(session, 'trim', choice)
@@ -4032,11 +4166,12 @@ def viewer_asker(summaries: List[dict],
     trimming and ignoring, the OD values and the event labels (which end the import),
     the processing (the haem fit, the trim and ignore times again if wanted, the
     oxidised and reduced regions, which start where they were saved with the dataset,
-    the averaging) and the individual figures. The standard plot of every file (oxygen,
-    OCR and the haems of the dataset's fit) is shown first, with no question asked. The
-    plot window is redrawn after each answer, and at the end any step can be gone back
-    to. The settings strip can be changed while these questions wait (except those of
-    the components found from the data); it is greyed out afterwards.
+    the averaging), the finalised figures and what to export. The standard plot of
+    every file (oxygen, OCR and the haems of the dataset's fit) is shown first, with no
+    question asked. The plot window is redrawn after each answer; an earlier step is
+    opened from the guide. The settings strip can be changed while these questions
+    wait (except those of the components found from the data); it is greyed out
+    afterwards.
 
     ---- Inputs ----
     summaries : List[dict]
@@ -4067,31 +4202,29 @@ def viewer_asker(summaries: List[dict],
         values and events of every file, whether the figure of each file has at least
         one panel, the oxidised and reduced region of every file as _regions_chooser
         gives them (those saved with the dataset when the step was not asked), and
-        whether the export of the import wrote the spectra as csv files.
+        whether the quick export of the trim step wrote the spectra of the trimmed
+        data as csv files with the trim edges in use.
 
     ---- Globals mutated ----
-    None. Stores the answers in ``answers``, reads from and prints to the terminal,
-    draws and closes the plot window, sets up the settings strip, writes the export
-    when one is chosen and adds to ``exported`` (side effects).
+    None. Stores the answers in ``answers`` (export_choice and export_spectra among
+    them), reads from and prints to the terminal, draws and closes the plot window,
+    sets up the settings strip, writes the csv files of the quick export and of the
+    whole recordings when chosen and adds to ``exported`` (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    _export_refresher
+    _export_chooser
+    _quick_exporter
     _standard_fit_loader
     _strip_change_applier
     _strip_shower
     active_gui_getter
     browser_stage_runner
-    choice_asker
     details_stage_runner
     fit_titles_lister
-    heading_printer
     library_haems_lister
-    info_printer
-    numbering_getter
-    numbering_setter
     plots_stage_runner
     processing_stage_runner
     section_starter
@@ -4155,7 +4288,7 @@ def viewer_asker(summaries: List[dict],
                                              )
         return state['limits']
     def export_csv(limits: Dict[str, dict], with_full: bool) -> None:
-        _export_asker(session, limits, state.get('details') or {}, with_full)
+        _quick_exporter(session, limits, state.get('details') or {}, with_full)
     kits = _tab_kits_builder(session, answers, state, keep_limits)
     session.tab_switcher = lambda tab: _tab_switcher(session, kits, tab)
     session.edit_runner = lambda name: _box_edit_runner(session,
@@ -4225,32 +4358,15 @@ def viewer_asker(summaries: List[dict],
             session.is_figure = False
             section_starter(STAGE_TITLES[key])
             runner()
-        last_section, last_question = numbering_getter(0), numbering_getter(1)
 
-        # ---- 4 Go back to any step ---------------------------------------------------
-        options = [('done', 'No, continue')]
-        options += [(key, STAGE_TITLES[key]) for key, _ in steps]
-        while True:
-            numbering_setter(0, last_section)
-            numbering_setter(1, last_question)
-            guide_step_starter('go_back')
-            chosen = choice_asker('Do you want to go back to any of these steps?',
-                                  options,
-                                  'done',
-                                  )
-            if chosen == 'done':
-                break
-            index = [key for key, _ in steps].index(chosen)
-            number = index + 2  # section 1 is the files
-            numbering_setter(0, number)
-            heading_printer(f'{number}. {STAGE_TITLES[chosen]} (again)')
-            session.is_figure = False
-            steps[index][1]()
-            if index < len(steps) - 1:
-                later = ', '.join(STAGE_TITLES[k] for k, _ in steps[index + 1:])
-                info_printer(f'Your answers to the later steps ({later}) were kept. '
-                             f'Go back to them if this change affects them.',
-                             )
+        # ---- 4 Choose what to export -------------------------------------------------
+        # Asked while the boxes still work: an earlier step is opened from the guide.
+        _export_chooser(session,
+                        answers,
+                        defaults,
+                        state['limits'],
+                        state['details'],
+                        )
     finally:
         window.strip_listener_setter(None)
         window.answer_listener_setter(None)
@@ -4263,7 +4379,14 @@ def viewer_asker(summaries: List[dict],
     # Read now: the strip may have changed the haems, or gone back to the kept regions,
     # after the figure was accepted.
     plotted = bool(answers['plot_o2'] or answers['plot_ocr'] or answers['plot_haems'])
-    has_spectra = EXPORT_PARTS.get(session.export_choice, (False, False))[1]
+    # the trimmed csv files of the quick export are used only while the trim edges
+    # they were written with are still the ones in use
+    has_spectra = (EXPORT_PARTS.get(session.export_choice, (False, False))[0] and
+                   all((session.export_limits.get(name) or {}).get(key) == own.get(key)
+                       for name, own in state['limits'].items()
+                       for key in ('trim_start', 'trim_end')
+                       )
+                   )
     return (state['limits'],
             session.fit,
             state['details'],

@@ -57,7 +57,6 @@ from utils_shared.survey import (files_asker,
                                  haem_name_formatter,
                                  JOURNAL_NAMES,
                                  multi_experiment_asker,
-                                 spectra_export_asker,
                                  )
 from utils_shared.user_notices import problem_shower, warning_shower
 from utils_shared.user_places import (app_output_logger,
@@ -251,8 +250,8 @@ def everything_asker(folder: Path,
     Main function to ask every question of the run after the files, in numbered
     sections (trimming and ignoring, analysis, plots, summary figures, export), and to
     build the per-file information. The plot and the workbook of every file are saved
-    as soon as its processing and figure are accepted, after asking whether the
-    spectra are written too, so the later sections show the plot.
+    as soon as the figures are finalised and the export chosen (5.9), with the spectra
+    when chosen, so the later sections show the plot.
 
     ---- Inputs ----
     folder : Path
@@ -307,7 +306,6 @@ def everything_asker(folder: Path,
     region_files_lister
     section_starter
     special_figures_maker
-    spectra_export_asker
     summary_figure_asker
     viewer_asker
     windows_stage_runner
@@ -354,17 +352,19 @@ def everything_asker(folder: Path,
                                         )
 
     # ---- 2.2 Save the plot and the workbook of every file ----------------------------
-    # The processing and the figures are accepted, so they are saved now and the later
-    # sections show each file as it is saved, not as it was last previewed. The
-    # spectra are asked about first, as they are written with the workbooks.
-    guide_step_starter('workbooks')
+    # The figures are finalised and the export chosen (5.9, which wrote the whole
+    # recordings' csv files), so the plots and workbooks are saved now, with the
+    # trimmed csv files when chosen, and the later sections show each file as it is
+    # saved, not as it was last previewed.
     print('  Every experiment gets a workbook with everything worked out for it: the '
           'measured and set oxygen, the OCR, the haems, Δψ, the averages, the events '
           'and your OD/volume/dilution entries.',
           )
-    answers['export_spectra'] = spectra_export_asker(has_spectra,
-                                                     defaults['export_spectra'],
-                                                     )
+    if has_spectra and answers['export_spectra']:
+        print('  The trimmed csv files were written by the quick export of the trim '
+              'step with these edges, so they are not written again; the workbook of '
+              'each experiment lists them.',
+              )
     context = {'answers': answers,
                'fit': fit,
                'summaries': summaries,
@@ -557,10 +557,9 @@ def everything_asker(folder: Path,
               f"{JOURNAL_NAMES[answers['ho_journal']]}, {answers['ho_pub_columns']:g} "
               f"column(s), height {answers['ho_pub_height']:g}",
               )
-    spectra_text = (' + spectra csv'
-                    if answers['export_spectra']
-                    else (' (the spectra csv are already exported)' if has_spectra else '')
-                    )
+    spectra_text = {'trimmed': ' + the trimmed csv',
+                    'full': ' + the trimmed and full csv',
+                    }.get(answers.get('export_choice'), '')
     written = len(saved_workbooks) if fit is plot_fit else 0
     workbooks_text = (f'written for {written} of {len(names)} file(s), with every table'
                       if written

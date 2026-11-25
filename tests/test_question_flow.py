@@ -29,7 +29,7 @@ NUMBERED_SECTIONS = ('1',
                      '5',
                      '9',
                      )  # every question here shows its number
-NOT_YET_NUMBERED = ('5.8',)  # asked through the going-back list, renumbered with it
+NOT_YET_NUMBERED: tuple = ()  # every question of those sections has its number
 
 
 # ---- HELPERS -------------------------------------------------------------------------
