@@ -515,12 +515,12 @@ def everything_asker(folder: Path,
                             ),
                          )
         if answers.get('each_window'):
-            kinds.append('some windows set on their own or left out')
+            kinds.append('some regions set on their own or left out')
         if answers.get('file_windows'):
             count = len(answers['file_windows'])
             kinds.append(f"fixed by hand in {count} file{'' if count == 1 else 's'}")
         averaging_text = '; '.join(kinds)
-    print(f'  Averaging windows: {averaging_text}')
+    print(f'  Averaging regions: {averaging_text}')
     haem_names = [haem_name_formatter(name) for name in answers['haems']]
     shown = [name
              for name, on in (('O2', answers['plot_o2']),

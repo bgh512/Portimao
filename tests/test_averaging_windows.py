@@ -229,7 +229,7 @@ def test_a_figure_asks_which_windows_only_with_both_kinds(
                                     'tr_window_kind',
                                     )
     assert kind == 'quick' and answers['tr_window_kind'] == 'quick'
-    assert asked == [('Which windows should this figure use?',
+    assert asked == [('Which averaging regions should this figure use?',
                       ['settled', 'quick'],
                       'settled',
                       '4.6.2',
@@ -599,7 +599,7 @@ def test_the_plot_shows_the_windows() -> None:
     edges, parts = layout(VALUES)
     assert edges == [('window_s@average0', 7.5, 'baseline 120 s', 'baseline'),
                      ('gap_s@average0', 9.5, '', 'baseline_end'),
-                     ('window_s@average1', 17.5, 'window 120 s', 'average'),
+                     ('window_s@average1', 17.5, 'region 120 s', 'average'),
                      ('gap_s@average1',
                       19.5,
                       'ends 30 s before the addition',
@@ -631,7 +631,7 @@ def test_the_plot_shows_the_windows() -> None:
 
     # ---- 4 Both kinds: the quick windows after the settled ones ----------------------
     quick_edges = [('delay_s@quick1', 10.5, 'starts 30 s after the addition', 'quick'),
-                   ('quick_s@quick1', 11.5, 'quick window 60 s', 'quick_end'),
+                   ('quick_s@quick1', 11.5, 'quick region 60 s', 'quick_end'),
                    ('delay_s@quick2', 20.5, '', 'quick'),
                    ('quick_s@quick2', 21.5, '', 'quick_end'),
                    ]
@@ -1846,7 +1846,7 @@ def test_the_plot_shows_windows_on_their_own() -> None:
                                         )
     assert edges == [('window_s@average0', 7.5, 'baseline 120 s', 'baseline'),
                      ('gap_s@average0', 9.5, '', 'baseline_end'),
-                     ('window_s@average1', 18.5, 'window 60 s', 'average'),
+                     ('window_s@average1', 18.5, 'region 60 s', 'average'),
                      ('gap_s@average1',
                       19.5,
                       'ends 30 s before the addition',
@@ -1857,7 +1857,7 @@ def test_the_plot_shows_windows_on_their_own() -> None:
                       'starts 30 s after the addition',
                       'quick',
                       ),
-                     ('quick_s@quick2', 21.5, 'quick window 60 s', 'quick_end'),
+                     ('quick_s@quick2', 21.5, 'quick region 60 s', 'quick_end'),
                      ]
     assert parts == [(7.5, 9.5, 'baseline'),
                      (18.5, 19.5, 'average'),
@@ -1933,7 +1933,7 @@ def test_one_window_is_adjusted_by_hand() -> None:
                                     BASELINE_MINIMUM_S,
                                     )
     edges, parts = layout(on)
-    assert edges == [('window_s@average1', 17.5, 'window 120 s', 'average'),
+    assert edges == [('window_s@average1', 17.5, 'region 120 s', 'average'),
                      ('gap_s@average1',
                       19.5,
                       'ends 30 s before the addition',
@@ -1956,7 +1956,7 @@ def test_one_window_is_adjusted_by_hand() -> None:
 
     # ---- 4 The last window ends before the end of the file ---------------------------
     last = window_value_setter(on, 'settled_picked', 2.0, 2)
-    assert window_pick_lister(last, 2)[1] == ('the last window: its time is before '
+    assert window_pick_lister(last, 2)[1] == ('the last region: its time is before '
                                               'the end of the file')
     assert window_shown_maker(last, 2) == {'window_s': 120.0, 'gap_s': 30.0}
     ended = window_value_setter(last, 'gap_s', 60.0, 2)
@@ -2033,7 +2033,7 @@ def test_the_window_step_keeps_each_file(monkeypatch: pytest.MonkeyPatch) -> Non
     assert not answers['quick_windows']
     assert {key: answers[key] for key in plan} == plan
     assert answers['file_windows'] == {'c': dict(plan, window_minutes=1.5)}
-    assert 'Left out: settled window 1.' in printed
+    assert 'Left out: settled region 1.' in printed
     assert any('c' in text and 'Apply to all' in text for text in printed)
     assert warned == []
 

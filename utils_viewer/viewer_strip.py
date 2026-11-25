@@ -712,7 +712,7 @@ class EdgeRow:
 
         ---- Inputs ----
         note : str
-            The note beside the ticks ('settled window 2'), or ''.
+            The note beside the ticks ('settled region 2'), or ''.
         ticks : List[Tuple[str, str, bool]]
             [(field, words, is_ticked)]; empty for none.
 

@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.28
+- **Version:** V2.29
 - **Date:** 25/11/2026
 
 ## Contents
@@ -142,6 +142,17 @@
     - [`example_table_builder`](#example_table_builder)
     - [`example_numbers_finder`](#example_numbers_finder)
     - [`test_example_delta_psi_stays_fixed`](#test_example_delta_psi_stays_fixed)
+- [`tests/test_dev_flag.py`](#teststest_dev_flagpy)
+    - [`_FakePicture`](#_fakepicture)
+    - [`_no_run_log`](#_no_run_log)
+    - [`_raising_grabber`](#_raising_grabber)
+    - [`test_dev_copy_needs_both_marks`](#test_dev_copy_needs_both_marks)
+    - [`test_flag_folder_is_named_by_its_time`](#test_flag_folder_is_named_by_its_time)
+    - [`test_flag_keeps_the_run_log_with_its_line`](#test_flag_keeps_the_run_log_with_its_line)
+    - [`test_flag_keeps_only_this_start_of_the_launch_log`](#test_flag_keeps_only_this_start_of_the_launch_log)
+    - [`test_flag_without_a_log`](#test_flag_without_a_log)
+    - [`test_cancel_removes_the_flag`](#test_cancel_removes_the_flag)
+    - [`test_screen_picture_saved_or_not`](#test_screen_picture_saved_or_not)
 - [`tests/test_difference_spectra.py`](#teststest_difference_spectrapy)
     - [`_background_builder`](#_background_builder)
     - [`_experiment_maker`](#_experiment_maker)
@@ -1040,6 +1051,7 @@
     - [`details_writer`](#details_writer)
     - [`logging_starter`](#logging_starter)
     - [`logging_stopper`](#logging_stopper)
+    - [`run_log_path_getter`](#run_log_path_getter)
     - [`settings_logger`](#settings_logger)
 - [`utils_shared/schema.py`](#utils_sharedschemapy)
     - [`finite_float_converter`](#finite_float_converter)
@@ -1157,6 +1169,16 @@
     - [`photo_maker`](#photo_maker)
     - [`shaded_picture_maker`](#shaded_picture_maker)
     - [`x_minute_finder`](#x_minute_finder)
+- [`utils_viewer/viewer_flag.py`](#utils_viewerviewer_flagpy)
+    - [`FlagBox`](#flagbox)
+    - [`_log_copier`](#_log_copier)
+    - [`_note_builder`](#_note_builder)
+    - [`dev_copy_checker`](#dev_copy_checker)
+    - [`flag_canceller`](#flag_canceller)
+    - [`flag_folder_maker`](#flag_folder_maker)
+    - [`flag_saver`](#flag_saver)
+    - [`flag_starter`](#flag_starter)
+    - [`screen_saver`](#screen_saver)
 - [`utils_viewer/viewer_gui.py`](#utils_viewerviewer_guipy)
     - [`GuiUnavailableError`](#guiunavailableerror)
     - [`ViewerGui`](#viewergui)
@@ -5504,6 +5526,317 @@ Each number within RELATIVE x its size of the one written down.
 ---- Helpers ----
 example_numbers_finder
 example_table_builder
+```
+
+## `tests/test_dev_flag.py`
+
+Tests of the developer's Flag button: the dev copy check and what a flag saves.
+
+### CLASSES
+
+#### `_FakePicture`
+
+```text
+---- Summary ----
+Stands in for a picture of the screen: saving it writes a few bytes.
+
+---- Attributes ----
+None.
+
+---- Globals read ----
+None.
+
+---- Methods ----
+save
+```
+
+##### `save`
+
+```text
+---- Summary ----
+Method to write a few bytes where the picture goes.
+
+---- Inputs ----
+path : Path
+    Where the picture goes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### HELPERS
+
+#### `_no_run_log`
+
+```text
+---- Summary ----
+Helper function to start each test with no run being logged, and to give back where
+the details of a problem went before it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+run_logging._details_targets (module state).
+
+---- Outputs ----
+Iterator[None]
+    Nothing, once.
+
+---- Globals mutated ----
+run_logging._details_targets (module state), restored at the end.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_raising_grabber`
+
+```text
+---- Summary ----
+Helper function to stand in for a computer that gives no picture of the screen.
+
+---- Inputs ----
+**kwargs : Any
+    The part of the screen asked for (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Any
+    Never returns.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_dev_copy_needs_both_marks`
+
+```text
+---- Summary ----
+Main function to check that only a folder with both `.style/VERSION` and
+`_USER_REVIEW/` counts as the developer's copy.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+dev_copy_checker
+```
+
+#### `test_flag_folder_is_named_by_its_time`
+
+```text
+---- Summary ----
+Main function to check that a flag's folder goes in the inbox under its time, and a
+second flag in the same second gets its own folder.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+MOMENT (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+flag_folder_maker
+```
+
+#### `test_flag_keeps_the_run_log_with_its_line`
+
+```text
+---- Summary ----
+Main function to check that a flag saved during a run writes its FLAG line into the
+run's log, copies that log beside the note, and that the note holds the comment and
+what was on screen.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+_no_run_log : None
+    Starts with no run being logged.
+
+---- Globals read ----
+DETAILS, MOMENT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+flag_folder_maker
+flag_saver
+logging_starter
+logging_stopper
+```
+
+#### `test_flag_keeps_only_this_start_of_the_launch_log`
+
+```text
+---- Summary ----
+Main function to check that before a run is logged, the flag's line goes into the
+start-up log and only this start of it is copied.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+_no_run_log : None
+    Starts with no run being logged.
+
+---- Globals read ----
+DETAILS, MOMENT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+details_place_setter
+flag_folder_maker
+flag_saver
+```
+
+#### `test_flag_without_a_log`
+
+```text
+---- Summary ----
+Main function to check that a flag with no log to copy (started from a terminal)
+still saves its note, which says no log was found.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+_no_run_log : None
+    Starts with no run being logged.
+
+---- Globals read ----
+DETAILS, MOMENT (module constants).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+details_place_setter
+flag_folder_maker
+flag_saver
+```
+
+#### `test_cancel_removes_the_flag`
+
+```text
+---- Summary ----
+Main function to check that Cancel removes the flag's folder and its picture.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+MOMENT (module constant).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+flag_canceller
+flag_folder_maker
+```
+
+#### `test_screen_picture_saved_or_not`
+
+```text
+---- Summary ----
+Main function to check that the picture is saved with the part of the screen asked
+for, and that a computer giving no picture leaves no file and says so.
+
+---- Inputs ----
+tmp_path : Path
+    Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_raising_grabber
+screen_saver
 ```
 
 ## `tests/test_difference_spectra.py`
@@ -33471,6 +33804,33 @@ None.
 None.
 ```
 
+#### `run_log_path_getter`
+
+```text
+---- Summary ----
+Main function to give the file of the run's log while a run is being logged.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+_details_targets (module state).
+
+---- Outputs ----
+Optional[Path]
+    The log file, or None while no run is being logged (before the results folder
+    is chosen, or after the run).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `settings_logger`
 
 ```text
@@ -37804,6 +38164,404 @@ time = start + share * (end - start).
 None.
 ```
 
+## `utils_viewer/viewer_flag.py`
+
+The developer's Flag button: a picture of the window, a comment and the log so far, saved
+
+### CLASSES
+
+#### `FlagBox`
+
+```text
+---- Summary ----
+The small box that takes the comment of a flag, above the window but not blocking
+it: Save (or Ctrl+Enter) writes the note and the log into the flag's folder, Cancel
+(or closing the box) removes the folder.
+
+---- Attributes ----
+folder : Path
+    The flag's folder, which already holds the picture.
+details : Dict[str, str]
+    What was on screen at the click (see flag_saver).
+moment : datetime
+    When Flag was clicked.
+launch_log : Path
+    The start-up log, used while no run is being logged.
+window : Any
+    The box (a Tk Toplevel).
+text : Any
+    The text area of the comment.
+
+---- Globals read ----
+BOX_HEADING, NO_PICTURE_SENTENCE (module constants).
+
+---- Methods ----
+__init__
+_canceller
+_saver
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to open the box above the window, with the cursor in its text area.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+parent : Any
+    The program's window.
+folder : Path
+    The flag's folder.
+details : Dict[str, str]
+    What was on screen at the click.
+moment : datetime
+    When Flag was clicked.
+has_picture : bool
+    False when no picture of the window could be taken, which the box says.
+launch_log : Path
+    The start-up log.
+
+---- Globals read ----
+BOX_HEADING, NO_PICTURE_SENTENCE (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Opens the box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_canceller
+_saver
+```
+
+##### `_canceller`
+
+```text
+---- Summary ----
+Method to drop the flag: its folder is removed and the box closed.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Removes the folder and closes the box (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+flag_canceller
+```
+
+##### `_saver`
+
+```text
+---- Summary ----
+Method to save the comment with the flag and close the box.
+
+---- Inputs ----
+event : Any
+    The Tk event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'break', so Ctrl+Enter adds no new line to the text area.
+
+---- Globals mutated ----
+None. Writes the flag's files and closes the box (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+flag_saver
+```
+
+### FLAG HELPERS
+
+#### `_log_copier`
+
+```text
+---- Summary ----
+Helper function to copy the log in use into the flag's folder; of the start-up log,
+which keeps the starts before, only this start is copied.
+
+---- Inputs ----
+source : Optional[Path]
+    The log in use, or None when there is none.
+target : Path
+    Where the copy goes.
+
+---- Globals read ----
+LAUNCH_LOG_NAME, LAUNCH_LOG_START (imported constants).
+
+---- Outputs ----
+bool
+    True when the log was copied; False when there is none or it cannot be read.
+
+---- Globals mutated ----
+None. Writes the copy (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_note_builder`
+
+```text
+---- Summary ----
+Helper function to write the text of a flag's note: the comment first, then what was
+on screen at the click, then the guide's last lines.
+
+---- Inputs ----
+comment : str
+    What the developer typed or pasted; may be empty.
+details : Dict[str, str]
+    What was on screen at the click (see flag_saver).
+moment : datetime
+    When Flag was clicked.
+has_log : bool
+    Whether the log was copied beside the note.
+
+---- Globals read ----
+LOG_NAME, SCREEN_NAME (module constants).
+
+---- Outputs ----
+str
+    The note, in Markdown.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `dev_copy_checker`
+
+```text
+---- Summary ----
+Main function to say whether the program runs from the developer's own copy, the
+only one that shows the Flag button.
+
+---- Inputs ----
+program_folder : Path
+    Folder with the program's own files.
+
+---- Globals read ----
+DEV_MARKS (module constant).
+
+---- Outputs ----
+bool
+    True when both `.style/VERSION` and `_USER_REVIEW/` are in the folder.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `flag_canceller`
+
+```text
+---- Summary ----
+Main function to remove a flag's folder and everything in it.
+
+---- Inputs ----
+folder : Path
+    The flag's folder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing. A folder already gone is left as it is.
+
+---- Globals mutated ----
+None. Removes the folder (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `flag_folder_maker`
+
+```text
+---- Summary ----
+Main function to make the folder of a new flag in the inbox, named by its time.
+
+---- Inputs ----
+program_folder : Path
+    Folder with the program's own files.
+moment : datetime
+    When Flag was clicked.
+
+---- Globals read ----
+FLAG_PREFIX, INBOX_PARTS (module constants).
+
+---- Outputs ----
+Path
+    The new, empty folder, for example `_USER_REVIEW/inbox/flag_2026_11_25-14_03_12`;
+    a second flag in the same second gets `_2` after it.
+
+---- Globals mutated ----
+None. Makes the folder (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `flag_saver`
+
+```text
+---- Summary ----
+Main function to finish a flag: a FLAG line with the comment goes into the log in
+use at that point, then that log is copied into the flag's folder beside the note.
+
+---- Inputs ----
+folder : Path
+    The flag's folder.
+comment : str
+    What the developer typed or pasted; may be empty.
+details : Dict[str, str]
+    What was on screen at the click: 'version', 'file' (the file shown), 'step'
+    (the stage and step the program waits at) and 'guide_text' (the guide's last
+    lines).
+moment : datetime
+    When Flag was clicked.
+launch_log : Path
+    The start-up log, used while no run is being logged.
+
+---- Globals read ----
+LOG_NAME, NOTE_NAME (module constants).
+
+---- Outputs ----
+bool
+    True when a log was copied beside the note.
+
+---- Globals mutated ----
+None. Writes the FLAG line into the log, and the note and the log's copy into the
+folder (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_log_copier
+_note_builder
+details_writer
+run_log_path_getter
+```
+
+#### `flag_starter`
+
+```text
+---- Summary ----
+Main function to answer a click on Flag: the picture of the window is saved first,
+as it is, then the box for the comment opens.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+root : Any
+    The program's window.
+program_folder : Path
+    Folder with the program's own files.
+details : Dict[str, str]
+    What is on screen (see flag_saver).
+launch_log : Path
+    The start-up log.
+
+---- Globals read ----
+NO_FOLDER_SENTENCE, SCREEN_NAME (module constants).
+
+---- Outputs ----
+Optional[FlagBox]
+    The box, or None when the flag's folder could not be made (said under the
+    plot).
+
+---- Globals mutated ----
+None. Makes the folder, saves the picture and opens the box (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+flag_folder_maker
+screen_saver
+FlagBox
+```
+
+#### `screen_saver`
+
+```text
+---- Summary ----
+Main function to save a picture of part of the screen.
+
+---- Inputs ----
+path : Path
+    Where the picture goes (.png).
+box : Tuple[int, int, int, int]
+    Left, top, right and bottom of the part, in screen pixels.
+grabber : Optional[Callable[..., Any]]
+    Takes the picture (bbox=, all_screens=) and gives an image with a save method;
+    None for Pillow's ImageGrab.grab.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the picture was saved; False when the computer gives none (Linux
+    without a screen grabber, a Mac without the right to record the screen).
+
+---- Globals mutated ----
+None. Writes the picture (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `utils_viewer/viewer_gui.py`
 
 The experiment browser window: the guide with its questions on the left, plots on the right.
@@ -38703,6 +39461,36 @@ None.
 
 ---- Helpers ----
 _navigator
+```
+
+##### `_flag_taker`
+
+```text
+---- Summary ----
+Method to answer the developer's Flag button: a picture of the window, then a
+box for the comment, with what is on screen (the version, the file shown, the
+step the program waits at and the guide's last lines).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FLAG_GUIDE_LINES (module constant); GUIDE_STEPS, LAUNCH_LOG_NAME (imported
+constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Saves the flag's picture and opens its box (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+flag_starter
+program_version_reader
 ```
 
 ##### `_formula_writer`
@@ -39769,7 +40557,8 @@ None.
 Method to build the guide on the left: the lines of the steps and the card of
 the open step, with its messages, the table (hidden until a table is asked
 for), the answers, the symbols (shown where text is typed), the hint and the
-Help button (greyed out until the Help box is made); and on the right the file
+Help button (greyed out until the Help box is made), with Flag beside it on the
+developer's copy only; and on the right the file
 controls, under them the plot with the overlay of its edges, then the settings
 strip and the edges row (hidden until edges are dragged).
 
@@ -39797,6 +40586,7 @@ _confirm_sender
 _edges_refresher
 _every_file_taker
 _file_follower
+_flag_taker
 _guide_line_clicker
 _history_stepper
 _message_shower
@@ -39812,6 +40602,7 @@ _time_clicker
 _typed_edge_taker
 AnswerArea
 AnswerTable
+dev_copy_checker
 EdgeOverlay
 EdgeRow
 GuidePanel
@@ -43937,8 +44728,8 @@ None.
 
 ---- Outputs ----
 str
-    'Set on their own: the baseline, settled window 2. Left out: quick window 1.',
-    each part only when it has a window; '' for none.
+    'Set on their own: the baseline, settled region 2. Left out: quick region 1.',
+    each part only when it has a region; '' for none.
 
 ---- Globals mutated ----
 None.
@@ -45607,7 +46398,7 @@ ticks are made again only when they change.
 
 ---- Inputs ----
 note : str
-    The note beside the ticks ('settled window 2'), or ''.
+    The note beside the ticks ('settled region 2'), or ''.
 ticks : List[Tuple[str, str, bool]]
     [(field, words, is_ticked)]; empty for none.
 

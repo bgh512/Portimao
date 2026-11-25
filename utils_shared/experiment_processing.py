@@ -461,7 +461,7 @@ def experiment_data_processor(info: dict,
                 if skipped:
                     warning_shower(f'  Warning: averaging skipped for '
                                    f"{', '.join(skipped)} (not enough time for the "
-                                   f'window and gap)',
+                                   f'region and gap)',
                                    )
                 has_baseline = baseline_percent_adder(experiment)
             except (KeyError, ValueError, TypeError) as exc:

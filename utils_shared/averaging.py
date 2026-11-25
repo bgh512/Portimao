@@ -256,12 +256,13 @@ def _own_minutes_reader(each_window: Dict[str, dict],
         return float(shared)
     value = float(value)
     if field == 'length_min' and value <= 0:
-        raise ValueError(f'The averaging window {name} must be longer than 0 min. '
-                         'Correct it in the window step.',
+        raise ValueError(f'The averaging region {name} must be longer than 0 min. '
+                         'Correct it in the averaging step.',
                          )
     if value < 0:
-        raise ValueError(f'The averaging window {name} cannot start or end on the '
-                         'wrong side of its addition. Correct it in the window step.',
+        raise ValueError(f'The averaging region {name} cannot start or end on the '
+                         'wrong side of its addition. Correct it in the averaging '
+                         'step.',
                          )
     return value
 
@@ -680,11 +681,11 @@ def experiment_averages_calculator(experiment: dict,
     # ---- 1 Validate the inputs -------------------------------------------------------
     name = experiment['experiment_name']
     if window_minutes <= 0:
-        raise ValueError('The averaging window must be longer than 0 min. Correct it '
+        raise ValueError('The averaging region must be longer than 0 min. Correct it '
                          'where the program asks for it.',
                          )
     if gap_minutes < 0 or final_window_gap_minutes < 0:
-        raise ValueError('The gap before an averaging window cannot be negative. '
+        raise ValueError('The gap before an averaging region cannot be negative. '
                          'Correct it where the program asks for it.',
                          )
     if baseline_minimum_seconds < 0:
@@ -692,11 +693,11 @@ def experiment_averages_calculator(experiment: dict,
                          'Correct it in config.py.',
                          )
     if quick_minutes is not None and quick_minutes <= 0:
-        raise ValueError('The quick averaging window must be longer than 0 min. '
+        raise ValueError('The quick averaging region must be longer than 0 min. '
                          'Correct it where the program asks for it.',
                          )
     if delay_minutes < 0:
-        raise ValueError('A quick averaging window cannot start before its addition. '
+        raise ValueError('A quick averaging region cannot start before its addition. '
                          'Correct it where the program asks for it.',
                          )
     if vo2_source is None and haem_source is None:
@@ -925,14 +926,14 @@ def kind_span_lister(kind: str,
     """
 
     if kind not in ('settled', 'quick'):
-        raise ValueError(f'The kind of averaging window {kind!r} is not known.')
-    spans = window_span_lister(event_times_min,
-                               recording_span_min,
-                               window_minutes,
-                               gap_minutes,
-                               final_window_gap_minutes,
-                               each_window=each_window,
-                               )
+        raise ValueError(f'The kind of averaging region {kind!r} is not known.')
+    spans =window_span_lister(event_times_min,
+                              recording_span_min,
+                              window_minutes,
+                              gap_minutes,
+                              final_window_gap_minutes,
+                              each_window=each_window,
+                              )
     if kind == 'settled':
         return spans
     quick = quick_span_lister(event_times_min,
@@ -1051,8 +1052,8 @@ def window_kind_picker(averages: dict, kind: str) -> dict:
     """
 
     if kind not in ('settled', 'quick'):
-        raise ValueError(f'The kind of averaging window {kind!r} is not known.')
-    picked = dict(averages)
+        raise ValueError(f'The kind of averaging region {kind!r} is not known.')
+    picked =dict(averages)
     for key in ('windows', 'skipped'):
         picked[key] = {}
         for name, window in averages.get(key, {}).items():
@@ -1171,7 +1172,7 @@ def window_layout_finder(values: Dict[str, float],
             words = f'baseline {round(length_s, 2):g} s'
         elif worded is None or name == worded:
             worded = name
-            words = f'window {round(length_s, 2):g} s'
+            words = f'region {round(length_s, 2):g} s'
         else:
             words = ''
         edges.append((f'window_s{EDGE_SEPARATOR}{name}', start, words, kind))
@@ -1206,7 +1207,7 @@ def window_layout_finder(values: Dict[str, float],
         length_s = values.get(f'{name}{OWN_SEPARATOR}quick_s', values['quick_s'])
         words = f'starts {round(delay_s, 2):g} s after the addition' if is_first else ''
         edges.append((f'delay_s{EDGE_SEPARATOR}{name}', start, words, 'quick'))
-        words = f'quick window {round(length_s, 2):g} s' if is_first else ''
+        words = f'quick region {round(length_s, 2):g} s' if is_first else ''
         edges.append((f'quick_s{EDGE_SEPARATOR}{name}', end, words, 'quick_end'))
         parts.append((start, end, 'quick' if problem is None else 'average_unfit'))
     return edges, parts
@@ -1516,7 +1517,7 @@ def window_pick_lister(values: Dict[str, float],
               )
              for index in range(addition_count + 1)
              ]
-    note = ('the last window: its time is before the end of the file'
+    note = ('the last region: its time is before the end of the file'
             if number == addition_count
             else ''
             )

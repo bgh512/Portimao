@@ -364,7 +364,7 @@ def _processing_table_builder(experiment: dict) -> pd.DataFrame:
             else None
             )
     if used:
-        rows.append(('OCR % of baseline: baseline window',
+        rows.append(('OCR % of baseline: baseline region',
                      '',
                      f"{used['start_time']:.2f} to {used['end_time']:.2f}",
                      'min',
@@ -855,14 +855,14 @@ def experiment_workbook_exporter(experiment: dict,
                      'addition.',
                      ]
             if settings.get('is_settled', True):
-                notes.append(f"Settled windows are {settings['window_minutes']:g} min "
+                notes.append(f"Settled regions are{settings['window_minutes']:g} min "
                              f"long, ending {settings['gap_minutes']:g} min before "
                              'the next addition and '
                              f"{settings['final_window_gap_minutes']:g} min before "
                              'the end of the recording.',
                              )
             if settings.get('quick_minutes') is not None:
-                notes.append(f"Quick windows are {settings['quick_minutes']:g} min "
+                notes.append(f"Quick regions are{settings['quick_minutes']:g} min "
                              f"long, starting {settings['delay_minutes']:g} min after "
                              'their addition.',
                              )
@@ -888,10 +888,10 @@ def experiment_workbook_exporter(experiment: dict,
                     notes.append(f"{window_name} is set on its own: "
                                  f"{', '.join(parts)}.",
                                  )
-            notes += ['Difference from baseline = the average in the window - the '
+            notes += ['Difference from baseline = the average in the region - the '
                       'average in the baseline (average0), in the unit of the '
                       'measurement.',
-                      'OCR (% of baseline) = the average in the window / the average '
+                      'OCR (% of baseline) = the average in the region / the average '
                       'in the baseline x 100 (100 = no change).',
                       ]
             if any(window.get('haem_views')
@@ -903,7 +903,7 @@ def experiment_workbook_exporter(experiment: dict,
                              'region).',
                              )
             if 'Δψ spectra used' in table.columns:
-                notes.append('Δψ is averaged over the spectra of the window that have '
+                notes.append('Δψ is averaged over the spectra of the region that have '
                              'a value (it is empty where bH or bL is outside its '
                              'limits); "spectra used" says how many that was.',
                              )

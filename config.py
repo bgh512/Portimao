@@ -29,145 +29,147 @@ STANDARD_FIT = 'bswitch_no2_mycobl_b557.csv'
 CHAMBER_VOLUME_ML = 5.0
 # the results folder offered, inside the data folder, for a dataset never run before
 RESULTS_FOLDER_NAME = 'results'
-DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ranges
-                   # the same at the end of the recording
-                   'ignore_last_minutes': 0.0,
-                   'decompose': True,
-                   'fit_file': STANDARD_FIT,
-                   # the library haems ticked under Build a fit in the strip, used when
-                   # fit_file is "Your own haems" (spectral_decomposer.OWN_HAEMS_NAME)
-                   'haem_files': [],
-                   # the background fitted under the haems (names and words in
-                   # utils_shared.spectral_decomposer.BACKGROUND_LABELS): the lab's own
-                   # chamber scripts' background, which can bend, as bL needs to fall
-                   # when reduced as the instrument's own trace does
-                   'haem_background': 'rowan_scatter',
-                   'decomposition_dataset': 'Cyt',
-                   'normalise_od': False,
-                   # the window step starts with windows, which the user can untick
-                   # 'averaging' is True when either kind of window is ticked: the
-                   # settled windows (ending gap_minutes before the next addition) or
-                   # the quick windows (starting delay_minutes after each addition)
-                   'averaging': True,
-                   'settled_windows': True,
-                   'window_minutes': 2.0,
-                   'gap_minutes': 0.5,
-                   'final_gap_minutes': 0.5,
-                   'quick_windows': False,
-                   'quick_minutes': 0.5,
-                   'delay_minutes': 10.0 / 60.0,
-                   # the windows set on their own and the files whose windows were
-                   # fixed by hand (each_window and file_windows, DATA_FORMAT.md)
-                   'each_window': {},
-                   'file_windows': {},
-                   # the kind of window ("settled" or "quick") the 2x2 grid, the time
-                   # response and the haem and OCR response average over, asked only
-                   # when both kinds are ticked
-                   'ex_window_kind': 'settled',
-                   'tr_window_kind': 'settled',
-                   'ho_window_kind': 'settled',
-                   'plot_o2': True,
-                   'plot_ocr': True,
-                   # "raw", "od" or "percent"
-                   'ocr_mode': 'od',
-                   # event label rotation in degrees: 0 = horizontal, 90 = vertical
-                   'event_label_angle': 45,
-                   # what the event labels show (Labels as in the strip): "chamber",
-                   # the concentration in the chamber after the addition ("400 µM
-                   # KCN"), or "added", the volume and the stock added ("10 µL of
-                   # 200 mM KCN")
-                   'label_mode': 'chamber',
-                   # the haems of the fit, when decomposed, in the figure of each file
-                   'plot_haems': True,
-                   'haems': [],
-                   # how a decomposition kept to compare with is shown: "side", a plot
-                   # of its own on the left of the plot in use, or "overlaid", dashed
-                   # over it
-                   'compare_layout': 'side',
-                   # the plot of each file shows its difference spectrum (reduced minus
-                   # oxidised, utils_shared.difference_spectra) in place of the standard
-                   # plot, for a file with both regions; the switch under the boxes
-                   'difference_spectra': False,
-                   # the panels of the plot of each file in the order the user moved
-                   # them to, top first, by their keys ("oxygen", "vo2", "haem:Cyt bH",
-                   # "delta_psi"); empty for the standard order (oxygen, OCR, the haems
-                   # a then b then c, delta psi)
-                   'panel_order': [],
-                   # "abs", "delta" or "percent" (% oxidised, for the files with an
-                   # oxidised and a reduced region); no haem amounts, as only cells are
-                   # measured and an amount depends on the size of its shape
-                   'haem_mode': 'delta',
-                   # divide the haem values (not "percent") by OD x volume x dilution
-                   # when OD scaling is on
-                   'haem_per_od': True,
-                   # Delta psi, the membrane potential, from how reduced bH and bL are
-                   # (utils_shared.delta_psi, MATHS.md): worked out for the files with
-                   # both regions only when switched on. Its numbers start from those of
-                   # Kim, Ripple and Springett (Biophys J 2012, 102:1194), measured on
-                   # mitochondria, and are kept with the dataset so they can be changed:
-                   # the temperature of the sample, each haem's midpoint potential with
-                   # the other haem oxidised (first) and reduced (second), the share of
-                   # the membrane potential that lies between the two haems, and the
-                   # limits: delta psi is given only where bH and bL are both between
-                   # these % reduced, as outside them a small error in the % gives a
-                   # large error in delta psi (the method's own rule)
-                   'delta_psi': False,
-                   'temperature_c': 37.0,
-                   'psi_bH_first_mV': 40.0,
-                   'psi_bL_first_mV': -20.0,
-                   'psi_bH_second_mV': -30.0,
-                   'psi_bL_second_mV': -90.0,
-                   'psi_share': 0.5,
-                   'psi_reduced_lowest_percent': 10.0,
-                   'psi_reduced_highest_percent': 90.0,
-                   # Figure sizes. Each figure has its own journal, width (columns) and
-                   # height (fraction of a page).
-                   # The *_size_mode answer is "default" (the journal question was
-                   # answered None: Nature and the size below) or "custom".
-                   # The standard figure: Nature, 1 column wide, 0.5 of a page tall.
-                   'journal': STANDARD_JOURNAL,
-                   'columns': 1,
-                   'height': 0.5,
-                   'size_mode': 'default',
-                   'plot_comparison': False,
-                   'comparison_journal': STANDARD_JOURNAL,
-                   'comparison_columns': 1.5,
-                   'comparison_height': 0.5,
-                   'comparison_size_mode': 'default',
-                   'plot_exemplar': False,
-                   'ho_exemplar_run': 1,
-                   'ex_journal': STANDARD_JOURNAL,
-                   'ho_ex_columns': 2,
-                   'ho_ex_height': 0.75,
-                   'ex_watermark': True,
-                   'ex_size_mode': 'default',
-                   'export_spectra': False,
-                   # what the Export step (5.9) writes besides the plot and workbook of
-                   # each file: 'summary' nothing more, 'trimmed' the spectra csv files,
-                   # 'full' those and the whole recording's
-                   'export_choice': 'summary',
-                   # special figures (see utils_custom): time response, and haem and OCR
-                   # response
-                   'plot_time_response': False,
-                   'plot_haem_ocr': False,
-                   'tr_groups': ['knockdown', 'control'],
-                   'tr_examples': [],
-                   'tr_decompositions': [],
-                   'tr_skip_hours': [],
-                   'tr_journal': STANDARD_JOURNAL,
-                   'tr_columns': 2,
-                   'tr_height': 1.0,
-                   'tr_size_mode': 'default',
-                   'ho_haem_mode': 'delta',
-                   'ho_per_od': True,
-                   'ho_metric': 'delta',
-                   'ho_haems': [],
-                   'ho_ocr_mode': 'od',
-                   'ho_journal': STANDARD_JOURNAL,
-                   'ho_pub_columns': 2,
-                   'ho_pub_height': 0.75,
-                   'ho_size_mode': 'default',
-                   }
+DEFAULT_ANSWERS = {
+    'ignore_first_minutes': 5.0,  # left out of baselines and ranges
+    # the same at the end of the recording
+    'ignore_last_minutes': 0.0,
+    'decompose': True,
+    'fit_file': STANDARD_FIT,
+    # the library haems ticked under Build a fit in the strip, used when
+    # fit_file is "Your own haems" (spectral_decomposer.OWN_HAEMS_NAME)
+    'haem_files': [],
+    # the background fitted under the haems (names and words in
+    # utils_shared.spectral_decomposer.BACKGROUND_LABELS): the lab's own
+    # chamber scripts' background, which can bend, as bL needs to fall
+    # when reduced as the instrument's own trace does
+    'haem_background': 'rowan_scatter',
+    'decomposition_dataset': 'Cyt',
+    'normalise_od': False,
+    # the averaging step starts with averaging regions, which the user
+    # can untick; 'averaging' is True when either kind of region is
+    # ticked: the settled regions (ending gap_minutes before the next
+    # addition) or the quick regions (starting delay_minutes after each
+    # addition). The stored names keep "window", so saved datasets load.
+    'averaging': True,
+    'settled_windows': True,
+    'window_minutes': 2.0,
+    'gap_minutes': 0.5,
+    'final_gap_minutes': 0.5,
+    'quick_windows': False,
+    'quick_minutes': 0.5,
+    'delay_minutes': 10.0 / 60.0,
+    # the averaging regions set on their own and the files whose regions
+    # were fixed by hand (each_window and file_windows, DATA_FORMAT.md)
+    'each_window': {},
+    'file_windows': {},
+    # the kind of averaging region ("settled" or "quick") the 2x2 grid, the time
+    # response and the haem and OCR response average over, asked only
+    # when both kinds are ticked
+    'ex_window_kind': 'settled',
+    'tr_window_kind': 'settled',
+    'ho_window_kind': 'settled',
+    'plot_o2': True,
+    'plot_ocr': True,
+    # "raw", "od" or "percent"
+    'ocr_mode': 'od',
+    # event label rotation in degrees: 0 = horizontal, 90 = vertical
+    'event_label_angle': 45,
+    # what the event labels show (Labels as in the strip): "chamber",
+    # the concentration in the chamber after the addition ("400 µM
+    # KCN"), or "added", the volume and the stock added ("10 µL of
+    # 200 mM KCN")
+    'label_mode': 'chamber',
+    # the haems of the fit, when decomposed, in the figure of each file
+    'plot_haems': True,
+    'haems': [],
+    # how a decomposition kept to compare with is shown: "side", a plot
+    # of its own on the left of the plot in use, or "overlaid", dashed
+    # over it
+    'compare_layout': 'side',
+    # the plot of each file shows its difference spectrum (reduced minus
+    # oxidised, utils_shared.difference_spectra) in place of the standard
+    # plot, for a file with both regions; the switch under the boxes
+    'difference_spectra': False,
+    # the panels of the plot of each file in the order the user moved
+    # them to, top first, by their keys ("oxygen", "vo2", "haem:Cyt bH",
+    # "delta_psi"); empty for the standard order (oxygen, OCR, the haems
+    # a then b then c, delta psi)
+    'panel_order': [],
+    # "abs", "delta" or "percent" (% oxidised, for the files with an
+    # oxidised and a reduced region); no haem amounts, as only cells are
+    # measured and an amount depends on the size of its shape
+    'haem_mode': 'delta',
+    # divide the haem values (not "percent") by OD x volume x dilution
+    # when OD scaling is on
+    'haem_per_od': True,
+    # Delta psi, the membrane potential, from how reduced bH and bL are
+    # (utils_shared.delta_psi, MATHS.md): worked out for the files with
+    # both regions only when switched on. Its numbers start from those of
+    # Kim, Ripple and Springett (Biophys J 2012, 102:1194), measured on
+    # mitochondria, and are kept with the dataset so they can be changed:
+    # the temperature of the sample, each haem's midpoint potential with
+    # the other haem oxidised (first) and reduced (second), the share of
+    # the membrane potential that lies between the two haems, and the
+    # limits: delta psi is given only where bH and bL are both between
+    # these % reduced, as outside them a small error in the % gives a
+    # large error in delta psi (the method's own rule)
+    'delta_psi': False,
+    'temperature_c': 37.0,
+    'psi_bH_first_mV': 40.0,
+    'psi_bL_first_mV': -20.0,
+    'psi_bH_second_mV': -30.0,
+    'psi_bL_second_mV': -90.0,
+    'psi_share': 0.5,
+    'psi_reduced_lowest_percent': 10.0,
+    'psi_reduced_highest_percent': 90.0,
+    # Figure sizes. Each figure has its own journal, width (columns) and
+    # height (fraction of a page).
+    # The *_size_mode answer is "default" (the journal question was
+    # answered None: Nature and the size below) or "custom".
+    # The standard figure: Nature, 1 column wide, 0.5 of a page tall.
+    'journal': STANDARD_JOURNAL,
+    'columns': 1,
+    'height': 0.5,
+    'size_mode': 'default',
+    'plot_comparison': False,
+    'comparison_journal': STANDARD_JOURNAL,
+    'comparison_columns': 1.5,
+    'comparison_height': 0.5,
+    'comparison_size_mode': 'default',
+    'plot_exemplar': False,
+    'ho_exemplar_run': 1,
+    'ex_journal': STANDARD_JOURNAL,
+    'ho_ex_columns': 2,
+    'ho_ex_height': 0.75,
+    'ex_watermark': True,
+    'ex_size_mode': 'default',
+    'export_spectra': False,
+    # what the Export step (5.9) writes besides the plot and workbook of
+    # each file: 'summary' nothing more, 'trimmed' the spectra csv files,
+    # 'full' those and the whole recording's
+    'export_choice': 'summary',
+    # special figures (see utils_custom): time response, and haem and OCR
+    # response
+    'plot_time_response': False,
+    'plot_haem_ocr': False,
+    'tr_groups': ['knockdown', 'control'],
+    'tr_examples': [],
+    'tr_decompositions': [],
+    'tr_skip_hours': [],
+    'tr_journal': STANDARD_JOURNAL,
+    'tr_columns': 2,
+    'tr_height': 1.0,
+    'tr_size_mode': 'default',
+    'ho_haem_mode': 'delta',
+    'ho_per_od': True,
+    'ho_metric': 'delta',
+    'ho_haems': [],
+    'ho_ocr_mode': 'od',
+    'ho_journal': STANDARD_JOURNAL,
+    'ho_pub_columns': 2,
+    'ho_pub_height': 0.75,
+    'ho_size_mode': 'default',
+    }
 # scatter terms the component finder takes out of the spectra; it does not follow the
 # 'haem_background' answer yet
 DEGREE_OF_SCATTER = 1
@@ -192,7 +194,7 @@ DELTA_PSI_MIDPOINT_ANSWERS = {'bH_first': 'psi_bH_first_mV',
                               }
 # least data the baseline average (before the first addition) must span
 BASELINE_MINIMUM_SECONDS = 10
-# an edge of an averaging window dragged on the plot moves in whole steps of this
+# an edge of an averaging region dragged on the plot moves in whole steps of this
 DRAG_STEP_SECONDS = 5
 # The window. Resolution of its plots, in dots per inch.
 PREVIEW_DPI = 200
@@ -206,7 +208,7 @@ WINDOW_KEPT_FILES = 3
 PREVIEW_TIME_TITLES = {'recording': 'Time in the recording (minutes)',
                        'trimmed': 'Time from the trimmed start (minutes)',
                        }
-# spectral window (nm) and smoothing (nm) first offered by the component finder (PCA)
+# spectral range (nm) and smoothing (nm) first offered by the component finder (PCA)
 PCA_WINDOW_NM = (500.0, 630.0)
 PCA_SMOOTHING_NM = 4.0
 # volume (mL) the spun-down cells are resuspended in, as the OD questions say
@@ -239,11 +241,11 @@ FALLBACK_WITHOUT_OD = {'od': 'raw', 'abs_od': 'abs', 'delta_abs_od': 'delta_abs'
 # experiment. The set and measured oxygen share a panel, so they also differ in line
 # style (solid and dashed) and stay apart in grey scale.
 TRACE_COLOURS = {'set_O2': '#1f77b4', 'measured_O2': '#ff7f0e', 'OCR': '#1f77b4'}
-# The baseline window (the averaging window before the first addition): the colour of
-# its shading and of its edge and name, gold to stand apart from the blue settled and
-# the green quick windows
+# The baseline (the averaging region before the first addition): the colour of its
+# shading and of its edge and name, gold to stand apart from the blue settled and the
+# green quick regions
 BASELINE_WINDOW_COLOURS = ('#E6B800', '#A88600')
-# An averaging window that could not be worked out, shown in the previews only
+# An averaging region that could not be worked out, shown in the previews only
 SKIPPED_WINDOW_COLOUR = '#d62728'
 # Usual reduced-minus-oxidised peaks (nm) of each haem type, drawn as guide lines on the
 # figure of the components found
@@ -609,15 +611,15 @@ class Config:
                 'EVENT_LABEL_FONTSIZE': fonts['tick'],
                 'EVENT_LABEL_ANCHOR': 'start',
                 'EVENT_LABEL_OFFSET': style['event_label_offset'],
-                # Averaging windows
+                # Averaging regions
                 'PLOT_AVERAGING_WINDOWS': a['averaging'],
                 'AVERAGING_WINDOW_COLOUR': '#4C9BE8',
                 'AVERAGING_WINDOW_ALPHA': 0.18,
                 'AVERAGING_WINDOW_EDGE_COLOUR': '#2878B5',
-                # the quick windows (starting after each addition) are green
+                # the quick regions (starting after each addition) are green
                 'QUICK_WINDOW_COLOUR': '#5DBB63',
                 'QUICK_WINDOW_EDGE_COLOUR': '#2E8B3D',
-                # the baseline (the window before the first addition) is orange, with
+                # the baseline (the region before the first addition) is orange, with
                 # its name above it
                 'BASELINE_WINDOW_COLOUR': BASELINE_WINDOW_COLOURS[0],
                 'BASELINE_WINDOW_EDGE_COLOUR': BASELINE_WINDOW_COLOURS[1],

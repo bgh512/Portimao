@@ -421,7 +421,7 @@ def test_ocr_percent_of_baseline_has_its_sheet(tmp_path: Path) -> None:
     assert list(sheet['OCR (% of baseline)']) == [0.0, 200.0, 400.0, 600.0]
     lines = _processing_table_builder(experiment)
     assert [tuple(row) for row in lines.itertuples(index=False)] == [
-        ('OCR % of baseline: baseline window', '', '0.00 to 1.00', 'min'),
+        ('OCR % of baseline: baseline region', '', '0.00 to 1.00', 'min'),
         ('OCR % of baseline: average OCR in the baseline (100 %)',
          '',
          1.0,

@@ -88,8 +88,8 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
      ),
     ('windows',
      'Experiment processing',
-     'Averaging windows',
-     'Drag the averaging windows on the plot, or type them under Averaging in the Time '
+     'Averaging regions',
+     'Drag the averaging regions on the plot, or type them under Averaging in the Time '
      'regions box above it.',
      ),
     ('figure',

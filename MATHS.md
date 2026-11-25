@@ -341,67 +341,67 @@ Checked by: `test_equal_haems_at_their_midpoints_give_120_mV`, `test_unequal_hae
 
 ---
 
-## 7. The averaging windows
+## 7. The averaging regions
 
-An averaging window is a stretch of time over which a measurement (the OCR, a haem, a spectrum) is averaged. There are two kinds, and a dataset can have either or both:
+An averaging region is a stretch of time over which a measurement (the OCR, a haem, a spectrum) is averaged. There are two kinds, and a dataset can have either or both:
 
-- A **settled window** is the stretch before an addition, once the measurement has settled after the addition before. Every settled window has the same length, $w$, and ends the same time, $g$, before the next addition, in every file of the dataset, unless it is set on its own (7.5).
-- A **quick window** is the stretch just after an addition, for the quick response to it. Every quick window has the same length, $q$, and starts the same time, $d$, after its own addition, in every file of the dataset, unless it is set on its own (7.5).
+- A **settled region** is the stretch before an addition, once the measurement has settled after the addition before. Every settled region has the same length, $w$, and ends the same time, $g$, before the next addition, in every file of the dataset, unless it is set on its own (7.5).
+- A **quick region** is the stretch just after an addition, for the quick response to it. Every quick region has the same length, $q$, and starts the same time, $d$, after its own addition, in every file of the dataset, unless it is set on its own (7.5).
 
-The window before the first addition is the baseline, which both kinds are compared with. Every figure that averages around the additions uses these windows; a figure that averages files together uses one kind, which it asks for when the dataset has both.
+The region before the first addition is the baseline, which both kinds are compared with. Every figure that averages around the additions uses these regions; a figure that averages files together uses one kind, which it asks for when the dataset has both.
 
-### 7.1 The baseline and the settled windows
+### 7.1 The baseline and the settled regions
 
 The baseline, before the first addition:
 
 $$\mathrm{end}_0 = a_1 - g \qquad \mathrm{start}_0 = \mathrm{end}_0 - w$$
 
-The window after addition number $i$, when another addition follows:
+The region after addition number $i$, when another addition follows:
 
 $$\mathrm{end}_i = a_{i+1} - g \qquad \mathrm{start}_i = \mathrm{end}_i - w$$
 
-The window after the last addition:
+The region after the last addition:
 
 $$\mathrm{end}_{\mathrm{last}} = T - f \qquad \mathrm{start}_{\mathrm{last}} = \mathrm{end}_{\mathrm{last}} - w$$
 
 - $a_1, a_2, \dots$: the times of the additions, in order (min); an addition marked to be ignored is left out
-- $w$: the length of the baseline and of every settled window (min; typed in seconds in the program, 120 s to start with)
-- $g$: the gap between the end of the baseline or of a settled window and the next addition (min; typed in seconds, 30 s to start with)
+- $w$: the length of the baseline and of every settled region (min; typed in seconds in the program, 120 s to start with)
+- $g$: the gap between the end of the baseline or of a settled region and the next addition (min; typed in seconds, 30 s to start with)
 - $T$: the time of the last measurement of the file, after trimming (min)
-- $f$: the gap between the last window and the end of the file (min; 0.5 min to start with, and set by moving the right edge of the last window)
-- start, end: the first and last time of a window (min); the measurements from start to end, both included, are averaged
+- $f$: the gap between the last region and the end of the file (min; 0.5 min to start with, and set by moving the right edge of the last region)
+- start, end: the first and last time of a region (min); the measurements from start to end, both included, are averaged
 
 Notes:
 
 - When the baseline would start before the file does, it starts where the file starts, so it is shorter than $w$. A baseline with less than 10 s of data is left out, and the file then has no baseline.
-- A window that would start before its own addition ($\mathrm{start}_i$ before $a_i$) does not fit: the additions are too close together for a window of that length. It is left out and named in a warning, and is never shortened.
-- The average of a window is the mean of its measurements, and the spread is their standard deviation (dividing by their number minus 1).
-- The baseline is there whenever the dataset has windows of either kind, with the length $w$ and the gap $g$, also when it has quick windows only.
+- A region that would start before its own addition ($\mathrm{start}_i$ before $a_i$) does not fit: the additions are too close together for a region of that length. It is left out and named in a warning, and is never shortened.
+- The average of a region is the mean of its measurements, and the spread is their standard deviation (dividing by their number minus 1).
+- The baseline is there whenever the dataset has averaging regions of either kind, with the length $w$ and the gap $g$, also when it has quick regions only.
 
-Example 1: a file of 30 min with additions at 10 and 20 min, $w = 2$ min and $g = 0.5$ min. The baseline ends at $10 - 0.5 = 9.5$ min and starts at $9.5 - 2 = 7.5$ min. The window after the first addition ends at $20 - 0.5 = 19.5$ min and starts at 17.5 min. The window after the last addition ends at $30 - 0.5 = 29.5$ min and starts at 27.5 min.
+Example 1: a file of 30 min with additions at 10 and 20 min, $w = 2$ min and $g = 0.5$ min. The baseline ends at $10 - 0.5 = 9.5$ min and starts at $9.5 - 2 = 7.5$ min. The region after the first addition ends at $20 - 0.5 = 19.5$ min and starts at 17.5 min. The region after the last addition ends at $30 - 0.5 = 29.5$ min and starts at 27.5 min.
 
-Example 2: the same file with $w = 12$ min. The baseline would start at $9.5 - 12 = -2.5$ min, so it starts at 0 and runs to 9.5 min. The window after the first addition would start at $19.5 - 12 = 7.5$ min, before its addition at 10 min, and the last would start at $29.5 - 12 = 17.5$ min, before its addition at 20 min: neither fits, and both are left out.
+Example 2: the same file with $w = 12$ min. The baseline would start at $9.5 - 12 = -2.5$ min, so it starts at 0 and runs to 9.5 min. The region after the first addition would start at $19.5 - 12 = 7.5$ min, before its addition at 10 min, and the last would start at $29.5 - 12 = 17.5$ min, before its addition at 20 min: neither fits, and both are left out.
 
-Checked by: `test_the_windows_fall_before_the_additions` in `tests/test_averaging_windows.py`; the averages inside the windows by `test_averages_around_the_additions` and `test_average_that_does_not_fit` in `tests/test_processing_maths.py`; the averaged spectra of the time response by `test_averaged_spectra_around_the_additions` and `test_baseline_starts_with_the_recording` in `tests/test_summary_maths.py`.
+Checked by: `test_the_windows_fall_before_the_additions` in `tests/test_averaging_windows.py`; the averages inside the regions by `test_averages_around_the_additions` and `test_average_that_does_not_fit` in `tests/test_processing_maths.py`; the averaged spectra of the time response by `test_averaged_spectra_around_the_additions` and `test_baseline_starts_with_the_recording` in `tests/test_summary_maths.py`.
 
-### 7.2 The quick windows
+### 7.2 The quick regions
 
-The quick window after addition number $i$:
+The quick region after addition number $i$:
 
 $$\mathrm{start}_i = a_i + d \qquad \mathrm{end}_i = \mathrm{start}_i + q$$
 
 - $a_i$: the time of addition number $i$ (min)
-- $d$: how long after its addition a quick window starts (min; typed in seconds in the program, 10 s to start with)
-- $q$: the length of every quick window (min; typed in seconds, 30 s to start with)
-- start, end: the first and last time of the window (min); the measurements from start to end, both included, are averaged
+- $d$: how long after its addition a quick region starts (min; typed in seconds in the program, 10 s to start with)
+- $q$: the length of every quick region (min; typed in seconds, 30 s to start with)
+- start, end: the first and last time of the region (min); the measurements from start to end, both included, are averaged
 
 Notes:
 
-- A quick window that would end after the next addition ($\mathrm{end}_i$ after $a_{i+1}$), or after the last measurement of the file for the last addition, does not fit. It is left out and named in a warning, and is never shortened. One that ends exactly at the next addition fits.
-- A quick window may overlap the settled window of the same addition; the measurements they share are then counted in both.
-- The average and the spread are worked out as for a settled window.
+- A quick region that would end after the next addition ($\mathrm{end}_i$ after $a_{i+1}$), or after the last measurement of the file for the last addition, does not fit. It is left out and named in a warning, and is never shortened. One that ends exactly at the next addition fits.
+- A quick region may overlap the settled region of the same addition; the measurements they share are then counted in both.
+- The average and the spread are worked out as for a settled region.
 
-Example 1: a file of 30 min with additions at 10 and 20 min, $d = 0.5$ min and $q = 1$ min. The first quick window starts at $10 + 0.5 = 10.5$ min and ends at $10.5 + 1 = 11.5$ min. The second starts at 20.5 min and ends at 21.5 min.
+Example 1: a file of 30 min with additions at 10 and 20 min, $d = 0.5$ min and $q = 1$ min. The first quick region starts at $10 + 0.5 = 10.5$ min and ends at $10.5 + 1 = 11.5$ min. The second starts at 20.5 min and ends at 21.5 min.
 
 Example 2: the same file with $q = 12$ min. The first would end at $10.5 + 12 = 22.5$ min, after the addition at 20 min, and the second at $20.5 + 12 = 32.5$ min, after the end of the file at 30 min: neither fits, and both are left out.
 
@@ -409,24 +409,24 @@ Checked by: `test_the_quick_windows_fall_after_the_additions` in `tests/test_ave
 
 ### 7.3 The change from the baseline
 
-The change of a window, settled or quick, is measured from the one baseline of its file:
+The change of a region, settled or quick, is measured from the one baseline of its file:
 
 $$\text{difference} = m - m_0 \qquad p = \frac{m}{m_0} \times 100$$
 
-- $m$: the average of the measurement in the window (in the unit of the measurement)
+- $m$: the average of the measurement in the region (in the unit of the measurement)
 - $m_0$: its average in the baseline
 - difference: in the unit of the measurement; worked out for the OCR, for every haem in every way it can be shown ($\Delta D$, absorbance, % oxidised) and for $\Delta\psi$
 - $p$: the OCR as % of baseline (%), 100 meaning no change; worked out for the OCR only. A haem and $\Delta\psi$ have no percentage of the baseline: $\Delta D$ starts at 0, and the other levels can be near 0 or below it, where a percentage means nothing.
 
-Each experiment's workbook gives these in its Averages sheet, one row per window: for the OCR the average, the spread, the difference and the % of baseline; for each haem, in each way it can be shown, the average, the spread and the difference (% oxidised only for a file with both regions); for $\Delta\psi$ the same three and the spectra used.
+Each experiment's workbook gives these in its Averages sheet, one row per region: for the OCR the average, the spread, the difference and the % of baseline; for each haem, in each way it can be shown, the average, the spread and the difference (% oxidised only for a file with both regions); for $\Delta\psi$ the same three and the spectra used.
 
-$\Delta\psi$ is empty wherever bH or bL is outside its limits (section 6), so a window can hold a $\Delta\psi$ for only some of its spectra. Its average and spread are taken over the spectra that have one, and "spectra used" says how many that was out of all the spectra of the window (5 of 9). A window with no $\Delta\psi$ at all is left empty (0 of 9).
+$\Delta\psi$ is empty wherever bH or bL is outside its limits (section 6), so a region can hold a $\Delta\psi$ for only some of its spectra. Its average and spread are taken over the spectra that have one, and "spectra used" says how many that was out of all the spectra of the region (5 of 9). A region with no $\Delta\psi$ at all is left empty (0 of 9).
 
-Example 1: an OCR that averages 10 in the baseline (7.5 to 9.5 min), 4 in the quick window after the first addition (10.5 to 11.5 min) and 6 in the settled window before the second (17.5 to 19.5 min). The quick window gives a difference of $4 - 10 = -6$ and $p = \dfrac{4}{10} \times 100 = 40$ % of the baseline; the settled window gives $6 - 10 = -4$ and $p = \dfrac{6}{10} \times 100 = 60$ %.
+Example 1: an OCR that averages 10 in the baseline (7.5 to 9.5 min), 4 in the quick region after the first addition (10.5 to 11.5 min) and 6 in the settled region before the second (17.5 to 19.5 min). The quick region gives a difference of $4 - 10 = -6$ and $p = \dfrac{4}{10} \times 100 = 40$ % of the baseline; the settled region gives $6 - 10 = -4$ and $p = \dfrac{6}{10} \times 100 = 60$ %.
 
-Example 2: the haem bH in the same baseline and settled window. As $\Delta D$ it averages 0.5 and −2.0 mOD: a difference of $-2.0 - 0.5 = -2.5$ mOD. As absorbance, 12.5 and 10.0 mOD: $10.0 - 12.5 = -2.5$ mOD. As % oxidised, 80 and 50 %: $50 - 80 = -30$ (in % oxidised).
+Example 2: the haem bH in the same baseline and settled region. As $\Delta D$ it averages 0.5 and −2.0 mOD: a difference of $-2.0 - 0.5 = -2.5$ mOD. As absorbance, 12.5 and 10.0 mOD: $10.0 - 12.5 = -2.5$ mOD. As % oxidised, 80 and 50 %: $50 - 80 = -30$ (in % oxidised).
 
-Example 3: $\Delta\psi$ averages 130 mV in the baseline. Of the nine spectra of the settled window the first four have no $\Delta\psi$ and the last five have 116, 116, 118, 120 and 120 mV. The average is
+Example 3: $\Delta\psi$ averages 130 mV in the baseline. Of the nine spectra of the settled region the first four have no $\Delta\psi$ and the last five have 116, 116, 118, 120 and 120 mV. The average is
 
 $$\frac{116 + 116 + 118 + 120 + 120}{5} = 118 \text{ mV}$$
 
@@ -436,50 +436,50 @@ Checked by: `test_both_kinds_are_averaged_from_one_baseline`, `test_every_haem_v
 
 ### 7.4 The OCR shown as % of baseline
 
-The same percentage, taken at every time of the run and not only in the windows, is one of the ways the OCR can be plotted (**OCR as** in the strip, question 5.3.1):
+The same percentage, taken at every time of the run and not only in the averaging regions, is one of the ways the OCR can be plotted (**OCR as** in the strip, question 5.3.1):
 
 $$y = \frac{x}{b} \times 100$$
 
 - $x$: the OCR at one time (µM min⁻¹)
-- $b$: the average of the OCR in the baseline window of that file (µM min⁻¹), the $m_0$ of 7.3
+- $b$: the average of the OCR in the baseline of that file (µM min⁻¹), the $m_0$ of 7.3
 - $y$: the OCR at that time, in % of baseline; 100 where the OCR is what it was in the baseline, 0 where there is no oxygen consumption
 
 - The OCR per OD gives the same $y$: the OD divides $x$ and $b$ alike.
 - A file without a baseline (less than 10 s of data before its first addition, or no addition) has no % of baseline; so has a file whose $b$ is 0. Its plot keeps the OCR in µM min⁻¹ (per OD when OD values were entered), as its axis says.
-- Each experiment's workbook gives $y$ in its sheet "OCR % of baseline", for every file with a baseline, and the baseline window and $b$ in "How it was worked out".
+- Each experiment's workbook gives $y$ in its sheet "OCR % of baseline", for every file with a baseline, and the baseline region and $b$ in "How it was worked out".
 
 Example: an OCR of 10 µM min⁻¹ all through the baseline (7.5 to 9.5 min), so $b = 10$. Where the OCR is 10, $y = \dfrac{10}{10} \times 100 = 100$ %. Where it is 6, $y = \dfrac{6}{10} \times 100 = 60$ %. Where it is 2, $y = \dfrac{2}{10} \times 100 = 20$ %.
 
 Checked by: `test_the_ocr_is_put_on_its_percent_of_baseline` in `tests/test_averaging_windows.py`.
 
-### 7.5 A window set on its own
+### 7.5 A region set on its own
 
-Any window can be given its own length and its own gap (a settled window or the baseline) or its own start (a quick window). The equations of 7.1 and 7.2 stay the same; only the numbers put into them change for that window:
+Any averaging region can be given its own length and its own gap (a settled region or the baseline) or its own start (a quick region). The equations of 7.1 and 7.2 stay the same; only the numbers put into them change for that region:
 
-Settled window $i$:
+Settled region $i$:
 
 $$\mathrm{end}_i = a_{i+1} - g_i \qquad \mathrm{start}_i = \mathrm{end}_i - w_i$$
 
-Quick window $i$:
+Quick region $i$:
 
 $$\mathrm{start}_i = a_i + d_i \qquad \mathrm{end}_i = \mathrm{start}_i + q_i$$
 
-- $w_i$, $g_i$: the length and gap of settled window number $i$ (the baseline is $i = 0$); where it has none of its own, $w_i = w$ and $g_i = g$ of 7.1
-- $d_i$, $q_i$: the start and length of quick window number $i$; where it has none of its own, $d_i = d$ and $q_i = q$ of 7.2
-- The last settled window always ends $f$ before the end of the file ($\mathrm{end}_{\mathrm{last}} = T - f$): its own length is used, but it has no gap of its own, as nothing follows it. $f$ can be changed, and is the same in every file.
+- $w_i$, $g_i$: the length and gap of settled region number $i$ (the baseline is $i = 0$); where it has none of its own, $w_i = w$ and $g_i = g$ of 7.1
+- $d_i$, $q_i$: the start and length of quick region number $i$; where it has none of its own, $d_i = d$ and $q_i = q$ of 7.2
+- The last settled region always ends $f$ before the end of the file ($\mathrm{end}_{\mathrm{last}} = T - f$): its own length is used, but it has no gap of its own, as nothing follows it. $f$ can be changed, and is the same in every file.
 
 Notes:
 
-- A settled or quick window can be left out with its tick. It is not averaged, and the figures leave a gap where it would be. Its row stays in the Averages sheet with its numbers empty and its kind marked "left out". The baseline cannot be left out, as every change is measured from it (7.3).
-- A window set on its own is set in every file of the dataset, while "Apply to all" is ticked. Unticked (as it is at first, and again whenever another file is shown), only the file shown gets its own windows, and it keeps them however the others are changed.
-- A window set on its own fits, or does not, by the same rules as in 7.1 and 7.2.
+- A settled or quick region can be left out with its tick. It is not averaged, and the figures leave a gap where it would be. Its row stays in the Averages sheet with its numbers empty and its kind marked "left out". The baseline cannot be left out, as every change is measured from it (7.3).
+- A region set on its own is set in every file of the dataset, while "Apply to all" is ticked. Unticked (as it is at first, and again whenever another file is shown), only the file shown gets its own regions, and it keeps them however the others are changed.
+- A region set on its own fits, or does not, by the same rules as in 7.1 and 7.2.
 
 Example: a file of 30 min with additions at 10 and 20 min, $w = 2$ min, $g = 0.5$ min and $f = 1$ min.
 
 - The baseline is set to 3 min long: it ends at $10 - 0.5 = 9.5$ min and starts at $9.5 - 3 = 6.5$ min.
-- The window after the first addition is set to end 1.5 min before the next addition: it ends at $20 - 1.5 = 18.5$ min and starts at $18.5 - 2 = 16.5$ min.
-- The last window is set to 4 min long: it ends at $30 - 1 = 29$ min and starts at $29 - 4 = 25$ min.
-- With quick windows of $q = 1$ min starting $d = 0.5$ min after their addition, the first set to start 1 min after and last 0.5 min runs from $10 + 1 = 11$ min to $11 + 0.5 = 11.5$ min. The second, left out, would run from 20.5 to 21.5 min but is not averaged.
+- The region after the first addition is set to end 1.5 min before the next addition: it ends at $20 - 1.5 = 18.5$ min and starts at $18.5 - 2 = 16.5$ min.
+- The last region is set to 4 min long: it ends at $30 - 1 = 29$ min and starts at $29 - 4 = 25$ min.
+- With quick regions of $q = 1$ min starting $d = 0.5$ min after their addition, the first set to start 1 min after and last 0.5 min runs from $10 + 1 = 11$ min to $11 + 0.5 = 11.5$ min. The second, left out, would run from 20.5 to 21.5 min but is not averaged.
 
 Checked by: `test_each_window_falls_on_its_own`, `test_a_window_left_out_keeps_its_row` and `test_each_file_finds_its_own_windows` in `tests/test_averaging_windows.py`.
 

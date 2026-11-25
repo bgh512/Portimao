@@ -202,14 +202,14 @@ REGION_NUDGE = ('Type the times in the Time regions box above the plot, or drag 
 WINDOW_FIELDS = [('window_s', 'Region length (s)'),
                  ('gap_s', 'Time before next addition (s)'),
                  ]
-WINDOW_SWITCH = ('is_on', 'Averaging windows')
-QUICK_FIELDS = [('quick_s', 'Quick window'), ('delay_s', 'Start after the addition')]
-QUICK_SWITCH = ('quick_is_on', 'Quick windows')
+WINDOW_SWITCH = ('is_on', 'Averaging regions')
+QUICK_FIELDS = [('quick_s', 'Quick region'), ('delay_s', 'Start after the addition')]
+QUICK_SWITCH = ('quick_is_on', 'Quick regions')
 # the toggle under the Use ticks: while on, only the window picked beside it changes,
 # on the file shown
 WINDOW_OPTIONS = [('each_is_on', 'Adjust region manually')]
-WINDOW_KEY_TEXT = ('gold = baseline, blue = window, grey = left out or not picked, red '
-                   'hatched = a window that does not fit')
+WINDOW_KEY_TEXT = ('gold = baseline, blue = averaging region, grey = left out or not '
+                   'picked, red hatched = a region that does not fit')
 FIGURE_NUDGE = ('Change the figure in the boxes above the plot, or the order of the '
                 'panels with the arrows; click Export when it looks right.')
 # The answers of the Export step (5.9): the summary is the plot and the workbook of each
@@ -219,9 +219,9 @@ EXPORT_CHOICES = (('summary', 'Export the summary'),
                   ('trimmed', 'Export the summary and the trimmed csv'),
                   ('full', 'Export the summary and the trimmed and full csv'),
                   )
-WINDOW_NUDGE = ('Type the numbers of the windows in the Time regions box above the '
-                'plot, or drag the edges of a window; press Continue when the windows '
-                'look right.')
+WINDOW_NUDGE = ('Type the numbers of the averaging regions in the Time regions box '
+                'above the plot, or drag the edges of a region; press Continue when '
+                'the regions look right.')
 
 
 # ---- STAGE HELPERS -------------------------------------------------------------------
@@ -1392,8 +1392,8 @@ def _own_windows_teller(each_window: Dict[str, dict]) -> str:
 
     ---- Outputs ----
     str
-        'Set on their own: the baseline, settled window 2. Left out: quick window 1.',
-        each part only when it has a window; '' for none.
+        'Set on their own: the baseline, settled region 2. Left out: quick region 1.',
+        each part only when it has a region; '' for none.
 
     ---- Globals mutated ----
     None.
@@ -1409,8 +1409,8 @@ def _own_windows_teller(each_window: Dict[str, dict]) -> str:
         if name == 'average0':
             return 'the baseline'
         if name.startswith('quick'):
-            return f"quick window {name[len('quick'):]}"
-        return f"settled window {name[len('average'):]}"
+            return f"quick region {name[len('quick'):]}"
+        return f"settled region {name[len('average'):]}"
     own = [namer(name)
            for name, values in each_window.items()
            if any(field != 'is_used' for field in values)
@@ -2880,35 +2880,35 @@ def _windows_chooser(session: ViewerSession,
 
     # ---- 2 Drag or type the windows until Continue -----------------------------------
     guide_step_starter('windows')
-    info_printer('AVERAGING WINDOWS = the stretches before each addition that its '
+    info_printer('AVERAGING REGIONS = the stretches before each addition that its '
                  'averages are taken over.',
                  )
-    info_printer('The baseline (gold) is the window before the first addition; every '
-                 'other window (blue) is compared with it.',
+    info_printer('The baseline (gold) is the region before the first addition; every '
+                 'other region (blue) is compared with it.',
                  tight=True,
                  )
-    info_printer('Each window ends a set time before the next addition, the last one '
+    info_printer('Each region ends a set time before the next addition, the last one '
                  f'{final_gap * 60.0:g} s before the end of the recording. Pull the '
-                 'start of a window to change its length, its end to change the time '
+                 'start of a region to change its length, its end to change the time '
                  'before the addition.',
                  tight=True,
                  )
     info_printer(
-        'A change moves every window, on the file shown; ticking Apply to all '
-        'copies its windows to every file, and it unticks itself when the next '
-        'file is shown. Untick a number under Use to leave that window out '
-        '(grey), or untick Averaging windows for none.',
+        'A change moves every region, on the file shown; ticking Apply to all '
+        'copies its regions to every file, and it unticks itself when the next '
+        'file is shown. Untick a number under Use to leave that region out '
+        '(grey), or untick Averaging regions for none.',
         tight=True,
         )
-    info_printer('Tick Adjust region manually to change one window of one file: pick '
+    info_printer('Tick Adjust region manually to change one region of one file: pick '
                  'it with the buttons beside it, then drag its edges or type its '
-                 'numbers; the other windows are grey until picked.',
+                 'numbers; the other regions are grey until picked.',
                  tight=True,
                  )
     _step_edges_shower(session, 'windows', choice)
     try:
-        enter_waiter('Drag the windows on the plot, or type their numbers in the Time '
-                     'regions box, press Continue when ready.',
+        enter_waiter('Drag the averaging regions on the plot, or type their numbers in '
+                     'the Time regions box, press Continue when ready.',
                      WINDOW_NUDGE,
                      number='4.6',
                      )
@@ -2981,7 +2981,7 @@ def _windows_choice_builder(session: ViewerSession,
     if not any(additions.values()):
         answers['averaging'] = False
         info_printer('None of the files has an addition, so there are no averaging '
-                     'windows.',
+                     'regions.',
                      )
         return None
     final_gap = float(answers['final_gap_minutes'])
@@ -3128,11 +3128,11 @@ def _windows_keeper(session: ViewerSession,
 
     # ---- 2 What they are -------------------------------------------------------------
     if not answers['averaging']:
-        info_printer('No averaging windows: nothing is averaged around the additions.')
+        info_printer('No averaging regions: nothing is averaged around the additions.')
         return
     window_s, gap_s = shared['window_minutes'] * 60.0, shared['gap_minutes'] * 60.0
     if answers['settled_windows']:
-        info_printer(f'Averaging windows: {round(window_s, 2):g} s long, ending '
+        info_printer(f'Averaging regions: {round(window_s, 2):g} s long, ending '
                      f'{round(gap_s, 2):g} s before the next addition, the last '
                      f"{round(shared['final_gap_minutes'] * 60.0, 2):g} s before the "
                      'end of the recording.',
@@ -3140,10 +3140,10 @@ def _windows_keeper(session: ViewerSession,
     else:
         info_printer(f'Baseline: {round(window_s, 2):g} s long, ending '
                      f'{round(gap_s, 2):g} s before the first addition. No settled '
-                     'windows.',
+                     'regions.',
                      )
     if answers['quick_windows']:
-        info_printer(f"Quick windows: {round(shared['quick_minutes'] * 60.0, 2):g} s "
+        info_printer(f"Quick regions: {round(shared['quick_minutes'] * 60.0, 2):g} s "
                      f"long, starting {round(shared['delay_minutes'] * 60.0, 2):g} s "
                      'after their addition.',
                      tight=True,
@@ -3152,7 +3152,7 @@ def _windows_keeper(session: ViewerSession,
     if told:
         info_printer(told, tight=True)
     if answers['file_windows']:
-        info_printer('Windows of their own (changed with Apply to all unticked): '
+        info_printer('Regions of their own (changed with Apply to all unticked): '
                      f"{', '.join(answers['file_windows'])}.",
                      tight=True,
                      )
@@ -3189,7 +3189,7 @@ def _windows_keeper(session: ViewerSession,
         if names:
             unfit.append(f"{name}: {', '.join(names)}")
     if unfit:
-        warning_shower('These averaging windows do not fit (not enough time), so they '
+        warning_shower('These averaging regions do not fit (not enough time), so they '
                        f"are left out: {'; '.join(unfit)}. They are red on the plot. "
                        'Go back to the processing step to shorten them or move them '
                        'if they are needed.',
@@ -3444,7 +3444,7 @@ def pca_stage_runner(session: ViewerSession,
 
     info_printer('This finds the components from your own data instead of using a fit '
                  'file. All the spectra of all the files (after trimming, without the '
-                 'ignored parts) are analysed together, so choose a spectral window '
+                 'ignored parts) are analysed together, so choose a spectral range '
                  'where the haems you are interested in absorb. The components are '
                  'abstract shapes that explain the changes in the spectra; where '
                  'haem spectra overlap strongly they may be mixtures of haems rather '
@@ -3458,13 +3458,13 @@ def pca_stage_runner(session: ViewerSession,
     smoothing = float(defaults.get('pca_smoothing_nm', settings.PCA_SMOOTHING_NM))
     while True:
         # ---- 1 Choose the window and read the spectra --------------------------------
-        start = number_asker('Where should the spectral window start (nm)?',
+        start = number_asker('Where should the spectral range start (nm)?',
                              start,
                              minimum=0,
                              depth=depth,
                              number='4.1.1',
                              )
-        end = number_asker('Where should the spectral window end (nm)?',
+        end = number_asker('Where should the spectral range end (nm)?',
                            max(end, start + 20.0),
                            minimum=start,
                            exclusive_minimum=True,
@@ -3578,7 +3578,7 @@ def pca_stage_runner(session: ViewerSession,
             # ---- 2.3 Accept or change them -------------------------------------------
             choice = accept_asker('Do you accept these components?',
                                   [('count', 'change the number of components'),
-                                   ('window', 'change the spectral window'),
+                                   ('window', 'change the spectral range'),
                                    ('fit', 'keep the fit in the box instead'),
                                    ],
                                   depth=depth,

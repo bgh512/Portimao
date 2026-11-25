@@ -1715,11 +1715,12 @@ def previous_processing_asker(saved: dict) -> dict:
     yes_no_asker
     """
 
-    info_printer('Its trim and ignore edges, OD values, labels, fit, regions, Δψ, '
-                 'windows and figure were saved with it. No starts it fresh, as a '
-                 'dataset never opened.',
-                 tight=True,
-                 )
+    info_printer(
+        'Its trim and ignore edges, OD values, labels, fit, regions, Δψ, '
+        'averaging regions and figure were saved with it. No starts it fresh, as a '
+        'dataset never opened.',
+        tight=True,
+        )
     if yes_no_asker('Do you want to load the previous processing?',
                     True,
                     number='1.3',
@@ -2453,7 +2454,7 @@ def window_kind_asker(answers: dict,
     if answers['settled_windows'] and answers['quick_windows']:
         kinds = [kind for kind, _ in WINDOW_KIND_OPTIONS]
         old = defaults.get(key)
-        answers[key] = choice_asker('Which windows should this figure use?',
+        answers[key] = choice_asker('Which averaging regions should this figure use?',
                                     WINDOW_KIND_OPTIONS,
                                     old if old in kinds else kinds[0],
                                     depth=depth,
@@ -2461,7 +2462,7 @@ def window_kind_asker(answers: dict,
                                     )
         return answers[key]
     answers[key] = 'quick' if answers['quick_windows'] else 'settled'
-    info_printer(f'This figure uses the {answers[key]} windows, the only kind set up.',
+    info_printer(f'This figure uses the {answers[key]} regions, the only kind set up.',
                  depth=depth,
                  )
     return answers[key]
@@ -2510,7 +2511,7 @@ def windows_ensurer(answers: dict,
 
     if answers['averaging']:
         return True
-    info_printer('No averaging windows are set up, and this figure needs them.',
+    info_printer('No averaging regions are set up, and this figure needs them.',
                  depth=depth,
                  )
     if windows_adder is None:
@@ -2525,7 +2526,7 @@ def windows_ensurer(answers: dict,
         return False
     if windows_adder():
         return True
-    info_printer('There are still no averaging windows, so this figure is not made.',
+    info_printer('There are still no averaging regions, so this figure is not made.',
                  depth=depth,
                  )
     return False
