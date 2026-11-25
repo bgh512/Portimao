@@ -368,9 +368,10 @@ def test_the_step_that_builds_the_page(tmp_path: Path,
     """
     ---- Summary ----
     Main function to check the Build a figure step: it starts its step of the guide,
-    shows an empty page with the layouts folder, asks 6.2 and gives the page the
-    window holds once Continue is clicked; without a window it gives an empty page
-    and asks nothing. The window and the question are stood in for.
+    shows an empty page with the layouts folder, the set-up and the experiments, asks
+    6.2 and gives the page the window holds once Continue is clicked; without a
+    window it gives an empty page and asks nothing. The window and the question are
+    stood in for.
 
     ---- Inputs ----
     tmp_path : Path
@@ -398,8 +399,14 @@ def test_the_step_that_builds_the_page(tmp_path: Path,
     done: List[tuple] = []
 
     class FakeWindow:
-        def page_shower(self, page: FigurePage, folder: Path) -> None:
-            done.append(('shown', page, folder))
+        def page_shower(self,
+                        page: FigurePage,
+                        folder: Path,
+                        setup: dict,
+                        experiments: dict,
+                        answers: dict,
+                        ) -> None:
+            done.append(('shown', page, folder, setup, experiments, answers))
 
         def page_hider(self) -> FigurePage:
             done.append(('hidden',))
@@ -420,9 +427,16 @@ def test_the_step_that_builds_the_page(tmp_path: Path,
     monkeypatch.setattr(viewer_stages, 'enter_waiter', waiter)
     monkeypatch.setattr(viewer_stages, '_template_offer_asker', offerer)
     monkeypatch.setattr(viewer_stages, 'active_gui_getter', lambda: FakeWindow())
-    assert viewer_stages.page_stage_runner(tmp_path) == built
+    setup = {'group_names': ['', ''], 'colours': {}, 'rows': []}
+    experiments = {'run1': {'experiment_name': 'run1'}}
+    answers = {'haems': ['Cyt cc']}
+    assert viewer_stages.page_stage_runner(tmp_path,
+                                           setup,
+                                           experiments,
+                                           answers,
+                                           ) == built
     assert done == [('step', 'page'),
-                    ('shown', FigurePage(), tmp_path),
+                    ('shown', FigurePage(), tmp_path, setup, experiments, answers),
                     ('asked', '6.2'),
                     ('hidden',),
                     ('offered', built, FigurePage(), tmp_path),

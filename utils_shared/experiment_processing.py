@@ -36,6 +36,60 @@ OCR_UNIT_TEXTS = {'raw': 'µM min⁻¹', 'od': 'µM min⁻¹ OD⁻¹'}
 # ---- EXPERIMENT PROCESSING HELPERS ---------------------------------------------------
 
 
+# ---- _decomposition_teller -----------------------------------------------------------
+def _decomposition_teller(experiment: dict,
+                          answers: dict,
+                          fit: dict,
+                          window_points: int,
+                          ) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the user how a file was decomposed into haems: the fit,
+    the background, where the zero of ΔD was taken for each haem, and the notes of
+    the fit file.
+
+    ---- Inputs ----
+    experiment : dict
+        Experiment dictionary, as defined in DATA_FORMAT.md, already decomposed (it
+        has haem_delta_abs with attrs['delta_abs_baseline']).
+    answers : dict
+        The answers of the run (fit_file, haem_background).
+    fit : dict
+        Fit dictionary; its 'notes', when it has any, are shown as warnings.
+    window_points : int
+        Number of spectra the zero of ΔD is the median of.
+
+    ---- Globals read ----
+    BACKGROUND_LABELS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Prints the sentence and shows the notes (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    warning_shower
+    """
+
+    reference = experiment['haem_delta_abs'].attrs['delta_abs_baseline']
+    spans = ', '.join(f'{haem} {first:.2f}-{last:.2f} min'
+                      for haem, (first, last) in reference['window_by_haem'].items()
+                      )
+    print(f"  Decomposed with {answers['fit_file']} and the background "
+          f"{BACKGROUND_LABELS[answers['haem_background']]}; the zero "
+          f'of ΔD is where each haem starts, the median of its first '
+          f"{window_points} spectra ({reference['window_seconds']:.3g} s) "
+          f'after the ignored start: {spans}',
+          )
+    for note in fit.get('notes', []):
+        warning_shower(f'  {note}')
+
+
 # ---- _skip_reporter ------------------------------------------------------------------
 def _skip_reporter(step: str, error: Exception) -> None:
     """
@@ -184,6 +238,7 @@ def experiment_data_processor(info: dict,
     None.
 
     ---- Helpers ----
+    _decomposition_teller
     _skip_reporter
     baseline_percent_adder
     delta_psi_table_builder
@@ -199,6 +254,7 @@ def experiment_data_processor(info: dict,
     percent_converter
     percent_need_checker
     percent_oxidised_calculator
+    problem_shower
     source_chooser
     time_getter
     warning_shower
@@ -258,6 +314,7 @@ def experiment_data_processor(info: dict,
     # ---- 4.2 Decompose into haems ----------------------------------------------------
     # Attenuation and decomposition into haems.
     if a['decompose']:
+        is_decomposed = False
         try:
             attenuation_datasets = (None
                                     if a['export_spectra']
@@ -283,21 +340,19 @@ def experiment_data_processor(info: dict,
                                   delta_window_points=window_points,
                                   delta_exclude_last_minutes=ignore_last,
                                   )
-            reference = experiment['haem_delta_abs'].attrs['delta_abs_baseline']
-            spans = ', '.join(f'{haem} {first:.2f}-{last:.2f} min'
-                              for haem, (first, last)
-                              in reference['window_by_haem'].items()
-                              )
-            print(f"  Decomposed with {a['fit_file']} and the background "
-                  f"{BACKGROUND_LABELS[a['haem_background']]}; the zero "
-                  f'of ΔD is where each haem starts, the median of its first '
-                  f"{window_points} spectra ({reference['window_seconds']:.3g} s) "
-                  f'after the ignored start: {spans}',
-                  )
-            for note in fit.get('notes', []):
-                warning_shower(f'  {note}')
+            is_decomposed = True
         except (KeyError, ValueError, PafError) as exc:
             _skip_reporter('the decomposition into haems', exc)
+        # Told outside the catch above: a sentence that cannot be written must never
+        # be reported as a decomposition that was skipped.
+        if is_decomposed:
+            try:
+                _decomposition_teller(experiment, a, fit, window_points)
+            except (KeyError, ValueError) as exc:
+                problem_shower('  Warning: how the haems were worked out could not be '
+                               'written here; the haems themselves are not affected',
+                               exc,
+                               )
     elif a['export_spectra']:
         experiment_attenuation_adder(experiment)
 

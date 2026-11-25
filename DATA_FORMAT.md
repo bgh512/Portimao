@@ -228,7 +228,7 @@ Added to each experiment of the time response figure by `utils_custom`.
 
 #### `region_difference` and `region_difference_decomposition`
 
-The difference spectrum of one file, reduced region minus oxidised region, shown in the window with the switch *Difference spectrum* under the boxes (`utils_shared/difference_spectra.py`, MATHS.md section 9). `region_difference` is built by `difference_spectrum_builder` from the processed experiment, only for a file with `'haem_levels'`; `region_difference_decomposition` by `difference_decomposer`, drawn by `difference_figure_drawer`. Neither is kept or exported.
+The difference spectrum of one file, reduced region minus oxidised region, shown in the window with the switch *Difference spectrum* under the boxes (`utils_shared/difference_spectra.py`, MATHS.md section 9). `region_difference` is built by `difference_spectrum_builder` from the processed experiment, only for a file with `'haem_levels'`; `region_difference_decomposition` by `difference_decomposer`, drawn by `difference_figure_drawer`. Neither is exported; both are kept in the slim copy of the file (`page_experiment`, as `'difference'` and `'difference_parts'`) for the Difference spectrum and the Waterfall of a dataset figure.
 
 `region_difference`:
 
@@ -527,14 +527,14 @@ Defined in `utils_viewer/viewer_edges.py`. Created by a step that lets the user 
 
 #### `FigurePage`
 
-Defined in `utils_shared/figure_page.py`. The page of a dataset figure; each change (`plot_placer`, `plot_lifter`, `plot_remover`) gives a new page. Drawn off screen by `figure_page_drawer`, saved by `template_saver` and read by `template_reader`.
+Defined in `utils_shared/figure_page.py`. The page of a dataset figure; each change (`plot_placer`, `plot_lifter`, `plot_remover`) gives a new page. Drawn off screen by `figure_page_drawer` from the set-up (`dataset_setup`), the slim copy of each experiment (`page_experiment`) and the answers of the run: each plot by the drawer of its plot type (`PLOT_DRAWERS`, filled by `utils_shared/page_plots.py`), the plots of one plot type then put on the same scales where it asks for that (`SCALE_SHARERS`), and each plot fitted into its cells with its text and its own small legend (`axes_room_fitter`, `plot_legend_placer`, `utils_shared/figure_layout.py`); a plot type without a drawer is a grey stand-in, and a Space for a drawing (P17) is empty. Saved by `template_saver` and read by `template_reader`.
 
 | Field | Type | Shape | Units | Default | Description |
 |---|---|---|---|---|---|
 | `journal` | str | | | `'nature'` | The journal the page is drawn for (a key of `config.JOURNAL_SPECS`) |
 | `columns` | float | | columns | `2` | The width, as a key of the journal's `'widths_mm'` |
 | `height` | float | | fraction of the tallest figure | `0.8` | The height, above 0 and at most 1 |
-| `plots` | Tuple[PagePlot, ...] | (n_plots,) | | `()` | The plots in the order they were placed; their letters come from where they sit (`panel_letters_finder`): a, b, c… by each plot's top left cell, left to right then down, none on the legend (P16) |
+| `plots` | Tuple[PagePlot, ...] | (n_plots,) | | `()` | The plots in the order they were placed; their letters come from where they sit (`panel_letters_finder`): a, b, c… by each plot's top left cell, left to right then down |
 
 #### `PagePlot`
 
@@ -542,12 +542,105 @@ Defined in `utils_shared/figure_page.py`. One plot of a `FigurePage`, a rectangl
 
 | Field | Type | Shape | Units | Default | Description |
 |---|---|---|---|---|---|
-| `plot_type` | str | | | | The plot type, `'P1'` to `'P20'` (`PLOT_TYPES`) |
+| `plot_type` | str | | | | The plot type, `'P1'` to `'P20'` (`PLOT_TYPES`); there is no `'P16'` (the Legend, taken out: a plot of it is refused) |
 | `row` | int | | grid cells | | The top row it takes, 0 to 5 |
 | `column` | int | | grid cells | | The left column it takes, 0 to 5 |
 | `n_rows` | int | | grid cells | `1` | How many rows it takes |
 | `n_columns` | int | | grid cells | `1` | How many columns it takes |
-| `roles` | Dict[str, str] | | | `{}` | What the plot shows, as roles (`{'group_1': 'Split'}`, `{'experiment': 'Group 1, first label, replicate 1'}`), never a file of the dataset |
+| `roles` | Dict[str, str] | | | `{}` | What the plot shows, as roles (below), never a file of the dataset |
+
+The roles are what the form of the plot holds (`form_roles_reader`, `utils_shared/page_data.py`), one per `form_field`:
+
+| Role | Value | Description |
+|---|---|---|
+| `'experiment'` | `'Group 1: 1, Group 2: 0, time point: 2, replicate: 1'` | One experiment, by the place of each of its labels among the labels of its column in the set-up (1 for the first label, 0 for a blank cell; rows in use only) and its replicate number (`experiment_role_maker`; `role_experiment_finder` gives the experiment of a dataset that fits, or None) |
+| `'group_1'`, `'group_2'`, `'time_point'` | `'Split'`, `'Only label 2'` or `'All together'` | A group drop-down: each label its own set, only the experiments of the label in that place, or the column left out. One not in the roles is `'Split'` for Group 1 and `'All together'` for the others (`plot_sets_lister`) |
+| the key of a tick | `'yes'` or `'no'` | A tick of the form |
+
+The roles of a Standard experiment (P1), beside `'experiment'` (`standard_form_maker`, `utils_shared/page_plots.py`); one that is not in the roles is as the plot starts:
+
+| Role | Value | Description |
+|---|---|---|
+| `'panel_oxygen'`, `'panel_vo2'`, `'panel_delta_psi'` | `'yes'` or `'no'` | Whether the oxygen, the OCR and the Δψ panel are drawn; starts `'yes'`. Δψ is asked only in a run that works it out |
+| `'panel_haem_<name>'` | `'yes'` or `'no'` | Whether the panel of a haem is drawn, one for each haem the run plots; the name in lower-case letters and digits only (`'panel_haem_cytbh'` for `Cyt $b_H$`); starts `'yes'` |
+| `'haem_view'` | `'delta'`, `'abs'` or `'percent'` | The haems as ΔD, absorbance or % oxidised (a key of `config.HAEM_SOURCE_BY_MODE`; per OD as in the run); starts `'delta'`. Asked only in a run that plots haems |
+| `'addition_labels'` | `'yes'` or `'no'` | The label of each addition above the top panel; starts `'yes'` |
+| `'regions_shaded'` | `'yes'` or `'no'` | The averaging regions shaded behind the panels; starts `'no'` |
+| `'same_scales'` | `'yes'` or `'no'` | The same scales as the other Standard experiments of the page whose tick is on (`standard_scales_sharer`); starts `'yes'` |
+
+The roles of a Difference spectrum (P2), beside `'experiment'` (`difference_form_maker`):
+
+| Role | Value | Description |
+|---|---|---|
+| `'haem_components'`, `'overall_fit'`, `'residual'` | `'yes'` or `'no'` | Whether the part of each haem, the fit and the residual (a small panel underneath) are drawn; each starts `'yes'` |
+| `'background'`, `'haem_bands'` | `'yes'` or `'no'` | Whether the background and the haem bands are drawn; each starts `'no'` |
+
+The roles of a Waterfall (P3) (`waterfall_form_maker`); the first two are read as group drop-downs (`plot_sets_lister`), Group 2 always All together:
+
+| Role | Value | Description |
+|---|---|---|
+| `'group_1'` | `'Only label 1'`, ... | The group whose experiments are stacked; starts at the first label. Not asked for a set-up without Group 1 labels (every experiment in use) |
+| `'time_point'` | `'Split'` or `'All together'` | One line per time point, the mean of its replicates, or one line per experiment; starts `'Split'`. Asked only for a set-up with time points; without, one line per experiment |
+| `'align_haem'` | str | The haem whose band the spectra are lined up on, its name in lower-case letters and digits (`'cytbh'`); starts at the first b haem. Asked only in a run that works out haems |
+| `'haem_bands'` | `'yes'` or `'no'` | Whether the haem bands are drawn; starts `'yes'`. Asked only in a run that works out haems |
+| `'trace'` | `'difference'`, or a trace as below | What is stacked: the difference spectrum (starts there), or one trace over time, read with `'vo2_value'`, `'haem_view'`, `'delta_psi_value'` and `'time_zero'` as in a Mean trace (`waterfall_traces_lister`, drawn by `_waterfall_traces_drawer`) |
+| `'addition_labels'` | `'yes'` or `'no'` | The label of each addition above a waterfall of traces; starts `'yes'` |
+
+The roles of the plots over time, a Single trace (P7, with `'experiment'`; `trace_form_maker`) and a Mean trace (P8, with the group drop-downs; `mean_form_maker`); one that is not in the roles, or that this run does not have, is as the plot starts (`_trace_roles_reader`):
+
+| Role | Value | Description |
+|---|---|---|
+| `'trace'` | `'oxygen'`, `'vo2'`, `'haem_<name>'` or `'delta_psi'` | The trace: the measured oxygen, the OCR, a haem of the fit (its name in lower-case letters and digits, `'haem_cytbh'`) or Δψ (only in a run that works it out); starts `'vo2'` |
+| `'vo2_value'` | `'baseline'`, `'raw'`, `'change'` or `'od'` | The OCR as % of baseline, as measured, as its change from baseline or per OD (offered only in a run with OD values); starts `'baseline'`. Used when the trace is the OCR |
+| `'haem_view'` | `'delta'`, `'abs'` or `'percent'` | A haem as ΔD, absorbance or % oxidised, per OD as in the run; starts `'delta'`. Used when the trace is a haem |
+| `'delta_psi_value'` | `'raw'` or `'change'` | Δψ in mV or as its change from baseline; starts `'raw'`. Used when the trace is Δψ |
+| `'time_zero'` | `'start'` or `'addition 1'` … `'addition 10'` | Where time 0 is: the start of the recording, or an addition (the last one of a file with fewer); starts `'addition 1'`. A Mean trace lined up on an addition uses every addition as its measuring stick (MATHS.md section 10.2) |
+| `'addition_labels'` | `'yes'` or `'no'` | The label of each addition above the plot; starts `'yes'` |
+| `'regions_shaded'` | `'yes'` or `'no'` | P7 only: the averaging regions shaded behind the trace; starts `'no'` |
+| `'band'` | `'sem'`, `'sd'` or `'none'` | P8 only: the band round each mean; starts `'sem'` |
+
+The lines of a Mean trace, from `mean_lines_lister` (`utils_shared/page_plots.py`): a dictionary with `'times_min'` (np.ndarray, (n_times,), the shared times, one a second), `'additions_min'` and `'breaks_min'` (the shared times of the additions and of the breaks), `'left_out'` (the experiments left out), `'label'` (the title of the y axis), `'events'` (the additions of the first experiment kept, for their labels), `'zero'` (which addition is time 0, from 0; None for the start) and `'lines'`, one per set with an experiment kept: `'label'` (`'control (n = 3)'`), `'colour'`, `'line_style'`, `'mean'` (np.ndarray, (n_times,)) and `'spread'` (the SEM or SD, (n_times,); None for no band). `waterfall_traces_lister` gives the same with lines of `'label'`, `'colour'` and `'values'`. The maths is in `utils_shared/trace_alignment.py` (`trace_reader`, `traces_aligner`, `traces_averager`).
+
+One line of a Waterfall, listed from the top down by `waterfall_lines_lister` (`utils_shared/page_plots.py`): `'label'` (the time point with how many experiments its mean is of, `'2 h (n = 3)'`, or the experiment name), `'colour'` (`'#rrggbb'`: the colour of the set, or the colour of the group made lighter down the stack), `'wavelengths_nm'` and `'values_mOD'` (np.ndarray, (n_wavelengths,)), before the stacking (`spectra_stacker`).
+
+#### `page_experiment`
+
+The slim copy of one processed experiment that the plots of a dataset figure are drawn from. Made by `experiment_slimmer` (`utils_shared/page_data.py`) when the plot and the workbook of the file are saved (`experiment_file_saver`, `main.py`), so the file is not read again; kept as `{experiment name: page_experiment}` and handed, with the answers of the run, to `page_stage_runner`, `figure_page_drawer` and `dataset_figure_saver`. The whole spectra (`'raw_spectra'`) are never in it. A file that could not be read is not in the dictionary.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'experiment_name'`, `'metadata'`, `'haem_levels'`, `'averages'` | | | | As in `experiment`, each only when the experiment has it |
+| `'CcO2'`, `'CsO2'`, `'VoO2'`, `'VoO2_OD'`, `'VoO2_percent'`, `'VoO2_baseline'`, `'haem_conc'`, `'haem_abs'`, `'haem_delta_abs'`, `'haem_OD'`, `'haem_abs_OD'`, `'haem_delta_abs_OD'`, `'haem_percent'`, `'delta_psi'` | pd.DataFrame | | | The tables of `experiment`, each only when the experiment has it (`TABLE_KEYS`) |
+| `'difference'` | Optional[dict] | | | The difference spectrum, reduced minus oxidised (`region_difference`); None for a file without both regions or without spectra of the spectrometer that holds the haems |
+| `'difference_parts'` | Optional[dict] | | | That difference split into the haems of the run's fit, the background, the fit and the residual (`region_difference_decomposition`, by `difference_decomposer` with the answer `haem_background`); None without a difference, or in a run that works out no haems |
+| `'haem_bands'` | Optional[Dict[str, Tuple[float, float]]] | | nm | `{haem: (start, end)}` of the band of each haem of the run's fit, 2.5 nm each side of where its shape is strongest (`haem_bands_finder`, MATHS.md section 9.1), in the order of the fit and the same in every file; a haem whose shape is only zeros has none. None in a run that works out no haems |
+| `'region_spectra'` | Optional[dict] | | | The mean spectrum of each averaging region: `'dataset'` (the spectrometer), `'wavelengths_nm'` (np.ndarray, (n_wavelengths,), nm) and `'mean_mOD'` (`{region name: np.ndarray (n_wavelengths,)}`, the mean attenuation of the spectra whose time is inside the region, in mOD; a region with no spectrum is left out). None for a file without those spectra |
+
+#### `plot_set`
+
+One set of experiments a plot shows, from its group drop-downs. Listed by `plot_sets_lister` (`utils_shared/page_data.py`), in the order first seen.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'name'` | str | | | The labels the set is split by, joined by ` · `; `'no labels'` when they are all blank; `'All experiments'` when nothing is split |
+| `'names'` | List[str] | (n_experiments,) | | The experiments of the set |
+| `'labels'` | Dict[str, str] | | | `{'group_1', 'group_2', 'time_point'}`: the label the set is split by or kept to (Only) in each column; `''` for a column left out |
+| `'base_colour'` | str | | | The colour of its Group 1 label (`'#rrggbb'`); black for a set that is not one Group 1 label |
+| `'line_style'` | str | | | `'-'`, `'--'`, `':'` or `'-.'` by the place of its Group 2 label in its column, when Group 2 is split; otherwise `'-'` |
+| `'shade'` | float | | share of white | 0 for the first time point to 0.7 for the last, by the place of its time point in its column, when the time point is split; otherwise 0 |
+| `'colour'` | str | | | The base colour with that share of white mixed in (`colour_shader`): what the set is drawn in |
+
+#### `form_field`
+
+One thing the form of a plot asks, as plain data, so the form is the same in the window and in the tests. Listed for a plot type by `form_fields_lister` (`utils_shared/page_data.py`, from `FORM_MAKERS`, filled by `utils_shared/page_plots.py`); made by `experiment_field_maker` (the experiment picker), `group_fields_lister` (the group drop-downs), `choice_field_maker` (a drop-down of fixed choices) and `tick_field_maker`. Shown by `PageBuilder` (`utils_viewer/viewer_page.py`).
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'key'` | str | | | The name of the role it gives |
+| `'kind'` | str | | | `'choice'` (a drop-down) or `'tick'` |
+| `'label'` | str | | | The words beside it |
+| `'choices'` | List[Tuple[str, str]] | (n_choices,) | | For a drop-down: (the role kept, the words shown), in the order shown; empty for a tick, and for a drop-down with nothing to pick from, which is not shown |
+| `'value'` | str | | | The role it starts at: one of the choices, or `'yes'` or `'no'` for a tick |
 
 #### `PreviewSpec`
 
@@ -909,7 +1002,7 @@ The layout of a dataset figure, to use again on any dataset. Written by `templat
 | `journal`, `columns`, `height` | text, number, number | columns, fraction of the tallest figure | The page size (`FigurePage`) |
 | `plots` | list | | One entry per plot, in the order placed: `{"type": "P9", "cells": {"row": 0, "column": 3, "rows": 2, "columns": 3}, "roles": {"group_1": "Split"}}` (`PagePlot`) |
 
-Refused, with the reason in one sentence naming the file: a file that is not readable JSON or not of this kind; another version; a page size that cannot be read; a plot with no cells, of an unknown type, past the edge of the grid or over another plot; a role that names a file (ending in `.paf`, `.csv`, `.xlsx`, `.txt`, `.bin`, `.fit` or `.json`, or holding a folder). A page with such a role is not saved.
+Refused, with the reason in one sentence naming the file: a file that is not readable JSON or not of this kind; another version; a page size that cannot be read; a plot with no cells, of an unknown type, of the Legend (P16, no longer a plot type), past the edge of the grid or over another plot; a role that names a file (ending in `.paf`, `.csv`, `.xlsx`, `.txt`, `.bin`, `.fit` or `.json`, or holding a folder). A page with such a role is not saved.
 
 #### `dataset figure`
 

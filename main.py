@@ -11,7 +11,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib
@@ -38,6 +38,9 @@ from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.journal_files import journal_answers_fitter
 from utils_shared.master_page_exporter import master_page_exporter
 from utils_shared.output_capture import output_capturer
+from utils_shared.page_data import experiment_slimmer, page_experiments_lister
+# loading page_plots also adds the plot types to the page
+from utils_shared.page_plots import traces_left_out_lister, waterfall_left_out_lister
 from utils_shared.questions import (guide_step_starter,
                                     info_printer,
                                     section_starter,
@@ -228,19 +231,36 @@ def comparison_maker(comparison: dict,
 
 
 # ---- dataset_figure_saver ------------------------------------------------------------
-def dataset_figure_saver(page: FigurePage, export_root: Path) -> List[Path]:
+def dataset_figure_saver(page: FigurePage,
+                         export_root: Path,
+                         setup: Optional[dict] = None,
+                         experiments: Optional[Dict[str, dict]] = None,
+                         answers: Optional[dict] = None,
+                         ) -> List[Path]:
     """
     ---- Summary ----
     Main function to save the dataset figure built on the page: the figure as a PDF of
     its printed size, with text that can still be changed, then its master page, the
     figure on a page of its journal. A page with no plot saves nothing. A file that
-    cannot be saved is said in one sentence and the run goes on.
+    cannot be saved is said in one sentence and the run goes on. An experiment a plot
+    shows that could not be read when the plots were saved is named in one warning,
+    and the plot is drawn without it; so is an experiment a waterfall leaves out for
+    having no difference spectrum, and one a mean trace (or a waterfall of traces)
+    leaves out for having nothing to show or another number of additions.
 
     ---- Inputs ----
     page : FigurePage
         The page as built in the Build a figure step.
     export_root : Path
         Results folder.
+    setup : Optional[dict]
+        The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+    experiments : Optional[Dict[str, dict]]
+        {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), kept when
+        the plot and the workbook of each file were saved; None for none.
+    answers : Optional[dict]
+        The answers of the run, for the plots drawn as the run was set up; None for
+        none.
 
     ---- Globals read ----
     settings.JOURNAL_SPECS; FIGURE_NAME (imported).
@@ -259,7 +279,11 @@ def dataset_figure_saver(page: FigurePage, export_root: Path) -> List[Path]:
     ---- Helpers ----
     figure_page_exporter
     master_page_exporter
+    page_experiments_lister
     problem_shower
+    traces_left_out_lister
+    warning_shower
+    waterfall_left_out_lister
     """
 
     # ---- 1 The figure ----------------------------------------------------------------
@@ -267,8 +291,43 @@ def dataset_figure_saver(page: FigurePage, export_root: Path) -> List[Path]:
         return []
     print('\nDataset figure')
     spec = settings.JOURNAL_SPECS[page.journal]
+    missing = [name
+               for name in page_experiments_lister(page, setup)
+               if name not in (experiments or {})
+               ]
+    if missing:
+        warning_shower(f"  The dataset figure is drawn without {', '.join(missing)}: "
+                       f"{'it' if len(missing) == 1 else 'they'} could not be read "
+                       f'when the plots were saved (the reason is above). Run '
+                       f'Portimao again once that is put right.',
+                       )
+    left_out = waterfall_left_out_lister(page, setup, experiments or {})
+    if left_out:
+        warning_shower(f"  The waterfall is drawn without {', '.join(left_out)}: "
+                       f"{'it has' if len(left_out) == 1 else 'they have'} no "
+                       f'difference spectrum, which needs an oxidised and a reduced '
+                       f'region. Set both regions for '
+                       f"{'it' if len(left_out) == 1 else 'them'} to have "
+                       f"{'it' if len(left_out) == 1 else 'them'} in the waterfall.",
+                       )
+    left_out = traces_left_out_lister(page, setup, experiments or {}, answers or {})
+    if left_out:
+        warning_shower(f"  The mean of the traces is worked out without "
+                       f"{', '.join(left_out)}: "
+                       f"{'it has' if len(left_out) == 1 else 'they have'} nothing "
+                       f'for the trace and value picked, or another number of '
+                       f'additions than the other experiments of the plot, so '
+                       f"{'its' if len(left_out) == 1 else 'their'} additions cannot "
+                       f'be lined up with theirs.',
+                       )
     try:
-        path, figure = figure_page_exporter(page, spec, export_root)
+        path, figure = figure_page_exporter(page,
+                                            spec,
+                                            export_root,
+                                            setup,
+                                            experiments,
+                                            answers,
+                                            )
     except Exception as exc:  # the figure must not lose the rest of the run
         problem_shower('  The dataset figure was not saved', exc)
         return []
@@ -300,6 +359,7 @@ def everything_asker(folder: Path,
                      exported: Optional[List[Path]] = None,
                      saved_plots: Optional[List[str]] = None,
                      saved_workbooks: Optional[List[str]] = None,
+                     page_data: Optional[dict] = None,
                      ) -> Tuple[dict,
                                 List[dict],
                                 Optional[dict],
@@ -334,6 +394,10 @@ def everything_asker(folder: Path,
     saved_workbooks : Optional[List[str]]
         List that holds the names of the files whose workbook is written before the
         run starts; None when not needed.
+    page_data : Optional[dict]
+        Dictionary that gets what the dataset figure is drawn from: 'setup' (the
+        set-up table, dataset_setup) and 'experiments' ({experiment name: its slim
+        copy}, page_experiment, DATA_FORMAT.md); None when not needed.
 
     ---- Globals read ----
     PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
@@ -427,6 +491,8 @@ def everything_asker(folder: Path,
                'regions': regions,
                'export_root': export_root,
                'has_spectra': has_spectra,
+               # the slim copy of each file, kept for the plots of the dataset figure
+               'page_experiments': {},
                }
     plot_fit = fit  # a fit changed later means the files are saved again in the run
     saved_plots = [] if saved_plots is None else saved_plots
@@ -442,7 +508,13 @@ def everything_asker(folder: Path,
     section_starter('Dataset figures: set-up')
     setup = setup_stage_runner(names, saved.get('setup'))
     section_starter('Dataset figures: build a figure')
-    page = page_stage_runner(PLACES.layouts_folder)
+    page = page_stage_runner(PLACES.layouts_folder,
+                             setup,
+                             context['page_experiments'],
+                             answers,
+                             )
+    if page_data is not None:
+        page_data.update(setup=setup, experiments=context['page_experiments'])
     comparison, exemplar_names = None, None
     custom = {'time_response': None, 'haem_ocr': None}
     answers['plot_time_response'] = answers['plot_haem_ocr'] = False
@@ -628,12 +700,15 @@ def experiment_file_saver(info: dict,
                           cfg: settings.Config,
                           fit: Optional[dict],
                           export_root: Path,
+                          page_experiments: Optional[Dict[str, dict]] = None,
                           ) -> Tuple[Optional[bytes], bool]:
     """
     ---- Summary ----
     Main function to read and process one .paf file once, then save its plot as the run
     does, handing back a picture of it for the window, and write its workbook. A plot
     that cannot be saved is said in one sentence and the workbook is still written.
+    A slim copy of the file is kept for the plots of the dataset figure, so the file
+    is not read again for them.
 
     ---- Inputs ----
     info : dict
@@ -647,6 +722,9 @@ def experiment_file_saver(info: dict,
         not decomposed.
     export_root : Path
         Results folder.
+    page_experiments : Optional[Dict[str, dict]]
+        Dictionary that gets the slim copy of the file under its name
+        (page_experiment, DATA_FORMAT.md); None keeps none.
 
     ---- Globals read ----
     settings.PREVIEW_DPI.
@@ -668,6 +746,7 @@ def experiment_file_saver(info: dict,
     ---- Helpers ----
     experiment_data_processor
     experiment_plotter
+    experiment_slimmer
     experiment_workbook_saver
     output_capturer
     problem_shower
@@ -677,6 +756,15 @@ def experiment_file_saver(info: dict,
     a = cfg.answers
     with output_capturer():
         processed = experiment_data_processor(info, cfg, fit)
+    if page_experiments is not None:
+        page_experiments[info['name']] = experiment_slimmer(processed['experiment'],
+                                                            a.get(
+                                                                'decomposition_dataset',
+                                                                ),
+                                                            fit,
+                                                            a.get('haem_background'),
+                                                            settings.HAEM_FACTOR,
+                                                            )
 
     # ---- 2 Save the plot -------------------------------------------------------------
     picture = None
@@ -734,7 +822,9 @@ def experiment_files_saver(context: dict,
     context : dict
         {answers, fit, summaries, limits, details, regions, export_root, has_spectra}
         of the run so far (everything_asker); has_spectra is True when the spectra
-        csv files are written already, and is set once they are written here.
+        csv files are written already, and is set once they are written here. With
+        'page_experiments' (a dictionary), the slim copy of each file read is put in
+        it for the dataset figure, in place of what it held.
     saved_plots : List[str]
         List emptied, then filled with the name of each file whose plot was saved.
     window : Any
@@ -774,6 +864,9 @@ def experiment_files_saver(context: dict,
     saved_workbooks = [] if saved_workbooks is None else saved_workbooks
     del saved_plots[:]
     del saved_workbooks[:]
+    page_experiments = context.get('page_experiments')
+    if page_experiments is not None:
+        page_experiments.clear()
     info_printer(f"Saving the plot and the workbook of each file in "
                  f"{context['export_root']} (each file is read again, so this can take "
                  f'a moment) ...',
@@ -794,6 +887,7 @@ def experiment_files_saver(context: dict,
                                                         cfg,
                                                         context['fit'],
                                                         context['export_root'],
+                                                        page_experiments,
                                                         )
         except Exception as exc:  # one file must not stop the questions
             problem_shower(f'  The plot and the workbook of {name} were not saved '
@@ -1245,6 +1339,7 @@ def program_runner() -> int:
     exported: List[Path] = []  # the trim step's export adds the results folder
     saved_plots: List[str] = []  # the files whose plot is saved before the run
     saved_workbooks: List[str] = []  # the files whose workbook is written before it
+    page_data: dict = {}  # the set-up and the slim experiments of the dataset figure
     try:
         try:
             (answers,
@@ -1260,6 +1355,7 @@ def program_runner() -> int:
                                   exported,
                                   saved_plots,
                                   saved_workbooks,
+                                  page_data,
                                   )
         except UserQuitError:
             changed = cancel_sentence_builder(exported,
@@ -1296,7 +1392,12 @@ def program_runner() -> int:
         if comparison:
             comparison_maker(comparison, kept, cfg, export_root)
         special_figures_maker(kept, cfg, fit, export_root, exemplar_names)
-        dataset_figure_saver(page, export_root)
+        dataset_figure_saver(page,
+                             export_root,
+                             page_data.get('setup'),
+                             page_data.get('experiments'),
+                             answers,
+                             )
         minutes, seconds = divmod(time.perf_counter() - start, 60)
         print(f'\nFinished {len(experiments) - len(failed)} of {len(experiments)} '
               f'file(s) in {int(minutes)} min {seconds:.0f} s.',

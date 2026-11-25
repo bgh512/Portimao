@@ -7,18 +7,37 @@ import math
 from typing import Any, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.collections import Collection
 from matplotlib.figure import Figure
 from matplotlib.font_manager import findfont, FontProperties
+from matplotlib.legend import Legend
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.textpath import TextPath
-from matplotlib.transforms import ScaledTranslation
+from matplotlib.transforms import Bbox, ScaledTranslation
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 MM_PER_INCH = 25.4
+POINTS_PER_INCH = 72.0
+# A plot is fitted into its room (axes_room_fitter) in a few passes, as the tick
+# numbers can change when the axes shrink; it stops once nothing sticks out by more
+# than FIT_TOLERANCE of the figure, and never shrinks the axes under SMALLEST_AXES of
+# the room.
+FIT_PASSES = 4
+FIT_TOLERANCE = 1e-4
+SMALLEST_AXES = 0.2
+# The corners a small legend is tried in, in this order, the columns it has when it
+# goes under the axes, and the points along each piece of a line that are checked
+# against the legend
+LEGEND_CORNERS = ('upper right', 'upper left', 'lower right', 'lower left')
+LEGEND_COLUMNS = 3
+LINE_CHECK_POINTS = 8
+# The attribute of something drawn faintly behind a plot (a haem band): a legend may
+# sit over it, as it hides nothing there
+BACKDROP_MARK = 'is_backdrop'
 # what the user is told each text size of the figures is (figure_style_builder's
 # 'fonts'), in the warning about a journal's text sizes; panel letters follow the journal
 TEXT_NAMES = {'tick': 'tick labels and legends',
@@ -63,7 +82,151 @@ def _renderer_getter(fig: Figure) -> Any:
         return fig._get_renderer()
 
 
+# ---- _legend_cover_checker -----------------------------------------------------------
+def _legend_cover_checker(ax: Axes, box: Bbox, renderer: Any) -> bool:
+    """
+    ---- Summary ----
+    Helper function to check whether a rectangle of the figure covers anything drawn
+    in a set of axes: a line, a bar or other patch, or a filled band. What is marked
+    as a backdrop (a faint haem band behind the lines) does not count.
+
+    ---- Inputs ----
+    ax : Axes
+        The axes.
+    box : Bbox
+        The rectangle (of a legend), in pixels of the figure.
+    renderer : Any
+        The renderer of the figure.
+
+    ---- Globals read ----
+    BACKDROP_MARK, LINE_CHECK_POINTS.
+
+    ---- Outputs ----
+    bool
+        True when the rectangle covers a part of something drawn.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Each piece of a line, between two of its points, is checked at
+    LINE_CHECK_POINTS places evenly spaced along it; a patch or a band is checked by
+    the rectangle round it.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The lines -----------------------------------------------------------------
+    shares = np.linspace(0.0, 1.0, LINE_CHECK_POINTS)
+    for line in ax.lines:
+        if not line.get_visible():
+            continue
+        points = line.get_transform().transform(np.asarray(line.get_xydata(),
+                                                           dtype=float,
+                                                           ),
+                                                )
+        points = points[np.isfinite(points).all(axis=1)]
+        if len(points) == 0:
+            continue
+        if len(points) > 1:
+            starts, steps = points[:-1], np.diff(points, axis=0)
+            points = (starts[:, None, :] + steps[:, None, :] * shares[None, :, None]
+                      ).reshape(-1, 2)
+        is_inside = ((points[:, 0] >= box.x0)
+                     & (points[:, 0] <= box.x1)
+                     & (points[:, 1] >= box.y0)
+                     & (points[:, 1] <= box.y1)
+                     )
+        if is_inside.any():
+            return True
+
+    # ---- 2 The bars and the bands ----------------------------------------------------
+    for artist in list(ax.patches) + list(ax.collections):
+        if getattr(artist, BACKDROP_MARK, False):
+            continue
+        if artist.get_visible() and box.overlaps(artist.get_window_extent(renderer)):
+            return True
+    return False
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- axes_room_fitter ----------------------------------------------------------------
+def axes_room_fitter(fig: Figure,
+                     axes: List[Axes],
+                     room: Tuple[float, float, float, float],
+                     ) -> None:
+    """
+    ---- Summary ----
+    Main function to fit the axes of one plot into its room on a page: the axes are
+    made smaller until their tick numbers, axis titles and legend are all inside the
+    room, so none of the plot's text falls into the cells of another plot.
+
+    ---- Inputs ----
+    fig : Figure
+        The figure of the page.
+    axes : List[Axes]
+        The axes of the plot, already drawn into; several keep their places beside
+        one another.
+    room : Tuple[float, float, float, float]
+        (x0, y0, x1, y1) of the room, as fractions of the figure.
+
+    ---- Globals read ----
+    FIT_PASSES, FIT_TOLERANCE, SMALLEST_AXES.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Moves the axes (side effect).
+
+    ---- Equations ----
+    With (L, B, R, T) how far the text sticks out of the room at the left, bottom,
+    right and top, the rectangle round all the axes (x0, y0, x1, y1) becomes
+    (x0 + L, y0 + B, x1 - R, y1 - T), never narrower or lower than SMALLEST_AXES of
+    the room, and each axes keeps its share of it. It is done again, at most
+    FIT_PASSES times, until nothing sticks out.
+
+    ---- Helpers ----
+    _renderer_getter
+    """
+
+    if not axes:
+        return
+    renderer = _renderer_getter(fig)
+    x0, y0, x1, y1 = room
+    for _ in range(FIT_PASSES):
+        # ---- 1 How far the text sticks out -------------------------------------------
+        boxes = [ax.get_tightbbox(renderer) for ax in axes]
+        boxes = [box for box in boxes if box is not None]
+        if not boxes:
+            return
+        tight = Bbox.union(boxes).transformed(fig.transFigure.inverted())
+        over = (max(x0 - tight.x0, 0.0),
+                max(y0 - tight.y0, 0.0),
+                max(tight.x1 - x1, 0.0),
+                max(tight.y1 - y1, 0.0),
+                )
+        if max(over) < FIT_TOLERANCE:
+            return
+
+        # ---- 2 The axes made smaller by that much ------------------------------------
+        old = Bbox.union([ax.get_position() for ax in axes])
+        width = max(old.width - over[0] - over[2], SMALLEST_AXES * (x1 - x0))
+        height = max(old.height - over[1] - over[3], SMALLEST_AXES * (y1 - y0))
+        left = min(old.x0 + over[0], x1 - width)
+        bottom = min(old.y0 + over[1], y1 - height)
+        for ax in axes:
+            place = ax.get_position()
+            ax.set_position(((left + (place.x0 - old.x0) / old.width * width),
+                             (bottom + (place.y0 - old.y0) / old.height * height),
+                             place.width / old.width * width,
+                             place.height / old.height * height,
+                             ),
+                            )
 
 
 # ---- figure_canvas_fitter ------------------------------------------------------------
@@ -728,6 +891,88 @@ def panel_letter_adder(fig: Figure,
                                          ),
                            )
     return artists
+
+
+# ---- plot_legend_placer --------------------------------------------------------------
+def plot_legend_placer(fig: Figure,
+                       ax: Axes,
+                       style: dict,
+                       fonts: List[str],
+                       ) -> Optional[Legend]:
+    """
+    ---- Summary ----
+    Main function to give a plot its own small legend, where it hides nothing: in the
+    first corner of the axes where it covers no line, bar or band, and under the axes
+    when every corner covers something. A plot with fewer than two named lines or
+    colours has no legend.
+
+    ---- Inputs ----
+    fig : Figure
+        The figure of the page.
+    ax : Axes
+        The axes, already drawn into, with a label on each line or bar to name.
+    style : dict
+        The style of the figure (figure_style_builder).
+    fonts : List[str]
+        The font families of the journal (font_family_lister).
+
+    ---- Globals read ----
+    LEGEND_COLUMNS, LEGEND_CORNERS, POINTS_PER_INCH.
+
+    ---- Outputs ----
+    Optional[Legend]
+        The legend, or None when there is none. Under the axes it is outside them, so
+        axes_room_fitter is run after it.
+
+    ---- Globals mutated ----
+    None. Draws the legend (side effect).
+
+    ---- Equations ----
+    Under the axes, the top of the legend is below the bottom of the axes by the
+    height of the tick numbers and the axis title there, plus half the padding unit
+    of the style, in points, so it stays clear of them when the axes change size.
+
+    ---- Helpers ----
+    _legend_cover_checker
+    _renderer_getter
+    """
+
+    # ---- 1 What there is to name -----------------------------------------------------
+    handles, labels = ax.get_legend_handles_labels()
+    if len(handles) < 2:
+        return None
+    renderer = _renderer_getter(fig)
+    look = {'prop': {'family': fonts, 'size': style['fonts']['tick']},
+            'frameon': False,
+            'handlelength': 1.6,
+            'handletextpad': 0.5,
+            'labelspacing': 0.3,
+            'columnspacing': 1.0,
+            }
+
+    # ---- 2 The first corner that covers nothing --------------------------------------
+    for corner in LEGEND_CORNERS:
+        legend = ax.legend(handles, labels, loc=corner, borderaxespad=0.3, **look)
+        if not _legend_cover_checker(ax, legend.get_window_extent(renderer), renderer):
+            return legend
+        legend.remove()
+
+    # ---- 3 Otherwise under the axes --------------------------------------------------
+    drop_px = ax.get_window_extent(renderer).y0 - ax.get_tightbbox(renderer).y0
+    drop_pt = max(drop_px, 0.0) * POINTS_PER_INCH / fig.dpi + 0.5 * style['unit']
+    place = ax.transAxes + ScaledTranslation(0.0,
+                                             -drop_pt / POINTS_PER_INCH,
+                                             fig.dpi_scale_trans,
+                                             )
+    return ax.legend(handles,
+                     labels,
+                     loc='upper center',
+                     bbox_to_anchor=(0.5, 0.0),
+                     bbox_transform=place,
+                     borderaxespad=0.0,
+                     ncol=min(len(handles), LEGEND_COLUMNS),
+                     **look,
+                     )
 
 
 # ---- stack_legend_drawer -------------------------------------------------------------

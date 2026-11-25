@@ -20,6 +20,7 @@ import pytest
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 import main as program
+import utils_shared.figure_page as figure_page
 from utils_shared.figure_page import (figure_file_namer,
                                       figure_page_drawer,
                                       figure_page_exporter,
@@ -34,6 +35,7 @@ from utils_shared.figure_page import (figure_file_namer,
                                       template_saver,
                                       )
 from utils_shared.journal_files import STANDARD_SPEC
+from utils_shared.page_plots import NO_MEAN, NOT_THERE
 from utils_shared.run_logging import details_place_setter
 
 
@@ -45,8 +47,8 @@ def _page_maker() -> FigurePage:
     """
     ---- Summary ----
     Helper function to make a page of four plots: a standard experiment over the top
-    left two rows and three columns, a bar chart top right, the legend below it and a
-    drawing along the bottom row, placed out of reading order.
+    left two rows and three columns, a bar chart top right, a mean trace below them
+    and a drawing along the bottom row, placed out of reading order.
 
     ---- Inputs ----
     None.
@@ -57,7 +59,7 @@ def _page_maker() -> FigurePage:
     ---- Outputs ----
     FigurePage
         The page; its plots in the order placed: drawing, bar chart, standard
-        experiment, legend.
+        experiment, mean trace.
 
     ---- Globals mutated ----
     None.
@@ -85,7 +87,7 @@ def _page_maker() -> FigurePage:
                           n_columns=3,
                           roles={'experiment': 'Group 1, first label, replicate 1'},
                           ),
-                 PagePlot('P16', row=2, column=0, n_rows=1, n_columns=6),
+                 PagePlot('P8', row=2, column=0, n_rows=1, n_columns=6),
                  ):
         page = plot_placer(page, plot)
     return page
@@ -136,8 +138,8 @@ def test_a_plot_is_refused_over_another_or_past_the_edge() -> None:
     """
     ---- Summary ----
     Main function to check that a plot is refused over a plot already there (named by
-    its letter, or the legend by its name), past the edge of the grid, of no cells, or
-    of an unknown type, and that the page is left as it was.
+    its letter), past the edge of the grid, of no cells, of an unknown type, or of
+    the Legend, which is no longer a plot type, and that the page is left as it was.
 
     ---- Inputs ----
     None.
@@ -162,8 +164,10 @@ def test_a_plot_is_refused_over_another_or_past_the_edge() -> None:
     page = _page_maker()
     with pytest.raises(FigurePageError, match=r'covers plot b \(Bar chart\)'):
         plot_placer(page, PagePlot('P7', row=1, column=5))
-    with pytest.raises(FigurePageError, match='covers the legend'):
+    with pytest.raises(FigurePageError, match=r'covers plot c \(Mean trace\)'):
         plot_placer(page, PagePlot('P7', row=2, column=2, n_rows=2))
+    with pytest.raises(FigurePageError, match='Legend is no longer a plot type'):
+        plot_placer(page, PagePlot('P16', row=3, column=0))
     with pytest.raises(FigurePageError, match='past the edge'):
         plot_placer(page, PagePlot('P7', row=3, column=4, n_rows=1, n_columns=3))
     with pytest.raises(FigurePageError, match='past the edge'):
@@ -219,7 +223,7 @@ def test_a_plot_taken_off_and_placed_again() -> None:
     assert cancelled.plots[-1] == plot
     assert sorted(cancelled.plots, key=repr) == sorted(page.plots, key=repr)
     removed = plot_remover(page, 1)
-    assert [p.plot_type for p in removed.plots] == ['P17', 'P1', 'P16']
+    assert [p.plot_type for p in removed.plots] == ['P17', 'P1', 'P8']
     with pytest.raises(IndexError):
         plot_remover(page, 4)
 
@@ -229,7 +233,7 @@ def test_letters_in_reading_order() -> None:
     """
     ---- Summary ----
     Main function to check the letters: by each plot's top left cell, left to right
-    then down, whatever the order the plots were placed in, none on the legend; and
+    then down, whatever the order the plots were placed in, every plot with one; and
     the letters follow when a plot is removed.
 
     ---- Inputs ----
@@ -247,16 +251,17 @@ def test_letters_in_reading_order() -> None:
 
     ---- Equations ----
     Plots placed: drawing (row 5), bar chart (row 0, column 3), standard experiment
-    (row 0, column 0), legend (row 2). Reading order: standard experiment a, bar chart
-    b, drawing c. Without the standard experiment: bar chart a, drawing b.
+    (row 0, column 0), mean trace (row 2). Reading order: standard experiment a, bar
+    chart b, mean trace c, drawing d. Without the standard experiment: bar chart a,
+    mean trace b, drawing c.
 
     ---- Helpers ----
     _page_maker
     """
 
     page = _page_maker()
-    assert panel_letters_finder(page) == {2: 'a', 1: 'b', 0: 'c'}
-    assert panel_letters_finder(plot_remover(page, 2)) == {1: 'a', 0: 'b'}
+    assert panel_letters_finder(page) == {2: 'a', 1: 'b', 3: 'c', 0: 'd'}
+    assert panel_letters_finder(plot_remover(page, 2)) == {1: 'a', 2: 'b', 0: 'c'}
 
 
 # ---- test_the_page_drawn_off_screen --------------------------------------------------
@@ -264,9 +269,12 @@ def test_the_page_drawn_off_screen() -> None:
     """
     ---- Summary ----
     Main function to check the page as drawn: a grey stand-in named by its plot type
-    over the cells of each plot, and the letters bold at the journal's size, at the
-    top left of their plots, lower case for Nature and upper case for a journal that
-    asks for it.
+    over the cells of each plot whose plot type is not built yet, one sentence over
+    those of a standard experiment and of a mean trace with no experiment to show, a
+    Space for a
+    drawing left empty, and the letters bold at the journal's size, at the top left
+    of their plots, lower case for Nature and upper case for a journal that asks for
+    it.
 
     ---- Inputs ----
     None.
@@ -292,25 +300,97 @@ def test_the_page_drawn_off_screen() -> None:
     page = _page_maker()
     fig, axes = figure_page_drawer(page, STANDARD_SPEC)
     assert set(axes) == {0, 1, 2, 3}
-    names = [axes[i].texts[0].get_text() for i in range(4)]
-    assert names == ['Space for a drawing',
-                     'Bar chart',
-                     'Standard experiment',
-                     'Legend',
-                     ]
+    names = [' '.join(axes[i].texts[0].get_text().split()) for i in range(1, 4)]
+    # the standard experiment and the mean trace are built: with no experiment to
+    # show, each says so
+    assert names == ['Bar chart', NOT_THERE, NO_MEAN]
+    # the space for a drawing draws nothing: no box, no text, only its letter
+    assert not axes[0].axison and not axes[0].texts and not axes[0].lines
     box = axes[2].get_position()
     assert 0 < box.x0 < box.x1 < 0.5
     assert 2 / 3 < box.y0 < box.y1 < 1
     assert axes[1].get_position().x0 > 0.5
     letters = sorted(fig.texts, key=lambda t: t.get_text())
-    assert [t.get_text() for t in letters] == ['a', 'b', 'c']
+    assert [t.get_text() for t in letters] == ['a', 'b', 'c', 'd']
     assert all(t.get_fontweight() == 'bold' for t in letters)
     assert all(t.get_fontsize() == STANDARD_SPEC['panel_letter_pt'] for t in letters)
     a_x, a_y = letters[0].get_position()
     assert a_x == pytest.approx(box.x0) and a_y > box.y1
     upper = dict(STANDARD_SPEC, panel_letter_case='upper')
     fig, _ = figure_page_drawer(page, upper)
-    assert sorted(t.get_text() for t in fig.texts) == ['A', 'B', 'C']
+    assert sorted(t.get_text() for t in fig.texts) == ['A', 'B', 'C', 'D']
+
+
+# ---- test_a_plot_keeps_its_text_inside_its_cells -------------------------------------
+def test_a_plot_keeps_its_text_inside_its_cells(monkeypatch: pytest.MonkeyPatch,
+                                                ) -> None:
+    """
+    ---- Summary ----
+    Main function to check a plot that is drawn for real, with a made-up plot type
+    that fills its room and has long tick numbers, axis titles and two named lines:
+    after the page is drawn, the tick numbers, the axis titles and the legend are all
+    inside the cells of the plot, the axes are smaller than the room they were given,
+    the legend covers neither line, and the drawer was handed the set-up and the
+    experiments.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Puts the made-up plot type in place of the standard experiment's.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The plot takes rows 2 and 3 and columns 0 to 2: x from 0 to 0.5 and y from
+    1 - 4 / 6 = 0.333 to 1 - 2 / 6 = 0.667 of the figure.
+
+    ---- Helpers ----
+    None.
+    """
+
+    given = {}
+
+    # ---- drawer ----------------------------------------------------------------------
+    def drawer(fig: object, room: tuple, plot: PagePlot, context: dict) -> list:
+        given.update(context, room=room)
+        x0, y0, x1, y1 = room
+        ax = fig.add_axes((x0, y0, x1 - x0, y1 - y0))
+        ax.plot([0, 1, 2, 3], [100000, 250000, 250000, 250000], label='control')
+        ax.plot([0, 1, 2, 3], [100000, 100000, 100000, 240000], label='knockdown')
+        ax.set_xlabel('Time (min)')
+        ax.set_ylabel('OCR (µM min⁻¹)')
+        return [ax]
+
+    monkeypatch.setitem(figure_page.PLOT_DRAWERS, 'P1', drawer)
+    setup = {'group_names': ['', ''], 'colours': {}, 'rows': []}
+    experiments = {'run1': {'experiment_name': 'run1'}}
+    page = plot_placer(FigurePage(),
+                       PagePlot('P1', row=2, column=0, n_rows=2, n_columns=3),
+                       )
+    fig, axes = figure_page_drawer(page, STANDARD_SPEC, setup, experiments)
+    assert given['setup'] is setup and given['experiments'] is experiments
+    ax = axes[0]
+    renderer = fig._get_renderer()
+    tight = ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+    assert 0 <= tight.x0 and tight.x1 <= 0.5
+    assert 1 / 3 <= tight.y0 and tight.y1 <= 2 / 3
+    place = ax.get_position()
+    x0, y0, x1, y1 = given['room']
+    assert place.x0 > x0 and place.y0 > y0  # room made for the numbers and titles
+    assert place.x1 <= x1 + 1e-6 and place.y1 <= y1 + 1e-6
+    legend = ax.get_legend()
+    assert [text.get_text() for text in legend.get_texts()] == ['control', 'knockdown']
+    box = legend.get_window_extent(renderer)
+    for line in ax.lines:
+        points = line.get_transform().transform(line.get_xydata())
+        assert not any(box.contains(x, y) for x, y in points)
 
 
 # ---- test_a_template_saved_and_read_back ---------------------------------------------
@@ -520,6 +600,85 @@ def test_an_empty_page_saves_no_figure(tmp_path: Path,
     assert program.dataset_figure_saver(FigurePage(), tmp_path / 'results') == []
     assert not (tmp_path / 'results').exists()
     assert capsys.readouterr().out == ''
+
+
+# ---- test_a_file_that_was_not_read_is_named ------------------------------------------
+def test_a_file_that_was_not_read_is_named(tmp_path: Path,
+                                           capsys: pytest.CaptureFixture,
+                                           ) -> None:
+    """
+    ---- Summary ----
+    Main function to check the run with a plot that shows experiments of which one
+    could not be read when the plots were saved: it is named in one warning, and the
+    figure is still saved; with every experiment read, nothing is said about them.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Results folder for the test.
+    capsys : pytest.CaptureFixture
+        What is shown on screen.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    setup = {'group_names': ['', ''],
+             'colours': {'control': '#0072b2'},
+             'rows': [{'name': name,
+                       'use': True,
+                       'group_1': 'control',
+                       'group_2': '',
+                       'time_point': '',
+                       'run': run,
+                       }
+                      for run, name in enumerate(('run1', 'run2'), start=1)
+                      ],
+             }
+    page = plot_placer(FigurePage(),
+                       PagePlot('P8', row=0, column=0, n_rows=2, n_columns=3),
+                       )
+    figure = tmp_path / 'dataset_figure_nature.pdf'
+    read = {'run1': {'experiment_name': 'run1'}}
+    assert program.dataset_figure_saver(page, tmp_path, setup, read)[0] == figure
+    shown = ' '.join(capsys.readouterr().out.split())
+    assert ('The dataset figure is drawn without run2: it could not be read when the '
+            'plots were saved'
+            ) in shown
+    both = dict(read, run2={'experiment_name': 'run2'})
+    assert program.dataset_figure_saver(page, tmp_path, setup, both)[0] == figure
+    assert 'drawn without' not in capsys.readouterr().out
+
+    # a waterfall names the experiments it leaves out for having no difference spectrum
+    page = plot_placer(FigurePage(),
+                       PagePlot('P3', row=0, column=0, n_rows=2, n_columns=3),
+                       )
+    spectrum = {'wavelengths_nm': [540.0, 550.0, 560.0],
+                'difference_mOD': [0.0, 2.0, 1.0],
+                }
+    both = {'run1': {'experiment_name': 'run1', 'difference': spectrum},
+            'run2': {'experiment_name': 'run2', 'difference': None},
+            }
+    assert program.dataset_figure_saver(page, tmp_path, setup, both)[0] == figure
+    shown = ' '.join(capsys.readouterr().out.split())
+    assert ('The waterfall is drawn without run2: it has no difference spectrum, '
+            'which needs an oxidised and a reduced region.'
+            ) in shown
+    both['run2']['difference'] = spectrum
+    assert program.dataset_figure_saver(page, tmp_path, setup, both)[0] == figure
+    assert 'drawn without' not in capsys.readouterr().out
 
 
 # ---- test_the_figure_pdf_has_its_printed_size ----------------------------------------

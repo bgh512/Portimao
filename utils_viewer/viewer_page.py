@@ -15,8 +15,10 @@ from PIL import Image
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+import utils_shared.page_plots  # noqa: F401  (loading it adds the plot types to the page)
 from utils_shared.figure_layout import figure_size_calculator
-from utils_shared.figure_page import (FIRST_TYPES,
+from utils_shared.figure_page import (EMPTY_TYPES,
+                                      FIRST_TYPES,
                                       figure_page_drawer,
                                       FigurePage,
                                       FigurePageError,
@@ -34,6 +36,11 @@ from utils_shared.figure_page import (FIRST_TYPES,
                                       template_saver,
                                       )
 from utils_shared.journal_files import STANDARD_JOURNAL
+from utils_shared.page_data import (caption_lines_builder,
+                                    form_fields_lister,
+                                    form_roles_reader,
+                                    TICK_ON,
+                                    )
 from utils_viewer.viewer_edges import photo_maker
 from utils_viewer.viewer_guide import CARD_BACKGROUND
 from utils_viewer.viewer_strip import height_checker, width_choices_lister
@@ -68,6 +75,10 @@ TYPES_PER_ROW = 6
 NO_TEMPLATES = '(no templates yet)'
 PAGE_HINT = ('Drag across the grid to place a plot, then fill in its form on the left. '
              f'{EDIT_MARK} changes a plot, {REMOVE_MARK} removes it.')
+# the line under the page while no plot on it has colours or line styles to explain
+NO_CAPTION = ('For the caption: what each colour and line style means is written here '
+              'once a plot on the page uses them.')
+EMPTY_PLOT_COLOUR = '#9a9a9a'  # the outline of a plot that is drawn as nothing
 
 
 # ---- PageBuilder ---------------------------------------------------------------------
@@ -88,6 +99,9 @@ class PageBuilder:
         The line under the strip.
     canvas : Any
         The plot area the page is drawn in.
+    caption : Any
+        The frame under the page: what each colour and line style on the page means,
+        for the caption, with its Copy button.
     form : Any
         The frame of the form, packed by the window in place of the guide's text.
 
@@ -98,9 +112,12 @@ class PageBuilder:
     __init__
     _button_taker
     _canvas_drawer
+    _caption_copier
+    _caption_setter
     _form_clearer
     _form_closer
     _form_opener
+    _form_roles_reader
     _height_taker
     _journal_taker
     _load_form_shower
@@ -174,6 +191,7 @@ class PageBuilder:
         None.
 
         ---- Helpers ----
+        _caption_copier
         _height_taker
         _journal_taker
         _load_taker
@@ -210,6 +228,15 @@ class PageBuilder:
         self._form_keys: Dict[str, str] = {}
         self._form_type: Any = None
         self._form_cells: Any = None
+        self._form_title = ''
+        # what the plot type asks, and the drop-down or the tick of each field
+        self._form_fields: List[dict] = []
+        self._form_inputs: Dict[str, Any] = {}
+        # the set-up table and the slim copy of each experiment the plots are drawn from
+        self._setup: Optional[dict] = None
+        self._experiments: Dict[str, dict] = {}
+        self._answers: dict = {}  # the answers of the run
+        self._caption_text = ''
 
         # ---- 2 The strip: the page size and the templates ----------------------------
         self.strip = tk.Frame(right, bg=background)
@@ -289,6 +316,21 @@ class PageBuilder:
         self.canvas.bind('<Button-1>', self._presser)
         self.canvas.bind('<B1-Motion>', self._mover)
         self.canvas.bind('<ButtonRelease-1>', self._releaser)
+        self.caption = tk.Frame(right, bg=background)
+        self._caption_button = ttk.Button(self.caption,
+                                          text='Copy',
+                                          command=self._caption_copier,
+                                          )
+        self._caption_button.pack(side='right', anchor='n', padx=(8, 0))
+        self._caption_words = tk.Label(self.caption,
+                                       text=NO_CAPTION,
+                                       bg=background,
+                                       fg=NOTE_COLOUR,
+                                       wraplength=820,
+                                       justify='left',
+                                       anchor='w',
+                                       )
+        self._caption_words.pack(side='left', fill='x', expand=True)
         self.form = tk.Frame(card, bg=CARD_BACKGROUND)
 
     # ---- PAGE HELPERS ----------------------------------------------------------------
@@ -349,9 +391,10 @@ class PageBuilder:
         """
         ---- Summary ----
         Method to draw the page in the plot area as large as it fits: the page with
-        its stand-ins and letters (with the plot whose form is open), the grid over
-        it, the open plot outlined in blue, the old cells of a plot being changed in
-        grey dashes, and ✎ and ✕ on each placed plot.
+        its plots and letters (with the plot whose form is open), the grid over it,
+        a plot that is drawn as nothing outlined in grey dashes with its name, the
+        open plot outlined in blue, the old cells of a plot being changed in grey
+        dashes, and ✎ and ✕ on each placed plot; then the caption lines under it.
 
         ---- Inputs ----
         None.
@@ -370,6 +413,7 @@ class PageBuilder:
         See page_box_finder.
 
         ---- Helpers ----
+        _caption_setter
         page_box_finder
         page_picture_maker
         photo_maker
@@ -387,10 +431,17 @@ class PageBuilder:
         shown = self.page
         if self._pending is not None:
             shown = replace(shown, plots=shown.plots + (self._pending,))
+        self._caption_setter(shown)
         spec = settings.JOURNAL_SPECS[shown.journal]
         size_in = figure_size_calculator(spec, shown.columns, shown.height)
         dpi = page_box_finder((width_px, height_px), size_in)
-        picture = page_picture_maker(shown, spec, dpi)
+        picture = page_picture_maker(shown,
+                                     spec,
+                                     dpi,
+                                     self._setup,
+                                     self._experiments,
+                                     self._answers,
+                                     )
         left = (width_px - picture.width) / 2.0
         top = (height_px - picture.height) / 2.0
         self._box = (left, top, float(picture.width), float(picture.height))
@@ -424,6 +475,24 @@ class PageBuilder:
                                 )
 
         # ---- 3 The plot being changed, and the old cells of one changed with ✎ -------
+        # a plot drawn as nothing is shown here only, never in the saved figure
+        for plot in shown.plots:
+            if plot.plot_type not in EMPTY_TYPES:
+                continue
+            x0, y0, x1, y1 = plot_box_finder(plot, self._box)
+            canvas.create_rectangle(x0 + BUTTON_GAP_PX,
+                                    y0 + BUTTON_GAP_PX,
+                                    x1 - BUTTON_GAP_PX,
+                                    y1 - BUTTON_GAP_PX,
+                                    outline=EMPTY_PLOT_COLOUR,
+                                    dash=(2, 4),
+                                    )
+            canvas.create_text((x0 + x1) / 2.0,
+                               (y0 + y1) / 2.0,
+                               text=PLOT_TYPES[plot.plot_type],
+                               fill=EMPTY_PLOT_COLOUR,
+                               font=(self._family, max(self._size - 2, 8)),
+                               )
         if self._lifted is not None:
             canvas.create_rectangle(*plot_box_finder(self._lifted, self._box),
                                     outline=OLD_CELLS_COLOUR,
@@ -451,6 +520,77 @@ class PageBuilder:
                                    text=EDIT_MARK if kind == 'edit' else REMOVE_MARK,
                                    font=(self._family, max(self._size - 3, 8)),
                                    )
+
+    # ---- _caption_copier -------------------------------------------------------------
+    def _caption_copier(self) -> None:
+        """
+        ---- Summary ----
+        Method to take Copy under the page: the caption lines go to the clipboard, to
+        paste into the caption of the figure.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the clipboard and the note line (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _note_setter
+        """
+
+        if not self._caption_text:
+            return
+        self.canvas.clipboard_clear()
+        self.canvas.clipboard_append(self._caption_text)
+        self._note_setter('Copied: paste it into the caption of the figure.')
+
+    # ---- _caption_setter -------------------------------------------------------------
+    def _caption_setter(self, page: FigurePage) -> None:
+        """
+        ---- Summary ----
+        Method to write under the page what each colour, line style and shade on it
+        means, for the caption; Copy is greyed out while there is nothing to explain.
+
+        ---- Inputs ----
+        page : FigurePage
+            The page as shown, with the plot whose form is open.
+
+        ---- Globals read ----
+        NO_CAPTION.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        caption_lines_builder
+        """
+
+        self._caption_text = '\n'.join(caption_lines_builder(page,
+                                                             self._setup,
+                                                             self._experiments,
+                                                             ),
+                                       )
+        self._caption_words.configure(text=self._caption_text or NO_CAPTION)
+        self._caption_button.configure(state='normal' if self._caption_text
+                                       else 'disabled',
+                                       )
 
     # ---- _form_clearer ---------------------------------------------------------------
     def _form_clearer(self) -> None:
@@ -569,6 +709,35 @@ class PageBuilder:
             self._on_form(True)
         self._form_mode = mode
         return body
+
+    # ---- _form_roles_reader ----------------------------------------------------------
+    def _form_roles_reader(self) -> Dict[str, str]:
+        """
+        ---- Summary ----
+        Method to read the form of a plot as it is filled in: the roles of the plot.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Dict[str, str]
+            The roles (form_roles_reader); empty for a plot type that asks nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        form_roles_reader
+        """
+
+        values = {key: widget.get() for key, widget in self._form_inputs.items()}
+        return form_roles_reader(self._form_fields, values)
 
     # ---- _height_taker ---------------------------------------------------------------
     def _height_taker(self) -> None:
@@ -916,7 +1085,8 @@ class PageBuilder:
     def _plot_done_taker(self) -> None:
         """
         ---- Summary ----
-        Method to take Done in the form of a plot: the plot is placed on the page.
+        Method to take Done in the form of a plot: what the form holds becomes the
+        roles of the plot, and the plot is placed on the page and drawn in its cells.
 
         ---- Inputs ----
         None.
@@ -937,6 +1107,7 @@ class PageBuilder:
         ---- Helpers ----
         _canvas_drawer
         _form_closer
+        _form_roles_reader
         _note_setter
         panel_letters_finder
         plot_placer
@@ -944,6 +1115,7 @@ class PageBuilder:
 
         if self._pending is None:
             return
+        self._pending = replace(self._pending, roles=self._form_roles_reader())
         self.page = plot_placer(self.page, self._pending)
         index = len(self.page.plots) - 1
         letter = panel_letters_finder(self.page).get(index)
@@ -960,7 +1132,8 @@ class PageBuilder:
         """
         ---- Summary ----
         Method to open the form of the plot whose form is open: its plot type, the
-        cells it takes, and Done and Cancel.
+        cells it takes, what its plot type asks (a drop-down or a tick for each
+        field, starting as the roles of the plot say), and Done and Cancel.
 
         ---- Inputs ----
         title : str
@@ -985,10 +1158,13 @@ class PageBuilder:
         _plot_done_taker
         _type_list_taker
         cells_describer
+        form_fields_lister
         """
 
+        # ---- 1 The plot type and the cells -------------------------------------------
         tk, ttk = self._tk, self._ttk
         plot = self._pending
+        self._form_title = title
         body = self._form_opener('plot',
                                  title,
                                  'Drag across the page again to move it or change its '
@@ -1025,8 +1201,46 @@ class PageBuilder:
                                     font=(self._family, self._size),
                                     )
         self._form_cells.grid(row=1, column=1, sticky='w', padx=(8, 0), pady=4)
+
+        # ---- 2 What the plot type asks -----------------------------------------------
+        self._form_fields = form_fields_lister(plot.plot_type,
+                                               self._setup,
+                                               plot.roles,
+                                               self._answers,
+                                               )
+        self._form_inputs = {}
+        row = 2
+        for field in self._form_fields:
+            if field['kind'] == 'tick':
+                ticked = tk.BooleanVar(body, value=field['value'] == TICK_ON)
+                tk.Checkbutton(body,
+                               text=field['label'],
+                               variable=ticked,
+                               bg=CARD_BACKGROUND,
+                               fg=FORM_TEXT,
+                               activebackground=CARD_BACKGROUND,
+                               activeforeground=FORM_TEXT,
+                               selectcolor=CARD_BACKGROUND,
+                               font=(self._family, self._size),
+                               ).grid(row=row, column=0, columnspan=2, sticky='w')
+                self._form_inputs[field['key']] = ticked
+            elif field['choices']:
+                tk.Label(body,
+                         text=field['label'],
+                         bg=CARD_BACKGROUND,
+                         fg=FORM_TEXT,
+                         font=(self._family, self._size),
+                         ).grid(row=row, column=0, sticky='w', pady=4)
+                words = [shown for _, shown in field['choices']]
+                picker = ttk.Combobox(body, state='readonly', width=28, values=words)
+                picker.set(dict(field['choices'])[field['value']])
+                picker.grid(row=row, column=1, sticky='w', padx=(8, 0), pady=4)
+                self._form_inputs[field['key']] = picker
+            row += 1
+
+        # ---- 3 Done and Cancel -------------------------------------------------------
         buttons = tk.Frame(body, bg=CARD_BACKGROUND)
-        buttons.grid(row=2, column=0, columnspan=2, sticky='w', pady=(8, 4))
+        buttons.grid(row=row, column=0, columnspan=2, sticky='w', pady=(8, 4))
         ttk.Button(buttons,
                    text='Done',
                    command=self._plot_done_taker,
@@ -1471,8 +1685,9 @@ class PageBuilder:
         for other, button in self._type_buttons.items():
             button.configure(relief=PICKED_RELIEF if other == key else UNPICKED_RELIEF)
         if self._form_mode == 'plot' and self._pending is not None:
-            self._pending = replace(self._pending, plot_type=key)
-            self._form_type.set(PLOT_TYPES[key])
+            # another plot type asks other things, so its form starts afresh
+            self._pending = replace(self._pending, plot_type=key, roles={})
+            self._plot_form_shower(self._form_title)
             self._canvas_drawer()
             return
         self._note_setter(f'Drag across the grid to place a {PLOT_TYPES[key].lower()}.')
@@ -1506,7 +1721,13 @@ class PageBuilder:
         key = self._form_keys.get(self._form_type.get())
         if key is None or self._pending is None:
             return
-        self._pending = replace(self._pending, plot_type=key)
+        if key != self._pending.plot_type:
+            # another plot type asks other things, so its form starts afresh
+            self._pending = replace(self._pending, plot_type=key, roles={})
+            # once the list has closed, as the form is built again with a new list
+            self.canvas.after_idle(lambda: self._pending is not None
+                                   and self._plot_form_shower(self._form_title),
+                                   )
         self._canvas_drawer()
 
     # ---- _width_taker ----------------------------------------------------------------
@@ -1606,7 +1827,13 @@ class PageBuilder:
         return self._kept
 
     # ---- opener ----------------------------------------------------------------------
-    def opener(self, page: FigurePage, folder: Path) -> None:
+    def opener(self,
+               page: FigurePage,
+               folder: Path,
+               setup: Optional[dict] = None,
+               experiments: Optional[Dict[str, dict]] = None,
+               answers: Optional[dict] = None,
+               ) -> None:
         """
         ---- Summary ----
         Method to start building a page: its size in the strip, the templates of the
@@ -1617,6 +1844,15 @@ class PageBuilder:
             The page to start from.
         folder : Path
             The layouts folder, where templates are saved and read.
+        setup : Optional[dict]
+            The set-up table (dataset_setup, DATA_FORMAT.md), which the forms of the
+            plots offer their choices from; None for none.
+        experiments : Optional[Dict[str, dict]]
+            {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), which
+            the plots are drawn from; None for none.
+        answers : Optional[dict]
+            The answers of the run, for what the forms offer from them and the plots
+            drawn as the run was set up; None for none.
 
         ---- Globals read ----
         PAGE_HINT; settings.JOURNAL_SPECS.
@@ -1642,6 +1878,8 @@ class PageBuilder:
         self.page, change = page_journal_fitter(page, settings.JOURNAL_SPECS)
         self._kept = self.page
         self._folder = folder
+        self._setup, self._experiments = setup, experiments or {}
+        self._answers = answers or {}
         self._pending, self._lifted, self._drag_start = None, None, None
         self._size_controls_setter()
         self._template_list_setter()
@@ -1936,7 +2174,13 @@ def page_offer_checker(page: FigurePage, kept: FigurePage) -> bool:
 
 
 # ---- page_picture_maker --------------------------------------------------------------
-def page_picture_maker(page: FigurePage, spec: dict, dpi: float) -> Image.Image:
+def page_picture_maker(page: FigurePage,
+                       spec: dict,
+                       dpi: float,
+                       setup: Optional[dict] = None,
+                       experiments: Optional[Dict[str, dict]] = None,
+                       answers: Optional[dict] = None,
+                       ) -> Image.Image:
     """
     ---- Summary ----
     Main function to draw a page as a picture for the plot area, off screen.
@@ -1948,6 +2192,12 @@ def page_picture_maker(page: FigurePage, spec: dict, dpi: float) -> Image.Image:
         What the page's journal asks (config.JOURNAL_SPECS entry).
     dpi : float
         Dots per inch (page_box_finder).
+    setup : Optional[dict]
+        The set-up table, as for figure_page_drawer.
+    experiments : Optional[Dict[str, dict]]
+        The slim copy of each experiment, as for figure_page_drawer.
+    answers : Optional[dict]
+        The answers of the run, as for figure_page_drawer.
 
     ---- Globals read ----
     None.
@@ -1966,7 +2216,7 @@ def page_picture_maker(page: FigurePage, spec: dict, dpi: float) -> Image.Image:
     figure_page_drawer
     """
 
-    fig, _ = figure_page_drawer(page, spec)
+    fig, _ = figure_page_drawer(page, spec, setup, experiments, answers)
     FigureCanvasAgg(fig)
     buffer = io.BytesIO()
     fig.savefig(buffer, format='png', dpi=dpi, facecolor='white')

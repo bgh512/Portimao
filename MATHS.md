@@ -1,6 +1,6 @@
 # Portimao maths
 
-How Portimao works out its haem numbers (and, in section 8, the concentration of each addition; in section 9, the difference spectrum), written so that the maths can be checked without reading the code. Each quantity has its equation, what every letter in it is (with its unit), a worked example in numbers, and the test that checks it. The numbers of each example are the numbers of its test, so the example and the program cannot drift apart: the tests are in the `tests/` folder of the development copy and are run each time the program is changed.
+How Portimao works out its haem numbers (and, in section 8, the concentration of each addition; in section 9, the difference spectrum, its haem bands and the waterfall; in section 10, the traces over time lined up on their additions and averaged), written so that the maths can be checked without reading the code. Each quantity has its equation, what every letter in it is (with its unit), a worked example in numbers, and the test that checks it. The numbers of each example are the numbers of its test, so the example and the program cannot drift apart: the tests are in the `tests/` folder of the development copy and are run each time the program is changed.
 
 The equations are written as a textbook writes them, which GitHub and VS Code's preview show typeset.
 
@@ -550,3 +550,136 @@ Example: three wavelengths, 500, 550 and 600 nm. In the oxidised region, 0 to 1 
 Second example: a reduced spectrum built as the oxidised one plus the five haem shapes of 1.2 in the amounts 0.0001 to 0.0005 mM, and a background of 1 mOD plus a part falling from 2 mOD at the shortest wavelength to 0 at the longest. The decomposition of the difference gives back those five amounts, each haem's part as its amount times its shape, and a residual of 0.
 
 Checked by: `test_mean_difference`, `test_known_haems_come_back` and `test_no_regions_no_difference` in `tests/test_difference_spectra.py`.
+
+### 9.1 The haem bands
+
+On the Difference spectrum and the Waterfall of a dataset figure, a shaded band in each haem's colour shows where that haem appears. A band comes from the haem's shape in the fit file alone, so it is the same on every plot and for every file, also for a haem a file has none of.
+
+$$\text{band} = w_{\mathrm{peak}} - 2.5 \quad \text{to} \quad w_{\mathrm{peak}} + 2.5$$
+
+- $w_{\mathrm{peak}}$: the wavelength where the haem's shape $S(w)$ is strongest, that is furthest from 0, whichever its sign (nm)
+- 2.5: how far the band reaches each side (nm)
+
+Example: a shape of 0, −3, 1, 0 at 540, 550, 560 and 570 nm is strongest (3) at 550 nm, so its band is 547.5 to 552.5 nm.
+
+Checked by: `test_the_haem_bands` in `tests/test_difference_spectra.py`.
+
+### 9.2 The waterfall
+
+The Waterfall of a dataset figure stacks difference spectra, the first at the top, so their shapes can be compared. Nothing is stretched: each spectrum is only moved up or down, which is why its y axis has no numbers.
+
+**The mean of the replicates.** As a time series, each line is the mean of the difference spectra of the experiments at one time point:
+
+$$\overline{\Delta A}(w) = \frac{\Delta A_1(w) + \Delta A_2(w) + \dots + \Delta A_n(w)}{n}$$
+
+- $\Delta A_1(w), \dots, \Delta A_n(w)$: the difference spectra of the $n$ experiments at that time point (mOD)
+- $w$: one wavelength of the first experiment (nm)
+
+An experiment measured at other wavelengths is first read at the wavelengths of the first, on the straight line between its own two nearest points:
+
+$$y = y_1 + (y_2 - y_1) \times \frac{w - w_1}{w_2 - w_1}$$
+
+- $w_1$, $w_2$: its two wavelengths either side of $w$ (nm); $y_1$, $y_2$: its values there (mOD)
+
+Where an experiment does not reach a wavelength, the mean there is of the others.
+
+Example: one spectrum is 1, 2, 3 mOD at 500, 510, 520 nm; another is 0, 2, 4 mOD at 495, 505, 515 nm. The second read at 500 nm is $0 + (2 - 0) \times \dfrac{5}{10} = 1$, at 510 nm it is 3, and it does not reach 520 nm. The mean is $\dfrac{1 + 1}{2} = 1$, $\dfrac{2 + 3}{2} = 2.5$, and 3 alone.
+
+**Lining up and stacking.** Each spectrum is moved so that its highest point inside the band (9.1) of the haem picked in the form is at 0, then the spectra are spread out by one fixed gap:
+
+$$y_{\mathrm{drawn}} = y - y_{\mathrm{top}} + (n - i) \times g, \qquad g = 0.75 \times h$$
+
+- $y$: one point of the spectrum (mOD)
+- $y_{\mathrm{top}}$: the highest point of that spectrum inside the band (mOD); the highest anywhere for a spectrum with no point in the band
+- $i$: the place of the spectrum, 1 for the top one; $n$: how many spectra there are
+- $h$: the height (highest minus lowest point) of the tallest spectrum (mOD); $g$: the gap between two neighbours
+
+Example: at 540, 550, 560 and 570 nm, the top spectrum is 1, 5, 2, 9 and the second 0, 2, 4, 1 mOD, lined up on a band of 545 to 565 nm. The highest point of the first inside the band is 5 (the 9 is outside it), so it becomes −4, 0, −3, 4, which is 8 high; that of the second is 4, so it becomes −4, −2, 0, −3, which is 4 high. The gap is $0.75 \times 8 = 6$. The first is drawn at 2, 6, 3, 10 and the second, the last, stays at −4, −2, 0, −3.
+
+Checked by: `test_spectra_averaged_and_stacked` in `tests/test_difference_spectra.py`, and `test_the_lines_of_a_waterfall` and `test_a_waterfall_drawn` in `tests/test_page_plots.py`.
+
+A Waterfall can stack one trace per line in place of the difference spectrum (the OCR, a haem, the oxygen or $\Delta\psi$ against time). The traces are first lined up in time and, as a time series, averaged as in section 10; they are then stacked in the same way, with no band: each is moved so that its highest point anywhere is at 0.
+
+Example: one line is 5 before the first addition and 2.5 after, the other 2 and 1. Moved, they are 0 and −2.5 (2.5 high) and 0 and −1 (1 high). The gap is $0.75 \times 2.5 = 1.875$, so the first is drawn at 1.875 and −0.625 and the second stays at 0 and −1.
+
+Checked by: `test_a_waterfall_of_traces` in `tests/test_page_plots.py`.
+
+---
+
+## 10. Traces over time: the Single trace and the Mean trace
+
+On a dataset figure, a Single trace shows one trace of one experiment, and a Mean trace the mean of the same trace over the experiments of each set. A trace is the measured oxygen, the OCR, one haem or $\Delta\psi$.
+
+### 10.1 The value shown
+
+A trace is shown in a value picked in the form of the plot. The OCR as measured (µM min⁻¹), per OD and as % of baseline (7.4), the haems as $\Delta D$ (section 2), absorbance (section 1) and % oxidised (section 4), and $\Delta\psi$ in mV (section 6) are read as the run worked them out. One value is new, for the OCR and for $\Delta\psi$, the change from baseline:
+
+$$y = x - b$$
+
+- $x$: the trace at one time (µM min⁻¹ for the OCR, mV for $\Delta\psi$)
+- $b$: its average in the baseline of that file (the $m_0$ of 7.3), in the same unit
+- $y$: what is drawn, in the same unit; 0 where the trace is what it was in the baseline
+
+A file without a baseline has no change from baseline and no % of baseline, and is left out of the plot. The haems have neither (7.3).
+
+Example: an OCR of 10, 10, 6 and 2 µM min⁻¹ with $b = 10$ is drawn at $10 - 10 = 0$, 0, $6 - 10 = -4$ and $2 - 10 = -8$ µM min⁻¹. A $\Delta\psi$ of 130, 126, 122 and 118 mV with $b = 130$ is drawn at 0, −4, −8 and −12 mV.
+
+Checked by: `test_a_trace_in_each_value` in `tests/test_trace_alignment.py`.
+
+### 10.2 Lining the experiments up
+
+Each experiment has its own clock: its additions are not made at the same times as those of another, and the gap between two additions is not the same length. So the additions are the measuring stick. A Single trace only moves its clock:
+
+$$t = x - a$$
+
+- $x$: a time on the experiment's own clock (min)
+- $a$: the time of the addition picked as time 0, on that clock (min); 0 when time 0 is the start of the recording
+- $t$: the time on the plot (min)
+
+A Mean trace puts every experiment on one shared time axis. On it, addition 1 of every experiment is at the same place, and so is addition 2, and so on. Up to halfway through the gap between two additions, a point is placed by its time after the addition before it; past halfway, by its time before the next one:
+
+$$t = A_i + (x - a_i) \qquad \text{in the first half of the gap}$$
+
+$$t = A_{i+1} - (a_{i+1} - x) \qquad \text{in the second half of the gap}$$
+
+$$A_{i+1} = A_i + g_i$$
+
+- $x$: a time on the experiment's own clock (min)
+- $a_i$, $a_{i+1}$: the times of the additions before and after it, on that clock (min)
+- $g_i$: the shortest gap $a_{i+1} - a_i$ among the experiments of the plot (min)
+- $A_i$, $A_{i+1}$: where those two additions sit on the shared axis (min); the addition picked as time 0 is at 0
+- $t$: the time on the shared axis (min); the two halves meet at $A_i + g_i / 2$
+
+So a point 30 s before an addition is 30 s before it in every experiment, however long the gap was. Nothing is stretched: in an experiment whose gap is longer than the shortest, the spare middle of its gap is left out, and the lines and the time axis have a break mark (//) there. A break is marked only where a gap is more than 1 s longer than the shortest.
+
+- Before the first addition a point is placed by its time before that addition, and after the last by its time after it. The axis goes as far each way as the shortest experiment does, so every point of a line is the mean of the same experiments.
+- An experiment with another number of additions than most experiments of the plot is left out, as its additions cannot be matched to theirs, and is named in one warning when the figure is saved. So is one that has nothing for the trace and value picked.
+- With time 0 at the start of the recording, the additions are not used: each experiment keeps its own clock, as far as they all go.
+- When the addition picked is one the experiments do not have (addition 3 of two), the last one is time 0.
+
+Example: experiment A has additions at 10 and 16 min (a gap of 6) and runs from 0 to 20 min; B has them at 12 and 17 min (a gap of 5) and runs to 25 min. With time 0 at the first addition, the shortest gap is $g = 5$, so the additions sit at $A_1 = 0$ and $A_2 = 5$ min, and the halves meet at 2.5 min.
+
+- 1 min after addition 1 ($t = 1$): A's own time is $10 + 1 = 11$ min, B's is $12 + 1 = 13$ min.
+- 30 s before addition 2 ($t = 5 - 0.5 = 4.5$): A's own time is $16 - 0.5 = 15.5$ min, B's is $17 - 0.5 = 16.5$ min.
+- At the meeting point ($t = 2.5$): A's own time is $16 - 2.5 = 13.5$ min; one second earlier it was still counted from the first addition, just under $10 + 2.5 = 12.5$ min. A's minute from 12.5 to 13.5 is the spare middle, left out, with a break mark at 2.5. B has none: $12 + 2.5 = 14.5 = 17 - 2.5$.
+- A has 10 min before its first addition and B 12, so the axis starts at −10. A has 4 min after its last and B 8, so it ends at $5 + 4 = 9$ min.
+
+Checked by: `test_traces_are_lined_up_on_their_additions` and `test_another_number_of_additions_is_left_out` in `tests/test_trace_alignment.py`, and `test_a_single_trace_drawn` in `tests/test_page_plots.py`.
+
+### 10.3 The mean and the band
+
+Each lined-up trace is read once a second of the shared axis, on the straight line between its two nearest points (the equation of 9.2, with times in place of wavelengths). At each of those times:
+
+$$\text{mean} = \frac{y_1 + y_2 + \dots + y_n}{n}$$
+
+$$\mathrm{SD} = \sqrt{\frac{(y_1 - \text{mean})^2 + \dots + (y_n - \text{mean})^2}{n - 1}} \qquad \mathrm{SEM} = \frac{\mathrm{SD}}{\sqrt{n}}$$
+
+- $y_1, \dots, y_n$: the values of the $n$ experiments of the set at that time, in the unit of the value shown
+- mean: the line of the set
+- SD: the spread of the experiments; SEM: the standard error of the mean. The band runs from mean − SEM to mean + SEM (or SD, as picked in the form)
+
+A set of one experiment has a line and no band. Where an experiment has no value (a $\Delta\psi$ outside its limits, section 6), the mean there is of the others.
+
+Example: three experiments read 4, 6 and 8. The mean is $\dfrac{4 + 6 + 8}{3} = 6$; the SD is $\sqrt{\dfrac{(-2)^2 + 0^2 + 2^2}{2}} = 2$; the SEM is $\dfrac{2}{\sqrt{3}} = 1.15$. The line is at 6 and its band from 4.85 to 7.15.
+
+Checked by: `test_the_mean_and_the_band` in `tests/test_trace_alignment.py`, and `test_the_lines_of_a_mean_trace` and `test_a_mean_trace_drawn` in `tests/test_page_plots.py`.

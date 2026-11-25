@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.31
+- **Version:** V2.32
 - **Date:** 25/11/2026
 
 ## Contents
@@ -176,6 +176,8 @@
     - [`test_no_regions_no_difference`](#test_no_regions_no_difference)
     - [`test_figure_panels`](#test_figure_panels)
     - [`test_strip_switch_value`](#test_strip_switch_value)
+    - [`test_the_haem_bands`](#test_the_haem_bands)
+    - [`test_spectra_averaged_and_stacked`](#test_spectra_averaged_and_stacked)
 - [`tests/test_early_plots.py`](#teststest_early_plotspy)
     - [`FakeWindow`](#fakewindow)
     - [`_context_builder`](#_context_builder)
@@ -218,6 +220,8 @@
     - [`test_text_fitted_to_the_journal`](#test_text_fitted_to_the_journal)
     - [`test_journal_with_no_largest_text`](#test_journal_with_no_largest_text)
     - [`test_lines_kept_to_what_the_journal_takes`](#test_lines_kept_to_what_the_journal_takes)
+    - [`test_axes_are_fitted_into_their_room`](#test_axes_are_fitted_into_their_room)
+    - [`test_a_small_legend_hides_nothing`](#test_a_small_legend_hides_nothing)
 - [`tests/test_figure_page.py`](#teststest_figure_pagepy)
     - [`_page_maker`](#_page_maker)
     - [`test_a_new_page_is_two_columns_and_0_8_tall`](#test_a_new_page_is_two_columns_and_0_8_tall)
@@ -225,10 +229,12 @@
     - [`test_a_plot_taken_off_and_placed_again`](#test_a_plot_taken_off_and_placed_again)
     - [`test_letters_in_reading_order`](#test_letters_in_reading_order)
     - [`test_the_page_drawn_off_screen`](#test_the_page_drawn_off_screen)
+    - [`test_a_plot_keeps_its_text_inside_its_cells`](#test_a_plot_keeps_its_text_inside_its_cells)
     - [`test_a_template_saved_and_read_back`](#test_a_template_saved_and_read_back)
     - [`test_a_template_with_a_file_name_is_not_saved`](#test_a_template_with_a_file_name_is_not_saved)
     - [`test_a_broken_template_is_refused`](#test_a_broken_template_is_refused)
     - [`test_an_empty_page_saves_no_figure`](#test_an_empty_page_saves_no_figure)
+    - [`test_a_file_that_was_not_read_is_named`](#test_a_file_that_was_not_read_is_named)
     - [`test_the_figure_pdf_has_its_printed_size`](#test_the_figure_pdf_has_its_printed_size)
     - [`test_the_figure_pdf_keeps_its_text`](#test_the_figure_pdf_keeps_its_text)
     - [`test_the_run_saves_the_figure_and_its_master_page`](#test_the_run_saves_the_figure_and_its_master_page)
@@ -452,6 +458,43 @@
     - [`test_the_step_that_builds_the_page`](#test_the_step_that_builds_the_page)
     - [`test_when_the_template_offer_is_made`](#test_when_the_template_offer_is_made)
     - [`test_the_template_offer_saves_the_page`](#test_the_template_offer_saves_the_page)
+- [`tests/test_page_data.py`](#teststest_page_datapy)
+    - [`_setup_maker`](#_setup_maker)
+    - [`test_the_slim_copy_of_an_experiment`](#test_the_slim_copy_of_an_experiment)
+    - [`test_an_experiment_and_its_role`](#test_an_experiment_and_its_role)
+    - [`test_the_sets_of_a_plot`](#test_the_sets_of_a_plot)
+    - [`test_the_fields_of_a_form`](#test_the_fields_of_a_form)
+    - [`test_the_caption_lines`](#test_the_caption_lines)
+    - [`test_a_difference_spectrum_adds_its_regions_to_the_caption`](#test_a_difference_spectrum_adds_its_regions_to_the_caption)
+    - [`test_a_mean_trace_adds_its_line_to_the_caption`](#test_a_mean_trace_adds_its_line_to_the_caption)
+- [`tests/test_page_plots.py`](#teststest_page_plotspy)
+    - [`_answers_maker`](#_answers_maker)
+    - [`_experiment_maker`](#_experiment_maker)
+    - [`_page_drawer`](#_page_drawer)
+    - [`_setup_maker`](#_setup_maker)
+    - [`_spectrum_drawer`](#_spectrum_drawer)
+    - [`_spectrum_experiments_maker`](#_spectrum_experiments_maker)
+    - [`_series_setup_maker`](#_series_setup_maker)
+    - [`_trace_experiments_maker`](#_trace_experiments_maker)
+    - [`_value_finder`](#_value_finder)
+    - [`test_the_form_of_a_standard_experiment`](#test_the_form_of_a_standard_experiment)
+    - [`test_the_panels_of_a_standard_experiment`](#test_the_panels_of_a_standard_experiment)
+    - [`test_the_labels_and_the_regions_of_a_standard_experiment`](#test_the_labels_and_the_regions_of_a_standard_experiment)
+    - [`test_standard_experiments_share_their_scales`](#test_standard_experiments_share_their_scales)
+    - [`test_a_standard_experiment_that_cannot_be_drawn_says_why`](#test_a_standard_experiment_that_cannot_be_drawn_says_why)
+    - [`test_a_standard_experiment_stays_inside_its_cells`](#test_a_standard_experiment_stays_inside_its_cells)
+    - [`test_a_standard_experiment_has_the_font_of_the_page`](#test_a_standard_experiment_has_the_font_of_the_page)
+    - [`test_the_form_of_a_difference_spectrum`](#test_the_form_of_a_difference_spectrum)
+    - [`test_the_lines_of_a_difference_spectrum`](#test_the_lines_of_a_difference_spectrum)
+    - [`test_a_difference_spectrum_that_cannot_be_drawn_says_why`](#test_a_difference_spectrum_that_cannot_be_drawn_says_why)
+    - [`test_the_form_of_a_waterfall`](#test_the_form_of_a_waterfall)
+    - [`test_the_lines_of_a_waterfall`](#test_the_lines_of_a_waterfall)
+    - [`test_a_waterfall_drawn`](#test_a_waterfall_drawn)
+    - [`test_the_forms_of_the_plots_over_time`](#test_the_forms_of_the_plots_over_time)
+    - [`test_a_single_trace_drawn`](#test_a_single_trace_drawn)
+    - [`test_the_lines_of_a_mean_trace`](#test_the_lines_of_a_mean_trace)
+    - [`test_a_mean_trace_drawn`](#test_a_mean_trace_drawn)
+    - [`test_a_waterfall_of_traces`](#test_a_waterfall_of_traces)
 - [`tests/test_panel_order.py`](#teststest_panel_orderpy)
     - [`_figure_drawer`](#_figure_drawer)
     - [`test_a_click_on_an_arrow_changes_the_order_kept_and_redraws`](#test_a_click_on_an_arrow_changes_the_order_kept_and_redraws)
@@ -476,6 +519,7 @@
     - [`test_window_mean_and_spread`](#test_window_mean_and_spread)
     - [`test_averages_around_the_additions`](#test_averages_around_the_additions)
     - [`test_a_file_with_both_regions_gets_percent_oxidised`](#test_a_file_with_both_regions_gets_percent_oxidised)
+    - [`test_a_sentence_that_cannot_be_written_keeps_the_haems`](#test_a_sentence_that_cannot_be_written_keeps_the_haems)
     - [`test_average_that_does_not_fit`](#test_average_that_does_not_fit)
     - [`test_baseline_needs_ten_seconds_of_data`](#test_baseline_needs_ten_seconds_of_data)
     - [`test_trimming_keeps_exactly_the_chosen_times`](#test_trimming_keeps_exactly_the_chosen_times)
@@ -572,6 +616,14 @@
     - [`test_a_tab_pressed_while_no_step_has_edges`](#test_a_tab_pressed_while_no_step_has_edges)
     - [`test_export_csv_in_the_trim_step`](#test_export_csv_in_the_trim_step)
     - [`test_the_figure_step_asks_only_continue`](#test_the_figure_step_asks_only_continue)
+- [`tests/test_trace_alignment.py`](#teststest_trace_alignmentpy)
+    - [`_clock_trace_maker`](#_clock_trace_maker)
+    - [`_experiment_maker`](#_experiment_maker)
+    - [`test_a_trace_in_each_value`](#test_a_trace_in_each_value)
+    - [`test_traces_are_lined_up_on_their_additions`](#test_traces_are_lined_up_on_their_additions)
+    - [`test_another_number_of_additions_is_left_out`](#test_another_number_of_additions_is_left_out)
+    - [`test_the_mean_and_the_band`](#test_the_mean_and_the_band)
+    - [`test_a_line_is_broken_where_a_gap_was_shortened`](#test_a_line_is_broken_where_a_gap_was_shortened)
 - [`tests/test_trim_edges.py`](#teststest_trim_edgespy)
     - [`test_edge_under_the_mouse`](#test_edge_under_the_mouse)
     - [`test_every_file_or_one_file`](#test_every_file_or_one_file)
@@ -890,6 +942,10 @@
     - [`difference_decomposer`](#difference_decomposer)
     - [`difference_figure_drawer`](#difference_figure_drawer)
     - [`difference_spectrum_builder`](#difference_spectrum_builder)
+    - [`haem_bands_drawer`](#haem_bands_drawer)
+    - [`haem_bands_finder`](#haem_bands_finder)
+    - [`spectra_averager`](#spectra_averager)
+    - [`spectra_stacker`](#spectra_stacker)
 - [`utils_shared/event_concentrations.py`](#utils_sharedevent_concentrationspy)
     - [`_label_key_maker`](#_label_key_maker)
     - [`addition_calculator`](#addition_calculator)
@@ -900,11 +956,14 @@
     - [`event_text_reader`](#event_text_reader)
     - [`unit_concentration_writer`](#unit_concentration_writer)
 - [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
+    - [`_decomposition_teller`](#_decomposition_teller)
     - [`_skip_reporter`](#_skip_reporter)
     - [`event_settings_merger`](#event_settings_merger)
     - [`experiment_data_processor`](#experiment_data_processor)
 - [`utils_shared/figure_layout.py`](#utils_sharedfigure_layoutpy)
     - [`_renderer_getter`](#_renderer_getter)
+    - [`_legend_cover_checker`](#_legend_cover_checker)
+    - [`axes_room_fitter`](#axes_room_fitter)
     - [`figure_canvas_fitter`](#figure_canvas_fitter)
     - [`figure_finisher`](#figure_finisher)
     - [`figure_lines_fitter`](#figure_lines_fitter)
@@ -915,6 +974,7 @@
     - [`gap_space_calculator`](#gap_space_calculator)
     - [`line_width_fitter`](#line_width_fitter)
     - [`panel_letter_adder`](#panel_letter_adder)
+    - [`plot_legend_placer`](#plot_legend_placer)
     - [`stack_legend_drawer`](#stack_legend_drawer)
     - [`text_extent_calculator`](#text_extent_calculator)
 - [`utils_shared/figure_page.py`](#utils_sharedfigure_pagepy)
@@ -923,6 +983,9 @@
     - [`FigurePage`](#figurepage)
     - [`_cells_lister`](#_cells_lister)
     - [`_placement_problem_finder`](#_placement_problem_finder)
+    - [`_drawing_space_drawer`](#_drawing_space_drawer)
+    - [`_plot_finisher`](#_plot_finisher)
+    - [`_stand_in_drawer`](#_stand_in_drawer)
     - [`_roles_checker`](#_roles_checker)
     - [`_template_plot_reader`](#_template_plot_reader)
     - [`figure_file_namer`](#figure_file_namer)
@@ -1036,6 +1099,66 @@
     - [`token_reader`](#token_reader)
     - [`u32_reader`](#u32_reader)
     - [`warning_printer`](#warning_printer)
+- [`utils_shared/page_data.py`](#utils_sharedpage_datapy)
+    - [`_column_namer`](#_column_namer)
+    - [`_label_placer`](#_label_placer)
+    - [`_rgb_reader`](#_rgb_reader)
+    - [`_rows_lister`](#_rows_lister)
+    - [`caption_lines_builder`](#caption_lines_builder)
+    - [`choice_field_maker`](#choice_field_maker)
+    - [`colour_namer`](#colour_namer)
+    - [`colour_shader`](#colour_shader)
+    - [`experiment_field_maker`](#experiment_field_maker)
+    - [`experiment_role_maker`](#experiment_role_maker)
+    - [`experiment_slimmer`](#experiment_slimmer)
+    - [`form_fields_lister`](#form_fields_lister)
+    - [`form_roles_reader`](#form_roles_reader)
+    - [`group_choices_lister`](#group_choices_lister)
+    - [`group_columns_lister`](#group_columns_lister)
+    - [`group_fields_lister`](#group_fields_lister)
+    - [`page_experiments_lister`](#page_experiments_lister)
+    - [`plot_sets_lister`](#plot_sets_lister)
+    - [`role_experiment_finder`](#role_experiment_finder)
+    - [`tick_field_maker`](#tick_field_maker)
+- [`utils_shared/page_plots.py`](#utils_sharedpage_plotspy)
+    - [`_align_band_finder`](#_align_band_finder)
+    - [`_first_haem_finder`](#_first_haem_finder)
+    - [`_fit_haems_lister`](#_fit_haems_lister)
+    - [`_spectrum_axes_styler`](#_spectrum_axes_styler)
+    - [`_waterfall_roles_reader`](#_waterfall_roles_reader)
+    - [`_haem_namer`](#_haem_namer)
+    - [`_haems_lister`](#_haems_lister)
+    - [`_sentence_drawer`](#_sentence_drawer)
+    - [`_standard_config_builder`](#_standard_config_builder)
+    - [`_tick_reader`](#_tick_reader)
+    - [`_additions_drawer`](#_additions_drawer)
+    - [`_breaks_drawer`](#_breaks_drawer)
+    - [`_per_od_checker`](#_per_od_checker)
+    - [`_regions_drawer`](#_regions_drawer)
+    - [`_sets_aligner`](#_sets_aligner)
+    - [`_time_label_writer`](#_time_label_writer)
+    - [`_trace_choices_lister`](#_trace_choices_lister)
+    - [`_trace_colour_finder`](#_trace_colour_finder)
+    - [`_trace_fields_lister`](#_trace_fields_lister)
+    - [`_trace_roles_reader`](#_trace_roles_reader)
+    - [`_vo2_values_lister`](#_vo2_values_lister)
+    - [`_waterfall_traces_drawer`](#_waterfall_traces_drawer)
+    - [`difference_form_maker`](#difference_form_maker)
+    - [`difference_plot_drawer`](#difference_plot_drawer)
+    - [`mean_form_maker`](#mean_form_maker)
+    - [`mean_lines_lister`](#mean_lines_lister)
+    - [`mean_plot_drawer`](#mean_plot_drawer)
+    - [`standard_form_maker`](#standard_form_maker)
+    - [`standard_plot_drawer`](#standard_plot_drawer)
+    - [`standard_scales_sharer`](#standard_scales_sharer)
+    - [`trace_form_maker`](#trace_form_maker)
+    - [`trace_plot_drawer`](#trace_plot_drawer)
+    - [`traces_left_out_lister`](#traces_left_out_lister)
+    - [`waterfall_form_maker`](#waterfall_form_maker)
+    - [`waterfall_left_out_lister`](#waterfall_left_out_lister)
+    - [`waterfall_lines_lister`](#waterfall_lines_lister)
+    - [`waterfall_plot_drawer`](#waterfall_plot_drawer)
+    - [`waterfall_traces_lister`](#waterfall_traces_lister)
 - [`utils_shared/pca_fitter.py`](#utils_sharedpca_fitterpy)
     - [`_component_orienter`](#_component_orienter)
     - [`_nuisance_basis_builder`](#_nuisance_basis_builder)
@@ -1213,6 +1336,16 @@
     - [`trim_times_finder`](#trim_times_finder)
     - [`window_kind_asker`](#window_kind_asker)
     - [`windows_ensurer`](#windows_ensurer)
+- [`utils_shared/trace_alignment.py`](#utils_sharedtrace_alignmentpy)
+    - [`_baseline_mean_finder`](#_baseline_mean_finder)
+    - [`_haem_table_finder`](#_haem_table_finder)
+    - [`_pieces_lister`](#_pieces_lister)
+    - [`_trace_interpolator`](#_trace_interpolator)
+    - [`additions_lister`](#additions_lister)
+    - [`line_breaker`](#line_breaker)
+    - [`trace_reader`](#trace_reader)
+    - [`traces_aligner`](#traces_aligner)
+    - [`traces_averager`](#traces_averager)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
 - [`utils_shared/user_notices.py`](#utils_shareduser_noticespy)
@@ -2637,13 +2770,25 @@ warning_shower
 Main function to save the dataset figure built on the page: the figure as a PDF of
 its printed size, with text that can still be changed, then its master page, the
 figure on a page of its journal. A page with no plot saves nothing. A file that
-cannot be saved is said in one sentence and the run goes on.
+cannot be saved is said in one sentence and the run goes on. An experiment a plot
+shows that could not be read when the plots were saved is named in one warning,
+and the plot is drawn without it; so is an experiment a waterfall leaves out for
+having no difference spectrum, and one a mean trace (or a waterfall of traces)
+leaves out for having nothing to show or another number of additions.
 
 ---- Inputs ----
 page : FigurePage
     The page as built in the Build a figure step.
 export_root : Path
     Results folder.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Optional[Dict[str, dict]]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), kept when
+    the plot and the workbook of each file were saved; None for none.
+answers : Optional[dict]
+    The answers of the run, for the plots drawn as the run was set up; None for
+    none.
 
 ---- Globals read ----
 settings.JOURNAL_SPECS; FIGURE_NAME (imported).
@@ -2662,7 +2807,11 @@ None.
 ---- Helpers ----
 figure_page_exporter
 master_page_exporter
+page_experiments_lister
 problem_shower
+traces_left_out_lister
+warning_shower
+waterfall_left_out_lister
 ```
 
 #### `everything_asker`
@@ -2694,6 +2843,10 @@ saved_plots : Optional[List[str]]
 saved_workbooks : Optional[List[str]]
     List that holds the names of the files whose workbook is written before the
     run starts; None when not needed.
+page_data : Optional[dict]
+    Dictionary that gets what the dataset figure is drawn from: 'setup' (the
+    set-up table, dataset_setup) and 'experiments' ({experiment name: its slim
+    copy}, page_experiment, DATA_FORMAT.md); None when not needed.
 
 ---- Globals read ----
 PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
@@ -2739,6 +2892,8 @@ yes_no_asker
 Main function to read and process one .paf file once, then save its plot as the run
 does, handing back a picture of it for the window, and write its workbook. A plot
 that cannot be saved is said in one sentence and the workbook is still written.
+A slim copy of the file is kept for the plots of the dataset figure, so the file
+is not read again for them.
 
 ---- Inputs ----
 info : dict
@@ -2752,6 +2907,9 @@ fit : Optional[dict]
     not decomposed.
 export_root : Path
     Results folder.
+page_experiments : Optional[Dict[str, dict]]
+    Dictionary that gets the slim copy of the file under its name
+    (page_experiment, DATA_FORMAT.md); None keeps none.
 
 ---- Globals read ----
 settings.PREVIEW_DPI.
@@ -2773,6 +2931,7 @@ None.
 ---- Helpers ----
 experiment_data_processor
 experiment_plotter
+experiment_slimmer
 experiment_workbook_saver
 output_capturer
 problem_shower
@@ -2792,7 +2951,9 @@ the others carry on; what was not saved is tried again in the run.
 context : dict
     {answers, fit, summaries, limits, details, regions, export_root, has_spectra}
     of the run so far (everything_asker); has_spectra is True when the spectra
-    csv files are written already, and is set once they are written here.
+    csv files are written already, and is set once they are written here. With
+    'page_experiments' (a dictionary), the slim copy of each file read is put in
+    it for the dataset figure, in place of what it held.
 saved_plots : List[str]
     List emptied, then filled with the name of each file whose plot was saved.
 window : Any
@@ -6331,7 +6492,7 @@ screen_saver
 
 ## `tests/test_difference_spectra.py`
 
-Tests of the difference spectrum of a file (reduced minus oxidised), its decomposition into the haems, its figure and its switch under the boxes, on made-up spectra worked out by hand.
+Tests of the difference spectrum of a file (reduced minus oxidised), its decomposition into the haems, its figure and its switch under the boxes, the haem bands of a fit, and the mean and the stacking of spectra for a waterfall, on made-up spectra worked out by hand.
 
 ### TEST HELPERS
 
@@ -6557,6 +6718,72 @@ None.
 
 ---- Equations ----
 None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_haem_bands`
+
+```text
+---- Summary ----
+Main function to check the band of each haem of a made-up fit, worked out by
+hand: 2.5 nm each side of where its shape is strongest, whichever its sign; a
+shorter haem read to its own end; none for a haem of only zeros; and the bands
+as drawn: in the colour of the haem, marked as a backdrop, the x range kept.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Haem A is 0, -3, 1, 0 at 540, 550, 560, 570 nm: strongest (3) at 550, so its
+band is 547.5 to 552.5 nm. Haem B is 1, 2 at 600, 605 nm and then empty:
+strongest at 605, band 602.5 to 607.5 nm; with 1 nm each side, 604 to 606 nm.
+
+---- Helpers ----
+None.
+```
+
+#### `test_spectra_averaged_and_stacked`
+
+```text
+---- Summary ----
+Main function to check, by hand, the mean of spectra on different wavelengths
+and the stacking of a waterfall: lined up on the highest point inside a band,
+or anywhere without one, and spread 0.75 of the tallest spectrum apart.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The mean: 1, 2, 3 at 500, 510, 520 nm and 0, 2, 4 at 495, 505, 515 nm. The
+second read at 500 nm is 0 + (2 - 0) x 5 / 10 = 1, at 510 nm 3, and it does not
+reach 520 nm: mean (1 + 1) / 2 = 1, (2 + 3) / 2 = 2.5, and 3 alone.
+The stack, at 540, 550, 560, 570 nm: 1, 5, 2, 9 and 0, 2, 4, 1, with the band
+545 to 565 nm. The first has 5 as its highest point in the band: -4, 0, -3, 4,
+8 high; the second 4: -4, -2, 0, -3, 4 high. The gap is 0.75 x 8 = 6, so the
+first is drawn at 2, 6, 3, 10 and the second stays. Without a band the first is
+lined up on 9: -8, -4, -7, 0, drawn at -2, 2, -1, 6.
 
 ---- Helpers ----
 None.
@@ -6801,9 +7028,9 @@ _context_builder
 Main function to check the saving of one file: with a panel to plot, the plot is
 drawn once into the results folder and a PNG picture of it is handed back; with no
 oxygen, no OCR and no haems, nothing is drawn and None is handed back; the
-workbook is written either way, with the spectra only when asked for; a plot that
-fails still lets the workbook be written. The reading, the plot and the workbook
-are stood in for.
+workbook is written either way, with the spectra only when asked for; the slim
+copy of the file is kept for the dataset figure when a place for it is given. The
+reading, the plot and the workbook are stood in for.
 
 ---- Inputs ----
 tmp_path : Path
@@ -7756,6 +7983,69 @@ figure, between 0.5 and 1.5 pt: 0.2 pt becomes 0.5 pt, 3 pt becomes 1.5 pt and
 None.
 ```
 
+#### `test_axes_are_fitted_into_their_room`
+
+```text
+---- Summary ----
+Main function to check the room a plot keeps for its own text: axes that fill
+their room are made smaller until the tick numbers and axis titles are inside it;
+two sets of axes one above the other keep their shares of the height; axes whose
+text is already inside are left where they are.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The room is x 0.1 to 0.6 and y 0.2 to 0.9 of the figure. The upper axes take the
+top 0.42 of its height and the lower the bottom 0.28, so the upper is 1.5 times
+as tall as the lower, before and after.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_small_legend_hides_nothing`
+
+```text
+---- Summary ----
+Main function to check the small legend of a plot: none for one named line; in
+the top right corner when nothing is drawn there; in the next corner when a line
+runs through the top right; and under the axes, below the tick numbers and the
+axis title, when a line runs through every corner.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Two lines along the bottom of the axes leave every upper corner free: the legend
+goes top right. A line from bottom left to top right covers the top right corner
+and leaves the top left free. Lines along the top and the bottom cover all four
+corners.
+
+---- Helpers ----
+None.
+```
+
 ## `tests/test_figure_page.py`
 
 Tests of the page of a dataset figure: plots placed on the grid, refused over another
@@ -7767,8 +8057,8 @@ Tests of the page of a dataset figure: plots placed on the grid, refused over an
 ```text
 ---- Summary ----
 Helper function to make a page of four plots: a standard experiment over the top
-left two rows and three columns, a bar chart top right, the legend below it and a
-drawing along the bottom row, placed out of reading order.
+left two rows and three columns, a bar chart top right, a mean trace below them
+and a drawing along the bottom row, placed out of reading order.
 
 ---- Inputs ----
 None.
@@ -7779,7 +8069,7 @@ None.
 ---- Outputs ----
 FigurePage
     The page; its plots in the order placed: drawing, bar chart, standard
-    experiment, legend.
+    experiment, mean trace.
 
 ---- Globals mutated ----
 None.
@@ -7826,8 +8116,8 @@ None.
 ```text
 ---- Summary ----
 Main function to check that a plot is refused over a plot already there (named by
-its letter, or the legend by its name), past the edge of the grid, of no cells, or
-of an unknown type, and that the page is left as it was.
+its letter), past the edge of the grid, of no cells, of an unknown type, or of
+the Legend, which is no longer a plot type, and that the page is left as it was.
 
 ---- Inputs ----
 None.
@@ -7882,7 +8172,7 @@ _page_maker
 ```text
 ---- Summary ----
 Main function to check the letters: by each plot's top left cell, left to right
-then down, whatever the order the plots were placed in, none on the legend; and
+then down, whatever the order the plots were placed in, every plot with one; and
 the letters follow when a plot is removed.
 
 ---- Inputs ----
@@ -7900,8 +8190,9 @@ None.
 
 ---- Equations ----
 Plots placed: drawing (row 5), bar chart (row 0, column 3), standard experiment
-(row 0, column 0), legend (row 2). Reading order: standard experiment a, bar chart
-b, drawing c. Without the standard experiment: bar chart a, drawing b.
+(row 0, column 0), mean trace (row 2). Reading order: standard experiment a, bar
+chart b, mean trace c, drawing d. Without the standard experiment: bar chart a,
+mean trace b, drawing c.
 
 ---- Helpers ----
 _page_maker
@@ -7912,9 +8203,12 @@ _page_maker
 ```text
 ---- Summary ----
 Main function to check the page as drawn: a grey stand-in named by its plot type
-over the cells of each plot, and the letters bold at the journal's size, at the
-top left of their plots, lower case for Nature and upper case for a journal that
-asks for it.
+over the cells of each plot whose plot type is not built yet, one sentence over
+those of a standard experiment and of a mean trace with no experiment to show, a
+Space for a
+drawing left empty, and the letters bold at the journal's size, at the top left
+of their plots, lower case for Nature and upper case for a journal that asks for
+it.
 
 ---- Inputs ----
 None.
@@ -7935,6 +8229,39 @@ x 0 to 0.5 and y 1 - 2 / 6 = 0.667 to 1. The bar chart lies inside x 0.5 to 1.
 
 ---- Helpers ----
 _page_maker
+```
+
+#### `test_a_plot_keeps_its_text_inside_its_cells`
+
+```text
+---- Summary ----
+Main function to check a plot that is drawn for real, with a made-up plot type
+that fills its room and has long tick numbers, axis titles and two named lines:
+after the page is drawn, the tick numbers, the axis titles and the legend are all
+inside the cells of the plot, the axes are smaller than the room they were given,
+the legend covers neither line, and the drawer was handed the set-up and the
+experiments.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Puts the made-up plot type in place of the standard experiment's.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The plot takes rows 2 and 3 and columns 0 to 2: x from 0 to 0.5 and y from
+1 - 4 / 6 = 0.333 to 1 - 2 / 6 = 0.667 of the figure.
+
+---- Helpers ----
+None.
 ```
 
 #### `test_a_template_saved_and_read_back`
@@ -8033,6 +8360,37 @@ one sentence, and the run saves nothing and says nothing.
 ---- Inputs ----
 tmp_path : Path
     Folder given by pytest.
+capsys : pytest.CaptureFixture
+    What is shown on screen.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_file_that_was_not_read_is_named`
+
+```text
+---- Summary ----
+Main function to check the run with a plot that shows experiments of which one
+could not be read when the plots were saved: it is named in one warning, and the
+figure is still saved; with every experiment read, nothing is said about them.
+
+---- Inputs ----
+tmp_path : Path
+    Results folder for the test.
 capsys : pytest.CaptureFixture
     What is shown on screen.
 
@@ -14002,9 +14360,10 @@ None.
 ```text
 ---- Summary ----
 Main function to check the Build a figure step: it starts its step of the guide,
-shows an empty page with the layouts folder, asks 6.2 and gives the page the
-window holds once Continue is clicked; without a window it gives an empty page
-and asks nothing. The window and the question are stood in for.
+shows an empty page with the layouts folder, the set-up and the experiments, asks
+6.2 and gives the page the window holds once Continue is clicked; without a
+window it gives an empty page and asks nothing. The window and the question are
+stood in for.
 
 ---- Inputs ----
 tmp_path : Path
@@ -14086,6 +14445,1150 @@ None.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_page_data.py`
+
+Tests of what the page of a dataset figure is given of the dataset, worked out by hand on made-up experiments.
+
+### MAKERS
+
+#### `_setup_maker`
+
+```text
+---- Summary ----
+Helper function to make the set-up of a made-up dataset of five experiments: two
+controls (order A, 2 h, runs 1 and 2), a knockdown (order A, 7 h), a knockdown
+(order B, no time point) and a control that is not in use.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE, RED_ORANGE.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md); Group 1 is named "strain".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_the_slim_copy_of_an_experiment`
+
+```text
+---- Summary ----
+Main function to check the slim copy of a processed experiment: its traces, its
+additions, averages and levels are kept as they are, the whole spectra are left
+out, and the difference spectrum and the mean spectrum of each averaging region
+are as worked out by hand; a region with no spectrum has no mean, and a file
+without spectra of that spectrometer has neither. With the fit of the run it
+also keeps the haem bands and the difference split into its haems (the
+decomposition stood in for).
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the decomposition.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Six spectra at 0 to 5 min of three wavelengths; spectrum i is (0.001 i, 0.002 i,
+0) OD. The baseline (0 to 1 min) holds spectra 0 and 1: mean (0.0005, 0.001, 0) OD
+= (0.5, 1, 0) mOD. The region of 2 to 3 min: (2.5, 5, 0) mOD. Reduced (4 to 5
+min) is (4.5, 9, 0) mOD and oxidised (0 to 1 min) is (0.5, 1, 0) mOD, so reduced
+minus oxidised is (4, 8, 0) mOD.
+
+---- Helpers ----
+None.
+```
+
+#### `test_an_experiment_and_its_role`
+
+```text
+---- Summary ----
+Main function to check the role of an experiment, both ways: the place of each of
+its labels in its column and its replicate, none for an experiment not in use;
+the experiment a role fits, none for a role nothing fits or that cannot be read;
+the same role on a dataset with other labels; and a template that keeps it.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest, for the template.
+
+---- Globals read ----
+C1_ROLE, C2_ROLE, K1_ROLE, K2_ROLE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The labels in the order first seen: Group 1 control (1), knockdown (2); Group 2
+order A (1), order B (2); time point 2 h (1), 7 h (2); a blank cell is 0. c1 and
+c2 share their three labels, so they are replicates 1 and 2 by run number.
+
+---- Helpers ----
+_setup_maker
+```
+
+#### `test_the_sets_of_a_plot`
+
+```text
+---- Summary ----
+Main function to check the sets a plot shows for each choice of its group
+drop-downs: split by Group 1 when nothing is chosen, all together, only one
+label, split by two columns, and a label the dataset does not have.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE, RED_ORANGE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Group 2: order A is the first label (solid line), order B the second (dashed).
+Time point: 2 h is the first of two (shade 0), 7 h the last (shade 0.7). The
+knockdown colour #d55e00 (213, 94, 0) with 0.7 of white: 213 + 42 x 0.7 = 242.4,
+94 + 161 x 0.7 = 206.7, 0 + 255 x 0.7 = 178.5, so (242, 207, 178) = #f2cfb2.
+
+---- Helpers ----
+_setup_maker
+```
+
+#### `test_the_fields_of_a_form`
+
+```text
+---- Summary ----
+Main function to check the shared parts of a form: the experiment picker (every
+experiment in use by its file name, starting at the first or at the one the plot
+has), the group drop-downs (one per column that has a label, under the name the
+user gave it), a tick, the roles a filled-in form gives, and that a plot type
+asks what was set for it and otherwise nothing.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Gives a made-up plot type its form.
+
+---- Globals read ----
+C1_ROLE, C2_ROLE, K1_ROLE, K2_ROLE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_setup_maker
+```
+
+#### `test_the_caption_lines`
+
+```text
+---- Summary ----
+Main function to check what is written under the page for the caption: nothing
+for a page whose plots show no sets, the colours of the Group 1 labels for a plot
+split by Group 1, then the line styles and the shades once a plot is split by
+Group 2 and by the time point; the plain name of a colour; and the experiments
+the plots of a page show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+K1_ROLE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+#101010 is nearest black (16² x 3 = 768 from it, far less than from grey).
+
+---- Helpers ----
+_setup_maker
+```
+
+#### `test_a_difference_spectrum_adds_its_regions_to_the_caption`
+
+```text
+---- Summary ----
+Main function to check the caption line of each Difference spectrum of a page:
+its letter and the times of its two regions, after the lines of the colours;
+none for one whose experiment has no difference spectrum or was not read.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+C1_ROLE, C2_ROLE, K1_ROLE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The plots are lettered in reading order: a (c1), b (k1), c (c2), d (the plot
+of sets).
+
+---- Helpers ----
+_setup_maker
+```
+
+#### `test_a_mean_trace_adds_its_line_to_the_caption`
+
+```text
+---- Summary ----
+Main function to check the caption line of each Mean trace of a page: its
+letter, what its lines and its band are and what it is lined up on, after the
+lines of the colours; as a new plot starts (SEM, the first addition), with the
+SD from another addition, and without a band from the start of each recording.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_setup_maker
+```
+
+## `tests/test_page_plots.py`
+
+Tests of the plot types of a dataset figure on made-up experiments, drawn off screen: the form of the Standard experiment, its panels, its views, its ticks, its sentences and the scales its plots share; the form, the lines and the sentences of the Difference spectrum; the form, the lines, the stacking and the sentence of the Waterfall, also of traces; the forms, the lines, the bands and the sentences of the Single trace and the Mean trace, worked out by hand.
+
+### MAKERS
+
+#### `_answers_maker`
+
+```text
+---- Summary ----
+Helper function to make the answers of a made-up run: two haems worked out and
+shown, Δψ worked out, nothing left out of the y ranges at the start or the end.
+
+---- Inputs ----
+**changed : object
+    Answers that differ (decompose=False).
+
+---- Globals read ----
+HAEMS.
+
+---- Outputs ----
+dict
+    The answers.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to make the slim copy of a made-up experiment of 0 to 30 min: set
+oxygen at 60 µM, measured oxygen falling from 50 µM (to 40 for c1, to 20 for k1),
+an OCR rising from 0 (to 3 for c1, to 6 for k1), two haems in ΔD, absorbance and
+% oxidised (HAEM_ENDS), one addition at 10 min, a baseline region from 2 to 8 min
+and a settled region from 20 to 28 min; c1 also has Δψ, from 100 to 130 mV.
+
+---- Inputs ----
+name : str
+    'c1' or 'k1'.
+
+---- Globals read ----
+HAEM_ENDS, HAEMS; DELTA_PSI_COLUMN, TIME_COLUMN (imported).
+
+---- Outputs ----
+dict
+    The slim copy (page_experiment, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Each trace is a straight line: value = start + (end - start) x time / 30.
+
+---- Helpers ----
+None.
+```
+
+#### `_page_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a page of Standard experiments side by side, each three
+columns wide and three rows tall, from the left.
+
+---- Inputs ----
+roles_by_name : List[Tuple[str, Dict[str, str]]]
+    (the experiment, the other roles of its plot) of each plot, at most two.
+answers : Optional[dict]
+    The answers of the run; None for those of _answers_maker.
+experiments : Optional[Dict[str, dict]]
+    The slim copies; None for c1 and k1 of _experiment_maker.
+
+---- Globals read ----
+NO_SUCH_ROLE; STANDARD_SPEC (imported).
+
+---- Outputs ----
+Tuple[Figure, List[Dict[str, Axes]]]
+    (the figure, for each plot {the key of the panel: its axes}; the axes of a
+    sentence are under 'sentence').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_experiment_maker
+_setup_maker
+experiment_role_maker
+figure_page_drawer
+```
+
+#### `_setup_maker`
+
+```text
+---- Summary ----
+Helper function to make the set-up of a made-up dataset of three experiments: a
+control (c1), a knockdown (k1) and a second knockdown (k2), which is never read.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_spectrum_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a page with one spectrum plot (a Difference spectrum or
+a Waterfall) of the made-up time series, three columns wide and three rows tall
+at the top left.
+
+---- Inputs ----
+plot_type : str
+    'P2' or 'P3'.
+roles : Dict[str, str]
+    The roles of the plot.
+experiments : Optional[Dict[str, dict]]
+    The slim copies; None for those of _spectrum_experiments_maker.
+
+---- Globals read ----
+STANDARD_SPEC (imported).
+
+---- Outputs ----
+Tuple[Figure, Axes]
+    (the figure, the first axes of the plot).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_series_setup_maker
+_spectrum_experiments_maker
+figure_page_drawer
+```
+
+#### `_spectrum_experiments_maker`
+
+```text
+---- Summary ----
+Helper function to make the slim copies of the made-up time series, as far as
+the spectrum plots read them: each difference spectrum is 0 mOD from 500 to 600
+nm (every 5 nm) but for the peak of bH at 560 nm and that of cc at 550 nm
+(PEAKS_MOD); its parts are those two peaks and a background of 0.5 mOD
+everywhere, so the fit is 0.5 mOD above the difference and the residual -0.5 mOD.
+a4 was read but has no difference spectrum.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BANDS, HAEMS, PEAKS_MOD.
+
+---- Outputs ----
+Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_series_setup_maker`
+
+```text
+---- Summary ----
+Helper function to make the set-up of the made-up time series: four controls
+(a1 and a2 at 2 h, a3 and a4 at 7 h) and one knockdown (k1, at 2 h).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_trace_experiments_maker`
+
+```text
+---- Summary ----
+Helper function to make the slim copies of the made-up time series, as far as
+the plots over time read them (OCR_RUNS): each has an OCR every half minute from
+0 min, at its level before its first addition and at half of it from then on,
+so 100 then 50 % of baseline; its additions, named add 1 and add 2; a baseline
+region from 2 to 8 min and a settled region 2 min long from 1 min after its
+first addition.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+OCR_RUNS; TIME_COLUMN (imported).
+
+---- Outputs ----
+Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_value_finder`
+
+```text
+---- Summary ----
+Helper function to read a line at the last of its points nearest to a time.
+
+---- Inputs ----
+times : np.ndarray
+    The times of the line, shape (n_points,) (min).
+values : np.ndarray
+    Its values, shape (n_points,).
+moment : float
+    The time (min).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    The value there.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_the_form_of_a_standard_experiment`
+
+```text
+---- Summary ----
+Main function to check what the form of a Standard experiment asks and how it
+starts: the first experiment; a tick per panel, all on, a haem named in plain
+letters; ΔD; the labels on, the regions off and the same scales on. A run without
+haems or Δψ has no tick for them and no view; a plot keeps the choices it has,
+and a view that does not exist starts again at ΔD.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_setup_maker
+experiment_role_maker
+form_fields_lister
+```
+
+#### `test_the_panels_of_a_standard_experiment`
+
+```text
+---- Summary ----
+Main function to check the panels a Standard experiment draws: every panel the
+file has to start with (Δψ only for the file that has it), in the order oxygen,
+OCR, haems, Δψ; only the ones ticked otherwise; and the haems in the view picked,
+read from the title of their axis.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+B_KEY, C_KEY.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_drawer
+```
+
+#### `test_the_labels_and_the_regions_of_a_standard_experiment`
+
+```text
+---- Summary ----
+Main function to check the two ticks of what is drawn over the panels: the label
+of each addition above the top panel (on to start with, its dashed line staying
+when it is off), and the averaging regions shaded behind every panel (off to
+start with), the baseline with its name.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The made-up file has two regions, so each panel has two shaded spans.
+
+---- Helpers ----
+_page_drawer
+```
+
+#### `test_standard_experiments_share_their_scales`
+
+```text
+---- Summary ----
+Main function to check the scales of two Standard experiments on one page, worked
+out by hand: with the tick on (as a plot starts) every haem panel of both has the
+one range in ΔD and the one height of range in absorbance, the oxygen panels and
+the OCR panels have the range that holds both; in % oxidised, and with the tick
+of one plot off, each plot keeps its own.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+B_KEY, C_KEY.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A panel alone runs from its lowest value less 5 % of its range to its highest
+plus 5 %. ΔD: c1 has bH 0 to 2 (-0.1 to 2.1) and cc 0 to 1 (-0.05 to 1.05), so
+alone its haems run from -0.1 to 2.1; k1 has bH 0 to -4 (-4.2 to 0.2) and cc 0 to
+1, so alone -4.2 to 1.05; together -4.2 to 2.1. Absorbance: c1 has bH 10 to 12
+(9.9 to 12.1, height 2.2, middle 11) and cc 5 to 6 (middle 5.5); k1 has bH 10 to
+6 (5.8 to 10.2, height 4.4, middle 8) and cc 5 to 6; the largest height is 4.4,
+so c1's bH runs from 11 - 2.2 = 8.8 to 13.2, k1's from 5.8 to 10.2 and both cc
+from 5.5 - 2.2 = 3.3 to 7.7.
+
+---- Helpers ----
+_page_drawer
+```
+
+#### `test_a_standard_experiment_that_cannot_be_drawn_says_why`
+
+```text
+---- Summary ----
+Main function to check the one sentence written in the cells in place of the
+plot: for a plot whose experiment is not in the dataset, for an experiment that
+could not be read, for a plot with no panel ticked, and for haems asked in a view
+the file does not have; the plot beside it is still drawn.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+B_KEY; NO_PANEL, NOT_READ, NOT_THERE (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_experiment_maker
+_page_drawer
+```
+
+#### `test_a_standard_experiment_stays_inside_its_cells`
+
+```text
+---- Summary ----
+Main function to check that everything a Standard experiment draws is inside its
+cells: its panels, their numbers and titles, the shared title of the haems, the
+labels of the additions above the top panel and the name of the baseline.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The first plot takes columns 0 to 2 and rows 0 to 2: x from 0 to 0.5 and y from
+0.5 to 1 of the figure; the second x from 0.5 to 1.
+
+---- Helpers ----
+_page_drawer
+```
+
+#### `test_a_standard_experiment_has_the_font_of_the_page`
+
+```text
+---- Summary ----
+Main function to check that every number and title of a Standard experiment is in
+the font of the page's journal, also when the run was set up for a journal with
+another font and the numbers of the axes are only made when the page is drawn.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+STANDARD_SPEC (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_drawer
+```
+
+#### `test_the_form_of_a_difference_spectrum`
+
+```text
+---- Summary ----
+Main function to check what the form of a Difference spectrum asks and how it
+starts: the first experiment; the haem parts, the fit and the residual on; the
+background and the haem bands off; and that it keeps the roles a plot has.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_series_setup_maker
+```
+
+#### `test_the_lines_of_a_difference_spectrum`
+
+```text
+---- Summary ----
+Main function to check what a Difference spectrum draws: as it starts, the
+measured difference in black, each haem in its colour and the fit, in mOD, with
+the residual in a panel underneath and a small legend; then the background, the
+haem bands (marked as a backdrop) and no residual, as ticked; everything inside
+its cells.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BANDS, HAEMS; BACKDROP_MARK (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+a1 has a bH peak of 4 mOD at 560 nm and a cc peak of 1 mOD at 550 nm, the 13th
+and the 11th of its 21 wavelengths; its fit is 0.5 mOD higher everywhere and its
+residual -0.5 mOD. The plot takes x from 0 to 0.5 and y from 0.5 to 1 of the
+figure.
+
+---- Helpers ----
+_series_setup_maker
+_spectrum_drawer
+```
+
+#### `test_a_difference_spectrum_that_cannot_be_drawn_says_why`
+
+```text
+---- Summary ----
+Main function to check the one sentence written in the cells of a Difference
+spectrum whose experiment is not in the dataset, could not be read, or has no
+difference spectrum.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+NO_SUCH_ROLE; NO_DIFFERENCE, NOT_READ, NOT_THERE (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_series_setup_maker
+_spectrum_drawer
+_spectrum_experiments_maker
+```
+
+#### `test_the_form_of_a_waterfall`
+
+```text
+---- Summary ----
+Main function to check what the form of a Waterfall asks and how it starts: one
+line for each time point, the first group, the difference spectrum stacked (or
+a trace, with how it is shown and its time 0), lined up on the first b haem, the
+haem bands on, the labels of the additions on; no question about the time
+points for a set-up without any; no question about the haems in a run that
+works out none.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_series_setup_maker
+_setup_maker
+```
+
+#### `test_the_lines_of_a_waterfall`
+
+```text
+---- Summary ----
+Main function to check the lines of a waterfall, worked out by hand: as a time
+series, one line per time point, the mean of its replicates, named with how many
+and lighter for the later time point; as experiments, one line each, lighter
+down the stack; an experiment without a difference spectrum left out and named,
+one that was not read only missing; another group; and the experiments the
+waterfalls of a page leave out.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The controls at 2 h are a1 (bH 4, cc 1 mOD) and a2 (6, 3): mean 5 and 2 mOD, at
+the 13th and the 11th wavelength. At 7 h only a3 (2, 8) has a difference
+spectrum. Blue #0072b2 with 0.7 of white: 0 + 255 x 0.7 = 178 (b2), 114 + 141 x
+0.7 = 213 (d5), 178 + 77 x 0.7 = 232 (e8); with 0.35 of white: 89 (59), 163
+(a3), 205 (cd).
+
+---- Helpers ----
+_series_setup_maker
+_spectrum_experiments_maker
+```
+
+#### `test_a_waterfall_drawn`
+
+```text
+---- Summary ----
+Main function to check a Waterfall as drawn, worked out by hand: the time series
+lined up on bH and stacked from the top down, no numbers on the y axis, the haem
+bands behind with the legend still inside the axes, everything inside its cells;
+then lined up on cc without bands; and the sentence of a waterfall with no
+spectrum to show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BANDS; NO_WATERFALL (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The lines are 2 h (bH 5, cc 2 mOD, else 0) and 7 h (bH 2, cc 8). Lined up on bH
+(its highest point in 557.5 to 562.5 nm moved to 0): 2 h is -5, with 0 at 560
+and -3 at 550 nm, 5 high; 7 h is -2, with 0 at 560 and 6 at 550 nm, 8 high. The
+gap is 0.75 x 8 = 6, so 2 h is drawn 6 higher: 1, with 6 at 560 and 3 at 550 nm;
+7 h stays. The y range is -2 to 6 with 2 % of 8 at each end: -2.16 to 6.16.
+Lined up on cc: 2 h is -2, with 0 at 550 and 3 at 560 nm, drawn 6 higher: 4, 6
+and 9; 7 h is -8, with 0 at 550 and -6 at 560 nm.
+
+---- Helpers ----
+_spectrum_drawer
+_spectrum_experiments_maker
+```
+
+#### `test_the_forms_of_the_plots_over_time`
+
+```text
+---- Summary ----
+Main function to check what the forms of a Single trace and of a Mean trace ask
+and how they start: the OCR as % of baseline, the haems as ΔD, Δψ in mV, time 0
+at the first addition; for a Single trace the experiment, the labels on and the
+regions off; for a Mean trace the group drop-downs, split by Group 1, the SEM
+and the labels on; the OCR per OD only in a run with OD values; no question
+about the haems or Δψ in a run without them; and what the roles hold is kept.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_series_setup_maker
+experiment_role_maker
+```
+
+#### `test_a_single_trace_drawn`
+
+```text
+---- Summary ----
+Main function to check a Single trace as drawn, worked out by hand: the OCR of
+one experiment as measured, its time counted from its first addition, in the
+colour of the OCR, with a dashed line and a label at each addition, no legend
+and everything inside its cells; as % of baseline when the roles say nothing;
+its time from the start, from the second addition and from an addition it does
+not have; the regions shaded as a backdrop; and the sentences of a plot that
+cannot be drawn.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+NO_SUCH_ROLE; NO_TRACE, NOT_READ, NOT_THERE (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+a1 runs from 0 to 20 min with additions at 10 and 16 min; its OCR is 4 before
+10 min and 2 from then on. From its first addition, t = x - 10: the trace runs
+from -10 to 10, is 4 at -1 and 2 at 1, and its additions are at 0 and 6. From
+its second (or from a fifth it does not have, taken as its last), t = x - 16:
+-16 to 4. Its baseline region, 2 to 8 min, is at -8 to -2; its settled region,
+11 to 13 min, at 1 to 3.
+
+---- Helpers ----
+_series_setup_maker
+_spectrum_drawer
+_trace_experiments_maker
+_value_finder
+experiment_role_maker
+```
+
+#### `test_the_lines_of_a_mean_trace`
+
+```text
+---- Summary ----
+Main function to check the lines of a Mean trace, worked out by hand: one line
+per group, the mean of its experiments lined up on their additions, with the
+SEM, the SD or no band; an experiment with another number of additions left
+out and named; the sets split by time point, in their shades; and the
+experiments the plots of a page leave out.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+a4 has one addition and the others two, so it is left out. The gaps are 6 (a1)
+and 5 min (a2, a3, k1): the additions are at 0 and 5, with a break at 2.5. The
+shortest run before the first addition is 10 min and after the last 4 (a1):
+the times run from -10 to 9. The controls a1, a2, a3 are 4, 6, 2 before their
+first addition: mean 4, SD sqrt((0 + 4 + 4) / 2) = 2, SEM 2 / sqrt(3) = 1.1547;
+and 2, 3, 1 after: mean 2, SD 1, SEM 0.5774. k1 alone is 10 then 5, with no
+spread. As % of baseline every experiment is 100 then 50. Split by time point,
+2 h is a1 and a2: mean 5 then 2.5, SD sqrt(2) = 1.4142 then 0.7071; 7 h is a3
+alone, in blue with 0.7 of white (#b2d5e8).
+
+---- Helpers ----
+_answers_maker
+_series_setup_maker
+_trace_experiments_maker
+_value_finder
+```
+
+#### `test_a_mean_trace_drawn`
+
+```text
+---- Summary ----
+Main function to check a Mean trace as drawn: a named line per group, broken at
+the break, with a band only for the group of more than one experiment; a dashed
+line and a label at each addition and a break mark on the time axis; its own
+small legend, and everything inside its cells; no labels when unticked; and the
+sentence of a plot with nothing to show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE; NO_MEAN (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The numbers of test_the_lines_of_a_mean_trace: the controls are 4 at -1 min and
+2 at 1 min, the knockdown 10 and 5. The times run from -10 to 9 min, one every
+second: 19 x 60 + 1 = 1141, and 1142 with the empty point of the break at 2.5.
+
+---- Helpers ----
+_spectrum_drawer
+_trace_experiments_maker
+_value_finder
+```
+
+#### `test_a_waterfall_of_traces`
+
+```text
+---- Summary ----
+Main function to check a Waterfall that stacks a trace in place of the
+difference spectrum, worked out by hand: as a time series, one line per time
+point, the mean of its replicates lined up on their additions; as experiments,
+one line each, lighter down the stack; the experiment left out, named by the
+list of the traces and not by that of the spectra; and the stack as drawn.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The controls a1, a2 and a3 have two additions (a4, with one, is left out): the
+times run from -10 to 9 min. 2 h is the mean of a1 and a2: 5 before the first
+addition and 2.5 after; 7 h is a3: 2 and 1. Each is moved so its highest point
+is at 0: 0 and -2.5, 2.5 high; 0 and -1, 1 high. The gap is 0.75 x 2.5 = 1.875,
+so 2 h is drawn at 1.875 and -0.625, and 7 h stays at 0 and -1. The y range is
+-1 to 1.875 with 2 % of 2.875 at each end: -1.0575 to 1.9325.
+
+---- Helpers ----
+_answers_maker
+_series_setup_maker
+_spectrum_drawer
+_trace_experiments_maker
+_value_finder
 ```
 
 ## `tests/test_panel_order.py`
@@ -14754,6 +16257,36 @@ was trimmed 2 min from its start. D is 12 mOD before 10 min, 10 mOD from 10 to
 20 min and 4 mOD from 20 min on. Regions on the recording: oxidised 2 to 8 min,
 reduced 24 to 30 min; on the trimmed data 0 to 6 and 22 to 28 min, 13 spectra
 each. D_ox = 12, D_red = 4, so P = (D - 4) / 8 x 100: 100 %, 75 % and 0 %.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_sentence_that_cannot_be_written_keeps_the_haems`
+
+```text
+---- Summary ----
+Main function to check that a file whose decomposition worked keeps its haems and
+is never said to have had its decomposition skipped when only the sentence about
+it cannot be written (a terminal without ₀ or Δ), and that the window's stand-in
+for the terminal passes "replace what cannot be written" on to the real one.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the decomposition and for the terminal.
+
+---- Globals read ----
+TIME_COLUMN, SPECTRUM_INDEX_COLUMN (module constants); settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None. The terminal is one of Windows' older kind (cp1252), which has no ₀: the
+sentence names the standard background, B = b₀ + b₁·w + b₂·(w − w_mid)².
 
 ---- Helpers ----
 None.
@@ -17552,6 +19085,237 @@ monkeypatch : pytest.MonkeyPatch
 
 ---- Globals read ----
 settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_trace_alignment.py`
+
+Tests of the traces of a dataset figure over time, worked out by hand on made-up experiments: a trace in each value, traces lined up on their additions, an experiment with another number of additions, a line broken where a gap was shortened, and the mean, the SD and the SEM.
+
+### MAKERS
+
+#### `_clock_trace_maker`
+
+```text
+---- Summary ----
+Helper function to make a trace whose value at each time is that time, from 0
+min, every half minute: read at a shared time, it gives back the experiment's
+own time there.
+
+---- Inputs ----
+end_min : float
+    The last time of the trace (min).
+additions : List[float]
+    The times of the additions of the experiment (min).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The trace, as traces_aligner takes it.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to make the slim copy of a made-up experiment at 0, 1, 2 and 3
+min: measured oxygen 50, 48, 46, 44 µM; an OCR of 10, 10, 6, 2 µM min⁻¹ with a
+baseline average of 10, so 100, 100, 60, 20 % of baseline, and 5, 5, 3, 1 per
+OD; bH as ΔD 0, 1, 2, 3 mOD, as absorbance 10, 11, 12, 13 mOD (per OD 5, 5.5, 6,
+6.5) and 0, 25, 50, 75 % oxidised; Δψ 130, 126, 122, 118 mV with a baseline
+average of 130; additions at 2 and 1 min, stored in that order.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+B_HAEM; DELTA_PSI_COLUMN, TIME_COLUMN (imported).
+
+---- Outputs ----
+dict
+    The slim copy (page_experiment, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_a_trace_in_each_value`
+
+```text
+---- Summary ----
+Main function to check one trace of an experiment in each value it can be shown
+in, with the title of its y axis: the oxygen; the OCR as measured, as % of
+baseline, as its change from baseline and per OD; a haem as ΔD, absorbance and
+% oxidised, per OD where the run is and the file has it; Δψ in mV and as its
+change from baseline; nothing for what the file does not have; and its
+additions in time order.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Change from baseline, y = x - b: the OCR with b = 10 is 10 - 10 = 0, 0, 6 - 10 =
+-4 and 2 - 10 = -8 µM min⁻¹ (the example of MATHS.md section 10.1); Δψ with b =
+130 is 0, -4, -8 and -12 mV.
+
+---- Helpers ----
+_experiment_maker
+```
+
+#### `test_traces_are_lined_up_on_their_additions`
+
+```text
+---- Summary ----
+Main function to check two experiments lined up on their additions, worked out
+by hand (the example of MATHS.md section 10.2): where the additions and the
+break sit on the shared axis, how far it goes, the own time of each experiment
+at shared times in both halves of the gap, and the same with time 0 at the
+second addition.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A (0 to 20 min) has additions at 10 and 16 min, B (0 to 25 min) at 12 and 17
+min. The shortest gap is 5, so the additions are at 0 and 5. A has 10 min
+before its first addition and B 12: the axis starts at -10. A has 4 min after
+its last and B 8: it ends at 5 + 4 = 9, so it has 19 x 60 + 1 = 1141 times. 1
+min after addition 1: A 10 + 1 = 11, B 12 + 1 = 13. 30 s before addition 2, at
+5 - 0.5 = 4.5: A 16 - 0.5 = 15.5, B 16.5. The halves meet at 2.5: there A is 16
+- 2.5 = 13.5 and B 14.5; one second earlier A is still counted from its first
+addition, 10 + 2.5 - 1/60. At -10: A 0, B 2. At 9: A 20, B 21.
+
+---- Helpers ----
+_clock_trace_maker
+```
+
+#### `test_another_number_of_additions_is_left_out`
+
+```text
+---- Summary ----
+Main function to check which experiments are lined up: one with another number
+of additions than most is left out; with a tie, the number met first is kept;
+lined up on the start of the recordings, or without any addition, every
+experiment is kept on its own clock, as far as they all go; an empty stretch of
+a trace stays empty; and no experiment gives no times.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+On their own clocks, traces of 0 to 20 and 0 to 25 min share 0 to 20 min: 20 x
+60 + 1 = 1201 times, each experiment at its own time. A trace of 1, empty, 3, 4
+at 0, 1, 2, 3 min read at 2.5 min is 3 + (4 - 3) x 0.5 = 3.5, and empty at 0.5
+and 1.5 min, beside the empty point.
+
+---- Helpers ----
+_clock_trace_maker
+```
+
+#### `test_the_mean_and_the_band`
+
+```text
+---- Summary ----
+Main function to check the mean, the SD and the SEM of lined-up traces at each
+time, worked out by hand (the example of MATHS.md section 10.3): of three
+experiments, of the two that have a value, of one alone and of none.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+4, 6 and 8: mean 18 / 3 = 6; SD = sqrt(((-2)² + 0² + 2²) / 2) = 2; SEM = 2 /
+sqrt(3) = 1.1547. 1 and 5 (the third empty): mean 3; SD = sqrt((4 + 4) / 1) =
+2.8284; SEM = 2.8284 / sqrt(2) = 2. 7 alone: mean 7, no SD and no SEM.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_line_is_broken_where_a_gap_was_shortened`
+
+```text
+---- Summary ----
+Main function to check that a line gets an empty point at each break, before
+the time of the break itself, so it is not drawn across the spare middle that
+was left out; and that a line without breaks stays as it is.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
 
 ---- Outputs ----
 None
@@ -27716,6 +29480,148 @@ the spectra in the oxidised region, × 1000 for mOD (MATHS.md section 9).
 None.
 ```
 
+#### `haem_bands_drawer`
+
+```text
+---- Summary ----
+Main function to shade the band of each haem behind the spectra of a plot, in the
+colour of the haem, to show where each haem appears. The bands are marked as a
+backdrop, so a legend may sit over them.
+
+---- Inputs ----
+ax : Axes
+    The axes, with the wavelength on the x axis.
+bands : Dict[str, Tuple[float, float]]
+    {haem name: (start, end) of its band in nm} (haem_bands_finder).
+colours : Dict[str, str]
+    {haem name: colour} (config.haem_colour_mapper).
+alpha : float
+    How see-through a band is, 0 (unseen) to 1 (solid).
+
+---- Globals read ----
+BAND_ALPHA; BACKDROP_MARK (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the axes and leaves its x limits as they were (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `haem_bands_finder`
+
+```text
+---- Summary ----
+Main function to find the band of each haem of a fit: a strip of wavelengths
+round the place where the shape of the haem in the fit file is strongest. The
+bands come from the fit alone, so they are the same on every plot and for every
+file, also for a haem a file has none of.
+
+---- Inputs ----
+fit : dict
+    The fit in use: 'data' (the fit table, a wavelength column then a shape
+    column for each haem) and 'haem_list' (the haem names in that order).
+half_width_nm : float
+    How far the band reaches each side of the strongest place (nm).
+
+---- Globals read ----
+BAND_HALF_WIDTH_NM.
+
+---- Outputs ----
+Dict[str, Tuple[float, float]]
+    {haem name: (start, end) of its band in nm}, in the order of the fit; a haem
+    whose shape holds no number, or only zeros, has no band.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+centre = the wavelength where |S(w)| is largest; band = centre - half_width_nm
+to centre + half_width_nm (MATHS.md section 9).
+
+---- Helpers ----
+None.
+```
+
+#### `spectra_averager`
+
+```text
+---- Summary ----
+Main function to average the spectra of several files into one: each is read at
+the wavelengths of the first, then the mean is taken at each wavelength.
+
+---- Inputs ----
+spectra : Sequence[Tuple[np.ndarray, np.ndarray]]
+    (wavelengths in nm, rising; values) of each spectrum, each of shape
+    (n_wavelengths,); at least one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[np.ndarray, np.ndarray]
+    (the wavelengths of the first spectrum, the mean at each). Raises ValueError
+    for no spectrum.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A spectrum is read at a wavelength w between two of its own, w1 and w2, on the
+straight line between them: y = y1 + (y2 - y1) x (w - w1) / (w2 - w1). A
+wavelength outside a spectrum is left out of the mean there. mean(w) = the sum of
+the spectra read at w / how many there are (MATHS.md section 9).
+
+---- Helpers ----
+None.
+```
+
+#### `spectra_stacker`
+
+```text
+---- Summary ----
+Main function to stack spectra for a waterfall: each is moved up or down, never
+stretched, until its highest point inside a band is at 0, so the peaks line up;
+then the spectra are spread out, the first at the top.
+
+---- Inputs ----
+spectra : Sequence[Tuple[np.ndarray, np.ndarray]]
+    (wavelengths in nm, values) of each spectrum, from the top down.
+band : Optional[Tuple[float, float]]
+    (start, end) in nm of the band the spectra are lined up on; None, or a band
+    a spectrum has no point in, lines that spectrum up on its highest point
+    anywhere.
+gap_share : float
+    How far apart two neighbours are, as a share of the height of the tallest
+    spectrum.
+
+---- Globals read ----
+STACK_GAP_SHARE.
+
+---- Outputs ----
+List[np.ndarray]
+    The values of each spectrum as drawn, in the order given.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+lined up = y - (the highest y inside the band); height = highest - lowest of a
+spectrum; gap = gap_share x the largest height (1 when every spectrum is flat);
+drawn_i = lined up_i + (n - 1 - i) x gap, i from 0 for the first of n (MATHS.md
+section 9).
+
+---- Helpers ----
+None.
+```
+
 ## `utils_shared/event_concentrations.py`
 
 The concentration of each addition: read from the text in the file, the stock typed with its unit, the concentration in the chamber, adding up for the same thing added again, and the text of its label.
@@ -27999,6 +29905,42 @@ Reading and processing of one experiment (everything before the figure and the e
 
 ### EXPERIMENT PROCESSING HELPERS
 
+#### `_decomposition_teller`
+
+```text
+---- Summary ----
+Helper function to tell the user how a file was decomposed into haems: the fit,
+the background, where the zero of ΔD was taken for each haem, and the notes of
+the fit file.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md, already decomposed (it
+    has haem_delta_abs with attrs['delta_abs_baseline']).
+answers : dict
+    The answers of the run (fit_file, haem_background).
+fit : dict
+    Fit dictionary; its 'notes', when it has any, are shown as warnings.
+window_points : int
+    Number of spectra the zero of ΔD is the median of.
+
+---- Globals read ----
+BACKGROUND_LABELS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints the sentence and shows the notes (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+warning_shower
+```
+
 #### `_skip_reporter`
 
 ```text
@@ -28117,6 +30059,7 @@ None. Processes the experiment dictionary in place (side effect).
 None.
 
 ---- Helpers ----
+_decomposition_teller
 _skip_reporter
 baseline_percent_adder
 delta_psi_table_builder
@@ -28132,6 +30075,7 @@ haem_levels_finder
 percent_converter
 percent_need_checker
 percent_oxidised_calculator
+problem_shower
 source_chooser
 time_getter
 warning_shower
@@ -28171,7 +30115,80 @@ None.
 None.
 ```
 
+#### `_legend_cover_checker`
+
+```text
+---- Summary ----
+Helper function to check whether a rectangle of the figure covers anything drawn
+in a set of axes: a line, a bar or other patch, or a filled band. What is marked
+as a backdrop (a faint haem band behind the lines) does not count.
+
+---- Inputs ----
+ax : Axes
+    The axes.
+box : Bbox
+    The rectangle (of a legend), in pixels of the figure.
+renderer : Any
+    The renderer of the figure.
+
+---- Globals read ----
+BACKDROP_MARK, LINE_CHECK_POINTS.
+
+---- Outputs ----
+bool
+    True when the rectangle covers a part of something drawn.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Each piece of a line, between two of its points, is checked at
+LINE_CHECK_POINTS places evenly spaced along it; a patch or a band is checked by
+the rectangle round it.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
+
+#### `axes_room_fitter`
+
+```text
+---- Summary ----
+Main function to fit the axes of one plot into its room on a page: the axes are
+made smaller until their tick numbers, axis titles and legend are all inside the
+room, so none of the plot's text falls into the cells of another plot.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+axes : List[Axes]
+    The axes of the plot, already drawn into; several keep their places beside
+    one another.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room, as fractions of the figure.
+
+---- Globals read ----
+FIT_PASSES, FIT_TOLERANCE, SMALLEST_AXES.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Moves the axes (side effect).
+
+---- Equations ----
+With (L, B, R, T) how far the text sticks out of the room at the left, bottom,
+right and top, the rectangle round all the axes (x0, y0, x1, y1) becomes
+(x0 + L, y0 + B, x1 - R, y1 - T), never narrower or lower than SMALLEST_AXES of
+the room, and each axes keeps its share of it. It is done again, at most
+FIT_PASSES times, until nothing sticks out.
+
+---- Helpers ----
+_renderer_getter
+```
 
 #### `figure_canvas_fitter`
 
@@ -28544,6 +30561,46 @@ None.
 _renderer_getter
 ```
 
+#### `plot_legend_placer`
+
+```text
+---- Summary ----
+Main function to give a plot its own small legend, where it hides nothing: in the
+first corner of the axes where it covers no line, bar or band, and under the axes
+when every corner covers something. A plot with fewer than two named lines or
+colours has no legend.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+ax : Axes
+    The axes, already drawn into, with a label on each line or bar to name.
+style : dict
+    The style of the figure (figure_style_builder).
+fonts : List[str]
+    The font families of the journal (font_family_lister).
+
+---- Globals read ----
+LEGEND_COLUMNS, LEGEND_CORNERS, POINTS_PER_INCH.
+
+---- Outputs ----
+Optional[Legend]
+    The legend, or None when there is none. Under the axes it is outside them, so
+    axes_room_fitter is run after it.
+
+---- Globals mutated ----
+None. Draws the legend (side effect).
+
+---- Equations ----
+Under the axes, the top of the legend is below the bottom of the axes by the
+height of the tick numbers and the axis title there, plus half the padding unit
+of the style, in points, so it stays clear of them when the axes change size.
+
+---- Helpers ----
+_legend_cover_checker
+_renderer_getter
+```
+
 #### `stack_legend_drawer`
 
 ```text
@@ -28704,7 +30761,7 @@ plot : PagePlot
     The plot to place.
 
 ---- Globals read ----
-GRID_COLUMNS, GRID_ROWS, PLOT_TYPES.
+GRID_COLUMNS, GRID_ROWS, PLOT_TYPES, REMOVED_TYPES.
 
 ---- Outputs ----
 Optional[str]
@@ -28719,6 +30776,114 @@ None.
 ---- Helpers ----
 _cells_lister
 panel_letters_finder
+```
+
+### DRAWING HELPERS
+
+#### `_drawing_space_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a Space for a drawing: nothing, so the cells stay empty
+under their letter for a drawing added later in a drawing program.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS); not used.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Axes]
+    One set of axes over the room, switched off: it draws nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_plot_finisher`
+
+```text
+---- Summary ----
+Helper function to finish a plot drawn into its room: its axes are made smaller
+until their tick numbers and axis titles are inside the room, each set of axes
+with more than one named line or colour and no legend yet gets its own small
+legend where it hides nothing, and the axes are fitted again for a legend that
+went under them.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+axes : List[Axes]
+    The axes of the plot, as its drawer gave them.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'style' and 'fonts' are used.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Moves the axes and draws the legends (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+axes_room_fitter
+plot_legend_placer
+```
+
+#### `_stand_in_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the stand-in of a plot type that is not built yet: a grey
+box over its room with the name of the plot type.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'spec' and 'fonts' are used.
+
+---- Globals read ----
+PLOT_TYPES, STAND_IN_EDGE, STAND_IN_GREY.
+
+---- Outputs ----
+List[Axes]
+    The axes of the grey box.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ### TEMPLATE HELPERS
@@ -28814,24 +30979,36 @@ file_name_sanitiser
 
 ```text
 ---- Summary ----
-Main function to draw a page at its printed size, off screen: each plot a grey
-stand-in with the name of its plot type, over the cells it takes, with its letter
-in bold at its top left.
+Main function to draw a page at its printed size, off screen: each plot drawn by
+its plot type into the cells it takes, the plots of a plot type put on the same
+scales where it asks for that, then room kept inside the cells for each plot's
+own text and legend, and its letter in bold at its top left. A plot type that is
+not built yet is a grey stand-in with its name; a Space for a drawing is empty.
 
 ---- Inputs ----
 page : FigurePage
     The page.
 spec : dict
     What the page's journal asks (config.JOURNAL_SPECS entry).
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md), for the plots that show
+    experiments; None for none.
+experiments : Optional[Dict[str, dict]]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md); None for
+    none.
+answers : Optional[dict]
+    The answers of the run (config.DEFAULT_ANSWERS), for the plots drawn as the
+    run was set up; None for none.
 
 ---- Globals read ----
-GRID_COLUMNS, GRID_ROWS, MM_PER_INCH, PLOT_GAP_MM, PLOT_TYPES, STAND_IN_EDGE,
-STAND_IN_GREY.
+EMPTY_TYPES, GRID_COLUMNS, GRID_ROWS, MM_PER_INCH, PLOT_DRAWERS, PLOT_GAP_MM,
+SCALE_SHARERS.
 
 ---- Outputs ----
 Tuple[Figure, Dict[int, Axes]]
-    (the figure, {place of the plot in page.plots: its axes}). Raises ValueError
-    for a width the journal does not have or a height outside (0, 1].
+    (the figure, {place of the plot in page.plots: its axes, the first when it
+    has several}). Raises ValueError for a width the journal does not have or a
+    height outside (0, 1].
 
 ---- Globals mutated ----
 None.
@@ -28839,11 +31016,16 @@ None.
 ---- Equations ----
 A plot of cells (row r, column c, n_rows, n_columns) covers the figure fractions
 x from c / 6 to (c + n_columns) / 6 and y from 1 - (r + n_rows) / 6 to 1 - r / 6;
-its axes are that rectangle less PLOT_GAP_MM on each side and the height of its
-letter at the top.
+its room is that rectangle less PLOT_GAP_MM on each side and the height of its
+letter at the top. A stand-in fills its room; the axes of a plot that is drawn
+are made smaller until their text is inside it (axes_room_fitter).
 
 ---- Helpers ----
+_drawing_space_drawer
+_plot_finisher
+_stand_in_drawer
 figure_size_calculator
+figure_style_builder
 font_family_lister
 panel_letters_finder
 ```
@@ -28863,6 +31045,12 @@ spec : dict
     What the page's journal asks (config.JOURNAL_SPECS entry).
 folder : Path
     Folder the PDF is saved in; it is made when missing.
+setup : Optional[dict]
+    The set-up table, as for figure_page_drawer.
+experiments : Optional[Dict[str, dict]]
+    The slim copy of each experiment, as for figure_page_drawer.
+answers : Optional[dict]
+    The answers of the run, as for figure_page_drawer.
 
 ---- Globals read ----
 PDF_FONT_TYPE.
@@ -28892,14 +31080,14 @@ figure_page_drawer
 ---- Summary ----
 Main function to give each plot of a page its letter, a, b, c... in reading order:
 by the top left cell of each plot, left to right along a row of the grid, then the
-next row down. The legend has none.
+next row down.
 
 ---- Inputs ----
 page : FigurePage
     The page.
 
 ---- Globals read ----
-LETTERS, UNLETTERED_TYPES.
+LETTERS.
 
 ---- Outputs ----
 Dict[int, str]
@@ -32828,6 +35016,2118 @@ None.
 
 ---- Helpers ----
 warning_shower
+```
+
+## `utils_shared/page_data.py`
+
+What the page of a dataset figure is given of the dataset: the slim copy of each experiment, the roles a plot keeps in place of file names, the sets of a plot, the fields of a plot's form and the caption lines.
+
+### SET-UP HELPERS
+
+#### `_column_namer`
+
+```text
+---- Summary ----
+Helper function to name a label column of the set-up: the name the user gave a
+group column, or "Group 1", "Group 2" or "Time point".
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+key : str
+    The column, one of LABEL_KEYS.
+
+---- Globals read ----
+LABEL_COLUMNS, LABEL_KEYS (imported).
+
+---- Outputs ----
+str
+    The name.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_label_placer`
+
+```text
+---- Summary ----
+Helper function to give the place of a label among the labels of its column.
+
+---- Inputs ----
+labels : Sequence[str]
+    The labels of the column, in the order first seen.
+label : str
+    The label; '' for a blank cell.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    1 for the first label, 2 for the second...; 0 for a blank cell.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_rgb_reader`
+
+```text
+---- Summary ----
+Helper function to read a colour written as '#rrggbb'.
+
+---- Inputs ----
+colour : str
+    The colour.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[int, int, int]
+    (red, green, blue), each 0 to 255.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_rows_lister`
+
+```text
+---- Summary ----
+Helper function to list the rows of the set-up that are in use, each with its
+replicate number.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[dict]
+    The rows in use, in the order of the table, each with 'replicate' (int).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+replicates_numberer
+```
+
+### MAIN FUNCTIONS
+
+#### `caption_lines_builder`
+
+```text
+---- Summary ----
+Main function to write, for the caption of the figure, what each colour, line
+style and shade on the page means: one line for the colours of the Group 1 labels,
+one for the line styles of the Group 2 labels and one for the shades of the time
+points, each only when a plot of the page uses it. Each Difference spectrum (P2)
+then adds a line with its letter and the times of its two regions, and each Mean
+trace (P8) a line with its letter, what its lines and bands are and what it is
+lined up on.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Optional[Dict[str, dict]]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), for the
+    regions of the difference spectra; None for none.
+
+---- Globals read ----
+ADDITION_PATTERN, ADDITION_WORDS, BAND_CHOICES, BAND_KEY, DIFFERENCE_TYPE,
+DIFFERENCE_WORDS, EXPERIMENT_ROLE, LINE_STYLE_WORDS, MEAN_BAND_WORDS, MEAN_TYPE,
+MEAN_WORDS, SET_TYPES, START_ROLE, START_WORDS, ZERO_KEY.
+
+---- Outputs ----
+List[str]
+    The lines, such as 'Colours (strain): control, blue; knockdown, red-orange.',
+    'b: reduced, 12.0 to 14.0 min, minus oxidised, 2.0 to 4.0 min.' and 'c: each
+    line is the mean of its experiments, the band ± SEM; lined up on addition
+    1.'; empty when no plot of the page shows sets of experiments, a difference
+    spectrum or a mean trace.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_column_namer
+colour_namer
+panel_letters_finder
+plot_sets_lister
+role_experiment_finder
+```
+
+#### `choice_field_maker`
+
+```text
+---- Summary ----
+Main function to make a drop-down of a form from a fixed list of choices.
+
+---- Inputs ----
+key : str
+    The name the drop-down has in the roles of the plot.
+label : str
+    The words beside the drop-down.
+choices : Sequence[Tuple[str, str]]
+    (the role kept, the words shown) for each choice, in the order shown.
+roles : Dict[str, str]
+    The roles the plot has so far.
+start : str
+    The role the drop-down starts at, for a plot whose roles do not hold one of
+    the choices.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The field (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `colour_namer`
+
+```text
+---- Summary ----
+Main function to give the plain name of a colour, for the caption: the nearest of
+the colours that have a name.
+
+---- Inputs ----
+colour : str
+    The colour as '#rrggbb'.
+
+---- Globals read ----
+COLOUR_WORDS.
+
+---- Outputs ----
+str
+    The name, such as 'blue' or 'red-orange'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The nearest is the named colour with the smallest (r - r')² + (g - g')² +
+(b - b')².
+
+---- Helpers ----
+_rgb_reader
+```
+
+#### `colour_shader`
+
+```text
+---- Summary ----
+Main function to make a colour lighter by mixing white into it.
+
+---- Inputs ----
+colour : str
+    The colour as '#rrggbb'.
+share : float
+    The share of white, 0 (the colour itself) to 1 (white).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The lighter colour as '#rrggbb'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Each of red, green and blue: c' = c + (255 - c) x share, rounded.
+
+---- Helpers ----
+_rgb_reader
+```
+
+#### `experiment_field_maker`
+
+```text
+---- Summary ----
+Main function to make the experiment picker of a form: one drop-down of every
+experiment in use by its file name, kept in the roles as the experiment's role.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles the plot has so far.
+
+---- Globals read ----
+EXPERIMENT_ROLE.
+
+---- Outputs ----
+dict
+    The field (form_field, DATA_FORMAT.md): its value is the role the plot has
+    when an experiment of this dataset fits it, otherwise the first experiment's;
+    '' with no choices when no experiment is in use.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_rows_lister
+experiment_role_maker
+role_experiment_finder
+```
+
+#### `experiment_role_maker`
+
+```text
+---- Summary ----
+Main function to give the role of an experiment: the place of each of its labels
+in its column and its replicate, which a template keeps in place of its file name.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+name : str
+    The experiment name.
+
+---- Globals read ----
+LABEL_KEYS (imported), ROLE_WORDS.
+
+---- Outputs ----
+Optional[str]
+    'Group 1: 1, Group 2: 0, time point: 2, replicate: 1' (the first label of
+    Group 1, a blank Group 2, the second time point, replicate 1); None for an
+    experiment that is not in use or not in the table.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_label_placer
+_rows_lister
+labels_lister
+```
+
+#### `experiment_slimmer`
+
+```text
+---- Summary ----
+Main function to keep, of a processed experiment, only what the plots of the page
+need: its traces, its additions, its averages and levels, its difference spectrum
+with its haems, the haem bands of the fit and the mean spectrum of each averaging
+region. The whole spectra are left out, as those of every file together would
+fill the computer's memory.
+
+---- Inputs ----
+experiment : dict
+    The processed experiment (DATA_FORMAT.md), still with its 'raw_spectra'.
+dataset : Optional[str]
+    The spectrometer whose spectra hold the haems (the answer
+    decomposition_dataset); None for none.
+fit : Optional[dict]
+    The fit in use ('data' and 'haem_list'); None when the haems are not worked
+    out.
+background : Optional[str]
+    The background fitted under the haems (the answer haem_background); None
+    when the haems are not worked out.
+haem_factor : float
+    Scale factor of the fit shapes (config.HAEM_FACTOR).
+
+---- Globals read ----
+OTHER_KEYS, TABLE_KEYS; MOD_PER_OD (imported).
+
+---- Outputs ----
+dict
+    The slim copy (page_experiment, DATA_FORMAT.md). 'difference' is None for a
+    file without both regions or without spectra of that spectrometer;
+    'difference_parts' is None without a difference, a fit or a background;
+    'haem_bands' is None without a fit; 'region_spectra' is None for a file
+    without those spectra.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The mean spectrum of a region, at each wavelength: the mean of the attenuation
+of the spectra whose time is inside the region, x 1000 for mOD.
+
+---- Helpers ----
+difference_decomposer
+difference_spectrum_builder
+haem_bands_finder
+```
+
+#### `form_fields_lister`
+
+```text
+---- Summary ----
+Main function to list the fields of the form of a plot, under its plot type and
+its cells: what the plot type asks, each field starting as the roles of the plot
+say, or as the plot type starts.
+
+---- Inputs ----
+plot_type : str
+    The plot type, such as 'P1'.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : Optional[dict]
+    The answers of the run (config.DEFAULT_ANSWERS), for what a form offers from
+    them (the haems of the fit); None for none.
+
+---- Globals read ----
+FORM_MAKERS.
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md); empty for a plot
+    type that asks nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `form_roles_reader`
+
+```text
+---- Summary ----
+Main function to turn a filled-in form into the roles of its plot.
+
+---- Inputs ----
+fields : List[dict]
+    The fields of the form (form_fields_lister).
+values : Dict[str, Any]
+    {key of the field: what the form holds}: the words picked in a drop-down, or
+    True or False for a tick. A field that is not here keeps its value.
+
+---- Globals read ----
+TICK_OFF, TICK_ON.
+
+---- Outputs ----
+Dict[str, str]
+    {key: role}; a drop-down with nothing to pick from is left out.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `group_choices_lister`
+
+```text
+---- Summary ----
+Main function to list what the drop-down of one label column offers: Split (each
+label its own set), Only <label> for each of its labels, or All together.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+key : str
+    The column, one of LABEL_KEYS.
+
+---- Globals read ----
+ONLY_WORDS, SPLIT, SPLIT_WORDS, TOGETHER.
+
+---- Outputs ----
+List[Tuple[str, str]]
+    (the role kept, the words shown) for each choice: ('Split', 'Split: each label
+    on its own'), ('Only label 1', 'Only control'), ..., ('All together', 'All
+    together').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_rows_lister
+labels_lister
+```
+
+#### `group_columns_lister`
+
+```text
+---- Summary ----
+Main function to list the label columns a form has a drop-down for: each of Group
+1, Group 2 and the time point that has a label filled in.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+
+---- Globals read ----
+LABEL_KEYS (imported).
+
+---- Outputs ----
+List[Tuple[str, str]]
+    (the column's key, its name: the one the user gave or "Group 1", "Group 2",
+    "Time point").
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_column_namer
+_rows_lister
+labels_lister
+```
+
+#### `group_fields_lister`
+
+```text
+---- Summary ----
+Main function to make the group drop-downs of a form: one for each label column
+that has a label.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles the plot has so far.
+splits : Sequence[str]
+    The columns that start as Split; the others start as All together.
+
+---- Globals read ----
+SPLIT, TOGETHER.
+
+---- Outputs ----
+List[dict]
+    The fields (form_field, DATA_FORMAT.md): each keeps the role the plot has when
+    the column still offers it, otherwise how it starts.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+group_choices_lister
+group_columns_lister
+```
+
+#### `page_experiments_lister`
+
+```text
+---- Summary ----
+Main function to list the experiments the plots of a page show: the one a plot's
+experiment picker names, and those of the sets of a plot that shows sets.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+
+---- Globals read ----
+EXPERIMENT_ROLE, SET_TYPES.
+
+---- Outputs ----
+List[str]
+    The experiment names, each once, in the order first shown.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+plot_sets_lister
+role_experiment_finder
+```
+
+#### `plot_sets_lister`
+
+```text
+---- Summary ----
+Main function to list the sets of experiments a plot shows, from its group
+drop-downs: Only <label> keeps the experiments with that label, Split gives each
+label its own set (split by two columns: every combination there is), All together
+leaves the column out. A drop-down the roles do not hold is Split for Group 1 and
+All together for the others.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot.
+
+---- Globals read ----
+ALL_EXPERIMENTS, LIGHTEST_SHADE, LINE_STYLES, NO_GROUP_COLOUR, ONLY_PATTERN,
+SPLIT, TOGETHER; COLOUR_KEY, LABEL_KEYS, NO_LABELS, SET_JOINER (imported).
+
+---- Outputs ----
+List[dict]
+    The sets in the order first seen (plot_set, DATA_FORMAT.md): each with its
+    'name', the 'names' of its experiments, its 'labels', its 'base_colour' (the
+    colour of its Group 1 label, black when it is not one label), its
+    'line_style' (by its Group 2 label when Group 2 is split), its 'shade' (by its
+    time point when the time point is split) and its 'colour' (the base colour
+    with that shade). Empty when no experiment is left.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The line style of the Group 2 label in place i (from 0) of its column is
+LINE_STYLES[i mod 4]. The shade of the time point in place i of n is
+LIGHTEST_SHADE x i / (n - 1), 0 for one time point, so the same label looks the
+same on every plot.
+
+---- Helpers ----
+_rows_lister
+colour_shader
+labels_lister
+```
+
+#### `role_experiment_finder`
+
+```text
+---- Summary ----
+Main function to find the experiment of this dataset that fits a role.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+role : str
+    The role (experiment_role_maker).
+
+---- Globals read ----
+LABEL_KEYS (imported), ROLE_PATTERN.
+
+---- Outputs ----
+Optional[str]
+    The experiment name; None when no experiment in use fits, or the role cannot
+    be read.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_label_placer
+_rows_lister
+labels_lister
+```
+
+#### `tick_field_maker`
+
+```text
+---- Summary ----
+Main function to make a tick of a form.
+
+---- Inputs ----
+key : str
+    The name the tick has in the roles of the plot.
+label : str
+    The words beside the tick.
+roles : Dict[str, str]
+    The roles the plot has so far.
+is_on : bool
+    Whether the tick starts ticked, for a plot whose roles do not hold it.
+
+---- Globals read ----
+TICK_OFF, TICK_ON.
+
+---- Outputs ----
+dict
+    The field (form_field, DATA_FORMAT.md), its value 'yes' or 'no'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `utils_shared/page_plots.py`
+
+The plot types of a dataset figure: what the form of each asks, how each is drawn into its cells of the page and how the plots of one type share their scales.
+
+### SPECTRUM HELPERS
+
+#### `_align_band_finder`
+
+```text
+---- Summary ----
+Helper function to find the band the spectra of a waterfall are lined up on: that
+of the haem picked in the form, otherwise that of the first b haem, otherwise the
+first band there is.
+
+---- Inputs ----
+bands : Dict[str, Tuple[float, float]]
+    {haem name: (start, end) of its band in nm}, in the order of the fit.
+wanted : Optional[str]
+    The haem picked, its name in lower-case letters and digits; None for none.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[Tuple[float, float]]
+    (start, end) of the band in nm; None when there is no band.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_first_haem_finder
+name_simplifier
+```
+
+#### `_first_haem_finder`
+
+```text
+---- Summary ----
+Helper function to find the haem a waterfall starts lined up on: the first b
+haem, otherwise the first haem.
+
+---- Inputs ----
+names : List[str]
+    The haem names, in the order of the fit.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    The name; None for no haem.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+haem_type_finder
+```
+
+#### `_fit_haems_lister`
+
+```text
+---- Summary ----
+Helper function to list the haems the run works out, whether or not it plots
+them.
+
+---- Inputs ----
+answers : dict
+    The answers of the run; a missing one is as in config.DEFAULT_ANSWERS.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+List[str]
+    The haem names, in the order of the answers; empty when there are none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_spectrum_axes_styler`
+
+```text
+---- Summary ----
+Helper function to give the axes of a spectrum plot the text sizes, the font and
+the line widths of the page's journal, without the top and right edges.
+
+---- Inputs ----
+ax : Axes
+    The axes.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'style' and 'fonts' are used.
+x_label : Optional[str]
+    The title of the x axis; None for an x axis without title or numbers (the
+    panel under it shows them).
+y_label : str
+    The title of the y axis.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_waterfall_roles_reader`
+
+```text
+---- Summary ----
+Helper function to read which experiments a waterfall shows, as the group
+drop-downs of a plot say it (plot_sets_lister): one Group 1 label, the first
+when the roles hold none this dataset has; one line per time point when the
+set-up has time points and the roles do not ask for one line per experiment.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot.
+
+---- Globals read ----
+GROUP_KEY, STACK_KEY; ONLY_PATTERN, SPLIT, TOGETHER (imported).
+
+---- Outputs ----
+Dict[str, str]
+    {'group_1': 'Only label 1' (All together for a set-up without Group 1
+    labels), 'group_2': 'All together', 'time_point': 'Split' or 'All together'}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+group_choices_lister
+group_columns_lister
+```
+
+### STANDARD EXPERIMENT HELPERS
+
+#### `_haem_namer`
+
+```text
+---- Summary ----
+Helper function to write a haem name for a form: without the marks of the fit
+file, so 'Cyt $b_H$' becomes 'Cyt bH'.
+
+---- Inputs ----
+name : str
+    The haem name as written in the fit file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The name in plain letters.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_haems_lister`
+
+```text
+---- Summary ----
+Helper function to list the haems the run plots: those of the fit, while the
+haems are worked out and shown.
+
+---- Inputs ----
+answers : dict
+    The answers of the run; a missing one is as in config.DEFAULT_ANSWERS.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+List[str]
+    The haem names, in the order of the answers; empty when there are none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_sentence_drawer`
+
+```text
+---- Summary ----
+Helper function to write one sentence in the cells of a plot that cannot be
+drawn, broken into lines that fit the width of the cells.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'style' and 'fonts' are used.
+sentence : str
+    The sentence.
+
+---- Globals read ----
+LETTER_WIDTH_SHARE, SENTENCE_GREY.
+
+---- Outputs ----
+List[Axes]
+    One set of axes over the room, switched off, with the sentence in its middle.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Letters per line = width of the room in points / (LETTER_WIDTH_SHARE x the size
+of the text in points), at least 12.
+
+---- Helpers ----
+None.
+```
+
+#### `_standard_config_builder`
+
+```text
+---- Summary ----
+Helper function to build the settings a Standard experiment is drawn with: those
+of the plot of one file in the run, at the page's journal and size, with the
+panels, the view of the haems, the addition labels and the averaging regions as
+ticked in the form of the plot. The OCR is shown as chosen in the run.
+
+---- Inputs ----
+experiment : dict
+    The slim copy of the experiment (page_experiment, DATA_FORMAT.md).
+plot : PagePlot
+    The plot, with its roles.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'answers' and 'page' are used.
+
+---- Globals read ----
+DELTA_PSI_KEY, FIRST_VIEW, HAEM_KEY_START, LABELS_KEY, NO_HAEMS, NO_PANEL,
+OXYGEN_KEY, REGIONS_KEY, VIEW_CHOICES, VIEW_KEY, VO2_KEY;
+settings.FALLBACK_WITHOUT_OD; HAEM_KEYS, VO2_KEYS (imported).
+
+---- Outputs ----
+Tuple[dict, dict, Optional[str]]
+    (the settings, in the format of Config.plot_config_builder; the matplotlib
+    settings of the page's journal; None, or the sentence to write in the cells
+    when the plot cannot be drawn: no panel with anything to show, or haems
+    ticked that the file does not have in the view picked).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haems_lister
+_tick_reader
+name_simplifier
+```
+
+#### `_tick_reader`
+
+```text
+---- Summary ----
+Helper function to read a tick from the roles of a plot.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles of the plot.
+key : str
+    The name of the tick.
+is_on : bool
+    What a plot whose roles do not hold the tick is taken as.
+
+---- Globals read ----
+TICK_ON (imported).
+
+---- Outputs ----
+bool
+    True when the tick is on.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### TRACE HELPERS
+
+#### `_additions_drawer`
+
+```text
+---- Summary ----
+Helper function to mark the additions on a plot over time, as on the plot of one
+file: a thin dashed line at each, and its label above the axes when asked.
+
+---- Inputs ----
+ax : Axes
+    The axes.
+moments : List[float]
+    The time of each addition on the x axis (min).
+events : List[dict]
+    The addition at each of those times (event, DATA_FORMAT.md), for its label.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'style', 'fonts' and 'answers'
+    are used.
+has_labels : bool
+    True to write the labels.
+
+---- Globals read ----
+ADDITION_LINE; settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+event_text_writer
+```
+
+#### `_breaks_drawer`
+
+```text
+---- Summary ----
+Helper function to put a break mark on the x axis wherever the spare middle of a
+longer gap between two additions was left out.
+
+---- Inputs ----
+ax : Axes
+    The axes.
+breaks : List[float]
+    The times of the breaks on the x axis (traces_aligner) (min).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'style' and 'fonts' are used.
+
+---- Globals read ----
+BREAK_MARK.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_per_od_checker`
+
+```text
+---- Summary ----
+Helper function to check whether the run shows its haems per OD.
+
+---- Inputs ----
+answers : dict
+    The answers of the run; a missing one is as in config.DEFAULT_ANSWERS.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+bool
+    True when OD values were entered and the haems are divided by them.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_regions_drawer`
+
+```text
+---- Summary ----
+Helper function to shade the averaging regions of an experiment behind its
+trace, each in the colour of its kind and marked as a backdrop, so the legend
+and the text may sit over them.
+
+---- Inputs ----
+ax : Axes
+    The axes.
+experiment : dict
+    The slim copy of the experiment (page_experiment, DATA_FORMAT.md).
+shift_min : float
+    What is taken off the experiment's own times on the x axis (min).
+
+---- Globals read ----
+REGION_ALPHA, REGION_COLOURS; BACKDROP_MARK (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_sets_aligner`
+
+```text
+---- Summary ----
+Helper function to read the trace picked of every experiment of the sets of a
+plot and line them all up on one shared time axis, so the lines of the plot can
+be compared. An experiment without that trace in that value, or with another
+number of additions than most, is left out; one that could not be read is not
+there at all.
+
+---- Inputs ----
+sets : List[dict]
+    The sets of the plot (plot_set, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles of the plot, for its trace, its value and its time 0.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    'times_min', 'values', 'additions_min' and 'breaks_min' as traces_aligner
+    gives them; 'kept': (the place of its set, its name) of the experiment of
+    each row of 'values'; 'left_out': the names left out; 'label': the title of
+    the y axis ('' with nothing kept); 'events': the additions of the first
+    experiment kept, in time order; 'zero': which addition is time 0, from 0, or
+    None for the clocks as they are.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See traces_aligner (MATHS.md section 10.2).
+
+---- Helpers ----
+_per_od_checker
+_trace_roles_reader
+additions_lister
+trace_reader
+traces_aligner
+```
+
+#### `_time_label_writer`
+
+```text
+---- Summary ----
+Helper function to write the title of the time axis of a plot over time.
+
+---- Inputs ----
+zero : Optional[int]
+    Which addition is time 0, from 0; None for the clocks as they are.
+n_additions : int
+    How many additions the plot is lined up on.
+
+---- Globals read ----
+TIME_LABEL, ZERO_TIME_LABEL.
+
+---- Outputs ----
+str
+    'Time (minutes)' without an addition at 0, otherwise 'Time from addition 2
+    (minutes)', with the last addition when the one picked is not there.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_trace_choices_lister`
+
+```text
+---- Summary ----
+Helper function to list the traces a plot over time can show in this run: the
+oxygen, the OCR, each haem of the fit while the haems are worked out, and Δψ
+when the run works it out.
+
+---- Inputs ----
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+HAEM_TRACE_START, OXYGEN_TRACE, PSI_TRACE, VO2_TRACE (imported).
+
+---- Outputs ----
+List[Tuple[str, str]]
+    (the role kept, the words shown) of each trace, in the order shown.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_fit_haems_lister
+_haem_namer
+name_simplifier
+```
+
+#### `_trace_colour_finder`
+
+```text
+---- Summary ----
+Helper function to find the colour of a trace drawn on its own: that of the
+same trace on the plot of one file.
+
+---- Inputs ----
+trace : str
+    The trace (a role of _trace_choices_lister).
+answers : dict
+    The answers of the run, for the colours of its haems.
+
+---- Globals read ----
+HAEM_TRACE_START (imported), TRACE_COLOURS.
+
+---- Outputs ----
+str
+    The colour.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_fit_haems_lister
+name_simplifier
+```
+
+#### `_trace_fields_lister`
+
+```text
+---- Summary ----
+Helper function to make the drop-downs every plot over time has in its form: the
+trace; how the OCR, the haems and Δψ are shown (the one that fits the trace
+picked is the one used); and where time 0 is.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles the plot has so far.
+answers : dict
+    The answers of the run.
+first : Optional[Tuple[str, str]]
+    A choice put before the traces, which the plot then starts at (the
+    difference spectrum of a Waterfall); None for none, the plot starting at the
+    OCR.
+
+---- Globals read ----
+ADDITIONS_OFFERED, FIRST_VIEW, PSI_VALUE_KEY, TRACE_KEY, VIEW_CHOICES, VIEW_KEY,
+VO2_VALUE_KEY; ADDITION_WORDS, PSI_TRACE, PSI_VALUES, START_ROLE, ZERO_KEY
+(imported).
+
+---- Outputs ----
+Tuple[List[dict], dict]
+    (the trace and the "shown as" fields, in the order shown; the "Time 0 at"
+    field), each a form_field (DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_fit_haems_lister
+_trace_choices_lister
+_vo2_values_lister
+choice_field_maker
+```
+
+#### `_trace_roles_reader`
+
+```text
+---- Summary ----
+Helper function to read from the roles of a plot over time its trace, the value
+that fits that trace and where its time 0 is; whatever the roles do not hold, or
+this run does not have, is as a new plot starts.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles of the plot.
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+FIRST_VIEW, PSI_VALUE_KEY, TRACE_KEY, VIEW_CHOICES, VIEW_KEY, VO2_VALUE_KEY;
+ADDITION_PATTERN, OXYGEN_TRACE, PSI_TRACE, PSI_VALUES, START_ROLE, VO2_TRACE,
+VO2_VALUES, ZERO_KEY (imported).
+
+---- Outputs ----
+Tuple[str, str, Optional[int]]
+    (the trace, the OCR when the roles hold no trace of this run; its value, ''
+    for the oxygen; which addition is time 0, from 0, or None for the start of
+    the recording).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_trace_choices_lister
+_vo2_values_lister
+```
+
+#### `_vo2_values_lister`
+
+```text
+---- Summary ----
+Helper function to list the values the OCR can be shown in: per OD only in a run
+with OD values.
+
+---- Inputs ----
+answers : dict
+    The answers of the run; a missing one is as in config.DEFAULT_ANSWERS.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS; VO2_VALUES (imported).
+
+---- Outputs ----
+List[Tuple[str, str]]
+    (the role kept, the words shown) of each value, in the order shown.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_waterfall_traces_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a Waterfall that stacks one trace per line in place of
+the difference spectrum: the traces lined up in time on their additions, then
+stacked from the top down, each moved so its highest point sits on its line. The
+y axis has no numbers. With no trace to show, one sentence in the cells.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (waterfall_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+LABELS_KEY, NO_MEAN, STACKED_WORDS.
+
+---- Outputs ----
+List[Axes]
+    The one set of axes of the waterfall, or of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+The lining up in time: traces_aligner (MATHS.md section 10.2). The stacking:
+spectra_stacker without a band (MATHS.md section 9.2). The y range is from the
+lowest to the highest point drawn, with 2 % of that height added at each end.
+
+---- Helpers ----
+_additions_drawer
+_breaks_drawer
+_sentence_drawer
+_spectrum_axes_styler
+_tick_reader
+_time_label_writer
+line_breaker
+spectra_stacker
+waterfall_traces_lister
+```
+
+### MAIN FUNCTIONS
+
+#### `difference_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Difference spectrum (P2) asks: the
+experiment, then a tick for each thing it can show: the part of each haem (on),
+the background (off), the overall fit (on), the residual in a small panel
+underneath (on) and the haem bands (off).
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run; not used.
+
+---- Globals read ----
+BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY, RESIDUAL_KEY.
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_field_maker
+tick_field_maker
+```
+
+#### `difference_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Difference spectrum (P2) into the room of its cells: the
+difference of one experiment, reduced minus oxidised, in black, with what its
+form ticks: the part of each haem in its colour, the background dotted, the fit
+dashed, the haem bands behind and the residual in a small panel underneath. The
+lines are named, so the page gives the plot its small legend. An experiment that
+is not in the dataset, could not be read or has no difference spectrum gives one
+sentence in the cells in place of the plot.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (difference_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY, NO_DIFFERENCE, NOT_READ,
+NOT_THERE, RESIDUAL_KEY; settings.COMPONENT_FIGURE_STYLE; EXPERIMENT_ROLE,
+RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, X_LABEL, Y_LABEL (imported).
+
+---- Outputs ----
+List[Axes]
+    The axes of the spectrum, then those of the residual when it is ticked; or
+    the one set of axes of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+None. Everything is in mOD (MATHS.md section 9).
+
+---- Helpers ----
+_sentence_drawer
+_spectrum_axes_styler
+_tick_reader
+haem_bands_drawer
+role_experiment_finder
+```
+
+#### `mean_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Mean trace (P8) asks: the trace (the
+OCR) and how the OCR (% of baseline), the haems (ΔD) and Δψ (mV) are shown, the
+one that fits the trace being the one used; the group drop-downs (split by Group
+1); where time 0 is (the first addition); the band (SEM); and a tick for the
+labels of the additions (on).
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run, for its haems, its OD values and whether it works
+    out Δψ.
+
+---- Globals read ----
+LABELS_KEY; BAND_CHOICES, BAND_KEY (imported).
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_trace_fields_lister
+choice_field_maker
+group_fields_lister
+tick_field_maker
+```
+
+#### `mean_lines_lister`
+
+```text
+---- Summary ----
+Main function to work out the lines of a Mean trace: the trace picked of every
+experiment of its sets, lined up on the additions on one shared time axis, then
+for each set the mean of its experiments at each shared time, with the SEM or
+the SD for its band.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (mean_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+BAND_CHOICES, BAND_KEY (imported).
+
+---- Outputs ----
+dict
+    What _sets_aligner gives ('times_min', 'additions_min', 'breaks_min',
+    'left_out', 'label', 'events', 'zero', ...), with 'lines': one per set that
+    has an experiment kept, each {'label': the name of the set with how many
+    experiments its mean is of ('control (n = 3)'), 'colour', 'line_style',
+    'mean': np.ndarray (n_times,), 'spread': the SEM or the SD at each time
+    (n_times,), or None for no band}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See traces_aligner and traces_averager (MATHS.md section 10).
+
+---- Helpers ----
+_sets_aligner
+plot_sets_lister
+traces_averager
+```
+
+#### `mean_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Mean trace (P8) into the room of its cells: one line per
+set, the mean of its experiments lined up on the additions, in the colour, line
+style and shade of the set, with its band (SEM or SD) in a see-through shade of
+the same colour; a thin dashed line at each addition, with its label when
+ticked; a break mark on the time axis where the spare middle of a longer gap was
+left out. The lines are named, so the page gives the plot its small legend. With
+nothing to show, one sentence in the cells.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (mean_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+LABELS_KEY, MEAN_BAND_ALPHA, NO_MEAN.
+
+---- Outputs ----
+List[Axes]
+    The one set of axes of the plot, or of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+The band runs from mean - spread to mean + spread (MATHS.md section 10.3).
+
+---- Helpers ----
+_additions_drawer
+_breaks_drawer
+_sentence_drawer
+_spectrum_axes_styler
+_tick_reader
+_time_label_writer
+line_breaker
+mean_lines_lister
+```
+
+#### `standard_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Standard experiment (P1) asks: the
+experiment; a tick per panel (the oxygen, the OCR, each haem the run plots, Δψ
+when the run works it out), all on; the view of the haems, ΔD first; and ticks
+for the labels of the additions (on), the averaging regions shaded (off) and the
+same scales as the other standard plots of the page (on).
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run, for its haems and whether it works out Δψ.
+
+---- Globals read ----
+DELTA_PSI_KEY, FIRST_VIEW, HAEM_KEY_START, LABELS_KEY, OXYGEN_KEY, REGIONS_KEY,
+SCALES_KEY, VIEW_CHOICES, VIEW_KEY, VO2_KEY.
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haem_namer
+_haems_lister
+choice_field_maker
+experiment_field_maker
+name_simplifier
+tick_field_maker
+```
+
+#### `standard_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Standard experiment (P1) into the room of its cells: the
+stacked panels of one experiment, as the plot of one file in the run, at the
+page's journal. An experiment that is not in the dataset or could not be read,
+and a plot with nothing to show, give one sentence in the cells in place of the
+plot.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (standard_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+NOT_READ, NOT_THERE; EXPERIMENT_ROLE (imported).
+
+---- Outputs ----
+List[Axes]
+    The axes of the panels from top to bottom, then the unseen axes that hold the
+    shared title of the haem panels; or the one set of axes of the sentence. Each
+    panel that can share its scale has 'scale_group': ('oxygen',), ('vo2', the
+    OCR source), ('haem', the haem source) or ('delta_psi',); the haems in %
+    oxidised have none.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_sentence_drawer
+_standard_config_builder
+experiment_drawer
+role_experiment_finder
+```
+
+#### `standard_scales_sharer`
+
+```text
+---- Summary ----
+Main function to put the Standard experiments of a page on the same scales, so
+their sizes can be compared: among the plots whose "same scales" tick is on, the
+oxygen panels share one y range, as do the OCR panels shown in the same way and
+the Δψ panels; the haem panels shown in the same way share one y range in ΔD and
+one height of range in absorbance. The haems in % oxidised keep their own.
+
+---- Inputs ----
+drawn : List[Tuple[PagePlot, List[Axes]]]
+    (the plot, its axes) of every Standard experiment of the page.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS); not used.
+
+---- Globals read ----
+SCALES_KEY.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the y limits of the axes (side effect).
+
+---- Equations ----
+Oxygen, OCR, Δψ and the haems in ΔD: low = the smallest of the lows, high = the
+largest of the highs, on every panel of the kind. The haems in absorbance:
+height = the largest (high - low); each panel runs from its own middle -
+height / 2 to its own middle + height / 2 (haem_ylim_sharer).
+
+---- Helpers ----
+_tick_reader
+haem_ylim_sharer
+```
+
+#### `trace_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Single trace (P7) asks: the experiment;
+the trace (the OCR) and how the OCR (% of baseline), the haems (ΔD) and Δψ (mV)
+are shown, the one that fits the trace being the one used; where time 0 is (the
+first addition); and ticks for the labels of the additions (on) and the
+averaging regions shaded (off).
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run, for its haems, its OD values and whether it works
+    out Δψ.
+
+---- Globals read ----
+LABELS_KEY, REGIONS_KEY.
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_trace_fields_lister
+experiment_field_maker
+tick_field_maker
+```
+
+#### `trace_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Single trace (P7) into the room of its cells: one trace
+of one experiment in the value picked, in the colour it has on the plot of one
+file, its time counted from the addition picked (or from the start of the
+recording), with a thin dashed line at each addition, its label when ticked and
+the averaging regions shaded behind when ticked. An experiment that is not in
+the dataset or could not be read, or that has nothing for the trace and value
+picked, gives one sentence in the cells in place of the plot.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (trace_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+LABELS_KEY, NO_TRACE, NOT_READ, NOT_THERE, REGIONS_KEY; EXPERIMENT_ROLE
+(imported).
+
+---- Outputs ----
+List[Axes]
+    The one set of axes of the plot, or of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+t = x - a, with x a time on the experiment's own clock and a the time of the
+addition picked (its last addition when it has fewer; 0 for the start of the
+recording or a file without additions).
+
+---- Helpers ----
+_additions_drawer
+_per_od_checker
+_regions_drawer
+_sentence_drawer
+_spectrum_axes_styler
+_tick_reader
+_time_label_writer
+_trace_colour_finder
+_trace_roles_reader
+additions_lister
+role_experiment_finder
+trace_reader
+```
+
+#### `traces_left_out_lister`
+
+```text
+---- Summary ----
+Main function to list the experiments the Mean traces of a page, and its
+Waterfalls that stack a trace, leave out: those that were read but have nothing
+for the trace and value picked, or another number of additions than most of the
+experiments of their plot.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+SPECTRUM_ROLE, TRACE_KEY.
+
+---- Outputs ----
+List[str]
+    The experiment names, each once, in the order first met.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+mean_lines_lister
+waterfall_traces_lister
+```
+
+#### `waterfall_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Waterfall (P3) asks: what one line is
+(each time point, the mean of its replicates, or each experiment; asked only when
+the set-up has time points, and starting at each time point), the group (the
+first), what is stacked (the difference spectrum, or one trace, with how the
+OCR, the haems and Δψ are shown and where time 0 is, as in a Mean trace), the
+haem the spectra are lined up on (the first b haem) and a tick for the haem
+bands (on), these two only in a run that works out haems, and a tick for the
+labels of the additions (on), used when a trace is stacked.
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run, for its haems.
+
+---- Globals read ----
+ALIGN_KEY, BANDS_KEY, GROUP_KEY, LABELS_KEY, SPECTRUM_ROLE, STACK_CHOICES,
+STACK_KEY; ONLY_PATTERN, SPLIT (imported).
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_first_haem_finder
+_fit_haems_lister
+_haem_namer
+_trace_fields_lister
+choice_field_maker
+group_choices_lister
+group_columns_lister
+name_simplifier
+tick_field_maker
+```
+
+#### `waterfall_left_out_lister`
+
+```text
+---- Summary ----
+Main function to list the experiments the waterfalls of difference spectra of a
+page leave out: those that were read but have no difference spectrum. What a
+waterfall that stacks a trace leaves out is listed by traces_left_out_lister.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+
+---- Globals read ----
+SPECTRUM_ROLE, TRACE_KEY.
+
+---- Outputs ----
+List[str]
+    The experiment names, each once, in the order first met.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+waterfall_lines_lister
+```
+
+#### `waterfall_lines_lister`
+
+```text
+---- Summary ----
+Main function to list the lines of a waterfall, from the top down: the
+difference spectrum of each experiment of its group, or, for a time series, the
+mean difference spectrum of the replicates of each time point. An experiment
+without a difference spectrum is left out; one that could not be read is not
+there at all.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (waterfall_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+
+---- Globals read ----
+NO_TIME_POINT, STACK_KEY; LIGHTEST_SHADE, SPLIT (imported).
+
+---- Outputs ----
+Tuple[List[dict], List[str]]
+    (the lines, each {'label', 'colour', 'wavelengths_nm', 'values_mOD'}; the
+    experiments left out, read but without a difference spectrum). A time point
+    is named with how many experiments its mean is of ('2 h (n = 3)') and has
+    the shade of its set (plot_sets_lister); the experiments of a group are in
+    the colour of the group, the first as it is and the last with
+    LIGHTEST_SHADE of white mixed in.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The mean of the replicates: spectra_averager. The shade of experiment i of n
+(from 0): LIGHTEST_SHADE x i / (n - 1), 0 for one experiment.
+
+---- Helpers ----
+_waterfall_roles_reader
+colour_shader
+plot_sets_lister
+spectra_averager
+```
+
+#### `waterfall_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Waterfall (P3) into the room of its cells: the
+difference spectra of a group stacked from the top down, each lined up on its
+highest point inside the band of the haem picked, in the colour of the group and
+lighter down the stack, with the haem bands behind when ticked. The y axis has
+no numbers, as each spectrum is moved to sit clear of its neighbours. The lines
+are named, so the page gives the plot its small legend. A waterfall with no
+spectrum to show gives one sentence in its cells. A waterfall that stacks a
+trace in place of the difference spectrum is drawn by _waterfall_traces_drawer.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (waterfall_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+ALIGN_KEY, BANDS_KEY, NO_WATERFALL, SPECTRUM_ROLE, TRACE_KEY, WATERFALL_Y_LABEL;
+X_LABEL (imported).
+
+---- Outputs ----
+List[Axes]
+    The one set of axes of the waterfall, or of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+See spectra_stacker (MATHS.md section 9). The y range is from the lowest to the
+highest point drawn, with 2 % of that height added at each end.
+
+---- Helpers ----
+_align_band_finder
+_sentence_drawer
+_spectrum_axes_styler
+_tick_reader
+_waterfall_traces_drawer
+haem_bands_drawer
+spectra_stacker
+waterfall_lines_lister
+```
+
+#### `waterfall_traces_lister`
+
+```text
+---- Summary ----
+Main function to work out the lines of a waterfall that stacks a trace, from the
+top down: the trace picked of every experiment of its group, lined up on the
+additions on one shared time axis; then one line per experiment, or, for a time
+series, the mean of the replicates of each time point.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (waterfall_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+NO_TIME_POINT, STACK_KEY; LIGHTEST_SHADE, SPLIT (imported).
+
+---- Outputs ----
+dict
+    What _sets_aligner gives ('times_min', 'additions_min', 'breaks_min',
+    'left_out', 'label', 'events', 'zero', ...), with 'lines': each {'label',
+    'colour', 'values': np.ndarray (n_times,)}, before the stacking, named and
+    coloured as the lines of waterfall_lines_lister.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See traces_aligner and traces_averager (MATHS.md section 10); the shades as in
+waterfall_lines_lister.
+
+---- Helpers ----
+_sets_aligner
+_waterfall_roles_reader
+colour_shader
+plot_sets_lister
+traces_averager
 ```
 
 ## `utils_shared/pca_fitter.py`
@@ -38900,6 +43200,346 @@ info_printer
 yes_no_asker
 ```
 
+## `utils_shared/trace_alignment.py`
+
+The traces of a dataset figure over time: one trace of an experiment in the value picked, the traces of several experiments lined up on their additions and read at shared times, and their mean, SD and SEM.
+
+### READING HELPERS
+
+#### `_baseline_mean_finder`
+
+```text
+---- Summary ----
+Helper function to find the average of the OCR or of Δψ in the baseline of an
+experiment, for its change from baseline.
+
+---- Inputs ----
+experiment : dict
+    The slim copy of the experiment (page_experiment, DATA_FORMAT.md).
+trace : str
+    VO2_TRACE or PSI_TRACE.
+column : str
+    The column of the OCR in its table; not used for Δψ.
+
+---- Globals read ----
+VO2_KEYS (imported), VO2_TRACE.
+
+---- Outputs ----
+Optional[float]
+    The average in the baseline (µM min⁻¹, or mV); None for a file without a
+    baseline, or without a Δψ in it.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_haem_table_finder`
+
+```text
+---- Summary ----
+Helper function to find the table of the haems in one view: per OD when the run
+is and the file has it, otherwise as it is.
+
+---- Inputs ----
+experiment : dict
+    The slim copy of the experiment (page_experiment, DATA_FORMAT.md).
+view : str
+    'delta', 'abs' or 'percent' (a key of config.HAEM_SOURCE_BY_MODE).
+is_per_od : bool
+    True when the run shows its haems per OD.
+
+---- Globals read ----
+settings.FALLBACK_WITHOUT_OD, settings.HAEM_SOURCE_BY_MODE; HAEM_KEYS (imported).
+
+---- Outputs ----
+Tuple[Optional[str], Optional[object]]
+    (the haem source, such as 'delta_abs'; its table), or (None, None) when the
+    file has no haems in that view.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### ALIGNING HELPERS
+
+#### `_pieces_lister`
+
+```text
+---- Summary ----
+Helper function to cut the shared time axis of several experiments into pieces,
+each piece being a stretch where every experiment's own time is the shared time
+plus one fixed number of its own.
+
+---- Inputs ----
+spans : Sequence[Tuple[float, float]]
+    (first time, last time) of the trace of each experiment, on its own clock
+    (min).
+additions : Sequence[Sequence[float]]
+    The times of the additions of each experiment, in order, the same number in
+    each (min).
+zero : Optional[int]
+    Which addition is time 0 of the shared axis, from 0; None to line up on the
+    clocks as they are, without the additions.
+
+---- Globals read ----
+STEPS_PER_MINUTE.
+
+---- Outputs ----
+Tuple[List[Tuple[float, float, List[float]]], List[float], List[float]]
+    (the pieces in time order, each (start, end, the number added for each
+    experiment) on the shared axis; the shared times of the additions; the shared
+    times where the spare middle of a longer gap is left out).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See traces_aligner.
+
+---- Helpers ----
+None.
+```
+
+#### `_trace_interpolator`
+
+```text
+---- Summary ----
+Helper function to read a trace at other times, on the straight line between its
+two nearest points; empty (NaN) outside the trace and beside an empty point.
+
+---- Inputs ----
+times : np.ndarray
+    The times of the trace, increasing, shape (n_points,) (min).
+values : np.ndarray
+    Its values, shape (n_points,).
+wanted : np.ndarray
+    The times to read it at, shape (n_times,) (min).
+
+---- Globals read ----
+TIME_TOLERANCE_MIN.
+
+---- Outputs ----
+np.ndarray
+    The values at the wanted times, shape (n_times,).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+y = y1 + (y2 - y1) x (t - t1) / (t2 - t1), with (t1, y1) and (t2, y2) the points
+either side of t.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `additions_lister`
+
+```text
+---- Summary ----
+Main function to list the times of the additions of an experiment, in order.
+
+---- Inputs ----
+experiment : dict
+    The slim copy of the experiment (page_experiment, DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[float]
+    The times (min); empty for a file without additions.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `line_breaker`
+
+```text
+---- Summary ----
+Main function to break a lined-up trace where the spare middle of a longer gap
+was left out: an empty point is put in at each break, so the line is not drawn
+across it.
+
+---- Inputs ----
+times : np.ndarray
+    The shared times, shape (n_times,) (min).
+values : np.ndarray
+    The values at those times, shape (n_times,).
+breaks : Sequence[float]
+    The shared times of the breaks (traces_aligner) (min).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[np.ndarray, np.ndarray]
+    (the times, the values), each one point longer for every break.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `trace_reader`
+
+```text
+---- Summary ----
+Main function to read one trace of an experiment in the value picked: the
+measured oxygen; the OCR as measured, per OD, as % of baseline or as its change
+from baseline; a haem as ΔD, absorbance or % oxidised; Δψ in mV or as its change
+from baseline.
+
+---- Inputs ----
+experiment : dict
+    The slim copy of the experiment (page_experiment, DATA_FORMAT.md).
+trace : str
+    OXYGEN_TRACE, VO2_TRACE, PSI_TRACE, or HAEM_TRACE_START then the name of a
+    haem in lower-case letters and digits.
+value : str
+    For the OCR a key of VO2_VALUES, for Δψ one of PSI_VALUES, for a haem a view
+    ('delta', 'abs', 'percent'); not used for the oxygen.
+is_per_od : bool
+    True when the run shows its haems per OD.
+
+---- Globals read ----
+CHANGE_VALUE, HAEM_LABELS, HAEM_TRACE_START, OXYGEN_LABEL, OXYGEN_TRACE,
+PSI_LABELS, PSI_TRACE, VO2_LABELS, VO2_TRACE; DELTA_PSI_COLUMN, TIME_COLUMN,
+VO2_KEYS (imported).
+
+---- Outputs ----
+Optional[dict]
+    {'times_min': np.ndarray (n_points,), 'values': np.ndarray (n_points,),
+    'label': the title of the y axis with its unit}; None when the file does not
+    have that trace in that value (no such table or haem, no baseline for a
+    change from baseline or a % of baseline).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Change from baseline: y = x - b, with x the trace at one time and b its average
+in the baseline of the file (MATHS.md section 10.1). The other values are read
+as the run worked them out.
+
+---- Helpers ----
+_baseline_mean_finder
+_haem_table_finder
+name_simplifier
+```
+
+#### `traces_aligner`
+
+```text
+---- Summary ----
+Main function to line the traces of several experiments up on their additions
+and read them all at the same shared times, one every second. The additions are
+the measuring stick: up to halfway through a gap between two additions a point
+is placed by its time after the addition before it, past halfway by its time
+before the next one, so a window 30 s before an addition is 30 s before it in
+every experiment. The gap on the shared axis is the shortest of the experiments;
+the spare middle of a longer gap is left out, and nothing is stretched. An
+experiment with another number of additions than most is left out.
+
+---- Inputs ----
+traces : Sequence[dict]
+    One per experiment: 'times_min' and 'values' (np.ndarray, (n_points,), the
+    times increasing) and 'additions_min' (the times of its additions, in
+    order).
+zero : Optional[int]
+    Which addition is time 0 of the shared axis, from 0 (the last, when there
+    are fewer); None to line the traces up on their clocks as they are.
+
+---- Globals read ----
+STEPS_PER_MINUTE.
+
+---- Outputs ----
+dict
+    'times_min': the shared times, np.ndarray (n_times,); 'values': np.ndarray
+    (n_kept, n_times), a row per experiment kept, NaN where it has no value;
+    'kept' and 'left_out': the places in traces of the experiments kept and left
+    out; 'additions_min': the shared times of the additions; 'breaks_min': the
+    shared times where a spare middle was left out.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+With a_i the time of addition i on an experiment's own clock, g_i the shortest
+gap a_(i+1) - a_i of the experiments and A_i the shared time of addition i (A of
+the addition picked = 0, A_(i+1) = A_i + g_i), a point at the own time x is at
+the shared time t:
+    before the first addition:   t = A_0 + (x - a_0)
+    first half of gap i:         t = A_i + (x - a_i),          t < A_i + g_i / 2
+    second half of gap i:        t = A_(i+1) - (a_(i+1) - x),  t >= A_i + g_i / 2
+    after the last addition:     t = A_last + (x - a_last)
+Before the first and after the last addition the axis goes as far as the
+shortest experiment does. The number of additions most experiments have is the
+one kept; with a tie, the one met first (MATHS.md section 10.2).
+
+---- Helpers ----
+_pieces_lister
+_trace_interpolator
+```
+
+#### `traces_averager`
+
+```text
+---- Summary ----
+Main function to average lined-up traces at each shared time: the mean, the
+spread (SD) and the standard error of the mean (SEM) of the experiments that
+have a value there.
+
+---- Inputs ----
+values : np.ndarray
+    The traces, shape (n_experiments, n_times), NaN where one has no value.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    'mean', 'sd' and 'sem': np.ndarray (n_times,), NaN where no experiment has a
+    value (the SD and the SEM also where only one has); 'n': np.ndarray
+    (n_times,) of int, how many experiments have a value.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+mean = (y_1 + ... + y_n) / n; SD = sqrt(((y_1 - mean)² + ... + (y_n - mean)²) /
+(n - 1)); SEM = SD / sqrt(n) (MATHS.md section 10.3).
+
+---- Helpers ----
+None.
+```
+
 ## `utils_shared/trimming.py`
 
 Trimming of the start and end of an experiment.
@@ -43065,6 +47705,13 @@ page : FigurePage
     The page to start from.
 folder : Path
     The layouts folder, where templates are saved and read.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Optional[Dict[str, dict]]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md); None
+    for none.
+answers : Optional[dict]
+    The answers of the run; None for none.
 
 ---- Globals read ----
 None.
@@ -45079,6 +49726,9 @@ note : Any
     The line under the strip.
 canvas : Any
     The plot area the page is drawn in.
+caption : Any
+    The frame under the page: what each colour and line style on the page means,
+    for the caption, with its Copy button.
 form : Any
     The frame of the form, packed by the window in place of the guide's text.
 
@@ -45089,9 +49739,12 @@ The colour and size constants (module constants); settings.JOURNAL_SPECS.
 __init__
 _button_taker
 _canvas_drawer
+_caption_copier
+_caption_setter
 _form_clearer
 _form_closer
 _form_opener
+_form_roles_reader
 _height_taker
 _journal_taker
 _load_form_shower
@@ -45157,6 +49810,7 @@ None. Creates the widgets (side effect).
 None.
 
 ---- Helpers ----
+_caption_copier
 _height_taker
 _journal_taker
 _load_taker
@@ -45209,9 +49863,10 @@ plot_remover
 ```text
 ---- Summary ----
 Method to draw the page in the plot area as large as it fits: the page with
-its stand-ins and letters (with the plot whose form is open), the grid over
-it, the open plot outlined in blue, the old cells of a plot being changed in
-grey dashes, and ✎ and ✕ on each placed plot.
+its plots and letters (with the plot whose form is open), the grid over it,
+a plot that is drawn as nothing outlined in grey dashes with its name, the
+open plot outlined in blue, the old cells of a plot being changed in grey
+dashes, and ✎ and ✕ on each placed plot; then the caption lines under it.
 
 ---- Inputs ----
 None.
@@ -45230,11 +49885,67 @@ None. Draws on the plot area (side effect).
 See page_box_finder.
 
 ---- Helpers ----
+_caption_setter
 page_box_finder
 page_picture_maker
 photo_maker
 plot_box_finder
 plot_buttons_placer
+```
+
+##### `_caption_copier`
+
+```text
+---- Summary ----
+Method to take Copy under the page: the caption lines go to the clipboard, to
+paste into the caption of the figure.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the clipboard and the note line (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_note_setter
+```
+
+##### `_caption_setter`
+
+```text
+---- Summary ----
+Method to write under the page what each colour, line style and shade on it
+means, for the caption; Copy is greyed out while there is nothing to explain.
+
+---- Inputs ----
+page : FigurePage
+    The page as shown, with the plot whose form is open.
+
+---- Globals read ----
+NO_CAPTION.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+caption_lines_builder
 ```
 
 ##### `_form_clearer`
@@ -45319,6 +50030,32 @@ None.
 
 ---- Helpers ----
 _form_clearer
+```
+
+##### `_form_roles_reader`
+
+```text
+---- Summary ----
+Method to read the form of a plot as it is filled in: the roles of the plot.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, str]
+    The roles (form_roles_reader); empty for a plot type that asks nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+form_roles_reader
 ```
 
 ##### `_height_taker`
@@ -45568,7 +50305,8 @@ plot_placer
 
 ```text
 ---- Summary ----
-Method to take Done in the form of a plot: the plot is placed on the page.
+Method to take Done in the form of a plot: what the form holds becomes the
+roles of the plot, and the plot is placed on the page and drawn in its cells.
 
 ---- Inputs ----
 None.
@@ -45589,6 +50327,7 @@ None.
 ---- Helpers ----
 _canvas_drawer
 _form_closer
+_form_roles_reader
 _note_setter
 panel_letters_finder
 plot_placer
@@ -45599,7 +50338,8 @@ plot_placer
 ```text
 ---- Summary ----
 Method to open the form of the plot whose form is open: its plot type, the
-cells it takes, and Done and Cancel.
+cells it takes, what its plot type asks (a drop-down or a tick for each
+field, starting as the roles of the plot say), and Done and Cancel.
 
 ---- Inputs ----
 title : str
@@ -45624,6 +50364,7 @@ _plot_cancel_taker
 _plot_done_taker
 _type_list_taker
 cells_describer
+form_fields_lister
 ```
 
 ##### `_presser`
@@ -46023,6 +50764,15 @@ page : FigurePage
     The page to start from.
 folder : Path
     The layouts folder, where templates are saved and read.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md), which the forms of the
+    plots offer their choices from; None for none.
+experiments : Optional[Dict[str, dict]]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), which
+    the plots are drawn from; None for none.
+answers : Optional[dict]
+    The answers of the run, for what the forms offer from them and the plots
+    drawn as the run was set up; None for none.
 
 ---- Globals read ----
 PAGE_HINT; settings.JOURNAL_SPECS.
@@ -46276,6 +51026,12 @@ spec : dict
     What the page's journal asks (config.JOURNAL_SPECS entry).
 dpi : float
     Dots per inch (page_box_finder).
+setup : Optional[dict]
+    The set-up table, as for figure_page_drawer.
+experiments : Optional[Dict[str, dict]]
+    The slim copy of each experiment, as for figure_page_drawer.
+answers : Optional[dict]
+    The answers of the run, as for figure_page_drawer.
 
 ---- Globals read ----
 None.
@@ -49778,14 +54534,24 @@ temperature_asker
 ```text
 ---- Summary ----
 Main function to build the page of a dataset figure in the window (Build a figure,
-6.2): the page starts empty, plots are placed by dragging across its grid, and a
-template can be loaded or saved; Continue ends the step, after the offer to save
-a page that was changed as a template.
+6.2): the page starts empty, plots are placed by dragging across its grid, each
+drawn from the experiments once its form is done, and a template can be loaded or
+saved; Continue ends the step, after the offer to save a page that was changed as
+a template.
 
 ---- Inputs ----
 layouts_folder : Path
     The layouts folder (UserPlaces.layouts_folder), where templates are saved and
     read.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md), for the forms of the plots;
+    None for none.
+experiments : Optional[Dict[str, dict]]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), which the
+    plots are drawn from; None for none.
+answers : Optional[dict]
+    The answers of the run, for what the forms offer from them and the plots
+    drawn as the run was set up; None for none.
 
 ---- Globals read ----
 PAGE_NUDGE.
@@ -53794,12 +58560,13 @@ None.
 
 ```text
 ---- Summary ----
-Method that accepts and ignores new stream settings, because the window shows
-every symbol.
+Method that passes new stream settings on to the stream that was replaced. The
+window shows every symbol and needs none, but what other threads print still
+goes to that stream, which must not stop at a symbol it cannot write.
 
 ---- Inputs ----
 **kwargs : Any
-    Stream settings (ignored).
+    Stream settings, for example errors='replace'.
 
 ---- Globals read ----
 None.
@@ -53809,7 +58576,8 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None.
+None. Changes the settings of the replaced stream (side effect); a stream
+that takes no settings is left as it is.
 
 ---- Equations ----
 None.

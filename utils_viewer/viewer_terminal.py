@@ -14,10 +14,22 @@ from utils_shared.output_capture import captured_buffer_getter
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 # The 16 basic terminal colours, chosen to be readable on the dark terminal background.
-BASIC_COLOURS = ('#1e1e1e', '#e06c75', '#98c379', '#e5c07b',
-                 '#61afef', '#c678dd', '#56b6c2', '#d4d4d4',
-                 '#5c6370', '#ff7b86', '#b5e890', '#ffd98a',
-                 '#82c4ff', '#e19cf5', '#7fdbe6', '#ffffff',
+BASIC_COLOURS = ('#1e1e1e',
+                 '#e06c75',
+                 '#98c379',
+                 '#e5c07b',
+                 '#61afef',
+                 '#c678dd',
+                 '#56b6c2',
+                 '#d4d4d4',
+                 '#5c6370',
+                 '#ff7b86',
+                 '#b5e890',
+                 '#ffd98a',
+                 '#82c4ff',
+                 '#e19cf5',
+                 '#7fdbe6',
+                 '#ffffff',
                  )
 _CODE_PATTERN = re.compile(r'(\x1b\[[0-9;]*m|\r)')
 
@@ -361,12 +373,13 @@ class OutputRouter:
     def reconfigure(self, **kwargs: Any) -> None:
         """
         ---- Summary ----
-        Method that accepts and ignores new stream settings, because the window shows
-        every symbol.
+        Method that passes new stream settings on to the stream that was replaced. The
+        window shows every symbol and needs none, but what other threads print still
+        goes to that stream, which must not stop at a symbol it cannot write.
 
         ---- Inputs ----
         **kwargs : Any
-            Stream settings (ignored).
+            Stream settings, for example errors='replace'.
 
         ---- Globals read ----
         None.
@@ -376,7 +389,8 @@ class OutputRouter:
             Nothing.
 
         ---- Globals mutated ----
-        None.
+        None. Changes the settings of the replaced stream (side effect); a stream
+        that takes no settings is left as it is.
 
         ---- Equations ----
         None.
@@ -384,6 +398,11 @@ class OutputRouter:
         ---- Helpers ----
         None.
         """
+
+        try:
+            self._original.reconfigure(**kwargs)
+        except (AttributeError, ValueError):
+            pass
 
     # ---- write -----------------------------------------------------------------------
     def write(self, text: str) -> int:

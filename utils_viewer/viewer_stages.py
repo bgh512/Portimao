@@ -3465,18 +3465,32 @@ def details_stage_runner(session: ViewerSession,
 
 
 # ---- page_stage_runner ---------------------------------------------------------------
-def page_stage_runner(layouts_folder: Path) -> FigurePage:
+def page_stage_runner(layouts_folder: Path,
+                      setup: Optional[dict] = None,
+                      experiments: Optional[Dict[str, dict]] = None,
+                      answers: Optional[dict] = None,
+                      ) -> FigurePage:
     """
     ---- Summary ----
     Main function to build the page of a dataset figure in the window (Build a figure,
-    6.2): the page starts empty, plots are placed by dragging across its grid, and a
-    template can be loaded or saved; Continue ends the step, after the offer to save
-    a page that was changed as a template.
+    6.2): the page starts empty, plots are placed by dragging across its grid, each
+    drawn from the experiments once its form is done, and a template can be loaded or
+    saved; Continue ends the step, after the offer to save a page that was changed as
+    a template.
 
     ---- Inputs ----
     layouts_folder : Path
         The layouts folder (UserPlaces.layouts_folder), where templates are saved and
         read.
+    setup : Optional[dict]
+        The set-up table (dataset_setup, DATA_FORMAT.md), for the forms of the plots;
+        None for none.
+    experiments : Optional[Dict[str, dict]]
+        {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), which the
+        plots are drawn from; None for none.
+    answers : Optional[dict]
+        The answers of the run, for what the forms offer from them and the plots
+        drawn as the run was set up; None for none.
 
     ---- Globals read ----
     PAGE_NUDGE.
@@ -3511,7 +3525,7 @@ def page_stage_runner(layouts_folder: Path) -> FigurePage:
     info_printer('Load template puts a layout saved before on the page; Save template '
                  'keeps this one for later.',
                  )
-    window.page_shower(FigurePage(), layouts_folder)
+    window.page_shower(FigurePage(), layouts_folder, setup, experiments, answers)
     enter_waiter('Drag across the grid to place each plot. When the page is ready, '
                  'click Continue.',
                  PAGE_NUDGE,

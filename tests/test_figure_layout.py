@@ -10,12 +10,14 @@ from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_shared.figure_layout import (figure_canvas_fitter,
+from utils_shared.figure_layout import (axes_room_fitter,
+                                        figure_canvas_fitter,
                                         figure_lines_fitter,
                                         figure_size_calculator,
                                         figure_style_builder,
                                         figure_style_checker,
                                         line_width_fitter,
+                                        plot_legend_placer,
                                         )
 
 
@@ -406,3 +408,140 @@ def test_lines_kept_to_what_the_journal_takes() -> None:
     line, = again.subplots().plot([0, 1], [0, 1], linewidth=0.2)
     figure_canvas_fitter(again, 3.0, line_limits_pt=(0.5, None))
     assert line.get_linewidth() == 0.5
+
+
+# ---- test_axes_are_fitted_into_their_room --------------------------------------------
+def test_axes_are_fitted_into_their_room() -> None:
+    """
+    ---- Summary ----
+    Main function to check the room a plot keeps for its own text: axes that fill
+    their room are made smaller until the tick numbers and axis titles are inside it;
+    two sets of axes one above the other keep their shares of the height; axes whose
+    text is already inside are left where they are.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The room is x 0.1 to 0.6 and y 0.2 to 0.9 of the figure. The upper axes take the
+    top 0.42 of its height and the lower the bottom 0.28, so the upper is 1.5 times
+    as tall as the lower, before and after.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Two sets of axes that fill the room ---------------------------------------
+    room = (0.1, 0.2, 0.6, 0.9)
+    fig = Figure(figsize=(6.0, 4.0))
+    lower = fig.add_axes((0.1, 0.2, 0.5, 0.28))
+    upper = fig.add_axes((0.1, 0.48, 0.5, 0.42))
+    for ax in (lower, upper):
+        ax.plot([0, 10], [0, 123456])
+        ax.set_ylabel('Oxygen (µM)')
+    lower.set_xlabel('Time (min)')
+    axes_room_fitter(fig, [lower, upper], room)
+    renderer = fig._get_renderer()
+    for ax in (lower, upper):
+        tight = ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+        assert room[0] - 1e-3 <= tight.x0 and tight.x1 <= room[2] + 1e-3
+        assert room[1] - 1e-3 <= tight.y0 and tight.y1 <= room[3] + 1e-3
+    low, high = lower.get_position(), upper.get_position()
+    assert low.x0 > 0.1 and low.y0 > 0.2  # room made for the numbers and the titles
+    assert low.x0 == pytest.approx(high.x0) and low.width == pytest.approx(high.width)
+    assert high.height / low.height == pytest.approx(1.5)
+    assert high.y0 == pytest.approx(low.y1)
+
+    # ---- 2 Axes whose text is inside the room stay where they are --------------------
+    small = fig.add_axes((0.75, 0.4, 0.1, 0.2))
+    axes_room_fitter(fig, [small], (0.62, 0.2, 1.0, 0.9))
+    assert small.get_position().bounds == pytest.approx((0.75, 0.4, 0.1, 0.2))
+    axes_room_fitter(fig, [], room)  # nothing to fit
+
+
+# ---- test_a_small_legend_hides_nothing -----------------------------------------------
+def test_a_small_legend_hides_nothing() -> None:
+    """
+    ---- Summary ----
+    Main function to check the small legend of a plot: none for one named line; in
+    the top right corner when nothing is drawn there; in the next corner when a line
+    runs through the top right; and under the axes, below the tick numbers and the
+    axis title, when a line runs through every corner.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    settings.JOURNAL_SPECS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Two lines along the bottom of the axes leave every upper corner free: the legend
+    goes top right. A line from bottom left to top right covers the top right corner
+    and leaves the top left free. Lines along the top and the bottom cover all four
+    corners.
+
+    ---- Helpers ----
+    None.
+    """
+
+    style = figure_style_builder(settings.JOURNAL_SPECS['nature'])
+    fonts = ['sans-serif']
+
+    # ---- axes_maker ------------------------------------------------------------------
+    def axes_maker(lines: list) -> tuple:
+        fig = Figure(figsize=(3.0, 2.0))
+        ax = fig.add_axes((0.2, 0.3, 0.7, 0.6))
+        for number, (x, y) in enumerate(lines, start=1):
+            ax.plot(x, y, label=f'set {number}')
+        ax.set_xlim(0, 10)
+        ax.set_ylim(0, 10)
+        ax.set_xlabel('Time (min)')
+        return fig, ax
+
+    # ---- 1 One named line: no legend -------------------------------------------------
+    fig, ax = axes_maker([([0, 10], [1, 1])])
+    assert plot_legend_placer(fig, ax, style, fonts) is None
+    assert ax.get_legend() is None
+
+    # ---- 2 Nothing in the top right: the legend goes there ---------------------------
+    fig, ax = axes_maker([([0, 10], [1, 1]), ([0, 10], [2, 2])])
+    legend = plot_legend_placer(fig, ax, style, fonts)
+    renderer = fig._get_renderer()
+    box, frame = legend.get_window_extent(renderer), ax.get_window_extent(renderer)
+    assert [text.get_text() for text in legend.get_texts()] == ['set 1', 'set 2']
+    assert box.x1 > frame.x0 + 0.8 * frame.width and box.y1 > frame.y0 + 0.8 * frame.height
+    assert box.x1 <= frame.x1 and box.y1 <= frame.y1
+    assert all(text.get_fontsize() == style['fonts']['tick'] for text in legend.get_texts())
+
+    # ---- 3 A line through the top right: the top left --------------------------------
+    fig, ax = axes_maker([([0, 10], [0, 10]), ([0, 10], [1, 1])])
+    legend = plot_legend_placer(fig, ax, style, fonts)
+    renderer = fig._get_renderer()
+    box, frame = legend.get_window_extent(renderer), ax.get_window_extent(renderer)
+    assert box.x0 < frame.x0 + 0.2 * frame.width and box.y1 > frame.y0 + 0.8 * frame.height
+
+    # ---- 4 A line through every corner: under the axes -------------------------------
+    fig, ax = axes_maker([([0, 10], [9.7, 9.7]), ([0, 10], [0.3, 0.3])])
+    labels_bottom = ax.get_tightbbox(fig._get_renderer()).y0
+    legend = plot_legend_placer(fig, ax, style, fonts)
+    renderer = fig._get_renderer()
+    box, frame = legend.get_window_extent(renderer), ax.get_window_extent(renderer)
+    assert box.y1 < labels_bottom < frame.y0  # below the numbers and the axis title
+    assert frame.x0 < (box.x0 + box.x1) / 2 < frame.x1

@@ -364,9 +364,9 @@ def test_a_file_with_nothing_to_plot_is_not_saved(tmp_path: Path,
     Main function to check the saving of one file: with a panel to plot, the plot is
     drawn once into the results folder and a PNG picture of it is handed back; with no
     oxygen, no OCR and no haems, nothing is drawn and None is handed back; the
-    workbook is written either way, with the spectra only when asked for; a plot that
-    fails still lets the workbook be written. The reading, the plot and the workbook
-    are stood in for.
+    workbook is written either way, with the spectra only when asked for; the slim
+    copy of the file is kept for the dataset figure when a place for it is given. The
+    reading, the plot and the workbook are stood in for.
 
     ---- Inputs ----
     tmp_path : Path
@@ -439,14 +439,25 @@ def test_a_file_with_nothing_to_plot_is_not_saved(tmp_path: Path,
 
     # ---- 3 With nothing plotted: not drawn, no picture, the workbook still -----------
     answers.update(plot_o2=False, plot_ocr=False, plot_haems=False)
+    kept: dict = {}
     picture, is_written = program.experiment_file_saver(dict(info, write_spectra=False),
                                                         settings.Config(answers),
                                                         None,
                                                         tmp_path,
+                                                        kept,
                                                         )
     assert picture is None and is_written
     assert len(drawn) == 1
     assert written[-1][2] == {'spectra': False, 'keeps_spectra_list': False}
+    # the slim copy of the file is kept for the dataset figure
+    assert kept == {'run1': {'experiment_name': 'run1',
+                             'metadata': experiment['metadata'],
+                             'difference': None,
+                             'difference_parts': None,
+                             'haem_bands': None,
+                             'region_spectra': None,
+                             },
+                    }
 
 
 # ---- test_a_failed_plot_still_writes_the_workbook ------------------------------------
@@ -654,6 +665,7 @@ def test_every_file_is_saved_once_and_shown(tmp_path: Path,
               _cfg: object,
               fit: object,
               folder: Path,
+              _page_experiments: object,
               ) -> Tuple[bytes, bool]:
         calls.append((info['name'],
                       fit,
@@ -783,13 +795,23 @@ def test_the_plots_are_saved_after_the_file_questions(tmp_path: Path,
     """
 
     def flags_reader(saved_plots: Optional[List[str]] = None) -> List[bool]:
+        page_data: dict = {}
         experiments = program.everything_asker(tmp_path,
                                                _summaries_builder(),
                                                tmp_path,
                                                {},
                                                None,
                                                saved_plots,
+                                               None,
+                                               page_data,
                                                )[1]
+        # the dataset figure is handed the set-up and the slim copy of each file read
+        assert page_data == {'setup': {'group_names': ['', ''],
+                                       'colours': {},
+                                       'rows': [],
+                                       },
+                             'experiments': {},
+                             }
         # the workbook is saved with the plot, so both flags are the same
         assert all(info['is_plot_saved'] == info['is_workbook_saved']
                    for info in experiments

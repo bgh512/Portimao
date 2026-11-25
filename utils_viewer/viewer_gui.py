@@ -1485,7 +1485,7 @@ class ViewerGui:
             # while it is built
             if event[1] is not None:
                 self._page_layout_setter(True)
-                self._page.opener(event[1], event[2])
+                self._page.opener(*event[1:])
             else:
                 self._page.closer()
                 self._page_layout_setter(False)
@@ -2503,9 +2503,11 @@ class ViewerGui:
                 widget.pack_forget()
             page.strip.pack(side='top', anchor='w', padx=8, pady=(8, 0))
             page.note.pack(side='top', fill='x', padx=8, pady=(4, 0))
+            # the caption lines keep their place under the page when it is resized
+            page.caption.pack(side='bottom', fill='x', padx=8, pady=(0, 8))
             page.canvas.pack(side='top', fill='both', expand=True, padx=8, pady=8)
             return
-        for widget in (page.strip, page.note, page.canvas):
+        for widget in (page.strip, page.note, page.caption, page.canvas):
             widget.pack_forget()
         self._controls.pack(side='top', pady=(8, 0), before=self._help)
         self._strip.frame.pack(side='top', pady=(6, 0), before=self._help)
@@ -4321,7 +4323,13 @@ class ViewerGui:
         return self._page.kept_reader()
 
     # ---- page_shower -----------------------------------------------------------------
-    def page_shower(self, page: FigurePage, folder: Path) -> None:
+    def page_shower(self,
+                    page: FigurePage,
+                    folder: Path,
+                    setup: Optional[dict] = None,
+                    experiments: Optional[Dict[str, dict]] = None,
+                    answers: Optional[dict] = None,
+                    ) -> None:
         """
         ---- Summary ----
         Method to start building the page of a dataset figure in the window. It is
@@ -4332,6 +4340,13 @@ class ViewerGui:
             The page to start from.
         folder : Path
             The layouts folder, where templates are saved and read.
+        setup : Optional[dict]
+            The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+        experiments : Optional[Dict[str, dict]]
+            {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md); None
+            for none.
+        answers : Optional[dict]
+            The answers of the run; None for none.
 
         ---- Globals read ----
         None.
@@ -4350,7 +4365,7 @@ class ViewerGui:
         None.
         """
 
-        self._events.put(('page', page, folder))
+        self._events.put(('page', page, folder, setup, experiments, answers))
 
     # ---- pictures_publisher ----------------------------------------------------------
     def pictures_publisher(self, pictures: List[Tuple[str, bytes]]) -> None:

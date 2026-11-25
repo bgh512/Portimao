@@ -3,13 +3,16 @@ The difference spectrum of a file, reduced minus oxidised, its decomposition int
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
+import pandas as pd
+from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.figure_layout import BACKDROP_MARK
 from utils_shared.spectral_decomposer import spectrum_decomposer
 
 
@@ -24,6 +27,12 @@ RESIDUAL_HEIGHT_SHARE = 0.25
 X_LABEL = 'Wavelength (nm)'
 Y_LABEL = 'Reduced − oxidised (mOD)'
 RESIDUAL_LABEL = 'Residual (mOD)'
+# A haem band: this far each side of where the shape of the haem is strongest, and how
+# see-through it is drawn
+BAND_HALF_WIDTH_NM = 2.5
+BAND_ALPHA = 0.15
+# How far apart stacked spectra are, as a share of the height of the tallest
+STACK_GAP_SHARE = 0.75
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -275,3 +284,212 @@ def difference_spectrum_builder(experiment: dict, dataset: str) -> Optional[dict
             'n_oxidised': counts['oxidised'],
             'n_reduced': counts['reduced'],
             }
+
+
+# ---- haem_bands_drawer ---------------------------------------------------------------
+def haem_bands_drawer(ax: Axes,
+                      bands: Dict[str, Tuple[float, float]],
+                      colours: Dict[str, str],
+                      alpha: float = BAND_ALPHA,
+                      ) -> None:
+    """
+    ---- Summary ----
+    Main function to shade the band of each haem behind the spectra of a plot, in the
+    colour of the haem, to show where each haem appears. The bands are marked as a
+    backdrop, so a legend may sit over them.
+
+    ---- Inputs ----
+    ax : Axes
+        The axes, with the wavelength on the x axis.
+    bands : Dict[str, Tuple[float, float]]
+        {haem name: (start, end) of its band in nm} (haem_bands_finder).
+    colours : Dict[str, str]
+        {haem name: colour} (config.haem_colour_mapper).
+    alpha : float
+        How see-through a band is, 0 (unseen) to 1 (solid).
+
+    ---- Globals read ----
+    BAND_ALPHA; BACKDROP_MARK (imported).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Draws on the axes and leaves its x limits as they were (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    x_limits = ax.get_xlim()
+    for name, (start, end) in bands.items():
+        band = ax.axvspan(start,
+                          end,
+                          color=colours.get(name, '0.5'),
+                          alpha=alpha,
+                          linewidth=0,
+                          zorder=0,
+                          )
+        setattr(band, BACKDROP_MARK, True)
+    ax.set_xlim(x_limits)
+
+
+# ---- haem_bands_finder ---------------------------------------------------------------
+def haem_bands_finder(fit: dict,
+                      half_width_nm: float = BAND_HALF_WIDTH_NM,
+                      ) -> Dict[str, Tuple[float, float]]:
+    """
+    ---- Summary ----
+    Main function to find the band of each haem of a fit: a strip of wavelengths
+    round the place where the shape of the haem in the fit file is strongest. The
+    bands come from the fit alone, so they are the same on every plot and for every
+    file, also for a haem a file has none of.
+
+    ---- Inputs ----
+    fit : dict
+        The fit in use: 'data' (the fit table, a wavelength column then a shape
+        column for each haem) and 'haem_list' (the haem names in that order).
+    half_width_nm : float
+        How far the band reaches each side of the strongest place (nm).
+
+    ---- Globals read ----
+    BAND_HALF_WIDTH_NM.
+
+    ---- Outputs ----
+    Dict[str, Tuple[float, float]]
+        {haem name: (start, end) of its band in nm}, in the order of the fit; a haem
+        whose shape holds no number, or only zeros, has no band.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    centre = the wavelength where |S(w)| is largest; band = centre - half_width_nm
+    to centre + half_width_nm (MATHS.md section 9).
+
+    ---- Helpers ----
+    None.
+    """
+
+    data = fit['data']
+    bands = {}
+    for place, name in enumerate(fit['haem_list']):
+        wavelengths = pd.to_numeric(data.iloc[:, 2 * place], errors='coerce').to_numpy()
+        shape = pd.to_numeric(data.iloc[:, 2 * place + 1], errors='coerce').to_numpy()
+        is_number = np.isfinite(wavelengths) & np.isfinite(shape)
+        if not is_number.any() or np.abs(shape[is_number]).max() == 0:
+            continue
+        centre = float(wavelengths[is_number][np.abs(shape[is_number]).argmax()])
+        bands[name] = (centre - half_width_nm, centre + half_width_nm)
+    return bands
+
+
+# ---- spectra_averager ----------------------------------------------------------------
+def spectra_averager(spectra: Sequence[Tuple[np.ndarray, np.ndarray]],
+                     ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    ---- Summary ----
+    Main function to average the spectra of several files into one: each is read at
+    the wavelengths of the first, then the mean is taken at each wavelength.
+
+    ---- Inputs ----
+    spectra : Sequence[Tuple[np.ndarray, np.ndarray]]
+        (wavelengths in nm, rising; values) of each spectrum, each of shape
+        (n_wavelengths,); at least one.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[np.ndarray, np.ndarray]
+        (the wavelengths of the first spectrum, the mean at each). Raises ValueError
+        for no spectrum.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    A spectrum is read at a wavelength w between two of its own, w1 and w2, on the
+    straight line between them: y = y1 + (y2 - y1) x (w - w1) / (w2 - w1). A
+    wavelength outside a spectrum is left out of the mean there. mean(w) = the sum of
+    the spectra read at w / how many there are (MATHS.md section 9).
+
+    ---- Helpers ----
+    None.
+    """
+
+    if not spectra:
+        raise ValueError('There is no spectrum to average.')
+    wavelengths = np.asarray(spectra[0][0], dtype=float)
+    rows = [np.interp(wavelengths,
+                      np.asarray(own, dtype=float),
+                      np.asarray(values, dtype=float),
+                      left=np.nan,
+                      right=np.nan,
+                      )
+            for own, values in spectra
+            ]
+    stacked = np.vstack(rows)
+    counts = np.isfinite(stacked).sum(axis=0)  # the first spectrum is always there
+    return wavelengths, np.nansum(stacked, axis=0) / counts
+
+
+# ---- spectra_stacker -----------------------------------------------------------------
+def spectra_stacker(spectra: Sequence[Tuple[np.ndarray, np.ndarray]],
+                    band: Optional[Tuple[float, float]] = None,
+                    gap_share: float = STACK_GAP_SHARE,
+                    ) -> List[np.ndarray]:
+    """
+    ---- Summary ----
+    Main function to stack spectra for a waterfall: each is moved up or down, never
+    stretched, until its highest point inside a band is at 0, so the peaks line up;
+    then the spectra are spread out, the first at the top.
+
+    ---- Inputs ----
+    spectra : Sequence[Tuple[np.ndarray, np.ndarray]]
+        (wavelengths in nm, values) of each spectrum, from the top down.
+    band : Optional[Tuple[float, float]]
+        (start, end) in nm of the band the spectra are lined up on; None, or a band
+        a spectrum has no point in, lines that spectrum up on its highest point
+        anywhere.
+    gap_share : float
+        How far apart two neighbours are, as a share of the height of the tallest
+        spectrum.
+
+    ---- Globals read ----
+    STACK_GAP_SHARE.
+
+    ---- Outputs ----
+    List[np.ndarray]
+        The values of each spectrum as drawn, in the order given.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    lined up = y - (the highest y inside the band); height = highest - lowest of a
+    spectrum; gap = gap_share x the largest height (1 when every spectrum is flat);
+    drawn_i = lined up_i + (n - 1 - i) x gap, i from 0 for the first of n (MATHS.md
+    section 9).
+
+    ---- Helpers ----
+    None.
+    """
+
+    lined_up = []
+    for wavelengths, values in spectra:
+        wavelengths = np.asarray(wavelengths, dtype=float)
+        values = np.asarray(values, dtype=float)
+        inside = np.isfinite(values)
+        if band is not None:
+            in_band = inside & (wavelengths >= band[0]) & (wavelengths <= band[1])
+            inside = in_band if in_band.any() else inside
+        lined_up.append(values - values[inside].max())
+    heights = [np.nanmax(values) - np.nanmin(values) for values in lined_up]
+    gap = gap_share * max(heights, default=0.0) or 1.0
+    count = len(lined_up)
+    return [values + (count - 1 - place) * gap for place, values in enumerate(lined_up)]

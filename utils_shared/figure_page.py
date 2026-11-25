@@ -1,7 +1,7 @@
 """
 The page of a dataset figure: plots placed on a grid over a journal page, their letters,
-the page drawn with a stand-in for each plot and saved as a PDF, and the templates saved
-and read back.
+the page drawn with each plot in its cells (a stand-in for a plot type not built yet)
+and saved as a PDF, and the templates saved and read back.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -9,7 +9,7 @@ import json
 import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib
@@ -17,9 +17,12 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.figure_layout import (figure_size_calculator,
+from utils_shared.figure_layout import (axes_room_fitter,
+                                        figure_size_calculator,
+                                        figure_style_builder,
                                         font_family_lister,
                                         MM_PER_INCH,
+                                        plot_legend_placer,
                                         )
 from utils_shared.helpers import file_name_sanitiser
 from utils_shared.journal_files import STANDARD_JOURNAL
@@ -38,7 +41,7 @@ PLOT_TYPES = {'P1': 'Standard experiment',
               'P4': 'Spectra at averaging regions',
               'P5': 'Spectral heat map',
               'P6': 'Spectra over time in 3D',
-              'P7': 'Traces overlaid',
+              'P7': 'Single trace',
               'P8': 'Mean trace',
               'P9': 'Bar chart',
               'P10': 'Before and after',
@@ -47,7 +50,6 @@ PLOT_TYPES = {'P1': 'Standard experiment',
               'P13': 'Haem amounts',
               'P14': 'Scatter of two numbers',
               'P15': 'Dose response',
-              'P16': 'Legend',
               'P17': 'Space for a drawing',
               'P18': 'Numbers table',
               'P19': 'PCA',
@@ -63,10 +65,26 @@ FIRST_TYPES = ('P1',
                'P11',
                'P12',
                'P13',
-               'P16',
                'P17',
                )
-UNLETTERED_TYPES = ('P16',)  # the legend is not a panel, so it has no letter
+# A plot type that was taken out, with the sentence a template that still holds one is
+# refused with
+REMOVED_TYPES = {'P16': 'The Legend is no longer a plot type: each plot has its own '
+                        'small legend.',
+                 }
+# What draws each plot type, {plot type: (fig, room, plot, context) -> its axes}: room
+# is (x0, y0, x1, y1) of the plot's cells less the gap and its letter, as fractions of
+# the figure, and context holds 'spec', 'style' (figure_style_builder), 'fonts',
+# 'setup' (dataset_setup), 'experiments' ({name: page_experiment}), 'answers' (the
+# answers of the run) and 'page' (the page). The axes are then fitted into the room
+# with their text and given a legend. A plot type that is not here is drawn as a grey
+# stand-in. Each plot type adds its own (utils_shared/page_plots.py).
+PLOT_DRAWERS: Dict[str, Callable[..., List[Axes]]] = {}
+# What puts the plots of one plot type on the same scales, {plot type: (drawn,
+# context) -> None}, drawn being [(the plot, its axes)] of every plot of that type on
+# the page; it runs once every plot is drawn, before their text is fitted.
+SCALE_SHARERS: Dict[str, Callable[[list, dict], None]] = {}
+EMPTY_TYPES = ('P17',)  # drawn as nothing but their letter
 LETTERS = 'abcdefghijklmnopqrstuvwxyz'
 # the space kept round each plot inside its cells, and the grey of a stand-in
 PLOT_GAP_MM = 1.5
@@ -187,7 +205,7 @@ def _placement_problem_finder(page: FigurePage, plot: PagePlot) -> Optional[str]
         The plot to place.
 
     ---- Globals read ----
-    GRID_COLUMNS, GRID_ROWS, PLOT_TYPES.
+    GRID_COLUMNS, GRID_ROWS, PLOT_TYPES, REMOVED_TYPES.
 
     ---- Outputs ----
     Optional[str]
@@ -204,6 +222,8 @@ def _placement_problem_finder(page: FigurePage, plot: PagePlot) -> Optional[str]
     panel_letters_finder
     """
 
+    if plot.plot_type in REMOVED_TYPES:
+        return REMOVED_TYPES[plot.plot_type]
     if plot.plot_type not in PLOT_TYPES:
         return f'There is no plot type {plot.plot_type!r}.'
     whole_numbers = (plot.row, plot.column, plot.n_rows, plot.n_columns)
@@ -222,11 +242,166 @@ def _placement_problem_finder(page: FigurePage, plot: PagePlot) -> Optional[str]
     for index, other in enumerate(page.plots):
         if cells & _cells_lister(other):
             name = PLOT_TYPES[other.plot_type]
-            which = (f'plot {letters[index]} ({name})' if index in letters
-                     else f'the {name.lower()}'
-                     )
-            return f'That rectangle covers {which}: drag over free cells only.'
+            return (f'That rectangle covers plot {letters[index]} ({name}): drag over '
+                    f'free cells only.')
     return None
+
+
+# ---- DRAWING HELPERS -----------------------------------------------------------------
+
+
+# ---- _drawing_space_drawer -----------------------------------------------------------
+def _drawing_space_drawer(fig: Figure,
+                          room: Tuple[float, float, float, float],
+                          plot: PagePlot,
+                          context: dict,
+                          ) -> List[Axes]:
+    """
+    ---- Summary ----
+    Helper function to draw a Space for a drawing: nothing, so the cells stay empty
+    under their letter for a drawing added later in a drawing program.
+
+    ---- Inputs ----
+    fig : Figure
+        The figure of the page.
+    room : Tuple[float, float, float, float]
+        (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+    plot : PagePlot
+        The plot.
+    context : dict
+        What a plot is drawn with (PLOT_DRAWERS); not used.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Axes]
+        One set of axes over the room, switched off: it draws nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    x0, y0, x1, y1 = room
+    ax = fig.add_axes((x0, y0, x1 - x0, y1 - y0))
+    ax.set_axis_off()
+    return [ax]
+
+
+# ---- _plot_finisher ------------------------------------------------------------------
+def _plot_finisher(fig: Figure,
+                   axes: List[Axes],
+                   room: Tuple[float, float, float, float],
+                   context: dict,
+                   ) -> None:
+    """
+    ---- Summary ----
+    Helper function to finish a plot drawn into its room: its axes are made smaller
+    until their tick numbers and axis titles are inside the room, each set of axes
+    with more than one named line or colour and no legend yet gets its own small
+    legend where it hides nothing, and the axes are fitted again for a legend that
+    went under them.
+
+    ---- Inputs ----
+    fig : Figure
+        The figure of the page.
+    axes : List[Axes]
+        The axes of the plot, as its drawer gave them.
+    room : Tuple[float, float, float, float]
+        (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+    context : dict
+        What a plot is drawn with (PLOT_DRAWERS): its 'style' and 'fonts' are used.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Moves the axes and draws the legends (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    axes_room_fitter
+    plot_legend_placer
+    """
+
+    shown = [ax for ax in axes if ax.axison]
+    if not shown:
+        return
+    axes_room_fitter(fig, shown, room)
+    for ax in shown:
+        if ax.get_legend() is None:
+            plot_legend_placer(fig, ax, context['style'], context['fonts'])
+    axes_room_fitter(fig, shown, room)
+
+
+# ---- _stand_in_drawer ----------------------------------------------------------------
+def _stand_in_drawer(fig: Figure,
+                     room: Tuple[float, float, float, float],
+                     plot: PagePlot,
+                     context: dict,
+                     ) -> List[Axes]:
+    """
+    ---- Summary ----
+    Helper function to draw the stand-in of a plot type that is not built yet: a grey
+    box over its room with the name of the plot type.
+
+    ---- Inputs ----
+    fig : Figure
+        The figure of the page.
+    room : Tuple[float, float, float, float]
+        (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+    plot : PagePlot
+        The plot.
+    context : dict
+        What a plot is drawn with (PLOT_DRAWERS): its 'spec' and 'fonts' are used.
+
+    ---- Globals read ----
+    PLOT_TYPES, STAND_IN_EDGE, STAND_IN_GREY.
+
+    ---- Outputs ----
+    List[Axes]
+        The axes of the grey box.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    spec = context['spec']
+    x0, y0, x1, y1 = room
+    ax = fig.add_axes((x0, y0, x1 - x0, y1 - y0))
+    ax.set_facecolor(STAND_IN_GREY)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_edgecolor(STAND_IN_EDGE)
+    ax.text(0.5,
+            0.5,
+            PLOT_TYPES[plot.plot_type],
+            ha='center',
+            va='center',
+            fontsize=spec.get('font_max_pt') or spec['font_min_pt'],
+            fontfamily=context['fonts'],
+            transform=ax.transAxes,
+            )
+    return [ax]
 
 
 # ---- TEMPLATE HELPERS ----------------------------------------------------------------
@@ -352,27 +527,42 @@ def figure_file_namer(journal: str) -> str:
 # ---- figure_page_drawer --------------------------------------------------------------
 def figure_page_drawer(page: FigurePage,
                        spec: dict,
+                       setup: Optional[dict] = None,
+                       experiments: Optional[Dict[str, dict]] = None,
+                       answers: Optional[dict] = None,
                        ) -> Tuple[Figure, Dict[int, Axes]]:
     """
     ---- Summary ----
-    Main function to draw a page at its printed size, off screen: each plot a grey
-    stand-in with the name of its plot type, over the cells it takes, with its letter
-    in bold at its top left.
+    Main function to draw a page at its printed size, off screen: each plot drawn by
+    its plot type into the cells it takes, the plots of a plot type put on the same
+    scales where it asks for that, then room kept inside the cells for each plot's
+    own text and legend, and its letter in bold at its top left. A plot type that is
+    not built yet is a grey stand-in with its name; a Space for a drawing is empty.
 
     ---- Inputs ----
     page : FigurePage
         The page.
     spec : dict
         What the page's journal asks (config.JOURNAL_SPECS entry).
+    setup : Optional[dict]
+        The set-up table (dataset_setup, DATA_FORMAT.md), for the plots that show
+        experiments; None for none.
+    experiments : Optional[Dict[str, dict]]
+        {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md); None for
+        none.
+    answers : Optional[dict]
+        The answers of the run (config.DEFAULT_ANSWERS), for the plots drawn as the
+        run was set up; None for none.
 
     ---- Globals read ----
-    GRID_COLUMNS, GRID_ROWS, MM_PER_INCH, PLOT_GAP_MM, PLOT_TYPES, STAND_IN_EDGE,
-    STAND_IN_GREY.
+    EMPTY_TYPES, GRID_COLUMNS, GRID_ROWS, MM_PER_INCH, PLOT_DRAWERS, PLOT_GAP_MM,
+    SCALE_SHARERS.
 
     ---- Outputs ----
     Tuple[Figure, Dict[int, Axes]]
-        (the figure, {place of the plot in page.plots: its axes}). Raises ValueError
-        for a width the journal does not have or a height outside (0, 1].
+        (the figure, {place of the plot in page.plots: its axes, the first when it
+        has several}). Raises ValueError for a width the journal does not have or a
+        height outside (0, 1].
 
     ---- Globals mutated ----
     None.
@@ -380,11 +570,16 @@ def figure_page_drawer(page: FigurePage,
     ---- Equations ----
     A plot of cells (row r, column c, n_rows, n_columns) covers the figure fractions
     x from c / 6 to (c + n_columns) / 6 and y from 1 - (r + n_rows) / 6 to 1 - r / 6;
-    its axes are that rectangle less PLOT_GAP_MM on each side and the height of its
-    letter at the top.
+    its room is that rectangle less PLOT_GAP_MM on each side and the height of its
+    letter at the top. A stand-in fills its room; the axes of a plot that is drawn
+    are made smaller until their text is inside it (axes_room_fitter).
 
     ---- Helpers ----
+    _drawing_space_drawer
+    _plot_finisher
+    _stand_in_drawer
     figure_size_calculator
+    figure_style_builder
     font_family_lister
     panel_letters_finder
     """
@@ -394,52 +589,64 @@ def figure_page_drawer(page: FigurePage,
     fig = Figure(figsize=(width_in, height_in))
     fonts = font_family_lister(spec.get('font_family') or ['sans-serif'])
     letter_pt = spec['panel_letter_pt']
-    text_pt = spec.get('font_max_pt') or spec['font_min_pt']
     case = spec.get('panel_letter_case', 'lower')
     gap_x = PLOT_GAP_MM / MM_PER_INCH / width_in
     gap_y = PLOT_GAP_MM / MM_PER_INCH / height_in
     letter_y = 1.4 * letter_pt / 72.0 / height_in
+    context = {'spec': spec,
+               'style': figure_style_builder(spec),
+               'fonts': fonts,
+               'setup': setup,
+               'experiments': experiments or {},
+               'answers': answers or {},
+               'page': page,
+               }
+    drawers = dict({key: _drawing_space_drawer for key in EMPTY_TYPES}, **PLOT_DRAWERS)
 
     # ---- 2 Draw each plot and its letter ---------------------------------------------
     letters = panel_letters_finder(page)
     axes = {}
+    drawn_plots: List[Tuple[PagePlot, List[Axes], tuple]] = []
     for index, plot in enumerate(page.plots):
         left = plot.column / GRID_COLUMNS
         top = 1 - plot.row / GRID_ROWS
         width = plot.n_columns / GRID_COLUMNS
         height = plot.n_rows / GRID_ROWS
-        ax = fig.add_axes((left + gap_x,
-                           top - height + gap_y,
-                           width - 2 * gap_x,
-                           height - 2 * gap_y - letter_y,
-                           ),
-                          )
-        ax.set_facecolor(STAND_IN_GREY)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        for spine in ax.spines.values():
-            spine.set_edgecolor(STAND_IN_EDGE)
-        ax.text(0.5,
-                0.5,
-                PLOT_TYPES[plot.plot_type],
-                ha='center',
-                va='center',
-                fontsize=text_pt,
-                fontfamily=fonts,
-                transform=ax.transAxes,
+        room = (left + gap_x,
+                top - height + gap_y,
+                left + width - gap_x,
+                top - gap_y - letter_y,
                 )
-        axes[index] = ax
-        if index in letters:
-            letter = letters[index]
-            fig.text(left + gap_x,
-                     top - gap_y,
-                     letter.upper() if case == 'upper' else letter,
-                     ha='left',
-                     va='top',
-                     fontsize=letter_pt,
-                     fontweight='bold',
-                     fontfamily=fonts,
-                     )
+        drawer = drawers.get(plot.plot_type)
+        if drawer is None:
+            drawn = _stand_in_drawer(fig, room, plot, context)
+        else:
+            drawn = drawer(fig, room, plot, context)
+            drawn_plots.append((plot, drawn, room))
+        axes[index] = drawn[0]
+        letter = letters[index]
+        fig.text(left + gap_x,
+                 top - gap_y,
+                 letter.upper() if case == 'upper' else letter,
+                 ha='left',
+                 va='top',
+                 fontsize=letter_pt,
+                 fontweight='bold',
+                 fontfamily=fonts,
+                 )
+
+    # ---- 3 Share the scales, then fit the text of each plot --------------------------
+    # The scales come first: a changed range changes the tick numbers, and with them
+    # the room the text needs.
+    for plot_type, sharer in SCALE_SHARERS.items():
+        same = [(plot, drawn)
+                for plot, drawn, _ in drawn_plots
+                if plot.plot_type == plot_type
+                ]
+        if len(same) > 1:
+            sharer(same, context)
+    for _, drawn, room in drawn_plots:
+        _plot_finisher(fig, drawn, room, context)
     return fig, axes
 
 
@@ -447,6 +654,9 @@ def figure_page_drawer(page: FigurePage,
 def figure_page_exporter(page: FigurePage,
                          spec: dict,
                          folder: Path,
+                         setup: Optional[dict] = None,
+                         experiments: Optional[Dict[str, dict]] = None,
+                         answers: Optional[dict] = None,
                          ) -> Tuple[Path, Figure]:
     """
     ---- Summary ----
@@ -461,6 +671,12 @@ def figure_page_exporter(page: FigurePage,
         What the page's journal asks (config.JOURNAL_SPECS entry).
     folder : Path
         Folder the PDF is saved in; it is made when missing.
+    setup : Optional[dict]
+        The set-up table, as for figure_page_drawer.
+    experiments : Optional[Dict[str, dict]]
+        The slim copy of each experiment, as for figure_page_drawer.
+    answers : Optional[dict]
+        The answers of the run, as for figure_page_drawer.
 
     ---- Globals read ----
     PDF_FONT_TYPE.
@@ -488,7 +704,7 @@ def figure_page_exporter(page: FigurePage,
         raise FigurePageError('The page has no plot on it, so there is no figure to '
                               'save.',
                               )
-    fig, _ = figure_page_drawer(page, spec)
+    fig, _ = figure_page_drawer(page, spec, setup, experiments, answers)
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / figure_file_namer(page.journal)
     with matplotlib.rc_context({'pdf.fonttype': PDF_FONT_TYPE}):
@@ -502,14 +718,14 @@ def panel_letters_finder(page: FigurePage) -> Dict[int, str]:
     ---- Summary ----
     Main function to give each plot of a page its letter, a, b, c... in reading order:
     by the top left cell of each plot, left to right along a row of the grid, then the
-    next row down. The legend has none.
+    next row down.
 
     ---- Inputs ----
     page : FigurePage
         The page.
 
     ---- Globals read ----
-    LETTERS, UNLETTERED_TYPES.
+    LETTERS.
 
     ---- Outputs ----
     Dict[int, str]
@@ -525,10 +741,7 @@ def panel_letters_finder(page: FigurePage) -> Dict[int, str]:
     None.
     """
 
-    lettered = sorted((index
-                       for index, plot in enumerate(page.plots)
-                       if plot.plot_type not in UNLETTERED_TYPES
-                       ),
+    lettered = sorted(range(len(page.plots)),
                       key=lambda index: (page.plots[index].row,
                                          page.plots[index].column,
                                          ),

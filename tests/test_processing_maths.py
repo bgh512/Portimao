@@ -4,6 +4,8 @@ of a processed file give the results worked out by hand from small made-up data.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import io
+import sys
 from typing import Optional
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
@@ -27,6 +29,7 @@ from utils_shared.reference_level import (reference_level_finder,
                                           )
 from utils_shared.schema import SPECTRUM_INDEX_COLUMN, TIME_COLUMN
 from utils_shared.trimming import experiment_trimmer
+from utils_viewer.viewer_terminal import OutputRouter
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -754,6 +757,125 @@ def test_a_file_with_both_regions_gets_percent_oxidised(monkeypatch: pytest.Monk
 
     # ---- 4 The haems switched off the plot: none is drawn ----------------------------
     assert processor(regions, plot_haems=False)['plotted_haem_source'] is None
+
+
+# ---- test_a_sentence_that_cannot_be_written_keeps_the_haems --------------------------
+def test_a_sentence_that_cannot_be_written_keeps_the_haems(
+    monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a file whose decomposition worked keeps its haems and
+    is never said to have had its decomposition skipped when only the sentence about
+    it cannot be written (a terminal without ₀ or Δ), and that the window's stand-in
+    for the terminal passes "replace what cannot be written" on to the real one.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Stands in for the decomposition and for the terminal.
+
+    ---- Globals read ----
+    TIME_COLUMN, SPECTRUM_INDEX_COLUMN (module constants); settings.DEFAULT_ANSWERS.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None. The terminal is one of Windows' older kind (cp1252), which has no ₀: the
+    sentence names the standard background, B = b₀ + b₁·w + b₂·(w − w_mid)².
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 A made-up file, its decomposition stood in for ----------------------------
+    times = np.arange(10) * 0.5
+
+    def decomposer(experiment: dict, *_args: object, **_kwargs: object) -> None:
+        table = pd.DataFrame({TIME_COLUMN: times,
+                              SPECTRUM_INDEX_COLUMN: np.arange(1, 11),
+                              'bH': 12.0,
+                              },
+                             )
+        delta = table.copy()
+        delta.attrs['delta_abs_baseline'] = {'window_by_haem': {'bH': (0.0, 1.0)},
+                                             'window_seconds': 60.0,
+                                             }
+        experiment.update({'haem_conc': table.copy(),
+                           'haem_abs': table,
+                           'haem_delta_abs': delta,
+                           },
+                          )
+
+    monkeypatch.setattr(experiment_processing, 'experiment_decomposer', decomposer)
+    monkeypatch.setattr(experiment_processing,
+                        'experiment_attenuation_adder',
+                        lambda *args, **kwargs: None,
+                        )
+    monkeypatch.setattr(experiment_processing,
+                        'fit_range_finder',
+                        lambda data: (500.0, 630.0),
+                        )
+    experiment = {'experiment_name': 'made_up',
+                  'CcO2': pd.DataFrame({TIME_COLUMN: times, 'Measured O2': 0.0}),
+                  'VoO2': pd.DataFrame({TIME_COLUMN: times, 'VoO2': 1.0}),
+                  'raw_spectra': {},
+                  'metadata': {'events': []},
+                  }
+    info = {'path': 'made_up.paf',
+            'name': 'made_up',
+            'trim_start': None,
+            'trim_end': None,
+            'ignore_start': 0.0,
+            'ignore_end': 0.0,
+            }
+    answers = dict(settings.DEFAULT_ANSWERS,
+                   decompose=True,
+                   haem_background='rowan_scatter',
+                   haem_mode='delta',
+                   haem_per_od=False,
+                   normalise_od=False,
+                   export_spectra=False,
+                   averaging=False,
+                   )
+
+    # ---- 2 A terminal that cannot write the sentence ---------------------------------
+    written = io.BytesIO()
+    terminal = io.TextIOWrapper(written,
+                                encoding='cp1252',
+                                errors='strict',
+                                newline='',
+                                )
+    monkeypatch.setattr(sys, 'stdout', terminal)
+    processed = experiment_processing.experiment_data_processor(info,
+                                                                settings.Config(answers,
+                                                                                ),
+                                                                {'haem_list': ['bH'],
+                                                                 'data': None,
+                                                                 },
+                                                                experiment,
+                                                                )
+    terminal.flush()
+    text = written.getvalue().decode('cp1252')
+    assert 'haem_delta_abs' in processed['experiment']
+    assert 'was skipped' not in text
+    assert 'the haems themselves are not affected' in text
+
+    # ---- 3 The window passes the setting on, so the sentence is written --------------
+    router = OutputRouter(terminal, lambda text, kind: None, 'out', lambda: None)
+    router.reconfigure(errors='replace')
+    router.write('B = b₀\n')
+    terminal.flush()
+    assert written.getvalue().decode('cp1252').endswith('B = b?\n')
+    router_without_settings = OutputRouter(io.StringIO(),
+                                           lambda text, kind: None,
+                                           'out',
+                                           lambda: None,
+                                           )
+    router_without_settings.reconfigure(errors='replace')  # nothing to set: no error
 
 
 # ---- test_average_that_does_not_fit --------------------------------------------------
