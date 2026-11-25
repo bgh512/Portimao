@@ -14,7 +14,7 @@ import threading
 import traceback
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 from PIL import Image
@@ -2289,6 +2289,7 @@ class ViewerGui:
         if not self._names:
             return
         self._index = index % len(self._names)
+        self._strip.shown_file_setter(self._names[self._index])
         self._combo.current(self._index)
         self._counter.configure(text=f'{self._index + 1} of {len(self._names)}')
         if self._session is not None and self._index < self._file_count:
@@ -3590,6 +3591,9 @@ class ViewerGui:
                                     self._strip_change_teller,
                                     )
         self._strip.frame.pack(side='top', pady=(6, 0))
+        # the switch between the standard plot and the difference spectrum, at the
+        # right under the boxes
+        self._strip.switch_frame.pack(side='top', fill='x', padx=6, pady=(2, 0))
         # the rows of the edges sit in the Time regions box, only while edges are
         # dragged; the second for a step with two rows of edges
         self._edge_row = EdgeRow(tk,
@@ -4252,12 +4256,14 @@ class ViewerGui:
                              has_od: bool,
                              has_baseline: bool = False,
                              has_psi: bool = False,
+                             region_files: Sequence[str] = (),
                              ) -> None:
         """
         ---- Summary ----
         Method to tell the boxes above the plot what they offer: the spectrometers of
         the "Spectra" drop-down, whether % oxidised is in "Haems as", whether per OD is
-        offered, whether % of baseline is in "OCR as", and whether Δψ can be ticked.
+        offered, whether % of baseline is in "OCR as", whether Δψ can be ticked, and
+        the files whose difference spectrum the switch under the boxes can show.
 
         ---- Inputs ----
         spectra : List[str]
@@ -4270,6 +4276,8 @@ class ViewerGui:
             True when the averaging windows are set up.
         has_psi : bool
             True when Δψ can be worked out.
+        region_files : Sequence[str]
+            The names of the files with both regions.
 
         ---- Globals read ----
         None.
@@ -4294,6 +4302,7 @@ class ViewerGui:
                           bool(has_od),
                           bool(has_baseline),
                           bool(has_psi),
+                          list(region_files),
                           ),
                          )
 

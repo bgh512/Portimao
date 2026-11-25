@@ -56,6 +56,10 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    'quick_windows': False,
                    'quick_minutes': 0.5,
                    'delay_minutes': 10.0 / 60.0,
+                   # the windows set on their own and the files whose windows were
+                   # fixed by hand (each_window and file_windows, DATA_FORMAT.md)
+                   'each_window': {},
+                   'file_windows': {},
                    # the kind of window ("settled" or "quick") the 2x2 grid, the time
                    # response and the haem and OCR response average over, asked only
                    # when both kinds are ticked
@@ -76,6 +80,14 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    # the haems of the fit, when decomposed, in the figure of each file
                    'plot_haems': True,
                    'haems': [],
+                   # how a decomposition kept to compare with is shown: "side", a plot
+                   # of its own on the left of the plot in use, or "overlaid", dashed
+                   # over it
+                   'compare_layout': 'side',
+                   # the plot of each file shows its difference spectrum (reduced minus
+                   # oxidised, utils_shared.difference_spectra) in place of the standard
+                   # plot, for a file with both regions; the switch under the boxes
+                   'difference_spectra': False,
                    # the panels of the plot of each file in the order the user moved
                    # them to, top first, by their keys ("oxygen", "vo2", "haem:Cyt bH",
                    # "delta_psi"); empty for the standard order (oxygen, OCR, the haems

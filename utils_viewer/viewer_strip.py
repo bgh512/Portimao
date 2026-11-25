@@ -71,6 +71,7 @@ VALUE_NAMES = ('plot_haems',
                'compare',
                'kept',
                'compare_layout',
+               'difference_spectra',
                'spectra',
                'haem_mode',
                'haem_per_od',
@@ -130,6 +131,12 @@ COMPARE_LAYOUT_TEXTS = {'side': 'Side by side', 'overlaid': 'Overlaid'}
 KEPT_PREFIXES = {'side': 'Kept to compare (Old, the plot on the left): ',
                  'overlaid': 'Kept to compare (Old, faint on the plot): ',
                  }
+# The switch under the boxes between the standard plot of the file shown and its
+# difference spectrum (reduced minus oxidised), by the value difference_spectra, and
+# the note beside it while it is greyed.
+DIFFERENCE_TEXTS = {False: 'Standard plot', True: 'Difference spectrum'}
+DIFFERENCE_NOTE = ('Set both the oxidised and the reduced region on this file to see '
+                   'its difference spectrum.')
 # The button that saves one page of the journal as a PDF with the figure of the file
 # shown on it, and what a click on it is told as: a click, not a value the strip keeps.
 MASTER_TEXT = 'Export master'
@@ -879,7 +886,9 @@ class SettingsStrip:
     values, and the share, the temperature and the limits as text, or as boxes when
     "More options" is ticked. Figure: the journal, the widths that journal allows, the
     height, a button that exports the master page and a button that puts the panels of
-    the plot back in the standard order. It tells the window what the user changed and
+    the plot back in the standard order. Under the boxes, a switch between the standard
+    plot of the file shown and its difference spectrum, greyed for a file without both
+    regions. It tells the window what the user changed and
     can be set by the program; it changes nothing by itself. It starts greyed out,
     until the program says it is listening. Every method runs on the window thread,
     except values_reader.
@@ -889,6 +898,9 @@ class SettingsStrip:
         The Tk frame holding the boxes, for the window to place.
     time_box : Any
         The Time regions box, where the window places the rows of the edges.
+    switch_frame : Any
+        The Tk frame of the switch between the standard plot and the difference
+        spectrum, for the window to place under the boxes.
 
     ---- Globals read ----
     settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS, JOURNAL_NAMES,
@@ -911,6 +923,9 @@ class SettingsStrip:
     _height_handler
     _journal_handler
     _label_mode_handler
+    _layout_handler
+    _difference_handler
+    _difference_checker
     _master_handler
     _more_toggler
     _ocr_handler
@@ -927,6 +942,7 @@ class SettingsStrip:
     choices_setter
     fits_setter
     library_setter
+    shown_file_setter
     state_setter
     values_reader
     values_setter
@@ -978,6 +994,7 @@ class SettingsStrip:
         _background_handler
         _build_toggler
         _compare_handler
+        _difference_handler
         _edit_handler
         _fit_handler
         _fit_saver
@@ -1015,6 +1032,9 @@ class SettingsStrip:
                                         'compare': False,
                                         'kept': '',
                                         'compare_layout': standard['compare_layout'],
+                                        'difference_spectra': bool(
+                                            standard['difference_spectra'],
+                                            ),
                                         'spectra': standard['decomposition_dataset'],
                                         'haem_mode': standard['haem_mode'],
                                         'haem_per_od': bool(standard['haem_per_od']),
@@ -1040,6 +1060,8 @@ class SettingsStrip:
         self._has_od = False
         self._has_baseline = False
         self._has_psi = False
+        self._region_files: List[str] = []
+        self._shown_file = ''
         self._fit_names: List[str] = [self._values['fit_file']]
         self._fit_titles: Dict[str, str] = {}
         self._haems_by_file: Dict[str, str] = {}
@@ -1464,6 +1486,24 @@ class SettingsStrip:
                                        command=self._order_handler,
                                        )
         self._order_button.pack(side='left')
+
+        # ---- 2.6 The switch under the boxes: the standard plot or the difference -----
+        # The window places switch_frame under the boxes; the buttons sit on its right,
+        # with the note on their left while the switch is greyed.
+        self.switch_frame = tk.Frame(parent, bg=background)
+        self._difference_buttons: Dict[bool, Any] = {}
+        for is_on in (True, False):
+            button = tk.Button(self.switch_frame,
+                               text=DIFFERENCE_TEXTS[is_on],
+                               command=lambda chosen=is_on: self._difference_handler(chosen),
+                               )
+            button.pack(side='right', padx=(0, 2))
+            self._difference_buttons[is_on] = button
+        self._difference_note = tk.Label(self.switch_frame,
+                                         text=DIFFERENCE_NOTE,
+                                         bg=background,
+                                         fg=NOTE_TEXT,
+                                         )
 
         # ---- 3 What the user does ----------------------------------------------------
         self._angle_entry.bind('<Return>', self._angle_handler)
@@ -2057,6 +2097,77 @@ class SettingsStrip:
         self._size_refresher()
         self._change_reporter(before)
 
+    # ---- _difference_handler ---------------------------------------------------------
+    def _difference_handler(self, is_on: bool) -> None:
+        """
+        ---- Summary ----
+        Method to take a click on the switch under the boxes: the standard plot of the
+        file shown, or its difference spectrum. A click on the one already in use, or
+        while the switch is greyed, changes nothing.
+
+        ---- Inputs ----
+        is_on : bool
+            True for the difference spectrum, False for the standard plot.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value, presses the button in and reports the change (side
+        effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _difference_checker
+        _size_refresher
+        """
+
+        if not self._difference_checker():
+            return
+        before = dict(self._values)
+        self._values['difference_spectra'] = bool(is_on)
+        self._size_refresher()
+        self._change_reporter(before)
+
+    # ---- _difference_checker ---------------------------------------------------------
+    def _difference_checker(self) -> bool:
+        """
+        ---- Summary ----
+        Method to say whether the switch under the boxes can be clicked: while the
+        strip is listening, the haems are shown and the file shown has both regions.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        bool
+            True when the switch can be clicked.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return (self._is_enabled and
+                bool(self._values['plot_haems']) and
+                self._shown_file in self._region_files
+                )
+
     # ---- _master_handler -------------------------------------------------------------
     def _master_handler(self) -> None:
         """
@@ -2371,6 +2482,7 @@ class SettingsStrip:
         None.
 
         ---- Helpers ----
+        _difference_checker
         fit_title_maker
         formula_note_writer
         formula_picture_maker
@@ -2582,6 +2694,20 @@ class SettingsStrip:
         if is_standard or not self._is_enabled:
             self._width_combo.configure(state='disabled')
             self._height_entry.configure(state='disabled')
+        # ---- the switch under the boxes: the one in use pressed in; greyed, with its
+        # note, unless the file shown has both regions
+        can_switch = self._difference_checker()
+        for is_on, button in self._difference_buttons.items():
+            button.configure(relief=('sunken'
+                                     if values['difference_spectra'] == is_on
+                                     else 'raised'
+                                     ),
+                             state='normal' if can_switch else 'disabled',
+                             )
+        if self._is_enabled and values['plot_haems'] and not can_switch:
+            self._difference_note.pack(side='right', padx=(0, 6))
+        else:
+            self._difference_note.pack_forget()
 
     # ---- _spectra_handler ------------------------------------------------------------
     def _spectra_handler(self, event: Any = None) -> None:
@@ -2741,14 +2867,16 @@ class SettingsStrip:
                        has_od: bool,
                        has_baseline: bool = False,
                        has_psi: bool = False,
+                       region_files: Sequence[str] = (),
                        ) -> None:
         """
         ---- Summary ----
         Method to say what the boxes offer: the spectrometers of the "Spectra"
         drop-down (shown only with more than one), whether % oxidised is in the "Haems
         as" drop-down, whether the per OD boxes of the OCR and the haems are shown,
-        whether % of baseline is in the "OCR as" drop-down, and whether the tick of the
-        Δψ box can be clicked. The values stay.
+        whether % of baseline is in the "OCR as" drop-down, whether the tick of the
+        Δψ box can be clicked, and the files whose difference spectrum the switch under
+        the boxes can show. The values stay.
 
         ---- Inputs ----
         spectra : List[str]
@@ -2763,6 +2891,9 @@ class SettingsStrip:
         has_psi : bool
             True when Δψ can be worked out (a file with both regions and a fit with bH
             and bL), so its tick can be clicked.
+        region_files : Sequence[str]
+            The names of the files with both regions; the switch under the boxes is
+            greyed for any other file.
 
         ---- Globals read ----
         None.
@@ -2786,6 +2917,7 @@ class SettingsStrip:
         self._has_od = bool(has_od)
         self._has_baseline = bool(has_baseline)
         self._has_psi = bool(has_psi)
+        self._region_files = list(region_files)
         self._size_refresher()
 
     # ---- fits_setter -----------------------------------------------------------------
@@ -2890,6 +3022,38 @@ class SettingsStrip:
             placed[kind] += 1
             self._tick_boxes[name] = box
         self._size_refresher()
+
+    # ---- shown_file_setter -----------------------------------------------------------
+    def shown_file_setter(self, name: str) -> None:
+        """
+        ---- Summary ----
+        Method to say which file the plot shows, so the switch under the boxes is
+        greyed for a file without both regions.
+
+        ---- Inputs ----
+        name : str
+            The name of the file shown.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the widgets (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _size_refresher
+        """
+
+        if name != self._shown_file:
+            self._shown_file = str(name)
+            self._size_refresher()
 
     # ---- state_setter ----------------------------------------------------------------
     def state_setter(self, is_enabled: bool) -> None:
@@ -3859,10 +4023,11 @@ def strip_values_builder(answers: dict,
     ---- Inputs ----
     answers : dict
         The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
-        haem_per_od, ocr_mode, label_mode, compare_layout, delta_psi and the numbers
-        of Δψ, journal, columns, height, size_mode); a fit_file of None shows an empty
-        fit, a missing label_mode the labels in the chamber, and a missing
-        compare_layout the standard one.
+        haem_per_od, ocr_mode, label_mode, compare_layout, difference_spectra,
+        delta_psi and the numbers of Δψ, journal, columns, height, size_mode); a
+        fit_file of None shows an empty fit, a missing label_mode the labels in the
+        chamber, a missing compare_layout the standard one and a missing
+        difference_spectra the standard plot.
     has_haems : bool
         True when the haems are worked out and shown, which ticks the box.
     haem_files : Sequence[str]
@@ -3900,6 +4065,7 @@ def strip_values_builder(answers: dict,
             'compare_layout': answers.get('compare_layout',
                                           settings.DEFAULT_ANSWERS['compare_layout'],
                                           ),
+            'difference_spectra': bool(answers.get('difference_spectra', False)),
             'spectra': str(answers.get('decomposition_dataset') or ''),
             'haem_mode': answers['haem_mode'],
             'haem_per_od': bool(answers['haem_per_od']),
@@ -3987,6 +4153,12 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         raise ValueError('The strip cannot show the kept decomposition as '
                          f"'{values['compare_layout']}'; it has "
                          f"{', '.join(COMPARE_LAYOUT_TEXTS)}.",
+                         )
+    if ('difference_spectra' in values and
+        not isinstance(values['difference_spectra'], bool)
+        ):
+        raise ValueError('Whether the plot shows the difference spectrum is True or '
+                         f"False; {values['difference_spectra']!r} is not.",
                          )
     if 'spectra' in values and not isinstance(values['spectra'], str):
         raise ValueError('The spectrometer of the strip is given by its name; '

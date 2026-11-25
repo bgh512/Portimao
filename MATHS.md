@@ -1,6 +1,6 @@
 # Portimao maths
 
-How Portimao works out its haem numbers (and, in section 8, the concentration of each addition), written so that the maths can be checked without reading the code. Each quantity has its equation, what every letter in it is (with its unit), a worked example in numbers, and the test that checks it. The numbers of each example are the numbers of its test, so the example and the program cannot drift apart: the tests are in the `tests/` folder of the development copy and are run each time the program is changed.
+How Portimao works out its haem numbers (and, in section 8, the concentration of each addition; in section 9, the difference spectrum), written so that the maths can be checked without reading the code. Each quantity has its equation, what every letter in it is (with its unit), a worked example in numbers, and the test that checks it. The numbers of each example are the numbers of its test, so the example and the program cannot drift apart: the tests are in the `tests/` folder of the development copy and are run each time the program is changed.
 
 The equations are written as a textbook writes them, which GitHub and VS Code's preview show typeset.
 
@@ -514,3 +514,39 @@ and $c = 0 + 400 = 400$ µM. The same again gives $c = 400 + 400 = 800$ µM, and
 Example 2: BD typed by hand as 10 µM in the chamber; then 5 µL of 10 mM BD gives $c = 10 + 10 = 20$ µM; then BD typed as 50 µM gives $a = 50 - 20 = 30$ µM.
 
 Checked by: `test_one_addition`, `test_the_same_thing_added_again_adds_up`, `test_a_concentration_typed`, `test_a_stock_typed_with_its_unit`, `test_the_text_of_the_labels` and `test_the_text_in_the_file_read` in `tests/test_event_concentrations.py`.
+
+---
+
+## 9. The difference spectrum
+
+The switch **Standard plot | Difference spectrum** under the boxes shows, for a file with both regions (section 3), how its spectrum changes from the oxidised region to the reduced region, and which haems make up that change.
+
+$$\Delta A(w) = \overline{A(w)}_{\mathrm{red}} - \overline{A(w)}_{\mathrm{ox}}$$
+
+- $w$: one wavelength (nm)
+- $A(w)$: the attenuation of one spectrum at that wavelength, from 1.1, written in mOD (1 OD = 1000 mOD)
+- $\overline{A(w)}_{\mathrm{red}}$: the mean of $A(w)$ over the spectra inside the reduced region (mOD); inside as in section 3, the spectra at both edges counted
+- $\overline{A(w)}_{\mathrm{ox}}$: the same over the spectra inside the oxidised region (mOD)
+- $\Delta A(w)$: the difference spectrum, reduced minus oxidised (mOD)
+
+The difference is then described as so much of each haem's shape on top of a smooth background, exactly as one spectrum is in 1.2, with the background chosen for the dataset (1.3):
+
+$$\Delta A = c_1 S_1 + c_2 S_2 + \dots + B$$
+
+The plot shows $\Delta A$ in black, each haem's part $c_i S_i$ in its colour, $B$ dotted, the fit $c_1 S_1 + c_2 S_2 + \dots + B$ dashed, and underneath the residual $\Delta A$ minus the fit.
+
+Notes:
+
+- Each region's spectrum is the **mean** (average) of its spectra at each wavelength, while a haem's level in a region (section 3) is the **median** of its values there. So one spike in a spectrum moves the difference spectrum a little, where it would not move a level; the more spectra a region holds, the less.
+- The shapes are oxidised minus reduced (1.2), so a haem more reduced in the reduced region has a negative amount $c$, and its part $c\,S$ follows the measured difference.
+- A file without both regions has no difference spectrum, and keeps its standard plot.
+
+Example: three wavelengths, 500, 550 and 600 nm. In the oxidised region, 0 to 1 min, three spectra: 400, 500, 600; 410, 510, 610; 420, 520, 620 mOD. A spectrum at 2 min (9000 mOD everywhere) lies in neither region and is left out. In the reduced region, 3 to 4 min: 412, 515, 610; 414, 517, 612; 416, 519, 614 mOD.
+
+- Oxidised mean: $\dfrac{400 + 410 + 420}{3} = 410$, then 510 and 610 mOD.
+- Reduced mean: $\dfrac{412 + 414 + 416}{3} = 414$, then 517 and 612 mOD.
+- $\Delta A = 414 - 410 = 4$, $517 - 510 = 7$ and $612 - 610 = 2$ mOD.
+
+Second example: a reduced spectrum built as the oxidised one plus the five haem shapes of 1.2 in the amounts 0.0001 to 0.0005 mM, and a background of 1 mOD plus a part falling from 2 mOD at the shortest wavelength to 0 at the longest. The decomposition of the difference gives back those five amounts, each haem's part as its amount times its shape, and a residual of 0.
+
+Checked by: `test_mean_difference`, `test_known_haems_come_back` and `test_no_regions_no_difference` in `tests/test_difference_spectra.py`.

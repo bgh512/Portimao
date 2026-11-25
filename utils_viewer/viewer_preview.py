@@ -21,7 +21,13 @@ from PIL import Image, ImageDraw, ImageFont
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
 from utils_shared.delta_psi import DELTA_PSI_COLUMN
+from utils_shared.difference_spectra import (difference_decomposer,
+                                             difference_figure_drawer,
+                                             difference_spectrum_builder,
+                                             WAVELENGTH_FIGURE_MARK,
+                                             )
 from utils_shared.experiment_processing import experiment_data_processor
+from utils_shared.figure_layout import figure_canvas_fitter
 from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_exporter import (experiment_workbook_exporter,
                                                          FULL_FOLDER,
@@ -1382,7 +1388,10 @@ def preview_figure_builder(session: ViewerSession,
         by the controls. With a decomposition kept and the answer compare_layout
         SIDE_BY_SIDE, the figure carries the kept plot as its attribute kept_figure,
         which preview_picture_maker puts on the left of the picture; otherwise the
-        kept haems are drawn dashed over the haems in use.
+        kept haems are drawn dashed over the haems in use. With the answer
+        difference_spectra on, a file with both regions is drawn as its difference
+        spectrum, with neither the kept decomposition nor the shading; any other file
+        as before.
 
     ---- Globals mutated ----
     None. Sets the matplotlib rcParams of the figure style; the details of a problem
@@ -1397,8 +1406,12 @@ def preview_figure_builder(session: ViewerSession,
     _kept_side_drawer
     _loaded_experiment_getter
     _overlay_drawer
+    difference_decomposer
+    difference_figure_drawer
+    difference_spectrum_builder
     experiment_data_processor
     experiment_plotter
+    figure_canvas_fitter
     preview_info_builder
     problem_teller
     time_title_chooser
@@ -1448,14 +1461,45 @@ def preview_figure_builder(session: ViewerSession,
                                                       'delta_psi'],
                                                   )
             plot_config.update(plot_extras)
-            _, axes = experiment_plotter(experiment,
-                                         plot_config,
-                                         session.export_root,
-                                         fig=fig,
+            # The difference spectrum in place of the standard plot, for a file with
+            # both regions when the switch under the boxes asks for it.
+            difference = None
+            if (preview_answers.get('difference_spectra') and
+                spec.fit is not None and
+                'haem_levels' in experiment
+                ):
+                difference = difference_spectrum_builder(
+                    experiment,
+                    preview_answers['decomposition_dataset'],
+                    )
+            if difference is not None:
+                decomposition = difference_decomposer(
+                    difference,
+                    spec.fit,
+                    preview_answers['haem_background'],
+                    settings.HAEM_FACTOR,
+                    )
+                fig.set_size_inches(*plot_config['FIGURE_SIZE'])
+                difference_figure_drawer(fig,
+                                         difference,
+                                         decomposition,
+                                         settings.haem_colour_mapper(
+                                             list(spec.fit['haem_list']),
+                                             ),
+                                         settings.COMPONENT_FIGURE_STYLE,
                                          )
+                figure_canvas_fitter(fig, plot_config['LAYOUT_PAD_PT'])
+            else:
+                _, axes = experiment_plotter(experiment,
+                                             plot_config,
+                                             session.export_root,
+                                             fig=fig,
+                                             )
     except Exception as exc:  # a preview problem must never stop the questions
         return None, problem_teller(f'Preview not drawn for {name}', exc)
     notes = '\n'.join(buffer.warnings)
+    if difference is not None:  # no kept decomposition, no shading: no time axis
+        return fig, notes
 
     # ---- 2.1 Draw the kept decomposition beside the plot, or over the haems ----------
     kept_fig, kept_axes = None, []
@@ -1622,7 +1666,8 @@ def time_axis_finder(fig: Figure) -> Optional[TimeAxis]:
     Optional[TimeAxis]
         The place and the range of the time axis, with the key, bottom and top of each
         panel of the standard plot (experiment_drawer names them), top first; or None
-        when the figure has no panel or its axis has no length.
+        when the figure has no panel, its axis has no length or it is a figure of
+        wavelengths (the difference spectrum, WAVELENGTH_FIGURE_MARK).
 
     ---- Globals mutated ----
     None.
@@ -1635,7 +1680,7 @@ def time_axis_finder(fig: Figure) -> Optional[TimeAxis]:
     None.
     """
 
-    if not fig.axes:
+    if not fig.axes or getattr(fig, WAVELENGTH_FIGURE_MARK, False):
         return None
     first = fig.axes[0]
     shared = first.get_shared_x_axes()

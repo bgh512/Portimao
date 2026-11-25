@@ -2238,7 +2238,9 @@ def _strip_change_applier(session: ViewerSession,
     of its own on the left or drawn dashed over the haems and over Δψ (the switch
     beside Keep new, kept in the answers), until one of the two is chosen (Keep new
     carries on with what is on the plot, Keep old puts the kept one back in use) or
-    the haems are left out. A click on Save fit saves the haems ticked under Build a fit as a fit file of
+    the haems are left out. The switch under the boxes shows the difference spectrum
+    of each file with both regions in place of the standard plot, or the standard
+    plot again, kept in the answers. A click on Save fit saves the haems ticked under Build a fit as a fit file of
     the name typed beside it. A click on Do PCA asks the questions that find the
     components from the data while the haem step waits, and says where to go
     otherwise. A new journal, width or height redraws only the figure
@@ -2461,6 +2463,17 @@ def _strip_change_applier(session: ViewerSession,
         info_printer(f"Now {COMPARE_LAYOUT_WORDS[answers['compare_layout']]}.")
         is_redrawn = is_redrawn or session.kept is not None
 
+    # ---- 4.2 The standard plot or the difference spectrum ----------------------------
+    if 'difference_spectra' in changes:
+        answers['difference_spectra'] = bool(changes['difference_spectra'])
+        info_printer('The plot now shows the difference spectrum of each file with '
+                     'both regions: reduced minus oxidised, with each haem, the fit '
+                     'and the residual.'
+                     if answers['difference_spectra']
+                     else 'The plot shows the standard plot again.',
+                     )
+        is_redrawn = True
+
     # ---- 5 Show what is in use and redraw --------------------------------------------
     _strip_shower(session, answers)
     if is_redrawn and session.redraw is not None:
@@ -2476,9 +2489,9 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
     the spectrometer, how the haems and the OCR are shown, the journal and the size.
     It also says what the strip offers: the spectrometers every file has, % oxidised
     when at least one file has both regions, per OD when every OD value was entered,
-    Edit ODs once scaling by OD was chosen, and the OCR as % of baseline once the
-    averaging windows are set up
-    (session.has_windows). Haems in % oxidised go back to delta D when no file has
+    Edit ODs once scaling by OD was chosen, the OCR as % of baseline once the
+    averaging windows are set up (session.has_windows), and the files whose difference
+    spectrum the switch under the boxes can show. Haems in % oxidised go back to delta D when no file has
     both regions any more.
 
     ---- Inputs ----
@@ -2526,6 +2539,7 @@ def _strip_shower(session: ViewerSession, answers: dict) -> None:
                                         session.has_od,
                                         session.has_windows,
                                         has_psi,
+                                        region_files,
                                         )
     fit = session.fit
     session.window.strip_setter(strip_values_builder(answers,

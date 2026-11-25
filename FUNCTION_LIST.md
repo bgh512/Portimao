@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.26
-- **Date:** 24/11/2026
+- **Version:** V2.27
+- **Date:** 25/11/2026
 
 ## Contents
 
@@ -142,6 +142,15 @@
     - [`example_table_builder`](#example_table_builder)
     - [`example_numbers_finder`](#example_numbers_finder)
     - [`test_example_delta_psi_stays_fixed`](#test_example_delta_psi_stays_fixed)
+- [`tests/test_difference_spectra.py`](#teststest_difference_spectrapy)
+    - [`_background_builder`](#_background_builder)
+    - [`_experiment_maker`](#_experiment_maker)
+    - [`_haem_experiment_maker`](#_haem_experiment_maker)
+    - [`test_mean_difference`](#test_mean_difference)
+    - [`test_known_haems_come_back`](#test_known_haems_come_back)
+    - [`test_no_regions_no_difference`](#test_no_regions_no_difference)
+    - [`test_figure_panels`](#test_figure_panels)
+    - [`test_strip_switch_value`](#test_strip_switch_value)
 - [`tests/test_early_plots.py`](#teststest_early_plotspy)
     - [`FakeWindow`](#fakewindow)
     - [`_context_builder`](#_context_builder)
@@ -813,6 +822,10 @@
     - [`delta_psi_table_builder`](#delta_psi_table_builder)
     - [`state_fractions_solver`](#state_fractions_solver)
     - [`thermal_voltage_finder`](#thermal_voltage_finder)
+- [`utils_shared/difference_spectra.py`](#utils_shareddifference_spectrapy)
+    - [`difference_decomposer`](#difference_decomposer)
+    - [`difference_figure_drawer`](#difference_figure_drawer)
+    - [`difference_spectrum_builder`](#difference_spectrum_builder)
 - [`utils_shared/event_concentrations.py`](#utils_sharedevent_concentrationspy)
     - [`_label_key_maker`](#_label_key_maker)
     - [`addition_calculator`](#addition_calculator)
@@ -5488,6 +5501,239 @@ Each number within RELATIVE x its size of the one written down.
 ---- Helpers ----
 example_numbers_finder
 example_table_builder
+```
+
+## `tests/test_difference_spectra.py`
+
+Tests of the difference spectrum of a file (reduced minus oxidised), its decomposition into the haems, its figure and its switch under the boxes, on made-up spectra worked out by hand.
+
+### TEST HELPERS
+
+#### `_background_builder`
+
+```text
+---- Summary ----
+Helper function to build the sloping background shape: it falls with wavelength
+from 1 at the shortest to 0 at the longest, as test_haem_decomposition's does.
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths (nm), shape (n_wavelengths).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The shape, shape (n_wavelengths).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+(1/wl - min(1/wl)) / (max(1/wl) - min(1/wl)).
+
+---- Helpers ----
+None.
+```
+
+#### `_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to make a processed file holding only what the difference spectrum
+reads: its Cyt spectra and, unless told not to, its two regions (oxidised 0 to 1
+min, reduced 3 to 4 min).
+
+---- Inputs ----
+wavelengths : np.ndarray
+    Wavelengths (nm), shape (n_wavelengths).
+times : np.ndarray
+    Time of each spectrum (min), shape (n_spectra).
+spectra : np.ndarray
+    Attenuation (OD), shape (n_spectra, n_wavelengths).
+has_levels : bool
+    False for a file without both regions (no haem_levels).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The experiment (DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_haem_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to make a file on the wavelengths of the test fit whose reduced
+spectra are its oxidised spectra plus known amounts of the five haems and a
+background.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, FIT_ORDER, HAEM_FACTOR, AMOUNTS, OFFSET, SLOPE.
+
+---- Outputs ----
+tuple
+    (the experiment, the haem shapes as columns in FIT_ORDER).
+
+---- Globals mutated ----
+None. Reads the fit file (side effect).
+
+---- Equations ----
+oxidised = 0.4 + 0.05 x background; reduced = oxidised + sum(amount_i x shape_i)
+x HAEM_FACTOR + OFFSET + SLOPE x background.
+
+---- Helpers ----
+_background_builder
+_experiment_maker
+```
+
+### TESTS
+
+#### `test_mean_difference`
+
+```text
+---- Summary ----
+Main function to check that the difference spectrum is the mean of the three
+reduced spectra minus the mean of the three oxidised ones, in mOD, leaving out the
+spectrum between the regions.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+WAVELENGTHS_NM, TIMES_MIN, ATTENUATION_OD, EXPECTED_MOD.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+(0.414 - 0.41, 0.517 - 0.51, 0.612 - 0.61) x 1000 = (4, 7, 2) mOD.
+
+---- Helpers ----
+_experiment_maker
+```
+
+#### `test_known_haems_come_back`
+
+```text
+---- Summary ----
+Main function to check that a difference built from known haem amounts on a
+background is decomposed into those amounts, each haem's line being its amount
+times its shape, with a residual of about 0.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, FIT_ORDER, HAEM_FACTOR, AMOUNTS, EXACT.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+haem_i (mOD) = amount_i x shape_i x HAEM_FACTOR x 1000.
+
+---- Helpers ----
+_haem_experiment_maker
+```
+
+#### `test_no_regions_no_difference`
+
+```text
+---- Summary ----
+Main function to check that a file without both regions has no difference
+spectrum, and that a file without the spectrometer asked for is refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+WAVELENGTHS_NM, TIMES_MIN, ATTENUATION_OD.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_experiment_maker
+```
+
+#### `test_figure_panels`
+
+```text
+---- Summary ----
+Main function to check the figure, drawn off screen: two panels, one line for each
+haem in its colour, the regions' times in the key, and no time axis for the window.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIT_FILE, FIT_ORDER, HAEM_FACTOR, settings.COMPONENT_FIGURE_STYLE.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haem_experiment_maker
+```
+
+#### `test_strip_switch_value`
+
+```text
+---- Summary ----
+Main function to check the switch's value in the strip: the standard plot unless
+the answers ask for the difference spectrum, and only True or False accepted.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `tests/test_early_plots.py`
@@ -25421,6 +25667,127 @@ s = R x (temperature + 273.15) / F x 1000.
 None.
 ```
 
+## `utils_shared/difference_spectra.py`
+
+The difference spectrum of a file, reduced minus oxidised, its decomposition into the haems and its figure.
+
+### MAIN FUNCTIONS
+
+#### `difference_decomposer`
+
+```text
+---- Summary ----
+Main function to decompose the difference spectrum into the haems of the fit and
+the background under them, as one spectrum of the run is decomposed (MATHS.md
+section 1.2).
+
+---- Inputs ----
+difference : dict
+    The difference spectrum (difference_spectrum_builder; DATA_FORMAT.md,
+    region_difference).
+fit : dict
+    The fit in use: 'data' (the fit table) and 'haem_list' (the haem names in the
+    order of its columns).
+background : str
+    The background fitted under the haems, a key of BACKGROUND_LABELS (the answer
+    haem_background).
+haem_factor : float
+    Scale factor of the fit shapes (config.HAEM_FACTOR).
+
+---- Globals read ----
+MOD_PER_OD.
+
+---- Outputs ----
+dict
+    The decomposition (DATA_FORMAT.md, region_difference_decomposition), its spectra on
+    the wavelengths the fit covers, in mOD.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+ΔA(w) = Σ c_i S_i(w) + background(w) + residual(w), with c_i found by least
+squares; fit = haems + background.
+
+---- Helpers ----
+spectrum_decomposer
+```
+
+#### `difference_figure_drawer`
+
+```text
+---- Summary ----
+Main function to draw the difference spectrum on a figure: on top the measured
+difference in black, each haem in its colour, the background dotted and the fit
+(haems + background) dashed, with a key giving the times of the two regions; under
+it a small panel of the residual. The figure is marked as having no time axis.
+
+---- Inputs ----
+fig : Figure
+    The figure to draw on; it is cleared first.
+difference : dict
+    The difference spectrum (difference_spectrum_builder).
+decomposition : dict
+    Its decomposition (difference_decomposer).
+colours : Dict[str, str]
+    {haem name: colour} (config.haem_colour_mapper).
+style : dict
+    Greys and line widths (config.COMPONENT_FIGURE_STYLE).
+
+---- Globals read ----
+RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, WAVELENGTH_FIGURE_MARK, X_LABEL, Y_LABEL.
+
+---- Outputs ----
+List
+    The two axes, the spectrum first.
+
+---- Globals mutated ----
+None. Draws on the figure and sets its WAVELENGTH_FIGURE_MARK attribute (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `difference_spectrum_builder`
+
+```text
+---- Summary ----
+Main function to work out the difference spectrum of a processed file: the mean
+attenuation of its spectra in the reduced region minus that in the oxidised region,
+at each wavelength. There is none for a file without both regions.
+
+---- Inputs ----
+experiment : dict
+    The processed experiment (DATA_FORMAT.md), with 'raw_spectra' and, for a file
+    with both regions, 'haem_levels'.
+dataset : str
+    The spectrometer whose spectra hold the haems (the answer
+    decomposition_dataset).
+
+---- Globals read ----
+MOD_PER_OD.
+
+---- Outputs ----
+Optional[dict]
+    The difference spectrum (DATA_FORMAT.md, region_difference), or None when the
+    file has no 'haem_levels' or a region holds no spectrum. Raises ValueError when
+    the file has no attenuation spectra of that spectrometer.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+ΔA(w) = mean of A(w) over the spectra in the reduced region - mean of A(w) over
+the spectra in the oxidised region, × 1000 for mOD (MATHS.md section 9).
+
+---- Helpers ----
+None.
+```
+
 ## `utils_shared/event_concentrations.py`
 
 The concentration of each addition: read from the text in the file, the stock typed with its unit, the concentration in the chamber, adding up for the same thing added again, and the text of its label.
@@ -39846,7 +40213,8 @@ None.
 ---- Summary ----
 Method to tell the boxes above the plot what they offer: the spectrometers of
 the "Spectra" drop-down, whether % oxidised is in "Haems as", whether per OD is
-offered, whether % of baseline is in "OCR as", and whether Δψ can be ticked.
+offered, whether % of baseline is in "OCR as", whether Δψ can be ticked, and
+the files whose difference spectrum the switch under the boxes can show.
 
 ---- Inputs ----
 spectra : List[str]
@@ -39859,6 +40227,8 @@ has_baseline : bool
     True when the averaging windows are set up.
 has_psi : bool
     True when Δψ can be worked out.
+region_files : Sequence[str]
+    The names of the files with both regions.
 
 ---- Globals read ----
 None.
@@ -42301,7 +42671,10 @@ Tuple[Optional[Figure], str]
     by the controls. With a decomposition kept and the answer compare_layout
     SIDE_BY_SIDE, the figure carries the kept plot as its attribute kept_figure,
     which preview_picture_maker puts on the left of the picture; otherwise the
-    kept haems are drawn dashed over the haems in use.
+    kept haems are drawn dashed over the haems in use. With the answer
+    difference_spectra on, a file with both regions is drawn as its difference
+    spectrum, with neither the kept decomposition nor the shading; any other file
+    as before.
 
 ---- Globals mutated ----
 None. Sets the matplotlib rcParams of the figure style; the details of a problem
@@ -42316,8 +42689,12 @@ _kept_haems_drawer
 _kept_side_drawer
 _loaded_experiment_getter
 _overlay_drawer
+difference_decomposer
+difference_figure_drawer
+difference_spectrum_builder
 experiment_data_processor
 experiment_plotter
+figure_canvas_fitter
 preview_info_builder
 problem_teller
 time_title_chooser
@@ -42379,7 +42756,8 @@ None.
 Optional[TimeAxis]
     The place and the range of the time axis, with the key, bottom and top of each
     panel of the standard plot (experiment_drawer names them), top first; or None
-    when the figure has no panel or its axis has no length.
+    when the figure has no panel, its axis has no length or it is a figure of
+    wavelengths (the difference spectrum, WAVELENGTH_FIGURE_MARK).
 
 ---- Globals mutated ----
 None.
@@ -43920,7 +44298,9 @@ the fit, the background, the regions and the numbers of Δψ in use, shown as a 
 of its own on the left or drawn dashed over the haems and over Δψ (the switch
 beside Keep new, kept in the answers), until one of the two is chosen (Keep new
 carries on with what is on the plot, Keep old puts the kept one back in use) or
-the haems are left out. A click on Save fit saves the haems ticked under Build a fit as a fit file of
+the haems are left out. The switch under the boxes shows the difference spectrum
+of each file with both regions in place of the standard plot, or the standard
+plot again, kept in the answers. A click on Save fit saves the haems ticked under Build a fit as a fit file of
 the name typed beside it. A click on Do PCA asks the questions that find the
 components from the data while the haem step waits, and says where to go
 otherwise. A new journal, width or height redraws only the figure
@@ -43977,9 +44357,9 @@ ticked when they are worked out, the fit, the decomposition kept to compare with
 the spectrometer, how the haems and the OCR are shown, the journal and the size.
 It also says what the strip offers: the spectrometers every file has, % oxidised
 when at least one file has both regions, per OD when every OD value was entered,
-Edit ODs once scaling by OD was chosen, and the OCR as % of baseline once the
-averaging windows are set up
-(session.has_windows). Haems in % oxidised go back to delta D when no file has
+Edit ODs once scaling by OD was chosen, the OCR as % of baseline once the
+averaging windows are set up (session.has_windows), and the files whose difference
+spectrum the switch under the boxes can show. Haems in % oxidised go back to delta D when no file has
 both regions any more.
 
 ---- Inputs ----
@@ -45171,7 +45551,9 @@ each midpoint with the other haem reduced filled in, a button for the paper's
 values, and the share, the temperature and the limits as text, or as boxes when
 "More options" is ticked. Figure: the journal, the widths that journal allows, the
 height, a button that exports the master page and a button that puts the panels of
-the plot back in the standard order. It tells the window what the user changed and
+the plot back in the standard order. Under the boxes, a switch between the standard
+plot of the file shown and its difference spectrum, greyed for a file without both
+regions. It tells the window what the user changed and
 can be set by the program; it changes nothing by itself. It starts greyed out,
 until the program says it is listening. Every method runs on the window thread,
 except values_reader.
@@ -45181,6 +45563,9 @@ frame : Any
     The Tk frame holding the boxes, for the window to place.
 time_box : Any
     The Time regions box, where the window places the rows of the edges.
+switch_frame : Any
+    The Tk frame of the switch between the standard plot and the difference
+    spectrum, for the window to place under the boxes.
 
 ---- Globals read ----
 settings.DEFAULT_ANSWERS, settings.JOURNAL_SPECS, JOURNAL_NAMES,
@@ -45203,6 +45588,9 @@ _haems_handler
 _height_handler
 _journal_handler
 _label_mode_handler
+_layout_handler
+_difference_handler
+_difference_checker
 _master_handler
 _more_toggler
 _ocr_handler
@@ -45219,6 +45607,7 @@ _width_handler
 choices_setter
 fits_setter
 library_setter
+shown_file_setter
 state_setter
 values_reader
 values_setter
@@ -45264,6 +45653,7 @@ _back_handler
 _background_handler
 _build_toggler
 _compare_handler
+_difference_handler
 _edit_handler
 _fit_handler
 _fit_saver
@@ -45745,6 +46135,65 @@ _change_reporter
 _size_refresher
 ```
 
+##### `_difference_handler`
+
+```text
+---- Summary ----
+Method to take a click on the switch under the boxes: the standard plot of the
+file shown, or its difference spectrum. A click on the one already in use, or
+while the switch is greyed, changes nothing.
+
+---- Inputs ----
+is_on : bool
+    True for the difference spectrum, False for the standard plot.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value, presses the button in and reports the change (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_difference_checker
+_size_refresher
+```
+
+##### `_difference_checker`
+
+```text
+---- Summary ----
+Method to say whether the switch under the boxes can be clicked: while the
+strip is listening, the haems are shown and the file shown has both regions.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the switch can be clicked.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_master_handler`
 
 ```text
@@ -46008,6 +46457,7 @@ None. Changes the widgets (side effect).
 None.
 
 ---- Helpers ----
+_difference_checker
 fit_title_maker
 formula_note_writer
 formula_picture_maker
@@ -46142,8 +46592,9 @@ _change_reporter
 Method to say what the boxes offer: the spectrometers of the "Spectra"
 drop-down (shown only with more than one), whether % oxidised is in the "Haems
 as" drop-down, whether the per OD boxes of the OCR and the haems are shown,
-whether % of baseline is in the "OCR as" drop-down, and whether the tick of the
-Δψ box can be clicked. The values stay.
+whether % of baseline is in the "OCR as" drop-down, whether the tick of the
+Δψ box can be clicked, and the files whose difference spectrum the switch under
+the boxes can show. The values stay.
 
 ---- Inputs ----
 spectra : List[str]
@@ -46158,6 +46609,9 @@ has_baseline : bool
 has_psi : bool
     True when Δψ can be worked out (a file with both regions and a fit with bH
     and bL), so its tick can be clicked.
+region_files : Sequence[str]
+    The names of the files with both regions; the switch under the boxes is
+    greyed for any other file.
 
 ---- Globals read ----
 None.
@@ -46233,6 +46687,34 @@ None.
 ---- Helpers ----
 _size_refresher
 _tick_handler
+```
+
+##### `shown_file_setter`
+
+```text
+---- Summary ----
+Method to say which file the plot shows, so the switch under the boxes is
+greyed for a file without both regions.
+
+---- Inputs ----
+name : str
+    The name of the file shown.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_size_refresher
 ```
 
 ##### `state_setter`
@@ -46933,10 +47415,11 @@ Main function to give the strip values that show the answers of the run.
 ---- Inputs ----
 answers : dict
     The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
-    haem_per_od, ocr_mode, label_mode, compare_layout, delta_psi and the numbers
-    of Δψ, journal, columns, height, size_mode); a fit_file of None shows an empty
-    fit, a missing label_mode the labels in the chamber, and a missing
-    compare_layout the standard one.
+    haem_per_od, ocr_mode, label_mode, compare_layout, difference_spectra,
+    delta_psi and the numbers of Δψ, journal, columns, height, size_mode); a
+    fit_file of None shows an empty fit, a missing label_mode the labels in the
+    chamber, a missing compare_layout the standard one and a missing
+    difference_spectra the standard plot.
 has_haems : bool
     True when the haems are worked out and shown, which ticks the box.
 haem_files : Sequence[str]
