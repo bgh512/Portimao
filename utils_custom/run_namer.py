@@ -4,7 +4,7 @@ Experiment (run) name parsing: conditions, run numbers, groups and hours.
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import re
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.user_notices import warning_shower
@@ -16,6 +16,10 @@ RUN_NAME_PATTERN = re.compile(r'^(?P<condition>.*?)[\s_-]*run[\s_-]*(?P<run>\d+)
                               re.IGNORECASE,
                               )
 HOURS_PATTERN = re.compile(r'(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b', re.IGNORECASE)
+# a lone number at the end of a name (wt_2), read as the run number when the name has
+# no run<N>
+LAST_NUMBER_PATTERN = re.compile(r'^(?P<condition>.*?)[\s_-]+(?P<run>\d+)\s*$')
+SEPARATORS = ' _-'
 
 
 # ---- RUN NAMER HELPERS ---------------------------------------------------------------
@@ -264,6 +268,69 @@ def experiment_classifier(name: str) -> tuple:
     condition, run = parsed
     strain, order = condition_classifier(condition)
     return strain, order, run
+
+
+# ---- file_name_reader ----------------------------------------------------------------
+def file_name_reader(name: str) -> Tuple[str, str, str, Optional[int]]:
+    """
+    ---- Summary ----
+    Main function to read from an experiment name what the dataset set-up table is
+    filled in with: the run number from its end, the time point from a number of
+    hours, and the two groups from what is left.
+
+    ---- Inputs ----
+    name : str
+        Experiment name (the .paf file name without the extension), for example
+        'control-bd_then_kcn-run2', 'knockdown_24hours' or 'WT_8umlDAP_2'.
+
+    ---- Globals read ----
+    HOURS_PATTERN, LAST_NUMBER_PATTERN, ORDER_TITLES, RUN_NAME_PATTERN, SEPARATORS
+    (module constants).
+
+    ---- Outputs ----
+    Tuple[str, str, str, Optional[int]]
+        (Group 1, Group 2, time point, run number). A part the name does not show is
+        '' (None for the run number). The time point is written '<hours> h'; an
+        addition order (bd_then_kcn) is written as in ORDER_TITLES.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The run number: run<N> at the end, else a lone number at the end ----------
+    text, run = str(name).strip(), None
+    for pattern in (RUN_NAME_PATTERN, LAST_NUMBER_PATTERN):
+        match = pattern.match(text)
+        if match:
+            text, run = match.group('condition'), int(match.group('run'))
+            break
+
+    # ---- 2 The time point: a number of hours -----------------------------------------
+    time_point = ''
+    match = HOURS_PATTERN.search(text)
+    if match:
+        time_point = f'{float(match.group(1)):g} h'
+        before = text[:match.start()].rstrip(SEPARATORS)
+        after = text[match.end():].lstrip(SEPARATORS)
+        # what stood round the hours is joined as the name joins its own parts
+        joiner = '-' if '-' in text else '_'
+        text = joiner.join(part for part in (before, after) if part)
+
+    # ---- 3 The groups: split at a hyphen if there is one, else at the first _ --------
+    text = text.strip(SEPARATORS)
+    separator = next((mark for mark in ('-', '_', ' ') if mark in text), None)
+    if separator is None:
+        group_1, group_2 = text, ''
+    else:
+        group_1, group_2 = text.split(separator, 1)
+    group_1, group_2 = group_1.strip(SEPARATORS), group_2.strip(SEPARATORS)
+    return group_1, ORDER_TITLES.get(group_2.lower(), group_2), time_point, run
 
 
 # ---- group_assigner ------------------------------------------------------------------

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.dataset_setup import saved_setup_reader
 from utils_shared.redox_regions import REGION_KEYS, REGION_NAMES
 
 
@@ -168,8 +169,9 @@ def dataset_settings_reader(folder: Path) -> dict:
 
     ---- Outputs ----
     dict
-        {'export_folder': Optional[Path], 'files': dict, 'answers': dict}
-        (DATA_FORMAT.md, dataset_settings). An empty dict when the dataset was never
+        {'export_folder': Optional[Path], 'files': dict, 'answers': dict, 'setup':
+        dict} (DATA_FORMAT.md, dataset_settings); the set-up is empty for a dataset
+        never set up. An empty dict when the dataset was never
         saved or its file cannot be read, so the standard settings are used. A haem
         way of showing no longer offered (RETIRED_HAEM_MODES) is given as its
         successor, and an answer saved under an old name (RENAMED_ANSWERS) under its
@@ -183,6 +185,7 @@ def dataset_settings_reader(folder: Path) -> dict:
 
     ---- Helpers ----
     _export_folder_resolver
+    saved_setup_reader
     """
 
     # ---- 1 Read the file -------------------------------------------------------------
@@ -213,6 +216,7 @@ def dataset_settings_reader(folder: Path) -> dict:
                                                      ),
             'files': files if isinstance(files, dict) else {},
             'answers': answers,
+            'setup': saved_setup_reader(values.get('setup')),
             }
 
 
@@ -221,6 +225,7 @@ def dataset_settings_saver(folder: Path,
                            export_root: Path,
                            files: dict,
                            answers: dict,
+                           setup: Optional[dict] = None,
                            ) -> bool:
     """
     ---- Summary ----
@@ -237,6 +242,9 @@ def dataset_settings_saver(folder: Path,
         builds it.
     answers : dict
         The answers of the run.
+    setup : Optional[dict]
+        The dataset set-up table as it is saved (saved_setup, DATA_FORMAT.md, from
+        setup_plainer); None or empty writes none.
 
     ---- Globals read ----
     SETTINGS_FILE_NAME (module constant).
@@ -259,6 +267,8 @@ def dataset_settings_saver(folder: Path,
               'files': files,
               'answers': answers,
               }
+    if setup:
+        values['setup'] = setup
     try:
         (Path(folder) / SETTINGS_FILE_NAME).write_text(json.dumps(values, indent=2),
                                                        encoding='utf-8',

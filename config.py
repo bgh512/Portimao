@@ -296,6 +296,18 @@ HAEM_TYPE_COLOURS = {'a': ['#00b050', '#006b30', '#7fd8a8'],
                                '#7f7f7f',
                                ],
                      }
+# The colours of the Group 1 labels of a dataset (the set-up table), given out in this
+# order and used on every panel of the dataset figures: told apart by colour-blind
+# readers, and none close to white.
+GROUP_COLOURS = ('#0072b2',
+                 '#d55e00',
+                 '#009e73',
+                 '#cc79a7',
+                 '#e69f00',
+                 '#56b4e9',
+                 '#000000',
+                 '#7f7f7f',
+                 )
 # What each journal asks of a figure, read from the journals folder, one .json file
 # per journal (utils_shared/journal_files.py, DATA_FORMAT.md): its widths, its tallest
 # figure ('page_height_mm', of which the height of a figure is chosen as a part), its

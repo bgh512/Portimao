@@ -51,7 +51,8 @@ FIRST_QUESTIONS = {'data_folder': '1.1',
                    'windows': '4.6',
                    'figure': '5.1',
                    'export': '5.9',
-                   'page': '6.1',
+                   'setup': '6.1',
+                   'page': '6.2',
                    'start': '9.1',
                    }
 
@@ -221,7 +222,7 @@ def test_steps_and_stages() -> None:
     assert [s for i, s in enumerate(stages) if i == 0 or s != stages[i - 1]] == list(
         GUIDE_STAGES,
         )
-    assert len(set(GUIDE_KEYS)) == len(GUIDE_KEYS) == 17
+    assert len(set(GUIDE_KEYS)) == len(GUIDE_KEYS) == 18
     assert list(FIRST_QUESTIONS) == list(GUIDE_KEYS)
     numbers = [tuple(int(n) for n in FIRST_QUESTIONS[key].split('.'))
                for key in GUIDE_KEYS
@@ -318,8 +319,8 @@ def test_steps_move_on_and_fold() -> None:
     assert stages[1] == 'Set-up'
     assert stages[2] == 'Experiment processing  ·  steps 10–13'
     assert stages[3] == 'Experiment export  ·  steps 14–15'
-    assert stages[-2] == 'Dataset figures  ·  step 16'
-    assert stages[-1] == 'Dataset export  ·  step 17'
+    assert stages[-2] == 'Dataset figures  ·  steps 16–17'
+    assert stages[-1] == 'Dataset export  ·  step 18'
     assert [row['is_open'] for row in stage_rows] == [False, True] + [False] * 4
     open_row = next(row for row in state.row_lister() if row.get('status') == 'open')
     assert open_row['text'] == ' 9  Event labels' and open_row['mark'] == '▸'

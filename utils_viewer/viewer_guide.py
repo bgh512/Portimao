@@ -105,6 +105,12 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
      'The plot and the workbook of each file were written here, with the spectra as '
      'csv files when you chose them.',
      ),
+    ('setup',
+     'Dataset figures',
+     'Dataset set-up',
+     'Which experiment is which was filled in here: its groups, its time point and '
+     'whether it is used in the dataset figures.',
+     ),
     ('page',
      'Dataset figures',
      'Build a figure',

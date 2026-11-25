@@ -29,6 +29,7 @@ from utils_shared.helpers import (file_name_sanitiser,
                                   panel_name_teller,
                                   panel_order_merger,
                                   )
+from utils_shared.dataset_setup import setup_builder
 from utils_shared.figure_page import (FigurePage,
                                       FigurePageError,
                                       template_path_finder,
@@ -227,6 +228,8 @@ EXPORT_CHOICES = (('summary', 'Export the summary'),
                   )
 PAGE_NUDGE = ('Build the figure on the page on the right; click Continue when it is '
               'ready.')
+SETUP_NUDGE = ('Fill in the table on the right; click Continue when it says which '
+               'experiment is which.')
 WINDOW_NUDGE = ('Type the numbers of the averaging regions in the Time regions box '
                 'above the plot, or drag the edges of a region; press Continue when '
                 'the regions look right.')
@@ -2810,7 +2813,7 @@ def _template_offer_asker(page: FigurePage,
     if not yes_no_asker('Do you want to save this page as a template, to load it for '
                         'another dataset?',
                         False,
-                        number='6.2',
+                        number='6.3',
                         ):
         return None
     def name_checker(text: Optional[str]) -> Optional[str]:
@@ -2818,14 +2821,14 @@ def _template_offer_asker(page: FigurePage,
     while True:
         name = text_asker('What should the template be called?',
                           checker=name_checker,
-                          number='6.3',
+                          number='6.4',
                           ).strip()
         path = template_path_finder(layouts_folder, name)
         if path.exists() and not yes_no_asker(f'A template called {path.stem} is '
                                               f'already there. Do you want to replace '
                                               f'it?',
                                               False,
-                                              number='6.4',
+                                              number='6.5',
                                               ):
             continue
         try:
@@ -3466,7 +3469,7 @@ def page_stage_runner(layouts_folder: Path) -> FigurePage:
     """
     ---- Summary ----
     Main function to build the page of a dataset figure in the window (Build a figure,
-    6.1): the page starts empty, plots are placed by dragging across its grid, and a
+    6.2): the page starts empty, plots are placed by dragging across its grid, and a
     template can be loaded or saved; Continue ends the step, after the offer to save
     a page that was changed as a template.
 
@@ -3512,7 +3515,7 @@ def page_stage_runner(layouts_folder: Path) -> FigurePage:
     enter_waiter('Drag across the grid to place each plot. When the page is ready, '
                  'click Continue.',
                  PAGE_NUDGE,
-                 number='6.1',
+                 number='6.2',
                  )
     kept = window.page_kept_reader()
     page = window.page_hider()
@@ -4167,6 +4170,66 @@ def region_files_lister(summaries: List[dict],
         if None not in region_span_reader(values, rule['minimum_min']).values():
             names.append(name)
     return names
+
+
+# ---- setup_stage_runner --------------------------------------------------------------
+def setup_stage_runner(names: List[str], saved: Optional[dict] = None) -> dict:
+    """
+    ---- Summary ----
+    Main function to have the dataset set-up table filled in in the window (Dataset
+    set-up, 6.1): one row per experiment, as saved with the dataset or filled in
+    from the file names, corrected by the user; Continue ends the step.
+
+    ---- Inputs ----
+    names : List[str]
+        The experiment names (the .paf file names without the extension), in the
+        order of the table.
+    saved : Optional[dict]
+        The set-up saved with the dataset (saved_setup, DATA_FORMAT.md); None or
+        empty for a dataset never set up.
+
+    ---- Globals read ----
+    SETUP_NUDGE.
+
+    ---- Outputs ----
+    dict
+        The set-up table (dataset_setup, DATA_FORMAT.md) as filled in; as built from
+        what was saved and the file names when there is no window.
+
+    ---- Globals mutated ----
+    None. Changes the window (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    active_gui_getter
+    enter_waiter
+    guide_step_starter
+    info_printer
+    setup_builder
+    """
+
+    guide_step_starter('setup')
+    setup = setup_builder(names, saved)
+    window = active_gui_getter()
+    if window is None:  # the table is filled in only in the window
+        return setup
+    info_printer('The table on the right says which experiment is which, filled in '
+                 'from the file names: check it, and type over what is wrong. The '
+                 'dataset figures split the experiments into sets by Group 1, Group '
+                 '2 and the time point, and untick Use to leave an experiment out.',
+                 )
+    info_printer('The replicates are numbered for you: the experiments with the same '
+                 'Group 1, Group 2 and time point count 1, 2, 3.',
+                 )
+    window.setup_shower(setup)
+    enter_waiter('Check which experiment is which in the table. When it is right, '
+                 'click Continue.',
+                 SETUP_NUDGE,
+                 number='6.1',
+                 )
+    return window.setup_hider()
 
 
 # ---- trim_stage_runner ---------------------------------------------------------------

@@ -368,7 +368,7 @@ def test_the_step_that_builds_the_page(tmp_path: Path,
     """
     ---- Summary ----
     Main function to check the Build a figure step: it starts its step of the guide,
-    shows an empty page with the layouts folder, asks 6.1 and gives the page the
+    shows an empty page with the layouts folder, asks 6.2 and gives the page the
     window holds once Continue is clicked; without a window it gives an empty page
     and asks nothing. The window and the question are stood in for.
 
@@ -423,7 +423,7 @@ def test_the_step_that_builds_the_page(tmp_path: Path,
     assert viewer_stages.page_stage_runner(tmp_path) == built
     assert done == [('step', 'page'),
                     ('shown', FigurePage(), tmp_path),
-                    ('asked', '6.1'),
+                    ('asked', '6.2'),
                     ('hidden',),
                     ('offered', built, FigurePage(), tmp_path),
                     ]
@@ -481,9 +481,9 @@ def test_the_template_offer_saves_the_page(tmp_path: Path,
     """
     ---- Summary ----
     Main function to check the offer made once the page is built: nothing is asked
-    for a page that has not changed; No to 6.2 saves nothing; Yes asks the name (6.3)
+    for a page that has not changed; No to 6.3 saves nothing; Yes asks the name (6.4)
     and writes the template, which reads back as the page; a name already there is
-    asked about (6.4), where No asks the name again and Yes writes over it. The
+    asked about (6.5), where No asks the name again and Yes writes over it. The
     questions are stood in for.
 
     ---- Inputs ----
@@ -530,7 +530,7 @@ def test_the_template_offer_saves_the_page(tmp_path: Path,
     assert asked == []
     replies[:] = [False]
     assert viewer_stages._template_offer_asker(built, empty, tmp_path) is None
-    assert asked == ['6.2']
+    assert asked == ['6.3']
     assert list(tmp_path.iterdir()) == []
 
     # ---- 2 Yes and a name: the template is written -----------------------------------
@@ -538,7 +538,7 @@ def test_the_template_offer_saves_the_page(tmp_path: Path,
     replies[:] = [True, ' bars ']
     path = viewer_stages._template_offer_asker(built, empty, tmp_path)
     assert path == tmp_path / 'bars.json'
-    assert asked == ['6.2', '6.3']
+    assert asked == ['6.3', '6.4']
     assert template_reader(path) == built
 
     # ---- 3 The name is taken: No asks again, Yes writes over -------------------------
@@ -547,11 +547,11 @@ def test_the_template_offer_saves_the_page(tmp_path: Path,
     replies[:] = [True, 'bars', False, 'bars two']
     path = viewer_stages._template_offer_asker(wider, built, tmp_path)
     assert path == tmp_path / 'bars two.json'
-    assert asked == ['6.2', '6.3', '6.4', '6.3']
+    assert asked == ['6.3', '6.4', '6.5', '6.4']
     assert template_reader(tmp_path / 'bars.json') == built
     del asked[:]
     replies[:] = [True, 'bars', True]
     assert viewer_stages._template_offer_asker(wider, built, tmp_path) == (
         tmp_path / 'bars.json')
-    assert asked == ['6.2', '6.3', '6.4']
+    assert asked == ['6.3', '6.4', '6.5']
     assert template_reader(tmp_path / 'bars.json') == wider

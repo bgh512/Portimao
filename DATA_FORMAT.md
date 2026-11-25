@@ -347,6 +347,7 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 |---|---|---|---|---|
 | `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`results`), otherwise the full path |
 | `'answers'` | dict | | | Terminal answers |
+| `'setup'` | dict | | | The dataset set-up table as saved (`saved_setup`); empty for a dataset never set up, and not written in the file then |
 | `'answers'['delta_psi']` | bool | | | Whether Δψ is worked out for the files with both regions (`utils_shared/delta_psi.py`) and drawn as a panel of the plot of each (the lowest in the standard order); off unless switched on at question 4.5, which is asked only when a file has both regions and the fit has one bH and one bL |
 | `'answers'['panel_order']` | List[str] | (n_panels,) | | The panels of the plot of each file in the order the user moved them to, top first, by their keys: `oxygen`, `vo2`, `delta_psi`, and `haem:` then the name of the haem (`haem:Cyt bH`). Empty for the standard order (oxygen, OCR, the haems a then b then c, Δψ). A panel the order does not know is drawn just above the panel that follows it in the standard order, or at the bottom (`panel_order_placer`); a move made on one file keeps the places of the panels that file does not have (`panel_order_merger`, both in `utils_shared/helpers.py`) |
 | `'answers'['temperature_c']` | float | | °C | Temperature of the runs, for Δψ; asked once per dataset in the import (question 3.1), from 0 to 100, 37 unless changed |
@@ -428,6 +429,32 @@ The events of every file as the labels table (question 3.3) starts and ends them
 | `'stock_uM'`, `'added_uL'` | Optional[float] | | µM, µL | The stock and the volume added, as on `event`; None for an event left out |
 | `'addition_uM'`, `'concentration_uM'` | Optional[float] | | µM | What the addition adds, and the concentration in the chamber after it, as on `event` |
 | `'ignored'` | bool | | | True for an event left out |
+
+#### `dataset_setup`
+
+The dataset set-up table: which experiment is which. Built by `setup_builder` (`utils_shared/dataset_setup.py`) from the file names (`file_name_reader`, `utils_custom/run_namer.py`) laid under what was saved, filled in in the window (`SetupTable`, `utils_viewer/viewer_setup.py`; `ViewerGui.setup_shower` and `setup_hider`) and returned by `setup_stage_runner` (`utils_viewer/viewer_stages.py`).
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'group_names'` | List[str] | (2,) | | The names the user gave the two group columns (`'strain'`, `'order of additions'`); `''` for a column left unnamed |
+| `'colours'` | Dict[str, str] | | | `{Group 1 label: colour as '#rrggbb'}`, one per label of the table, in the order first seen (`group_colours_filler`: a label keeps its colour, a new one takes the first of `config.GROUP_COLOURS` no label has) |
+| `'rows'` | List[dict] | (n_files,) | | One per experiment, in the order of the files; the keys below |
+| `'name'` | str | | | Experiment name (the `.paf` file name without the extension) |
+| `'use'` | bool | | | Whether the experiment is in the dataset figures |
+| `'group_1'`, `'group_2'`, `'time_point'` | str | | | Its labels; `''` for a blank cell. A time point read from a file name is `'<hours> h'` |
+| `'run'` | Optional[int] | | | Run number read from the file name (`run<N>`, or a lone number at its end); `None` for none. It orders the replicates and is not saved |
+
+The replicate number of each row is not kept: `replicates_numberer` works it out (the rows in use with the same three labels count 1, 2, 3 by run number, then by place in the table; `None` for a row not in use). `sets_lister` gives the sets as `{'name', 'n', 'colour'}`.
+
+#### `saved_setup`
+
+The set-up as it is kept in the settings file of the dataset, under `'setup'` (`dataset_settings`). Written by `setup_plainer` and read by `saved_setup_reader` (`utils_shared/dataset_setup.py`), which keeps only the parts of the right form. Empty for a dataset never set up.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'group_names'` | List[str] | (2,) | | As in `dataset_setup` |
+| `'colours'` | Dict[str, str] | | | As in `dataset_setup`, for the labels in the table when it was saved |
+| `'files'` | dict | | | `{file name: {'use': bool, 'group_1': str, 'group_2': str, 'time_point': str}}`; a file saved before and not in a later run is kept. A file in the folder that is not here is filled in from its name |
 
 #### `table_rows`
 

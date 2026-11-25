@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.30
+- **Version:** V2.31
 - **Date:** 25/11/2026
 
 ## Contents
@@ -126,6 +126,19 @@
     - [`test_saved_old_names_open_with_the_new_ones`](#test_saved_old_names_open_with_the_new_ones)
     - [`test_settings_are_read_back`](#test_settings_are_read_back)
     - [`test_unwritable_folder_is_reported`](#test_unwritable_folder_is_reported)
+- [`tests/test_dataset_setup.py`](#teststest_dataset_setuppy)
+    - [`_row_maker`](#_row_maker)
+    - [`test_file_names_read`](#test_file_names_read)
+    - [`test_the_table_from_the_file_names`](#test_the_table_from_the_file_names)
+    - [`test_the_table_as_it_was_saved`](#test_the_table_as_it_was_saved)
+    - [`test_the_replicates_numbered`](#test_the_replicates_numbered)
+    - [`test_a_colour_per_group_1_label`](#test_a_colour_per_group_1_label)
+    - [`test_several_rows_filled`](#test_several_rows_filled)
+    - [`test_the_labels_and_the_sets`](#test_the_labels_and_the_sets)
+    - [`test_the_setup_saved_and_read_back`](#test_the_setup_saved_and_read_back)
+    - [`test_a_settings_file_without_a_usable_setup`](#test_a_settings_file_without_a_usable_setup)
+    - [`test_the_headings_of_the_group_columns`](#test_the_headings_of_the_group_columns)
+    - [`test_the_step_that_shows_the_table`](#test_the_step_that_shows_the_table)
 - [`tests/test_delta_psi.py`](#teststest_delta_psipy)
     - [`_calculator`](#_calculator)
     - [`test_delta_psi_is_empty_outside_the_limits`](#test_delta_psi_is_empty_outside_the_limits)
@@ -742,6 +755,7 @@
     - [`condition_classifier`](#condition_classifier)
     - [`condition_grouper`](#condition_grouper)
     - [`experiment_classifier`](#experiment_classifier)
+    - [`file_name_reader`](#file_name_reader)
     - [`group_assigner`](#group_assigner)
     - [`hours_parser`](#hours_parser)
     - [`run_name_lister`](#run_name_lister)
@@ -854,6 +868,17 @@
     - [`dataset_settings_reader`](#dataset_settings_reader)
     - [`dataset_settings_saver`](#dataset_settings_saver)
     - [`file_settings_merger`](#file_settings_merger)
+- [`utils_shared/dataset_setup.py`](#utils_shareddataset_setuppy)
+    - [`_label_matcher`](#_label_matcher)
+    - [`_text_cleaner`](#_text_cleaner)
+    - [`column_filler`](#column_filler)
+    - [`group_colours_filler`](#group_colours_filler)
+    - [`labels_lister`](#labels_lister)
+    - [`replicates_numberer`](#replicates_numberer)
+    - [`saved_setup_reader`](#saved_setup_reader)
+    - [`sets_lister`](#sets_lister)
+    - [`setup_builder`](#setup_builder)
+    - [`setup_plainer`](#setup_plainer)
 - [`utils_shared/delta_psi.py`](#utils_shareddelta_psipy)
     - [`_settings_validator`](#_settings_validator)
     - [`b_haem_column_finder`](#b_haem_column_finder)
@@ -1290,6 +1315,9 @@
     - [`_made_up_experiment_builder`](#_made_up_experiment_builder)
     - [`_preview_shower`](#_preview_shower)
     - [`self_test_runner`](#self_test_runner)
+- [`utils_viewer/viewer_setup.py`](#utils_viewerviewer_setuppy)
+    - [`SetupTable`](#setuptable)
+    - [`group_heading_writer`](#group_heading_writer)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
     - [`_addition_time_lister`](#_addition_time_lister)
     - [`_answers_previewer`](#_answers_previewer)
@@ -1336,6 +1364,7 @@
     - [`plots_stage_runner`](#plots_stage_runner)
     - [`processing_stage_runner`](#processing_stage_runner)
     - [`region_files_lister`](#region_files_lister)
+    - [`setup_stage_runner`](#setup_stage_runner)
     - [`trim_stage_runner`](#trim_stage_runner)
     - [`viewer_asker`](#viewer_asker)
     - [`windows_stage_runner`](#windows_stage_runner)
@@ -2697,6 +2726,8 @@ journal_answers_fitter
 last_answers_saver
 page_stage_runner
 section_starter
+setup_plainer
+setup_stage_runner
 viewer_asker
 yes_no_asker
 ```
@@ -5135,6 +5166,373 @@ and does not raise.
 ---- Inputs ----
 tmp_path : Path
     Empty folder from pytest.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+## `tests/test_dataset_setup.py`
+
+Tests of the dataset set-up table, without the window: the filling in from the file names, the replicate numbers, the colours, the fill of several rows, the sets, the saving and reading back, and the step that shows the table.
+
+### HELPERS
+
+#### `_row_maker`
+
+```text
+---- Summary ----
+Helper function to make one row of a set-up table.
+
+---- Inputs ----
+name : str
+    The experiment name.
+group_1 : str
+    Its Group 1 label.
+group_2 : str
+    Its Group 2 label.
+time_point : str
+    Its time point.
+run : object
+    Its run number, or None.
+use : bool
+    Whether it is in use.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The row (dataset_setup, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### TESTS
+
+#### `test_file_names_read`
+
+```text
+---- Summary ----
+Main function to check what a file name gives the set-up table: run<N> or a lone
+number at its end is the run number, a number of hours the time point ('7 h'),
+and what is left is split at a hyphen, else at the first underscore, into Group
+1 and Group 2; an addition order is written with its arrow.
+
+---- Inputs ----
+name : str
+    The file name without .paf.
+read : tuple
+    (Group 1, Group 2, time point, run number) worked out by hand.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_table_from_the_file_names`
+
+```text
+---- Summary ----
+Main function to check the table of a dataset never set up: one row per file in
+the order given, every row in use, a label spelt as it was first seen whatever
+its case (wt, then WT read as wt), the group columns unnamed, and the first
+colour of the list for the one Group 1 label.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIRST.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_row_maker
+```
+
+#### `test_the_table_as_it_was_saved`
+
+```text
+---- Summary ----
+Main function to check the table of a dataset set up before: a file saved keeps
+its cells and its tick, whatever its name says; a file new to the folder is
+filled in from its name and spelt as the saved label (Control, not control); the
+group names and the colour picked come back, and the new label takes the first
+colour not taken.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIRST, SECOND.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_row_maker
+```
+
+#### `test_the_replicates_numbered`
+
+```text
+---- Summary ----
+Main function to check the replicate numbers, worked out by hand. The three
+control rows with the same labels count by run number, not by place (runs 3, 1,
+2 are replicates 3, 1, 2); a row of the set with no run number comes after
+them (4); a row with another time point starts again at 1; a row not in use has
+no number and does not take one; rows with no run number count in the order of
+the table.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_row_maker
+```
+
+#### `test_a_colour_per_group_1_label`
+
+```text
+---- Summary ----
+Main function to check the colours of the Group 1 labels: the labels take the
+colours of the list in the order first seen; a label keeps the colour it has; a
+new label takes the first colour no label has (the second is taken, so the
+first, then the third); a label no longer in the table loses its colour, and a
+blank cell has none; with more labels than colours the list starts again.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIRST, SECOND, THIRD.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_row_maker
+```
+
+#### `test_several_rows_filled`
+
+```text
+---- Summary ----
+Main function to check the fill of a Shift-click: every row from the cell
+clicked first to the one Shift-clicked gets the label of the first, down the
+table and up it, in that column only; the rows given are not changed; a column
+that holds no labels and a row the table does not have are refused.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_row_maker
+```
+
+#### `test_the_labels_and_the_sets`
+
+```text
+---- Summary ----
+Main function to check the labels a cell offers and the sets under the table.
+The labels of a column are listed once each, in the order first seen, blank
+cells left out. The sets are the rows in use with the same three labels: two
+control rows with BD → KCN (n = 2), one control row at 24 h, one row with no
+label at all ('no labels', no colour); the knockdown row not in use is in no
+set.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+FIRST.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_row_maker
+```
+
+#### `test_the_setup_saved_and_read_back`
+
+```text
+---- Summary ----
+Main function to check that the set-up is kept with the dataset: what is saved
+holds the group names, the colours of the labels in the table and the cells of
+each file (not its run number, read from the name each time), with a file saved
+before and not in this run kept; read back from the settings file and built
+again, the table is the one saved.
+
+---- Inputs ----
+tmp_path : Path
+    The dataset folder for the test.
+
+---- Globals read ----
+FIRST, SECOND, THIRD.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_a_settings_file_without_a_usable_setup`
+
+```text
+---- Summary ----
+Main function to check that a settings file never stops the dataset opening: a
+file written before the set-up was kept reads as no set-up, and none is written
+when there is none; of a set-up changed by hand only the parts of the right
+form are kept (a colour that is not '#rrggbb' and a file that is not a table
+are dropped, a missing cell is blank, a missing tick is in use, one group name
+becomes two).
+
+---- Inputs ----
+tmp_path : Path
+    The dataset folder for the test.
+
+---- Globals read ----
+SETTINGS_FILE_NAME (imported).
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_headings_of_the_group_columns`
+
+```text
+---- Summary ----
+Main function to check the heading of a group column: its number, with the name
+typed for it in brackets, and its number alone when it is left unnamed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_step_that_shows_the_table`
+
+```text
+---- Summary ----
+Main function to check the Dataset set-up step: it starts its step of the guide,
+shows the table built from the file names and what was saved, asks 6.1 and gives
+the table the window holds once Continue is clicked; without a window it gives
+the table as built and asks nothing. The window and the question are stood in
+for.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Pytest's tool for the stand-ins.
 
 ---- Globals read ----
 None.
@@ -13604,7 +14002,7 @@ None.
 ```text
 ---- Summary ----
 Main function to check the Build a figure step: it starts its step of the guide,
-shows an empty page with the layouts folder, asks 6.1 and gives the page the
+shows an empty page with the layouts folder, asks 6.2 and gives the page the
 window holds once Continue is clicked; without a window it gives an empty page
 and asks nothing. The window and the question are stood in for.
 
@@ -13663,9 +14061,9 @@ None.
 ```text
 ---- Summary ----
 Main function to check the offer made once the page is built: nothing is asked
-for a page that has not changed; No to 6.2 saves nothing; Yes asks the name (6.3)
+for a page that has not changed; No to 6.3 saves nothing; Yes asks the name (6.4)
 and writes the template, which reads back as the page; a name already there is
-asked about (6.4), where No asks the name again and Yes writes over it. The
+asked about (6.5), where No asks the name again and Yes writes over it. The
 questions are stood in for.
 
 ---- Inputs ----
@@ -22968,6 +23366,39 @@ condition_classifier
 run_name_parser
 ```
 
+#### `file_name_reader`
+
+```text
+---- Summary ----
+Main function to read from an experiment name what the dataset set-up table is
+filled in with: the run number from its end, the time point from a number of
+hours, and the two groups from what is left.
+
+---- Inputs ----
+name : str
+    Experiment name (the .paf file name without the extension), for example
+    'control-bd_then_kcn-run2', 'knockdown_24hours' or 'WT_8umlDAP_2'.
+
+---- Globals read ----
+HOURS_PATTERN, LAST_NUMBER_PATTERN, ORDER_TITLES, RUN_NAME_PATTERN, SEPARATORS
+(module constants).
+
+---- Outputs ----
+Tuple[str, str, str, Optional[int]]
+    (Group 1, Group 2, time point, run number). A part the name does not show is
+    '' (None for the run number). The time point is written '<hours> h'; an
+    addition order (bd_then_kcn) is written as in ORDER_TITLES.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `group_assigner`
 
 ```text
@@ -26501,8 +26932,9 @@ SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RETIRED_HAEM_MODE_KEYS, RENAMED_ANSWERS
 
 ---- Outputs ----
 dict
-    {'export_folder': Optional[Path], 'files': dict, 'answers': dict}
-    (DATA_FORMAT.md, dataset_settings). An empty dict when the dataset was never
+    {'export_folder': Optional[Path], 'files': dict, 'answers': dict, 'setup':
+    dict} (DATA_FORMAT.md, dataset_settings); the set-up is empty for a dataset
+    never set up. An empty dict when the dataset was never
     saved or its file cannot be read, so the standard settings are used. A haem
     way of showing no longer offered (RETIRED_HAEM_MODES) is given as its
     successor, and an answer saved under an old name (RENAMED_ANSWERS) under its
@@ -26516,6 +26948,7 @@ None.
 
 ---- Helpers ----
 _export_folder_resolver
+saved_setup_reader
 ```
 
 #### `dataset_settings_saver`
@@ -26535,6 +26968,9 @@ files : dict
     builds it.
 answers : dict
     The answers of the run.
+setup : Optional[dict]
+    The dataset set-up table as it is saved (saved_setup, DATA_FORMAT.md, from
+    setup_plainer); None or empty writes none.
 
 ---- Globals read ----
 SETTINGS_FILE_NAME (module constant).
@@ -26595,6 +27031,335 @@ None.
 
 ---- Helpers ----
 _event_plainer
+```
+
+## `utils_shared/dataset_setup.py`
+
+The set-up of a dataset: which experiment is which (its groups, time point and replicate), filled in from the file names, with a colour per Group 1 label.
+
+### SETUP HELPERS
+
+#### `_label_matcher`
+
+```text
+---- Summary ----
+Helper function to spell a label read from a file name as the same label is
+already spelt in its column, whatever its case (wt and WT are one label), and to
+note a new label as known.
+
+---- Inputs ----
+label : str
+    The label read from the name; '' for none.
+known : List[str]
+    The labels of the column so far, in the order first seen; a new label is
+    added to it.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The label as first spelt.
+
+---- Globals mutated ----
+None. Adds a new label to ``known`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_text_cleaner`
+
+```text
+---- Summary ----
+Helper function to give a saved or typed value as the text of a cell.
+
+---- Inputs ----
+value : Any
+    The value; anything that is not text counts as blank.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The text without the spaces round it; '' for a value that is not text.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `column_filler`
+
+```text
+---- Summary ----
+Main function to fill several rows of one column with the label of a cell: the
+cell clicked first, then every row up or down to the cell Shift-clicked.
+
+---- Inputs ----
+rows : List[dict]
+    The rows of the table (dataset_setup, DATA_FORMAT.md).
+key : str
+    The column, one of LABEL_KEYS.
+first : int
+    The row whose label is copied.
+last : int
+    The row Shift-clicked; above or below ``first``.
+
+---- Globals read ----
+LABEL_KEYS (module constant).
+
+---- Outputs ----
+List[dict]
+    The rows, those from ``first`` to ``last`` with the label of ``first`` in the
+    column. The rows given are not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `group_colours_filler`
+
+```text
+---- Summary ----
+Main function to give every Group 1 label of the table a colour: a label keeps
+the colour it has, and a new one takes the first colour of the list no label of
+the table has (the list starts again once every colour is taken).
+
+---- Inputs ----
+rows : List[dict]
+    The rows of the table (dataset_setup, DATA_FORMAT.md).
+colours : Dict[str, str]
+    {Group 1 label: colour as '#rrggbb'} so far.
+
+---- Globals read ----
+COLOUR_KEY (module constant); settings.GROUP_COLOURS.
+
+---- Outputs ----
+Dict[str, str]
+    {Group 1 label: colour} for the labels of the table, in the order first seen;
+    a colour of a label no longer in the table is left out.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+labels_lister
+```
+
+#### `labels_lister`
+
+```text
+---- Summary ----
+Main function to list the labels used in one column of the table, each once, in
+the order first seen: what a cell of the column offers to pick from.
+
+---- Inputs ----
+rows : List[dict]
+    The rows of the table (dataset_setup, DATA_FORMAT.md).
+key : str
+    The column, one of LABEL_KEYS.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[str]
+    The labels; a blank cell gives none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `replicates_numberer`
+
+```text
+---- Summary ----
+Main function to number the replicates: the rows in use with the same Group 1,
+Group 2 and time point count 1, 2, 3, in the order of their run numbers, a row
+with no run number after those that have one, and otherwise in the order of the
+table.
+
+---- Inputs ----
+rows : List[dict]
+    The rows of the table (dataset_setup, DATA_FORMAT.md).
+
+---- Globals read ----
+LABEL_KEYS (module constant).
+
+---- Outputs ----
+List[Optional[int]]
+    The replicate number of each row, in the order of the table; None for a row
+    not in use.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `saved_setup_reader`
+
+```text
+---- Summary ----
+Main function to keep, of the set-up read from a dataset's settings file, the
+parts that have the right form, so a file changed by hand or written by an older
+Portimao never stops the dataset opening.
+
+---- Inputs ----
+value : Any
+    What the settings file holds under 'setup'; anything.
+
+---- Globals read ----
+COLOUR_PATTERN, GROUP_COUNT, LABEL_KEYS (module constants).
+
+---- Outputs ----
+dict
+    {'group_names': [str, str], 'colours': {label: '#rrggbb'}, 'files': {file
+    name: {'use': bool, 'group_1': str, 'group_2': str, 'time_point': str}}}
+    (saved_setup, DATA_FORMAT.md). An empty dict when nothing usable was saved.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_text_cleaner
+```
+
+#### `sets_lister`
+
+```text
+---- Summary ----
+Main function to list the sets of the dataset as the table stands: the rows in
+use with the same Group 1, Group 2 and time point, each set with its name, its
+number of experiments and the colour of its Group 1 label.
+
+---- Inputs ----
+rows : List[dict]
+    The rows of the table (dataset_setup, DATA_FORMAT.md).
+colours : Dict[str, str]
+    {Group 1 label: colour as '#rrggbb'}.
+
+---- Globals read ----
+COLOUR_KEY, LABEL_KEYS, NO_LABELS, SET_JOINER (module constants).
+
+---- Outputs ----
+List[dict]
+    One {'name': str, 'n': int, 'colour': Optional[str]} per set, in the order
+    first seen. The name is the labels that are filled in, joined by ' · ', or
+    'no labels'; the colour is None for a set with no Group 1 label.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `setup_builder`
+
+```text
+---- Summary ----
+Main function to build the set-up table of a dataset: one row per experiment, as
+it was saved for the dataset, and filled in from its file name for an experiment
+never saved. Every Group 1 label has a colour.
+
+---- Inputs ----
+names : Sequence[str]
+    The experiment names (the .paf file names without the extension), in the
+    order of the table.
+saved : Optional[dict]
+    The set-up saved with the dataset (saved_setup, DATA_FORMAT.md, as
+    saved_setup_reader gives it); None or empty for a dataset never set up.
+
+---- Globals read ----
+GROUP_COUNT, LABEL_KEYS (module constants).
+
+---- Outputs ----
+dict
+    {'group_names': [str, str], 'colours': {Group 1 label: '#rrggbb'}, 'rows':
+    [{'name', 'use', 'group_1', 'group_2', 'time_point', 'run'}]}
+    (dataset_setup, DATA_FORMAT.md). A label read from a file name is spelt as
+    the same label is first spelt in its column, whatever its case.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_label_matcher
+file_name_reader
+group_colours_filler
+```
+
+#### `setup_plainer`
+
+```text
+---- Summary ----
+Main function to give the set-up table as it is saved with the dataset: the group
+names, the colour of each Group 1 label in the table, and the cells of each file.
+A file saved before that is not in this run is kept as it was.
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+remembered : Optional[dict]
+    The set-up saved before (saved_setup, DATA_FORMAT.md); None or empty for a
+    dataset never set up.
+
+---- Globals read ----
+LABEL_KEYS (module constant).
+
+---- Outputs ----
+dict
+    {'group_names', 'colours', 'files'} (saved_setup, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+group_colours_filler
 ```
 
 ## `utils_shared/delta_psi.py`
@@ -39904,6 +40669,7 @@ _picture_shower
 _pointer_mover
 _resizer
 _screen_filler
+_setup_layout_setter
 _step_taker
 _strip_change_runner
 _strip_change_teller
@@ -39931,6 +40697,8 @@ pictures_publisher
 run
 saved_plot_publisher
 session_attacher
+setup_hider
+setup_shower
 spec_publisher
 step_teller
 strip_choices_setter
@@ -40594,7 +41362,8 @@ event : tuple
     terminal), 'spec', 'session', 'pictures', 'extra',
     'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
     'strip_library', 'strip_state', 'busy', 'page' (the page of a dataset
-    figure shown, or taken away with None),
+    figure shown, or taken away with None), 'setup' (the dataset set-up
+    table shown, or taken away with None),
     'table_show', 'table_hide', 'closed' or 'finished'. The "Plotting data …"
     sign of 'busy' stays until the next question, preview or picture shown.
     With close_after_s, 'finished' also closes the window after that time.
@@ -40627,11 +41396,14 @@ _navigator
 _page_layout_setter
 _pane_writer
 _picture_shower
+_setup_layout_setter
 _table_layout_setter
 AnswerArea.request_shower
 GuideState.step_starter
 PageBuilder.closer
 PageBuilder.opener
+SetupTable.closer
+SetupTable.opener
 ```
 
 ##### `_every_file_taker`
@@ -41497,6 +42269,34 @@ size = max(minimum, min(usual, screen - margin)), for the width and the height.
 None.
 ```
 
+##### `_setup_layout_setter`
+
+```text
+---- Summary ----
+Method to put the dataset set-up table in place of the file controls, the
+boxes and the plot, or to put those back.
+
+---- Inputs ----
+is_on : bool
+    True while the table is filled in.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ##### `_step_taker`
 
 ```text
@@ -41925,6 +42725,7 @@ EdgeRow
 GuidePanel
 PageBuilder
 SettingsStrip
+SetupTable
 ```
 
 ##### `_window_raiser`
@@ -42427,6 +43228,63 @@ None
 
 ---- Globals mutated ----
 None. Queues the settings for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `setup_hider`
+
+```text
+---- Summary ----
+Method to end the filling in of the dataset set-up table and give the table
+as filled in (SetupTable.setup_reader); the file controls, the boxes and the
+plot come back. It is called from the question thread once the step is
+answered.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+SetupTable.setup_reader
+```
+
+##### `setup_shower`
+
+```text
+---- Summary ----
+Method to show the dataset set-up table in the window, to be filled in. It is
+called from the question thread.
+
+---- Inputs ----
+setup : dict
+    The set-up table to start from (dataset_setup, DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the table for the window (side effect).
 
 ---- Equations ----
 None.
@@ -46791,6 +47649,469 @@ ViewerGui
 window_opener
 ```
 
+## `utils_viewer/viewer_setup.py`
+
+The dataset set-up table in the window: one row per experiment in the plot area, with its groups, time point, replicate and the colour of its Group 1 label.
+
+### CLASSES
+
+#### `SetupTable`
+
+```text
+---- Summary ----
+The dataset set-up table while it is filled in: the names of the two group
+columns, one row per experiment (a tick for Use, the file, the colour and the
+label of Group 1, the labels of Group 2 and the time point, the replicate
+worked out by the program), the colours to pick from once a coloured square is
+clicked, and the sets as they stand under the table. It keeps what is typed as it
+is typed, so the program can read it once the step is answered. It runs on the
+window thread, except setup_reader; the window packs its frame.
+
+---- Attributes ----
+frame : Any
+    The Tk frame holding the table, packed by the window in place of the file
+    controls, the boxes and the plot.
+
+---- Globals read ----
+The words, colour and size constants (module constants); settings.GROUP_COLOURS.
+
+---- Methods ----
+__init__
+_cell_taker
+_colour_taker
+_fill_taker
+_focus_taker
+_name_taker
+_palette_opener
+_refresher
+_rows_builder
+_use_taker
+_wheel_binder
+_wheel_scroller
+closer
+opener
+setup_reader
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the frame of the table with its parts, empty and not packed;
+opener fills it.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+ttk : Any
+    The tkinter.ttk module.
+right : Any
+    The right side of the window, which holds the plot area.
+fonts : Tuple[str, int]
+    (family, size) of the guide's text.
+background : str
+    The colour behind the plot area.
+
+---- Globals read ----
+GROUP_COUNT, NAME_WIDTH, NOTE_COLOUR, SETS_LINES, SETUP_HINT, SWATCH_WIDTH;
+settings.GROUP_COLOURS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_colour_taker
+_name_taker
+_refresher
+_wheel_binder
+```
+
+##### `_cell_taker`
+
+```text
+---- Summary ----
+Method to keep what is typed in a cell as it is typed, so setup_reader gives
+it even when the cell was never left. The rest of the table follows once the
+cell is left (_refresher).
+
+---- Inputs ----
+row : int
+    The row of the cell.
+key : str
+    Its column, one of the keys of LABEL_COLUMNS.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the row kept (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_colour_taker`
+
+```text
+---- Summary ----
+Method to give the Group 1 label whose coloured square was clicked the colour
+picked, on every row, and take the colours to pick from away again.
+
+---- Inputs ----
+colour : Optional[str]
+    The colour picked, as '#rrggbb'; None for Cancel.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the colours kept and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_refresher
+```
+
+##### `_fill_taker`
+
+```text
+---- Summary ----
+Method to take a Shift-click on a cell: every row from the cell clicked
+before it to this one gets the label of that cell, when both are in the same
+column. Otherwise the click is an ordinary one.
+
+---- Inputs ----
+row : int
+    The row of the cell Shift-clicked.
+key : str
+    Its column, one of the keys of LABEL_COLUMNS.
+
+---- Globals read ----
+BREAK.
+
+---- Outputs ----
+Optional[str]
+    'break' when the rows were filled, so the click does nothing else; None
+    for an ordinary click.
+
+---- Globals mutated ----
+None. Changes the rows kept and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_refresher
+column_filler
+```
+
+##### `_focus_taker`
+
+```text
+Method to note the cell clicked or moved into, which a Shift-click on another
+cell of its column fills from. See _fill_taker.
+```
+
+##### `_name_taker`
+
+```text
+---- Summary ----
+Method to keep the name typed for a group column and show it in the heading
+of the column.
+
+---- Inputs ----
+place : int
+    0 for Group 1, 1 for Group 2.
+
+---- Globals read ----
+LABEL_COLUMNS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the names kept and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+group_heading_writer
+```
+
+##### `_palette_opener`
+
+```text
+---- Summary ----
+Method to show the colours to pick from for the Group 1 label of a row, above
+the table. A row not in use, or with no Group 1 label, has no colour.
+
+---- Inputs ----
+row : int
+    The row whose coloured square was clicked.
+
+---- Globals read ----
+COLOUR_KEY.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_refresher
+```
+
+##### `_refresher`
+
+```text
+---- Summary ----
+Method to bring the table in line with its cells once one was left or
+changed: the colour of each Group 1 label, the replicate numbers, the rows
+not in use greyed out, and the sets under the table.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+COLOUR_KEY, LABEL_COLUMNS, NO_REPLICATE, NO_SETS, SET_MARK, SETS_HEADING,
+UNUSED_COLOUR.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the colours kept and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+group_colours_filler
+replicates_numberer
+sets_lister
+```
+
+##### `_rows_builder`
+
+```text
+---- Summary ----
+Method to build the headings and one line of widgets per row of the table, in
+place of those of the table shown before.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CELL_PAD_PX, CELL_WIDTH, FILE_HEADING, HEADING_COLOUR, LABEL_COLUMNS,
+REPLICATE_HEADING, SWATCH_WIDTH, USE_HEADING.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_cell_taker
+_fill_taker
+_focus_taker
+_palette_opener
+_refresher
+_use_taker
+_wheel_binder
+group_heading_writer
+labels_lister
+```
+
+##### `_use_taker`
+
+```text
+Method to keep the tick of a row (whether its experiment is in the dataset
+figures) and bring the table in line. See _refresher.
+```
+
+##### `_wheel_binder`
+
+```text
+Method to have the mouse wheel over a widget scroll the table, and never
+change the label of a cell under the mouse. See _wheel_scroller.
+```
+
+##### `_wheel_scroller`
+
+```text
+---- Summary ----
+Method to scroll the table with the mouse wheel, when it is taller than its
+room.
+
+---- Inputs ----
+event : Any
+    The Tk event of the wheel.
+
+---- Globals read ----
+BREAK.
+
+---- Outputs ----
+str
+    'break', so the wheel does nothing else.
+
+---- Globals mutated ----
+None. Scrolls the table (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+wheel_step_finder
+```
+
+##### `closer`
+
+```text
+---- Summary ----
+Method to end the filling in once the step is answered: the colours to pick
+from are taken away. What the table holds stays for setup_reader.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `opener`
+
+```text
+---- Summary ----
+Method to show a set-up table: its group names, its rows and its colours.
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_refresher
+_rows_builder
+```
+
+##### `setup_reader`
+
+```text
+---- Summary ----
+Method to give the set-up table as filled in. It may be called from the
+question thread once the step is answered.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md), with a colour for
+    every Group 1 label in it.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+group_colours_filler
+```
+
+### MAIN FUNCTIONS
+
+#### `group_heading_writer`
+
+```text
+---- Summary ----
+Main function to write the heading of a group column: its number, with the name
+the user gave it in brackets.
+
+---- Inputs ----
+place : int
+    0 for Group 1, 1 for Group 2.
+name : str
+    The name typed for the column; '' or spaces for none.
+
+---- Globals read ----
+LABEL_COLUMNS.
+
+---- Outputs ----
+str
+    'Group 1 (strain)', or 'Group 1' for a column left unnamed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `utils_viewer/viewer_stages.py`
 
 The steps of the experiment browser: ask, redraw the plot window, then accept or repeat.
@@ -48457,7 +49778,7 @@ temperature_asker
 ```text
 ---- Summary ----
 Main function to build the page of a dataset figure in the window (Build a figure,
-6.1): the page starts empty, plots are placed by dragging across its grid, and a
+6.2): the page starts empty, plots are placed by dragging across its grid, and a
 template can be loaded or saved; Continue ends the step, after the offer to save
 a page that was changed as a template.
 
@@ -48706,6 +50027,44 @@ used part of the run counts when it is at least the least length.
 _region_rules_lister
 region_edges_builder
 region_span_reader
+```
+
+#### `setup_stage_runner`
+
+```text
+---- Summary ----
+Main function to have the dataset set-up table filled in in the window (Dataset
+set-up, 6.1): one row per experiment, as saved with the dataset or filled in
+from the file names, corrected by the user; Continue ends the step.
+
+---- Inputs ----
+names : List[str]
+    The experiment names (the .paf file names without the extension), in the
+    order of the table.
+saved : Optional[dict]
+    The set-up saved with the dataset (saved_setup, DATA_FORMAT.md); None or
+    empty for a dataset never set up.
+
+---- Globals read ----
+SETUP_NUDGE.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md) as filled in; as built from
+    what was saved and the file names when there is no window.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+active_gui_getter
+enter_waiter
+guide_step_starter
+info_printer
+setup_builder
 ```
 
 #### `trim_stage_runner`

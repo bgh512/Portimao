@@ -29,6 +29,7 @@ from utils_custom.custom_runner import (exemplar_runner,
 from utils_shared.app_messages import SEND_DETAILS, start_problem_shower
 from utils_shared.comparison_plotter import comparison_figure_plotter
 from utils_shared.dataset_settings import dataset_settings_saver, file_settings_merger
+from utils_shared.dataset_setup import setup_plainer
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.figure_page import FIGURE_NAME, figure_page_exporter, FigurePage
@@ -61,7 +62,10 @@ from utils_shared.user_places import (app_output_logger,
                                       )
 from utils_viewer.viewer_gui import active_gui_getter, gui_runner, GuiUnavailableError
 from utils_viewer.viewer_preview import preview_info_builder
-from utils_viewer.viewer_stages import page_stage_runner, viewer_asker
+from utils_viewer.viewer_stages import (page_stage_runner,
+                                        setup_stage_runner,
+                                        viewer_asker,
+                                        )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -362,6 +366,8 @@ def everything_asker(folder: Path,
     last_answers_saver
     page_stage_runner
     section_starter
+    setup_plainer
+    setup_stage_runner
     viewer_asker
     yes_no_asker
     """
@@ -431,6 +437,10 @@ def everything_asker(folder: Path,
     # The figure builder takes the place of the fixed figures (side by side, the 2x2
     # grid, the time response, the haem and OCR response), whose questions are no
     # longer asked; the page is exported with the dataset figures.
+    # Which experiment is which comes first: the plots of the page split the
+    # experiments into sets by it.
+    section_starter('Dataset figures: set-up')
+    setup = setup_stage_runner(names, saved.get('setup'))
     section_starter('Dataset figures: build a figure')
     page = page_stage_runner(PLACES.layouts_folder)
     comparison, exemplar_names = None, None
@@ -604,6 +614,7 @@ def everything_asker(folder: Path,
                                    for k, v in answers.items()
                                    if k not in ('haems', 'ho_haems') or v
                                    },
+                                  setup_plainer(setup, saved.get('setup')),
                                   ):
         print(f'  The settings could not be saved in {folder} (the folder cannot be '
               f'written to), so this dataset will start from the standard settings '

@@ -46,6 +46,7 @@ from utils_viewer.viewer_guide import (AnswerArea,
                                        GuideState,
                                        )
 from utils_viewer.viewer_page import PageBuilder
+from utils_viewer.viewer_setup import SetupTable
 from utils_viewer.viewer_preview import (KEY_PREFIX,
                                          PreviewSpec,
                                          TimeAxis,
@@ -278,6 +279,7 @@ class ViewerGui:
     _pointer_mover
     _resizer
     _screen_filler
+    _setup_layout_setter
     _step_taker
     _strip_change_runner
     _strip_change_teller
@@ -305,6 +307,8 @@ class ViewerGui:
     run
     saved_plot_publisher
     session_attacher
+    setup_hider
+    setup_shower
     spec_publisher
     step_teller
     strip_choices_setter
@@ -1324,7 +1328,8 @@ class ViewerGui:
             terminal), 'spec', 'session', 'pictures', 'extra',
             'image', 'time', 'edges', 'strip', 'strip_choices', 'strip_fits',
             'strip_library', 'strip_state', 'busy', 'page' (the page of a dataset
-            figure shown, or taken away with None),
+            figure shown, or taken away with None), 'setup' (the dataset set-up
+            table shown, or taken away with None),
             'table_show', 'table_hide', 'closed' or 'finished'. The "Plotting data …"
             sign of 'busy' stays until the next question, preview or picture shown.
             With close_after_s, 'finished' also closes the window after that time.
@@ -1357,11 +1362,14 @@ class ViewerGui:
         _page_layout_setter
         _pane_writer
         _picture_shower
+        _setup_layout_setter
         _table_layout_setter
         AnswerArea.request_shower
         GuideState.step_starter
         PageBuilder.closer
         PageBuilder.opener
+        SetupTable.closer
+        SetupTable.opener
         """
 
         kind = event[0]
@@ -1481,6 +1489,15 @@ class ViewerGui:
             else:
                 self._page.closer()
                 self._page_layout_setter(False)
+        elif kind == 'setup':
+            # the dataset set-up table takes the place of the boxes and the plot
+            # while it is filled in
+            if event[1] is not None:
+                self._setup_layout_setter(True)
+                self._setup.opener(event[1])
+            else:
+                self._setup.closer()
+                self._setup_layout_setter(False)
         elif kind == 'table_show':
             self._table_opener(event[1])
         elif kind == 'table_hide':
@@ -2990,6 +3007,54 @@ class ViewerGui:
         except self._tk.TclError:  # a system without maximising: the whole screen
             root.geometry(f'{screen[0]}x{screen[1]}+0+0')
 
+    # ---- _setup_layout_setter --------------------------------------------------------
+    def _setup_layout_setter(self, is_on: bool) -> None:
+        """
+        ---- Summary ----
+        Method to put the dataset set-up table in place of the file controls, the
+        boxes and the plot, or to put those back.
+
+        ---- Inputs ----
+        is_on : bool
+            True while the table is filled in.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        if is_on:
+            for widget in (self._controls,
+                           self._strip.frame,
+                           self._strip.switch_frame,
+                           self._canvas,
+                           ):
+                widget.pack_forget()
+            self._setup.frame.pack(side='top', fill='both', expand=True)
+            return
+        self._setup.frame.pack_forget()
+        self._controls.pack(side='top', pady=(8, 0), before=self._help)
+        self._strip.frame.pack(side='top', pady=(6, 0), before=self._help)
+        self._strip.switch_frame.pack(side='top',
+                                      fill='x',
+                                      padx=6,
+                                      pady=(2, 0),
+                                      before=self._help,
+                                      )
+        self._canvas.pack(side='top', fill='both', expand=True, padx=8, pady=8)
+
     # ---- _step_taker -----------------------------------------------------------------
     def _step_taker(self, step: int) -> None:
         """
@@ -3607,6 +3672,7 @@ class ViewerGui:
         GuidePanel
         PageBuilder
         SettingsStrip
+        SetupTable
         """
 
         tk = self._tk
@@ -3837,6 +3903,13 @@ class ViewerGui:
                                  (self._family, self._size),
                                  PLOT_BACKGROUND,
                                  self._page_form_shower,
+                                 )
+        # the dataset set-up table, in their place while it is filled in
+        self._setup = SetupTable(tk,
+                                 ttk,
+                                 right,
+                                 (self._family, self._size),
+                                 PLOT_BACKGROUND,
                                  )
         self._previous_button = ttk.Button(controls,
                                            text='< Prev',
@@ -4475,6 +4548,69 @@ class ViewerGui:
         """
 
         self._events.put(('spec', spec, name))
+
+    # ---- setup_hider -----------------------------------------------------------------
+    def setup_hider(self) -> dict:
+        """
+        ---- Summary ----
+        Method to end the filling in of the dataset set-up table and give the table
+        as filled in (SetupTable.setup_reader); the file controls, the boxes and the
+        plot come back. It is called from the question thread once the step is
+        answered.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        dict
+            The set-up table (dataset_setup, DATA_FORMAT.md).
+
+        ---- Globals mutated ----
+        None. Queues the change for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        SetupTable.setup_reader
+        """
+
+        setup = self._setup.setup_reader()
+        self._events.put(('setup', None))
+        return setup
+
+    # ---- setup_shower ----------------------------------------------------------------
+    def setup_shower(self, setup: dict) -> None:
+        """
+        ---- Summary ----
+        Method to show the dataset set-up table in the window, to be filled in. It is
+        called from the question thread.
+
+        ---- Inputs ----
+        setup : dict
+            The set-up table to start from (dataset_setup, DATA_FORMAT.md).
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Queues the table for the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        self._events.put(('setup', setup))
 
     # ---- step_teller -----------------------------------------------------------------
     def step_teller(self, key: str) -> None:

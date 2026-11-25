@@ -1,11 +1,11 @@
-# Portimao question flow (V2.31)
+# Portimao question flow (V2.32)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
 **How to read it**
 
 - The questions are asked in Portimao's window. If the window cannot open, nothing is asked: a message says why and what to do (in the Mac app, with a **Copy details** button to send the details with the Mac problem form).
-- **The guide** on the left of the window lists the steps, numbered, one line each, under the names of the stages: **Import** (steps 1 to 4, sections 1 and 2 here), **Set-up** (5 to 9, section 3), **Experiment processing** (10 to 13, section 4), **Experiment export** (14 Finalise figures and 15 Export, section 5), **Dataset figures** (16 Build a figure, section 6) and **Dataset export** (17, section 9). The guide has four levels, largest first: the stage name, the steps under it, then in the open step the explanations and the question. Only the stage of the step open lists its steps, its name large and bold; the others show their name a little smaller and paler, with the numbers of their steps and a tick once they are passed. In the stage shown, a step done has a tick, a step passed without being asked (the previous processing of a dataset never opened, the OD values when you do not give them) stays in the list, greyed, with "· not needed this run", and the steps to come are paler.
+- **The guide** on the left of the window lists the steps, numbered, one line each, under the names of the stages: **Import** (steps 1 to 4, sections 1 and 2 here), **Set-up** (5 to 9, section 3), **Experiment processing** (10 to 13, section 4), **Experiment export** (14 Finalise figures and 15 Export, section 5), **Dataset figures** (16 Dataset set-up and 17 Build a figure, section 6) and **Dataset export** (18, section 9). The guide has four levels, largest first: the stage name, the steps under it, then in the open step the explanations and the question. Only the stage of the step open lists its steps, its name large and bold; the others show their name a little smaller and paler, with the numbers of their steps and a tick once they are passed. In the stage shown, a step done has a tick, a step passed without being asked (the previous processing of a dataset never opened, the OD values when you do not give them) stays in the list, greyed, with "· not needed this run", and the steps to come are paler.
 - **The step open** sits under its line, marked ▸: what was said since your last answer (the explanations in a light grey, the messages), then the question in pink, larger than the rest, then its answers. The stage name is not repeated there. What was said before your last answer folds away when the next question is asked; all of it stays in the run's log.
 - **Answers are clicked**, not typed:
     - something done on the plot or in the boxes above it (2.1, 4.4, 4.6, 5.1): one big **Continue** button (in 2.1 with **Export full + trimmed csv** and **Export trimmed csv** above it, buttons of the same size; in 5.1 named **Export**, for what it opens);
@@ -348,9 +348,35 @@ Every workbook has each sheet named in plain words with the unit in its headings
 
 ---
 
-## 6. Dataset figures: build a figure
+## 6. Dataset figures: set-up, then build a figure
 
-One step in the guide: **Build a figure**. The figure of the whole dataset is laid out on a page, which takes the place of the file arrows, the boxes and the plot while the step is open.
+Two steps in the guide: **Dataset set-up**, then **Build a figure**.
+
+### 6.A Dataset set-up
+
+A table says which experiment is which, so the plots of the dataset figure can split the experiments into sets. It takes the place of the file arrows, the boxes and the plot while the step is open, one row per experiment:
+
+- **Use**: a tick. An experiment unticked is greyed, has no replicate number and is left out of the dataset figures.
+- **File**: the name of the file.
+- **Group 1**, **Group 2** and **Time point**: a label each. Type one, or pick one already used in that column from the list of the cell. Any cell may stay blank.
+- **Replicate**: numbered by the program, never typed. The experiments in use with the same Group 1, Group 2 and time point count 1, 2, 3, in the order of their run numbers (an experiment whose name has none comes after those that have one), and otherwise in the order of the table.
+
+Above the table, **Group 1 is:** and **Group 2 is:** name the two group columns (for example "strain" and "order of additions"); the name shows in the heading of the column, as "Group 1 (strain)". They may be left empty.
+
+- **Filled in from the file names** the first time: `run<N>` at the end of a name, or a lone number at its end (`wt_2`), is the run number; a number of hours (`7hours`, `24h`) is the time point, written "7 h"; what is left is split at a hyphen if it has one, otherwise at its first underscore, into Group 1 and Group 2. `bd_then_kcn` and `kcn_then_bd` are written BD → KCN and KCN → BD. The same label in another case (`wt`, `WT`) is one label, spelt as first seen. So `control-bd_then_kcn-run2` is control, BD → KCN, run 2, and `knockdown_24hours` is knockdown at 24 h.
+- **To fill several rows**, click a cell, then Shift-click another cell of the same column: every row between gets the label of the first.
+- **Colours**: each Group 1 label has a colour, shown as a square beside it, the same on every row and used on every panel of the dataset figures. Click the square: a row of colours opens above the table, with **Cancel**; click one to give it to the label.
+- **Under the table**, the sets as they stand, each with its colour and its number of experiments ("■ control · BD → KCN (n = 3)").
+- The table is saved with the dataset's settings when the run starts, and opens as it was left next time; a file new to the folder is filled in from its name.
+- Nothing here opens a window of its own.
+
+| # | Question | Leads to |
+|---|---|---|
+| 6.1 | Check which experiment is which in the table. When it is right, click Continue. (above it, in grey: "The table on the right says which experiment is which, filled in from the file names: check it, and type over what is wrong. The dataset figures split the experiments into sets by Group 1, Group 2 and the time point, and untick Use to leave an experiment out." and "The replicates are numbered for you: the experiments with the same Group 1, Group 2 and time point count 1, 2, 3.") One button, **Continue**. | **Continue**: the file arrows, the boxes and the plot come back, then **6.2**. |
+
+### 6.B Build a figure
+
+The figure of the whole dataset is laid out on a page, which takes the place of the file arrows, the boxes and the plot while the step is open.
 
 - **The page** on the right is the journal page at its printed size, drawn as large as it fits, with a faint grid of 6 × 6 cells. It starts empty: Nature, 2 columns wide and 0.8 of a page tall.
 - **The strip** above the page holds the **Journal**, the **Width** and the **Height** of the page (as in the Figure box: every journal of the `journals` folder, the widths it allows, the height as a share of its page), then **Template** with **Load template** and **Save template**, and under them a button for each **plot type** that can be used now: Standard experiment, Difference spectrum, Waterfall, Traces overlaid, Mean trace, Bar chart, Before and after, Response by region, Time points, Haem amounts, Legend and Space for a drawing.
@@ -364,10 +390,10 @@ One step in the guide: **Build a figure**. The figure of the whole dataset is la
 
 | # | Question | Leads to |
 |---|---|---|
-| 6.1 | Drag across the grid to place each plot. When the page is ready, click Continue. (above it, in grey: "The page on the right is the journal page at its printed size, with a grid of 6 × 6 cells. Pick a plot type in the strip above it, then drag across the cells it should take; its form opens here." and "Load template puts a layout saved before on the page; Save template keeps this one for later.") One button, **Continue**. | **Continue**: a form still open is cancelled, the file arrows, the boxes and the plot come back. A page with at least one plot that has changed since it was last saved as a template or loaded from one → **6.2**; otherwise **9.1**. |
-| 6.2 | Do you want to save this page as a template, to load it for another dataset? `(y/N)` | **Yes** → **6.3**. **No** → **9.1**. |
-| 6.3 | What should the template be called? (an empty answer is refused: "Type a name for the template.") | A template of that name already there → **6.4**. Otherwise the template is written in the `layouts` folder, one line says so ("Saved the template … It is in the list beside Load template from now on."), then **9.1**. A template that cannot be written says why in one line, then **9.1**. |
-| 6.4 | A template called *name* is already there. Do you want to replace it? `(y/N)` | **Yes**: it is written over, then **9.1**. **No** → **6.3** again. |
+| 6.2 | Drag across the grid to place each plot. When the page is ready, click Continue. (above it, in grey: "The page on the right is the journal page at its printed size, with a grid of 6 × 6 cells. Pick a plot type in the strip above it, then drag across the cells it should take; its form opens here." and "Load template puts a layout saved before on the page; Save template keeps this one for later.") One button, **Continue**. | **Continue**: a form still open is cancelled, the file arrows, the boxes and the plot come back. A page with at least one plot that has changed since it was last saved as a template or loaded from one → **6.3**; otherwise **9.1**. |
+| 6.3 | Do you want to save this page as a template, to load it for another dataset? `(y/N)` | **Yes** → **6.4**. **No** → **9.1**. |
+| 6.4 | What should the template be called? (an empty answer is refused: "Type a name for the template.") | A template of that name already there → **6.5**. Otherwise the template is written in the `layouts` folder, one line says so ("Saved the template … It is in the list beside Load template from now on."), then **9.1**. A template that cannot be written says why in one line, then **9.1**. |
+| 6.5 | A template called *name* is already there. Do you want to replace it? `(y/N)` | **Yes**: it is written over, then **9.1**. **No** → **6.4** again. |
 
 When the run starts, a page with at least one plot is saved in the results folder as `dataset_figure_<journal>.pdf`: the figure at exactly its printed size, drawn as lines and text with its fonts in the file, so the text can still be changed in a drawing program. Its master page, `dataset_figure_master_<journal>.pdf`, is the same figure on one page of the journal, as **Export master** makes for one experiment. An empty page saves neither. A PDF that cannot be written (open in another program) is said in one sentence and the run goes on.
 
