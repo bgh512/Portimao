@@ -1483,6 +1483,12 @@ def preview_figure_builder(session: ViewerSession,
                                              list(spec.fit['haem_list']),
                                              ),
                                          settings.COMPONENT_FIGURE_STYLE,
+                                         bool(
+                                             preview_answers.get(
+                                                 'difference_background',
+                                                 False,
+                                                 ),
+                                             ),
                                          )
                 figure_canvas_fitter(fig, plot_config['LAYOUT_PAD_PT'])
             else:

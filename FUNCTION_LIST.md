@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.37
+- **Version:** V2.38
 - **Date:** 26/11/2026
 
 ## Contents
@@ -7086,8 +7086,10 @@ _experiment_maker
 
 ```text
 ---- Summary ----
-Main function to check the figure, drawn off screen: two panels, one line for each
-haem in its colour, the regions' times in the key, and no time axis for the window.
+Main function to check the figure, drawn off screen: one panel, one line for each
+haem in its colour, the residual as a grey line, the difference and the fit with the background taken off
+(then with it, and the background as a line), the regions' times in the key, and
+no time axis for the window.
 
 ---- Inputs ----
 None.
@@ -7113,7 +7115,8 @@ _haem_experiment_maker
 ```text
 ---- Summary ----
 Main function to check the switch's value in the strip: the standard plot unless
-the answers ask for the difference spectrum, and only True or False accepted.
+the answers ask for the difference spectrum, and only True or False accepted; the
+same for the tick of the background beside it.
 
 ---- Inputs ----
 None.
@@ -7787,10 +7790,11 @@ None.
 
 ```text
 ---- Summary ----
-Main function to check the labels on the plot: in the chamber always in µM
-('1200 µM KCN', not 1.2 mM); what was added with the stock always in mM ('10 µL of
-200 mM KCN', and a 1 M stock as 1000 mM); an event with only a typed concentration
-shows it either way; an event with no concentration shows its label alone.
+Main function to check the labels on the plot: in the chamber in its tidiest unit
+('1.2 mM KCN', not 1200 µM; '500 nM'); what was added with the stock in its
+tidiest unit ('10 µL of 200 mM KCN', and a 1 M stock as 1 M); an event with only a
+typed concentration shows it either way; an event with no concentration shows its
+label alone; the labels table keeps its fixed units.
 
 ---- Inputs ----
 None.
@@ -15929,10 +15933,11 @@ _series_setup_maker
 ```text
 ---- Summary ----
 Main function to check what a Difference spectrum draws: as it starts, the
-measured difference in black, each haem in its colour and the fit, in mOD, with
-the residual in a panel underneath and a small legend; then the background, the
-haem bands (marked as a backdrop) and no residual, as ticked; everything inside
-its cells.
+measured difference in black and the fit with the background taken off, each
+haem in its colour and the residual as a line of its own, in mOD, in one panel
+with a small legend; then the difference with its background and the background
+line, the haem bands (marked as a backdrop) and no residual, as ticked;
+everything inside its cells.
 
 ---- Inputs ----
 None.
@@ -15949,8 +15954,10 @@ None.
 
 ---- Equations ----
 a1 has a bH peak of 4 mOD at 560 nm and a cc peak of 1 mOD at 550 nm, the 13th
-and the 11th of its 21 wavelengths; its fit is 0.5 mOD higher everywhere and its
-residual -0.5 mOD. The plot takes x from 0 to 0.5 and y from 0.5 to 1 of the
+and the 11th of its 21 wavelengths, on a background of 0.5 mOD; its fit is 0.5
+mOD higher everywhere and its residual -0.5 mOD. Without the background the
+difference is 4 - 0.5 = 3.5, 1 - 0.5 = 0.5 and 0 - 0.5 = -0.5 mOD and the fit
+4.5 - 0.5 = 4 mOD at the bH peak. The plot takes x from 0 to 0.5 and y from 0.5 to 1 of the
 figure.
 
 ---- Helpers ----
@@ -16387,8 +16394,8 @@ _region_points_setup_maker
 ```text
 ---- Summary ----
 Main function to check a Bar chart as drawn: a bar and an error bar for each set
-of more than one experiment and none for the set of one; a dot per experiment in
-the colour of its set; one bracket with its mark, between the two sets that
+of more than one experiment, in the full colour of its set, and none for the set
+of one; a black dot per experiment; one bracket with its mark, between the two sets that
 differ, above everything under it; the y axis from 0 holding every dot, bar and
 mark; the names of the sets and of the region; no small legend; everything
 inside its cells. Then the SD and the p value, no marks, a plot whose numbers go
@@ -16399,7 +16406,7 @@ show.
 None.
 
 ---- Globals read ----
-BLUE, GREEN, ORANGE; NO_VALUES (imported).
+BLUE, ORANGE; NO_VALUES (imported).
 
 ---- Outputs ----
 None
@@ -16419,7 +16426,6 @@ with an SD of 2: t = 0.61, no mark.
 
 ---- Helpers ----
 _region_drawer
-colour_shader
 ```
 
 #### `test_a_before_and_after`
@@ -25037,14 +25043,15 @@ _tests_lister
 ```text
 ---- Summary ----
 Helper function to lay out the numbers of a Difference spectrum for its sheet:
-the wavelength, then the difference and each part its form ticks.
+the wavelength, then the difference and each part its form ticks, and whether
+the background is taken off.
 
 ---- Inputs ----
 numbers : dict
     The numbers of the plot (difference_numbers_lister).
 
 ---- Globals read ----
-None.
+BACKGROUND_OFF, BACKGROUND_ON.
 
 ---- Outputs ----
 dict
@@ -25988,10 +25995,12 @@ spectrum_decomposer
 
 ```text
 ---- Summary ----
-Main function to draw the difference spectrum on a figure: on top the measured
-difference in black, each haem in its colour, the background dotted and the fit
-(haems + background) dashed, with a key giving the times of the two regions; under
-it a small panel of the residual. The figure is marked as having no time axis.
+Main function to draw the difference spectrum on a figure, in one panel: the
+measured difference in black, each haem in its colour, the fit dashed and the
+residual as a grey line, with a key giving the times of the two regions. The
+difference and the fit have the background taken off, so they sit on zero; with
+the background shown they are drawn with it, and the background dotted. The
+figure is marked as having no time axis.
 
 ---- Inputs ----
 fig : Figure
@@ -26004,20 +26013,24 @@ colours : Dict[str, str]
     {haem name: colour} (config.haem_colour_mapper).
 style : dict
     Greys and line widths (config.COMPONENT_FIGURE_STYLE).
+is_background_shown : bool
+    True to draw the difference and the fit with the background, and the
+    background itself; False to take it off both.
 
 ---- Globals read ----
-RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, WAVELENGTH_FIGURE_MARK, X_LABEL, Y_LABEL.
+WAVELENGTH_FIGURE_MARK, X_LABEL, Y_LABEL.
 
 ---- Outputs ----
 List
-    The two axes, the spectrum first.
+    The one set of axes.
 
 ---- Globals mutated ----
 None. Draws on the figure and sets its WAVELENGTH_FIGURE_MARK attribute (side
 effects).
 
 ---- Equations ----
-None.
+Without the background: measured = difference - background, and fit = the sum
+of the haems (MATHS.md section 9).
 
 ---- Helpers ----
 None.
@@ -26309,8 +26322,9 @@ typed_number_reader
 ```text
 ---- Summary ----
 Main function to write how much of a thing an event holds, as the labels show it:
-the concentration in the chamber after it (µM), or the volume and the stock added
-(mM); an event with no stock shows its concentration either way.
+the concentration in the chamber after it, or the volume and the stock added,
+each concentration in its tidiest unit; an event with no stock shows its
+concentration either way.
 
 ---- Inputs ----
 event : dict
@@ -26324,7 +26338,7 @@ None.
 
 ---- Outputs ----
 str
-    For example '400 µM', '1200 µM' or '10 µL of 200 mM'; '' when the event has no
+    For example '400 µM', '1.2 mM' or '10 µL of 200 mM'; '' when the event has no
     concentration.
 
 ---- Globals mutated ----
@@ -26334,7 +26348,7 @@ None.
 None.
 
 ---- Helpers ----
-unit_concentration_writer
+concentration_formatter
 ```
 
 #### `event_concentration_filler`
@@ -26397,7 +26411,7 @@ None.
 
 ---- Outputs ----
 str
-    For example '400 µM KCN', '10 µL of 200 mM KCN' or 'KCN'.
+    For example '400 µM KCN', '1.2 mM KCN', '10 µL of 200 mM KCN' or 'KCN'.
 
 ---- Globals mutated ----
 None.
@@ -26447,8 +26461,8 @@ typed_number_reader
 
 ```text
 ---- Summary ----
-Main function to write a concentration in one fixed unit: the stock in mM and the
-concentration in the chamber in µM, whatever its size.
+Main function to write a concentration in one fixed unit, whatever its size: in
+the labels table, the stock in mM and the concentration in the chamber in µM.
 
 ---- Inputs ----
 value_um : float
@@ -27989,7 +28003,8 @@ str
 None.
 
 ---- Equations ----
-mM = uM / 1000; M = uM / 1 000 000; nM = uM × 1000.
+mM = uM / 1000; M = uM / 1 000 000; nM = uM × 1000. The value is rounded to the
+significant figures first, so 999.96 µM (1000 µM to four figures) is '1 mM'.
 
 ---- Helpers ----
 None.
@@ -33907,8 +33922,8 @@ set_values_lister
 ```text
 ---- Summary ----
 Main function to draw a Bar chart (P9) into the room of its cells: for each set
-a bar up to the mean of its experiments in the region picked, with its SEM or
-SD, and a dot per experiment in the colour of the set; a set of one experiment
+a bar in its colour up to the mean of its experiments in the region picked,
+with its SEM or SD, and a black dot per experiment; a set of one experiment
 has its dot and no bar. A bracket with its mark joins two sets only where they
 differ (corrected p under 0.05). The y axis holds 0, every dot, bar and mark.
 With nothing to show, one sentence in the cells.
@@ -33924,7 +33939,7 @@ context : dict
     What a plot is drawn with (PLOT_DRAWERS).
 
 ---- Globals read ----
-BAR_SHADE, BAR_WIDTH, BRACKET_STEP_SHARE, CAP_WIDTH_PT, DOT_WIDTHS, DOTS_WIDTH,
+BAR_WIDTH, BRACKET_STEP_SHARE, CAP_WIDTH_PT, DOT_COLOUR, DOT_WIDTHS, DOTS_WIDTH,
 MARK_COLOUR, NO_VALUES.
 
 ---- Outputs ----
@@ -33948,7 +33963,6 @@ _sentence_drawer
 _spectrum_axes_styler
 _y_range_setter
 bar_numbers_lister
-colour_shader
 p_value_marker
 ```
 
@@ -34135,8 +34149,8 @@ p_value_marker
 ---- Summary ----
 Main function to list what the form of a Difference spectrum (P2) asks: the
 experiment, then a tick for each thing it can show: the part of each haem (on),
-the background (off), the overall fit (on), the residual in a small panel
-underneath (on) and the haem bands (off).
+the background (off: the spectrum is drawn with it taken off, so it sits on
+zero), the overall fit (on), the residual (on) and the haem bands (off).
 
 ---- Inputs ----
 setup : dict
@@ -34170,7 +34184,9 @@ tick_field_maker
 ---- Summary ----
 Main function to list the numbers of a Difference spectrum: the difference of
 its experiment, reduced minus oxidised, and each part its form ticks, at each
-wavelength; or the sentence the plot shows when it has nothing to draw.
+wavelength; or the sentence the plot shows when it has nothing to draw. Unless
+the background is ticked, the difference and the fit have it taken off, so they
+sit on zero.
 
 ---- Inputs ----
 setup : Optional[dict]
@@ -34195,14 +34211,16 @@ dict
     'wavelengths_nm': np.ndarray (n_wavelengths,), 'columns': (its name, its
     values in mOD, (n_wavelengths,)) of the difference and of each part ticked,
     in the order Measured, each haem, Background, Fit, Residual,
-    'has_residual': whether the residual is ticked, and 'bands': {haem: (from,
-    to) in nm} when the haem bands are ticked, otherwise {}.
+    'is_background_shown': whether the background is ticked, and 'bands':
+    {haem: (from, to) in nm} when the haem bands are ticked, otherwise {}.
 
 ---- Globals mutated ----
 None.
 
 ---- Equations ----
-None. Everything is in mOD (MATHS.md section 9).
+Without the background ticked: Measured = difference - background and Fit =
+fit - background, the sum of the haems. Everything is in mOD (MATHS.md
+section 9).
 
 ---- Helpers ----
 _missing_sentence_finder
@@ -34216,8 +34234,10 @@ role_experiment_finder
 ---- Summary ----
 Main function to draw a Difference spectrum (P2) into the room of its cells: the
 difference of one experiment, reduced minus oxidised, in black, with what its
-form ticks: the part of each haem in its colour, the background dotted, the fit
-dashed, the haem bands behind and the residual in a small panel underneath. The
+form ticks: the part of each haem in its colour, the fit dashed, the residual
+as a grey line and the haem bands behind. The difference and the fit have the
+background taken off, so they sit on zero; with the background ticked they are
+drawn with it, and the background dotted. The
 lines are named, so the page gives the plot its small legend. An experiment that
 is not in the dataset, could not be read or has no difference spectrum gives one
 sentence in the cells in place of the plot.
@@ -34233,14 +34253,11 @@ context : dict
     What a plot is drawn with (PLOT_DRAWERS).
 
 ---- Globals read ----
-BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY;
-settings.COMPONENT_FIGURE_STYLE; RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, X_LABEL,
-Y_LABEL (imported).
+settings.COMPONENT_FIGURE_STYLE; X_LABEL, Y_LABEL (imported).
 
 ---- Outputs ----
 List[Axes]
-    The axes of the spectrum, then those of the residual when it is ticked; or
-    the one set of axes of the sentence.
+    The axes of the spectrum, or those of the sentence.
 
 ---- Globals mutated ----
 None. Adds axes to the figure (side effect).
@@ -34251,7 +34268,6 @@ None. Everything is in mOD (MATHS.md section 9).
 ---- Helpers ----
 _sentence_drawer
 _spectrum_axes_styler
-_tick_reader
 difference_numbers_lister
 haem_bands_drawer
 ```
@@ -54553,6 +54569,35 @@ _change_reporter
 _size_refresher
 ```
 
+##### `_background_tick_handler`
+
+```text
+---- Summary ----
+Method to take the tick beside the switch under the boxes: ticked, the
+difference spectrum is drawn with its background; unticked, with the
+background taken off.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Keeps the value and reports the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_change_reporter
+_size_refresher
+```
+
 ##### `_difference_handler`
 
 ```text
@@ -55834,10 +55879,11 @@ Main function to give the strip values that show the answers of the run.
 answers : dict
     The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
     haem_per_od, ocr_mode, label_mode, compare_layout, difference_spectra,
-    delta_psi and the numbers of Δψ, journal, columns, height, size_mode); a
-    fit_file of None shows an empty fit, a missing label_mode the labels in the
-    chamber, a missing compare_layout the standard one and a missing
-    difference_spectra the standard plot.
+    difference_background, delta_psi and the numbers of Δψ, journal, columns,
+    height, size_mode); a fit_file of None shows an empty fit, a missing
+    label_mode the labels in the chamber, a missing compare_layout the standard
+    one, a missing difference_spectra the standard plot and a missing
+    difference_background the background taken off.
 has_haems : bool
     True when the haems are worked out and shown, which ticks the box.
 haem_files : Sequence[str]

@@ -72,6 +72,7 @@ VALUE_NAMES = ('plot_haems',
                'kept',
                'compare_layout',
                'difference_spectra',
+               'difference_background',
                'spectra',
                'haem_mode',
                'haem_per_od',
@@ -135,6 +136,9 @@ KEPT_PREFIXES = {'side': 'Kept to compare (Old, the plot on the left): ',
 # difference spectrum (reduced minus oxidised), by the value difference_spectra, and
 # the note beside it while it is greyed.
 DIFFERENCE_TEXTS = {False: 'Standard plot', True: 'Difference spectrum'}
+# The tick beside the switch: the difference spectrum with its background, by the value
+# difference_background; unticked, the background is taken off.
+BACKGROUND_TICK_TEXT = 'Show background'
 DIFFERENCE_NOTE = ('Set both the oxidised and the reduced region on this file to see '
                    'its difference spectrum.')
 # The button that saves one page of the journal as a PDF with the figure of the file
@@ -1035,6 +1039,9 @@ class SettingsStrip:
                                         'difference_spectra': bool(
                                             standard['difference_spectra'],
                                             ),
+                                        'difference_background': bool(
+                                            standard['difference_background'],
+                                            ),
                                         'spectra': standard['decomposition_dataset'],
                                         'haem_mode': standard['haem_mode'],
                                         'haem_per_od': bool(standard['haem_per_od']),
@@ -1489,8 +1496,16 @@ class SettingsStrip:
 
         # ---- 2.6 The switch under the boxes: the standard plot or the difference -----
         # The window places switch_frame under the boxes; the buttons sit on its right,
-        # with the note on their left while the switch is greyed.
+        # with the note on their left while the switch is greyed. The tick of the
+        # background is packed first, so it sits right of the buttons.
         self.switch_frame = tk.Frame(parent, bg=background)
+        self._background_on = tk.BooleanVar(master=parent, value=False)
+        self._background_tick = tick_maker(BACKGROUND_TICK_TEXT,
+                                           self._background_on,
+                                           self._background_tick_handler,
+                                           self.switch_frame,
+                                           )
+        self._background_tick.pack(side='right', padx=(4, 2))
         self._difference_buttons: Dict[bool, Any] = {}
         for is_on in (True, False):
             button = tk.Button(self.switch_frame,
@@ -2094,6 +2109,40 @@ class SettingsStrip:
             return
         before = dict(self._values)
         self._values['compare_layout'] = layout
+        self._size_refresher()
+        self._change_reporter(before)
+
+    # ---- _background_tick_handler ----------------------------------------------------
+    def _background_tick_handler(self) -> None:
+        """
+        ---- Summary ----
+        Method to take the tick beside the switch under the boxes: ticked, the
+        difference spectrum is drawn with its background; unticked, with the
+        background taken off.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Keeps the value and reports the change (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _change_reporter
+        _size_refresher
+        """
+
+        before = dict(self._values)
+        self._values['difference_background'] = bool(self._background_on.get())
         self._size_refresher()
         self._change_reporter(before)
 
@@ -2704,6 +2753,14 @@ class SettingsStrip:
                                      ),
                              state='normal' if can_switch else 'disabled',
                              )
+        # the tick of the background counts only while the difference spectrum shows
+        self._background_on.set(values['difference_background'])
+        self._background_tick.configure(
+            state=('normal'
+                   if can_switch and values['difference_spectra']
+                   else 'disabled'
+                   ),
+            )
         if self._is_enabled and values['plot_haems'] and not can_switch:
             self._difference_note.pack(side='right', padx=(0, 6))
         else:
@@ -4024,10 +4081,11 @@ def strip_values_builder(answers: dict,
     answers : dict
         The answers (fit_file, haem_background, decomposition_dataset, haem_mode,
         haem_per_od, ocr_mode, label_mode, compare_layout, difference_spectra,
-        delta_psi and the numbers of Δψ, journal, columns, height, size_mode); a
-        fit_file of None shows an empty fit, a missing label_mode the labels in the
-        chamber, a missing compare_layout the standard one and a missing
-        difference_spectra the standard plot.
+        difference_background, delta_psi and the numbers of Δψ, journal, columns,
+        height, size_mode); a fit_file of None shows an empty fit, a missing
+        label_mode the labels in the chamber, a missing compare_layout the standard
+        one, a missing difference_spectra the standard plot and a missing
+        difference_background the background taken off.
     has_haems : bool
         True when the haems are worked out and shown, which ticks the box.
     haem_files : Sequence[str]
@@ -4066,6 +4124,7 @@ def strip_values_builder(answers: dict,
                                           settings.DEFAULT_ANSWERS['compare_layout'],
                                           ),
             'difference_spectra': bool(answers.get('difference_spectra', False)),
+            'difference_background': bool(answers.get('difference_background', False)),
             'spectra': str(answers.get('decomposition_dataset') or ''),
             'haem_mode': answers['haem_mode'],
             'haem_per_od': bool(answers['haem_per_od']),
@@ -4159,6 +4218,12 @@ def strip_values_checker(values: Dict[str, Any]) -> None:
         ):
         raise ValueError('Whether the plot shows the difference spectrum is True or '
                          f"False; {values['difference_spectra']!r} is not.",
+                         )
+    if ('difference_background' in values and
+        not isinstance(values['difference_background'], bool)
+        ):
+        raise ValueError('Whether the difference spectrum shows its background is '
+                         f"True or False; {values['difference_background']!r} is not.",
                          )
     if 'spectra' in values and not isinstance(values['spectra'], str):
         raise ValueError('The spectrometer of the strip is given by its name; '

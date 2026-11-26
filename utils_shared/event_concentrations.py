@@ -7,7 +7,7 @@ import re
 from typing import List, Optional, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.helpers import name_simplifier
+from utils_shared.helpers import concentration_formatter, name_simplifier
 from utils_shared.questions import typed_number_reader
 
 
@@ -27,8 +27,9 @@ TYPED_CONCENTRATION_PATTERN = re.compile(r'\s*(.*?)\s*([nuµμm]?m)?\s*')
 # addition ("400 µM KCN"), or what was added ("10 µL of 200 mM KCN").
 LABEL_MODES = {'chamber': 'In the chamber', 'added': 'What was added'}
 UL_PER_ML = 1000.0
-# A stock is always written in mM and a concentration in the chamber in µM, on the
-# labels and in the labels table alike: {unit key of UNIT_FACTORS_UM: unit written}.
+# In the labels table a stock is always written in mM and a concentration in the
+# chamber in µM: {unit key of UNIT_FACTORS_UM: unit written}. On a label each is
+# written in the unit that gives the tidiest number (concentration_formatter).
 STOCK_UNIT = 'mm'
 CHAMBER_UNIT = 'um'
 UNIT_NAMES = {'mm': 'mM', 'um': 'µM'}
@@ -176,8 +177,9 @@ def event_amount_writer(event: dict, mode: str) -> str:
     """
     ---- Summary ----
     Main function to write how much of a thing an event holds, as the labels show it:
-    the concentration in the chamber after it (µM), or the volume and the stock added
-    (mM); an event with no stock shows its concentration either way.
+    the concentration in the chamber after it, or the volume and the stock added,
+    each concentration in its tidiest unit; an event with no stock shows its
+    concentration either way.
 
     ---- Inputs ----
     event : dict
@@ -191,7 +193,7 @@ def event_amount_writer(event: dict, mode: str) -> str:
 
     ---- Outputs ----
     str
-        For example '400 µM', '1200 µM' or '10 µL of 200 mM'; '' when the event has no
+        For example '400 µM', '1.2 mM' or '10 µL of 200 mM'; '' when the event has no
         concentration.
 
     ---- Globals mutated ----
@@ -201,16 +203,17 @@ def event_amount_writer(event: dict, mode: str) -> str:
     None.
 
     ---- Helpers ----
-    unit_concentration_writer
+    concentration_formatter
     """
 
     stock, added = event.get('stock_uM'), event.get('added_uL')
     if mode == 'added' and stock is not None and added is not None:
-        return f'{float(added):g} µL of {unit_concentration_writer(stock, STOCK_UNIT)}'
+        written = concentration_formatter(stock, LABEL_FIGURES)
+        return f'{float(added):g} µL of {written}'
     concentration = event.get('concentration_uM')
     if concentration is None:
         return ''
-    return unit_concentration_writer(concentration, CHAMBER_UNIT)
+    return concentration_formatter(concentration, LABEL_FIGURES)
 
 
 # ---- event_concentration_filler ------------------------------------------------------
@@ -304,7 +307,7 @@ def event_text_writer(event: dict, mode: str) -> str:
 
     ---- Outputs ----
     str
-        For example '400 µM KCN', '10 µL of 200 mM KCN' or 'KCN'.
+        For example '400 µM KCN', '1.2 mM KCN', '10 µL of 200 mM KCN' or 'KCN'.
 
     ---- Globals mutated ----
     None.
@@ -380,8 +383,8 @@ def unit_concentration_writer(value_um: float,
                               ) -> str:
     """
     ---- Summary ----
-    Main function to write a concentration in one fixed unit: the stock in mM and the
-    concentration in the chamber in µM, whatever its size.
+    Main function to write a concentration in one fixed unit, whatever its size: in
+    the labels table, the stock in mM and the concentration in the chamber in µM.
 
     ---- Inputs ----
     value_um : float

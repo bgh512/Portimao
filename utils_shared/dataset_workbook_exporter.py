@@ -114,6 +114,9 @@ TABLE_FORMULAS = {'mean': '=AVERAGE({0})',
 OWN_WORKBOOK = ('The numbers of this plot are in the workbook of the experiment, '
                 '{0}/{0}.xlsx in the folder of this workbook: a sheet for each of its '
                 'traces, its averages and how it was worked out.')
+BACKGROUND_OFF = ('The measured difference and the fit are given with the background '
+                  'taken off, as the plot draws them.')
+BACKGROUND_ON = 'The measured difference and the fit are given with the background.'
 BEFORE_STACKING = ('The lines are listed from the top of the plot down, each as it is '
                    'before the plot moves it to stack them (MATHS.md section 9.2).')
 LINED_UP = ('Each experiment is read at the shared times, lined up on the additions '
@@ -254,14 +257,15 @@ def _difference_content_builder(numbers: dict) -> dict:
     """
     ---- Summary ----
     Helper function to lay out the numbers of a Difference spectrum for its sheet:
-    the wavelength, then the difference and each part its form ticks.
+    the wavelength, then the difference and each part its form ticks, and whether
+    the background is taken off.
 
     ---- Inputs ----
     numbers : dict
         The numbers of the plot (difference_numbers_lister).
 
     ---- Globals read ----
-    None.
+    BACKGROUND_OFF, BACKGROUND_ON.
 
     ---- Outputs ----
     dict
@@ -279,8 +283,9 @@ def _difference_content_builder(numbers: dict) -> dict:
 
     if numbers['sentence'] is not None:
         return {'lines': [], 'notes': [], 'sentence': numbers['sentence'], 'blocks': []}
+    background = BACKGROUND_ON if numbers['is_background_shown'] else BACKGROUND_OFF
     lines = [f"Experiment: {numbers['name']}",
-             'Reduced minus oxidised, in mOD (MATHS.md section 9).',
+             f'Reduced minus oxidised, in mOD (MATHS.md section 9). {background}',
              ]
     if numbers['bands']:
         bands = '; '.join(f'{_label_plainer(haem)} {low:g} to {high:g}'

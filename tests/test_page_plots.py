@@ -31,7 +31,6 @@ from utils_shared.figure_layout import (BACKDROP_MARK,
                                         font_family_lister,
                                         )
 from utils_shared.page_data import (caption_lines_builder,
-                                    colour_shader,
                                     experiment_role_maker,
                                     form_fields_lister,
                                     )
@@ -1316,10 +1315,11 @@ def test_the_lines_of_a_difference_spectrum() -> None:
     """
     ---- Summary ----
     Main function to check what a Difference spectrum draws: as it starts, the
-    measured difference in black, each haem in its colour and the fit, in mOD, with
-    the residual in a panel underneath and a small legend; then the background, the
-    haem bands (marked as a backdrop) and no residual, as ticked; everything inside
-    its cells.
+    measured difference in black and the fit with the background taken off, each
+    haem in its colour and the residual as a line of its own, in mOD, in one panel
+    with a small legend; then the difference with its background and the background
+    line, the haem bands (marked as a backdrop) and no residual, as ticked;
+    everything inside its cells.
 
     ---- Inputs ----
     None.
@@ -1336,8 +1336,10 @@ def test_the_lines_of_a_difference_spectrum() -> None:
 
     ---- Equations ----
     a1 has a bH peak of 4 mOD at 560 nm and a cc peak of 1 mOD at 550 nm, the 13th
-    and the 11th of its 21 wavelengths; its fit is 0.5 mOD higher everywhere and its
-    residual -0.5 mOD. The plot takes x from 0 to 0.5 and y from 0.5 to 1 of the
+    and the 11th of its 21 wavelengths, on a background of 0.5 mOD; its fit is 0.5
+    mOD higher everywhere and its residual -0.5 mOD. Without the background the
+    difference is 4 - 0.5 = 3.5, 1 - 0.5 = 0.5 and 0 - 0.5 = -0.5 mOD and the fit
+    4.5 - 0.5 = 4 mOD at the bH peak. The plot takes x from 0 to 0.5 and y from 0.5 to 1 of the
     figure.
 
     ---- Helpers ----
@@ -1352,24 +1354,23 @@ def test_the_lines_of_a_difference_spectrum() -> None:
     assert [label for label in lines if not label.startswith('_')] == ['Measured',
                                                                        *HAEMS,
                                                                        'Fit',
+                                                                       'Residual',
                                                                        ]
     measured = lines['Measured'].get_ydata()
-    assert (measured[12], measured[10], measured[0]) == (4.0, 1.0, 0.0)
+    assert (measured[12], measured[10], measured[0]) == (3.5, 0.5, -0.5)
     assert lines['Measured'].get_color() == 'black'
     colours = settings.haem_colour_mapper(HAEMS)
     for haem in HAEMS:
         assert lines[haem].get_color() == colours[haem]
     assert lines[HAEMS[0]].get_ydata()[12] == 4.0
-    assert lines['Fit'].get_ydata()[12] == 4.5
+    assert lines['Fit'].get_ydata()[12] == 4.0
+    assert list(lines['Residual'].get_ydata()) == [-0.5] * 21
+    assert lines['Residual'].get_color() not in ('black', lines['Fit'].get_color())
     assert main.get_ylabel() == 'Reduced − oxidised (mOD)'
+    assert main.get_xlabel() == 'Wavelength (nm)'
     assert main.get_xlim() == (500.0, 600.0)
     assert main.get_legend() is not None and not main.patches
-    lower = [ax for ax in fig.axes if ax is not main and ax.axison]
-    assert len(lower) == 1
-    assert lower[0].get_xlabel() == 'Wavelength (nm)'
-    assert lower[0].get_ylabel() == 'Residual (mOD)'
-    assert list(lower[0].lines[0].get_ydata()) == [-0.5] * 21
-    assert lower[0].get_position().y1 < main.get_position().y0
+    assert [ax for ax in fig.axes if ax.axison] == [main]
     tight = Bbox.union([ax.get_tightbbox(fig._get_renderer()) for ax in fig.axes])
     tight = tight.transformed(fig.transFigure.inverted())
     assert 0.0 <= tight.x0 and tight.x1 <= 0.5
@@ -1388,6 +1389,8 @@ def test_the_lines_of_a_difference_spectrum() -> None:
     assert [label for label in labels if not label.startswith('_')] == ['Measured',
                                                                         'Background',
                                                                         ]
+    measured = main.lines[0].get_ydata()
+    assert (measured[12], measured[10], measured[0]) == (4.0, 1.0, 0.0)
     assert [ax for ax in fig.axes if ax.axison] == [main]
     assert main.get_xlabel() == 'Wavelength (nm)'
     assert [(band.get_x(), band.get_x() + band.get_width())
@@ -2453,8 +2456,8 @@ def test_a_bar_chart_drawn() -> None:
     """
     ---- Summary ----
     Main function to check a Bar chart as drawn: a bar and an error bar for each set
-    of more than one experiment and none for the set of one; a dot per experiment in
-    the colour of its set; one bracket with its mark, between the two sets that
+    of more than one experiment, in the full colour of its set, and none for the set
+    of one; a black dot per experiment; one bracket with its mark, between the two sets that
     differ, above everything under it; the y axis from 0 holding every dot, bar and
     mark; the names of the sets and of the region; no small legend; everything
     inside its cells. Then the SD and the p value, no marks, a plot whose numbers go
@@ -2465,7 +2468,7 @@ def test_a_bar_chart_drawn() -> None:
     None.
 
     ---- Globals read ----
-    BLUE, GREEN, ORANGE; NO_VALUES (imported).
+    BLUE, ORANGE; NO_VALUES (imported).
 
     ---- Outputs ----
     None
@@ -2485,7 +2488,6 @@ def test_a_bar_chart_drawn() -> None:
 
     ---- Helpers ----
     _region_drawer
-    colour_shader
     """
 
     # ---- 1 The bars, the error bars and the dots -------------------------------------
@@ -2495,8 +2497,8 @@ def test_a_bar_chart_drawn() -> None:
         )
     assert [bar.get_height() for bar in ax.patches] == pytest.approx([5.0, 9.0])
     assert [matplotlib.colors.to_hex(bar.get_facecolor()) for bar in ax.patches] == [
-        colour_shader(BLUE, 0.65),
-        colour_shader(ORANGE, 0.65),
+        BLUE,
+        ORANGE,
         ]
     assert [matplotlib.colors.to_hex(bar.get_edgecolor()) for bar in ax.patches] == [
         BLUE,
@@ -2507,9 +2509,9 @@ def test_a_bar_chart_drawn() -> None:
             if isinstance(group, matplotlib.collections.PathCollection)
             ]
     assert [matplotlib.colors.to_hex(group.get_facecolor()[0]) for group in dots] == [
-        BLUE,
-        ORANGE,
-        GREEN,
+        '#000000',
+        '#000000',
+        '#000000',
         ]
     assert np.asarray(dots[0].get_offsets()) == pytest.approx(np.array([[-0.15, 4.0],
                                                                         [0.0, 5.0],

@@ -204,10 +204,11 @@ def test_a_stock_typed_with_its_unit() -> None:
 def test_the_text_of_the_labels() -> None:
     """
     ---- Summary ----
-    Main function to check the labels on the plot: in the chamber always in µM
-    ('1200 µM KCN', not 1.2 mM); what was added with the stock always in mM ('10 µL of
-    200 mM KCN', and a 1 M stock as 1000 mM); an event with only a typed concentration
-    shows it either way; an event with no concentration shows its label alone.
+    Main function to check the labels on the plot: in the chamber in its tidiest unit
+    ('1.2 mM KCN', not 1200 µM; '500 nM'); what was added with the stock in its
+    tidiest unit ('10 µL of 200 mM KCN', and a 1 M stock as 1 M); an event with only a
+    typed concentration shows it either way; an event with no concentration shows its
+    label alone; the labels table keeps its fixed units.
 
     ---- Inputs ----
     None.
@@ -230,7 +231,7 @@ def test_the_text_of_the_labels() -> None:
     """
 
     last = event_concentration_filler(RUN, CHAMBER_ML)[4]
-    assert event_text_writer(last, 'chamber') == '1200 µM KCN'
+    assert event_text_writer(last, 'chamber') == '1.2 mM KCN'
     assert event_text_writer(last, 'added') == '10 µL of 200 mM KCN'
     typed = {'label': 'BD', 'concentration_uM': 10.0}
     assert event_text_writer(typed, 'added') == '10 µM BD'
@@ -238,8 +239,18 @@ def test_the_text_of_the_labels() -> None:
     # 20 µL of a 1 M stock: 1 000 000 × 20 ÷ 5000 = 4000 µM
     dithionite = {'label': 'dithi', 'stock_uM': 1_000_000.0, 'added_uL': 20.0}
     filled = event_concentration_filler([dithionite], CHAMBER_ML)[0]
-    assert event_text_writer(filled, 'chamber') == '4000 µM dithi'
-    assert event_text_writer(filled, 'added') == '20 µL of 1000 mM dithi'
+    assert event_text_writer(filled, 'chamber') == '4 mM dithi'
+    assert event_text_writer(filled, 'added') == '20 µL of 1 M dithi'
+    # 0.5 µM is 500 nM; 999.96 µM is 1000 µM to four figures, so 1 mM
+    assert event_text_writer({'label': 'x', 'concentration_uM': 0.5}, 'chamber') == (
+        '500 nM x'
+        )
+    assert event_text_writer({'label': 'x', 'concentration_uM': 999.96}, 'chamber') == (
+        '1 mM x'
+        )
+    assert event_text_writer({'label': 'x', 'concentration_uM': 0.0}, 'chamber') == (
+        '0 µM x'
+        )
     # 1 µL of an 8 mM stock: 8000 × 1 ÷ 5000 = 1.6 µM
     small = {'label': 'nd-011992', 'stock_uM': 8000.0, 'added_uL': 1.0}
     filled = event_concentration_filler([small], CHAMBER_ML)[0]

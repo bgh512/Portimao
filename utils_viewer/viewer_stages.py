@@ -2626,6 +2626,15 @@ def _strip_change_applier(session: ViewerSession,
                      else 'The plot shows the standard plot again.',
                      )
         is_redrawn = True
+    if 'difference_background' in changes:
+        answers['difference_background'] = bool(changes['difference_background'])
+        info_printer('The difference spectrum is now drawn with its background, and '
+                     'the background as a dotted line.'
+                     if answers['difference_background']
+                     else 'The difference spectrum now has its background taken off, '
+                          'so it sits on zero.',
+                     )
+        is_redrawn = True
 
     # ---- 5 Show what is in use and redraw --------------------------------------------
     _strip_shower(session, answers)

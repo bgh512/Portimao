@@ -84,6 +84,10 @@ DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ran
                    # oxidised, utils_shared.difference_spectra) in place of the standard
                    # plot, for a file with both regions; the switch under the boxes
                    'difference_spectra': False,
+                   # the difference spectrum of each file is drawn with its background
+                   # (and the background itself); otherwise the background is taken
+                   # off, so the spectrum sits on zero; the tick beside the switch
+                   'difference_background': False,
                    # the panels of the plot of each file in the order the user moved
                    # them to, top first, by their keys ("oxygen", "vo2", "haem:Cyt bH",
                    # "delta_psi"); empty for the standard order (oxygen, OCR, the haems

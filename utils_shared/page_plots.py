@@ -18,8 +18,6 @@ from matplotlib.gridspec import GridSpec
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.difference_spectra import (haem_bands_drawer,
-                                             RESIDUAL_HEIGHT_SHARE,
-                                             RESIDUAL_LABEL,
                                              spectra_averager,
                                              spectra_stacker,
                                              X_LABEL,
@@ -197,11 +195,12 @@ NO_VALUES = ('No experiment of this plot has a value in the region picked. Open 
 NO_PAIRS = ('No experiment of this plot has a value in either region picked. Open its '
             'form (✎) to pick another measurement, other regions or another group.')
 # A Bar chart: the width of a bar and of the row of its dots (1 is the distance between
-# two bars), the share of white in the face of a bar, the colour of the error bars and
-# of the brackets, and the width of the cap of an error bar (points)
+# two bars), the colour of the dots on its bars (the bars are in the full colour of
+# their set), the colour of the error bars and of the brackets, and the width of the
+# cap of an error bar (points)
 BAR_WIDTH = 0.6
 DOTS_WIDTH = 0.3
-BAR_SHADE = 0.65
+DOT_COLOUR = 'black'
 MARK_COLOUR = '0.15'
 CAP_WIDTH_PT = 2.0
 # the size of a dot (its width in points is DOT_WIDTHS x the width of a line)
@@ -2552,8 +2551,8 @@ def bar_plot_drawer(fig: Figure,
     """
     ---- Summary ----
     Main function to draw a Bar chart (P9) into the room of its cells: for each set
-    a bar up to the mean of its experiments in the region picked, with its SEM or
-    SD, and a dot per experiment in the colour of the set; a set of one experiment
+    a bar in its colour up to the mean of its experiments in the region picked,
+    with its SEM or SD, and a black dot per experiment; a set of one experiment
     has its dot and no bar. A bracket with its mark joins two sets only where they
     differ (corrected p under 0.05). The y axis holds 0, every dot, bar and mark.
     With nothing to show, one sentence in the cells.
@@ -2569,7 +2568,7 @@ def bar_plot_drawer(fig: Figure,
         What a plot is drawn with (PLOT_DRAWERS).
 
     ---- Globals read ----
-    BAR_SHADE, BAR_WIDTH, BRACKET_STEP_SHARE, CAP_WIDTH_PT, DOT_WIDTHS, DOTS_WIDTH,
+    BAR_WIDTH, BRACKET_STEP_SHARE, CAP_WIDTH_PT, DOT_COLOUR, DOT_WIDTHS, DOTS_WIDTH,
     MARK_COLOUR, NO_VALUES.
 
     ---- Outputs ----
@@ -2593,7 +2592,6 @@ def bar_plot_drawer(fig: Figure,
     _spectrum_axes_styler
     _y_range_setter
     bar_numbers_lister
-    colour_shader
     p_value_marker
     """
 
@@ -2622,7 +2620,7 @@ def bar_plot_drawer(fig: Figure,
             ax.bar(place,
                    mean,
                    width=BAR_WIDTH,
-                   color=colour_shader(entry['colour'], BAR_SHADE),
+                   color=entry['colour'],
                    edgecolor=entry['colour'],
                    linewidth=style['line_width'],
                    linestyle=entry['line_style'],
@@ -2646,7 +2644,7 @@ def bar_plot_drawer(fig: Figure,
         ax.scatter(place + offsets,
                    values,
                    s=(DOT_WIDTHS * style['line_width']) ** 2,
-                   color=entry['colour'],
+                   color=DOT_COLOUR,
                    edgecolors='white',
                    linewidths=style['thin_line_width'] / 2.0,
                    zorder=5,
@@ -3039,8 +3037,8 @@ def difference_form_maker(setup: dict,
     ---- Summary ----
     Main function to list what the form of a Difference spectrum (P2) asks: the
     experiment, then a tick for each thing it can show: the part of each haem (on),
-    the background (off), the overall fit (on), the residual in a small panel
-    underneath (on) and the haem bands (off).
+    the background (off: the spectrum is drawn with it taken off, so it sits on
+    zero), the overall fit (on), the residual (on) and the haem bands (off).
 
     ---- Inputs ----
     setup : dict
@@ -3070,9 +3068,9 @@ def difference_form_maker(setup: dict,
 
     return [experiment_field_maker(setup, roles),
             tick_field_maker(COMPONENTS_KEY, 'The part of each haem', roles, True),
-            tick_field_maker(BACKGROUND_KEY, 'Background', roles, False),
+            tick_field_maker(BACKGROUND_KEY, 'Show background', roles, False),
             tick_field_maker(FIT_KEY, 'Overall fit', roles, True),
-            tick_field_maker(RESIDUAL_KEY, 'Residual underneath', roles, True),
+            tick_field_maker(RESIDUAL_KEY, 'Residual', roles, True),
             tick_field_maker(BANDS_KEY, 'Haem bands', roles, False),
             ]
 
@@ -3087,7 +3085,9 @@ def difference_numbers_lister(setup: Optional[dict],
     ---- Summary ----
     Main function to list the numbers of a Difference spectrum: the difference of
     its experiment, reduced minus oxidised, and each part its form ticks, at each
-    wavelength; or the sentence the plot shows when it has nothing to draw.
+    wavelength; or the sentence the plot shows when it has nothing to draw. Unless
+    the background is ticked, the difference and the fit have it taken off, so they
+    sit on zero.
 
     ---- Inputs ----
     setup : Optional[dict]
@@ -3112,14 +3112,16 @@ def difference_numbers_lister(setup: Optional[dict],
         'wavelengths_nm': np.ndarray (n_wavelengths,), 'columns': (its name, its
         values in mOD, (n_wavelengths,)) of the difference and of each part ticked,
         in the order Measured, each haem, Background, Fit, Residual,
-        'has_residual': whether the residual is ticked, and 'bands': {haem: (from,
-        to) in nm} when the haem bands are ticked, otherwise {}.
+        'is_background_shown': whether the background is ticked, and 'bands':
+        {haem: (from, to) in nm} when the haem bands are ticked, otherwise {}.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    None. Everything is in mOD (MATHS.md section 9).
+    Without the background ticked: Measured = difference - background and Fit =
+    fit - background, the sum of the haems. Everything is in mOD (MATHS.md
+    section 9).
 
     ---- Helpers ----
     _missing_sentence_finder
@@ -3139,15 +3141,19 @@ def difference_numbers_lister(setup: Optional[dict],
         return {'sentence': NO_DIFFERENCE.format(name), 'name': name}
 
     # ---- 2 The difference and what is ticked -----------------------------------------
-    columns = [('Measured', parts['measured_mOD'])]
+    is_background_shown = _tick_reader(roles, BACKGROUND_KEY, False)
+    taken_off = (0.0
+                 if is_background_shown
+                 else np.asarray(parts['background_mOD'], dtype=float)
+                 )
+    columns = [('Measured', np.asarray(parts['measured_mOD'], dtype=float) - taken_off)]
     if _tick_reader(roles, COMPONENTS_KEY, True):
         columns += list(parts['haems_mOD'].items())
-    if _tick_reader(roles, BACKGROUND_KEY, False):
+    if is_background_shown:
         columns.append(('Background', parts['background_mOD']))
     if _tick_reader(roles, FIT_KEY, True):
-        columns.append(('Fit', parts['fit_mOD']))
-    has_residual = _tick_reader(roles, RESIDUAL_KEY, True)
-    if has_residual:
+        columns.append(('Fit', np.asarray(parts['fit_mOD'], dtype=float) - taken_off))
+    if _tick_reader(roles, RESIDUAL_KEY, True):
         columns.append(('Residual', parts['residual_mOD']))
     has_bands = _tick_reader(roles, BANDS_KEY, False)
     return {'sentence': None,
@@ -3156,7 +3162,7 @@ def difference_numbers_lister(setup: Optional[dict],
             'parts': parts,
             'wavelengths_nm': np.asarray(parts['wavelengths_nm'], dtype=float),
             'columns': columns,
-            'has_residual': has_residual,
+            'is_background_shown': is_background_shown,
             'bands': dict(experiment.get('haem_bands') or {}) if has_bands else {},
             }
 
@@ -3171,8 +3177,10 @@ def difference_plot_drawer(fig: Figure,
     ---- Summary ----
     Main function to draw a Difference spectrum (P2) into the room of its cells: the
     difference of one experiment, reduced minus oxidised, in black, with what its
-    form ticks: the part of each haem in its colour, the background dotted, the fit
-    dashed, the haem bands behind and the residual in a small panel underneath. The
+    form ticks: the part of each haem in its colour, the fit dashed, the residual
+    as a grey line and the haem bands behind. The difference and the fit have the
+    background taken off, so they sit on zero; with the background ticked they are
+    drawn with it, and the background dotted. The
     lines are named, so the page gives the plot its small legend. An experiment that
     is not in the dataset, could not be read or has no difference spectrum gives one
     sentence in the cells in place of the plot.
@@ -3188,14 +3196,11 @@ def difference_plot_drawer(fig: Figure,
         What a plot is drawn with (PLOT_DRAWERS).
 
     ---- Globals read ----
-    BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY;
-    settings.COMPONENT_FIGURE_STYLE; RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, X_LABEL,
-    Y_LABEL (imported).
+    settings.COMPONENT_FIGURE_STYLE; X_LABEL, Y_LABEL (imported).
 
     ---- Outputs ----
     List[Axes]
-        The axes of the spectrum, then those of the residual when it is ticked; or
-        the one set of axes of the sentence.
+        The axes of the spectrum, or those of the sentence.
 
     ---- Globals mutated ----
     None. Adds axes to the figure (side effect).
@@ -3206,95 +3211,43 @@ def difference_plot_drawer(fig: Figure,
     ---- Helpers ----
     _sentence_drawer
     _spectrum_axes_styler
-    _tick_reader
     difference_numbers_lister
     haem_bands_drawer
     """
 
     # ---- 1 The experiment and its difference spectrum --------------------------------
-    roles = plot.roles
     found = difference_numbers_lister(context['setup'],
-                                      roles,
+                                      plot.roles,
                                       context['experiments'],
                                       context['answers'],
                                       )
     if found['sentence'] is not None:
         return _sentence_drawer(fig, room, context, found['sentence'])
-    experiment, parts = found['experiment'], found['parts']
 
-    # ---- 2 The panels: the spectrum, and the residual underneath ---------------------
+    # ---- 2 The difference and what is ticked, each line in its own look --------------
     x0, y0, x1, y1 = room
-    has_residual = found['has_residual']
-    if has_residual:
-        grid = GridSpec(2,
-                        1,
-                        figure=fig,
-                        left=x0,
-                        bottom=y0,
-                        right=x1,
-                        top=y1,
-                        height_ratios=(1.0 - RESIDUAL_HEIGHT_SHARE,
-                                       RESIDUAL_HEIGHT_SHARE,
-                                       ),
-                        hspace=0.08,
-                        )
-        main = fig.add_subplot(grid[0])
-        lower = fig.add_subplot(grid[1], sharex=main)
-    else:
-        main, lower = fig.add_axes((x0, y0, x1 - x0, y1 - y0)), None
-
-    # ---- 3 The difference and what is ticked -----------------------------------------
+    main = fig.add_axes((x0, y0, x1 - x0, y1 - y0))
     style, look = context['style'], settings.COMPONENT_FIGURE_STYLE
-    colours = settings.haem_colour_mapper(list(parts['haems_mOD']))
-    wavelengths = parts['wavelengths_nm']
-    width = style['line_width']
-    main.plot(wavelengths,
-              parts['measured_mOD'],
-              color='black',
-              linewidth=width,
-              label='Measured',
-              )
-    if _tick_reader(roles, COMPONENTS_KEY, True):
-        for haem, values in parts['haems_mOD'].items():
-            main.plot(wavelengths,
-                      values,
-                      color=colours[haem],
-                      linewidth=width,
-                      label=haem,
-                      )
-    if _tick_reader(roles, BACKGROUND_KEY, False):
+    colours = settings.haem_colour_mapper(list(found['parts']['haems_mOD']))
+    looks = {'Measured': {'color': 'black'},
+             'Background': {'color': look['background_colour'], 'linestyle': ':'},
+             'Fit': {'color': look['residual_colour'], 'linestyle': '--'},
+             'Residual': {'color': look['measured_colour']},
+             }
+    wavelengths = found['wavelengths_nm']
+    for name, values in found['columns']:
         main.plot(wavelengths,
-                  parts['background_mOD'],
-                  color=look['background_colour'],
-                  linestyle=':',
-                  linewidth=width,
-                  label='Background',
-                  )
-    if _tick_reader(roles, FIT_KEY, True):
-        main.plot(wavelengths,
-                  parts['fit_mOD'],
-                  color=look['residual_colour'],
-                  linestyle='--',
-                  linewidth=width,
-                  label='Fit',
+                  values,
+                  linewidth=style['line_width'],
+                  label=name,
+                  **looks.get(name, {'color': colours.get(name)}),
                   )
     main.axhline(0, color=look['zero_colour'], linewidth=style['thin_line_width'])
     main.set_xlim(float(np.min(wavelengths)), float(np.max(wavelengths)))
-    if _tick_reader(roles, BANDS_KEY, False):
-        haem_bands_drawer(main, experiment.get('haem_bands') or {}, colours)
-    _spectrum_axes_styler(main, context, None if has_residual else X_LABEL, Y_LABEL)
-    if lower is None:
-        return [main]
-
-    # ---- 4 The residual --------------------------------------------------------------
-    lower.plot(wavelengths,
-               parts['residual_mOD'],
-               color=look['residual_colour'],
-               linewidth=width,
-               )
-    lower.axhline(0, color=look['zero_colour'], linewidth=style['thin_line_width'])
-    _spectrum_axes_styler(lower, context, X_LABEL, RESIDUAL_LABEL)
-    return [main, lower]
+    if found['bands']:
+        haem_bands_drawer(main, found['bands'], colours)
+    _spectrum_axes_styler(main, context, X_LABEL, Y_LABEL)
+    return [main]
 
 
 # ---- mean_form_maker -----------------------------------------------------------------

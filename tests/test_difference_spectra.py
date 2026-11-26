@@ -314,8 +314,10 @@ def test_no_regions_no_difference() -> None:
 def test_figure_panels() -> None:
     """
     ---- Summary ----
-    Main function to check the figure, drawn off screen: two panels, one line for each
-    haem in its colour, the regions' times in the key, and no time axis for the window.
+    Main function to check the figure, drawn off screen: one panel, one line for each
+    haem in its colour, the residual as a grey line, the difference and the fit with the background taken off
+    (then with it, and the background as a line), the regions' times in the key, and
+    no time axis for the window.
 
     ---- Inputs ----
     None.
@@ -348,21 +350,41 @@ def test_figure_panels() -> None:
                                     colours,
                                     settings.COMPONENT_FIGURE_STYLE,
                                     )
-    assert len(fig.axes) == 2
-    assert axes[0] is fig.axes[0]
+    assert axes == fig.axes and len(axes) == 1
     labels = [line.get_label() for line in axes[0].lines]
     for name in FIT_ORDER:
         assert labels.count(name) == 1
         line = axes[0].lines[labels.index(name)]
         assert line.get_color() == colours[name]
-    assert 'Measured' in labels
-    assert 'Background' in labels
-    assert axes[1].get_xlabel() == 'Wavelength (nm)'
+    # as it starts the background is taken off the difference and the fit, and not
+    # drawn: the fit is then the sum of the haems
+    assert 'Background' not in labels
+    measured = axes[0].lines[labels.index('Measured')].get_ydata()
+    assert np.allclose(measured, found['measured_mOD'] - found['background_mOD'])
+    fit = axes[0].lines[labels.index('Fit (haems)')].get_ydata()
+    assert np.allclose(fit, sum(found['haems_mOD'].values()), rtol=0, atol=1e-9)
+    residual = axes[0].lines[labels.index('Residual')]
+    assert np.allclose(residual.get_ydata(), found['residual_mOD'])
+    assert residual.get_color() == settings.COMPONENT_FIGURE_STYLE['measured_colour']
+    assert axes[0].get_xlabel() == 'Wavelength (nm)'
     title = axes[0].get_legend().get_title().get_text()
     assert '3.0–4.0 min' in title
     assert '0.0–1.0 min' in title
     assert getattr(fig, WAVELENGTH_FIGURE_MARK)
     assert time_axis_finder(fig) is None
+    # with the background shown: the difference and the fit as they are, and the
+    # background as a line
+    axes = difference_figure_drawer(fig,
+                                    difference,
+                                    found,
+                                    colours,
+                                    settings.COMPONENT_FIGURE_STYLE,
+                                    True,
+                                    )
+    lines = {line.get_label(): line.get_ydata() for line in axes[0].lines}
+    assert np.allclose(lines['Measured'], found['measured_mOD'])
+    assert np.allclose(lines['Background'], found['background_mOD'])
+    assert np.allclose(lines['Fit (haems + background)'], found['fit_mOD'])
 
 
 # ---- test_strip_switch_value ---------------------------------------------------------
@@ -370,7 +392,8 @@ def test_strip_switch_value() -> None:
     """
     ---- Summary ----
     Main function to check the switch's value in the strip: the standard plot unless
-    the answers ask for the difference spectrum, and only True or False accepted.
+    the answers ask for the difference spectrum, and only True or False accepted; the
+    same for the tick of the background beside it.
 
     ---- Inputs ----
     None.
@@ -401,6 +424,15 @@ def test_strip_switch_value() -> None:
     for wrong in ('yes', 1, None):
         with pytest.raises(ValueError, match='difference spectrum'):
             strip_values_checker({'difference_spectra': wrong})
+    # the tick beside the switch: the background taken off unless the answers show it
+    assert standard['difference_background'] is False
+    assert strip_values_builder(standard, True, [])['difference_background'] is False
+    shown = strip_values_builder(dict(standard, difference_background=True), True, [])
+    assert shown['difference_background'] is True
+    strip_values_checker(shown)
+    for wrong in ('yes', 1, None):
+        with pytest.raises(ValueError, match='shows its background'):
+            strip_values_checker({'difference_background': wrong})
 
 
 # ---- test_the_haem_bands -------------------------------------------------------------

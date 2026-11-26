@@ -22,11 +22,8 @@ MOD_PER_OD = 1000.0
 # The attribute a figure of the difference spectrum carries, so the window knows it has
 # no time axis (no time cursor, no edges and no arrows beside its panels).
 WAVELENGTH_FIGURE_MARK = 'is_wavelength_figure'
-# The residual panel's share of the height of the figure.
-RESIDUAL_HEIGHT_SHARE = 0.25
 X_LABEL = 'Wavelength (nm)'
 Y_LABEL = 'Reduced − oxidised (mOD)'
-RESIDUAL_LABEL = 'Residual (mOD)'
 # A haem band: this far each side of where the shape of the haem is strongest, and how
 # see-through it is drawn
 BAND_HALF_WIDTH_NM = 2.5
@@ -115,13 +112,16 @@ def difference_figure_drawer(fig: Figure,
                              decomposition: dict,
                              colours: Dict[str, str],
                              style: dict,
+                             is_background_shown: bool = False,
                              ) -> List:
     """
     ---- Summary ----
-    Main function to draw the difference spectrum on a figure: on top the measured
-    difference in black, each haem in its colour, the background dotted and the fit
-    (haems + background) dashed, with a key giving the times of the two regions; under
-    it a small panel of the residual. The figure is marked as having no time axis.
+    Main function to draw the difference spectrum on a figure, in one panel: the
+    measured difference in black, each haem in its colour, the fit dashed and the
+    residual as a grey line, with a key giving the times of the two regions. The
+    difference and the fit have the background taken off, so they sit on zero; with
+    the background shown they are drawn with it, and the background dotted. The
+    figure is marked as having no time axis.
 
     ---- Inputs ----
     fig : Figure
@@ -134,41 +134,41 @@ def difference_figure_drawer(fig: Figure,
         {haem name: colour} (config.haem_colour_mapper).
     style : dict
         Greys and line widths (config.COMPONENT_FIGURE_STYLE).
+    is_background_shown : bool
+        True to draw the difference and the fit with the background, and the
+        background itself; False to take it off both.
 
     ---- Globals read ----
-    RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, WAVELENGTH_FIGURE_MARK, X_LABEL, Y_LABEL.
+    WAVELENGTH_FIGURE_MARK, X_LABEL, Y_LABEL.
 
     ---- Outputs ----
     List
-        The two axes, the spectrum first.
+        The one set of axes.
 
     ---- Globals mutated ----
     None. Draws on the figure and sets its WAVELENGTH_FIGURE_MARK attribute (side
     effects).
 
     ---- Equations ----
-    None.
+    Without the background: measured = difference - background, and fit = the sum
+    of the haems (MATHS.md section 9).
 
     ---- Helpers ----
     None.
     """
 
-    # ---- 1 The two panels, sharing the wavelength axis -------------------------------
+    # ---- 1 The one panel -------------------------------------------------------------
     fig.clf()
-    grid = fig.add_gridspec(2,
-                            1,
-                            height_ratios=(1.0 - RESIDUAL_HEIGHT_SHARE,
-                                           RESIDUAL_HEIGHT_SHARE,
-                                           ),
-                            hspace=0.08,
-                            )
-    main = fig.add_subplot(grid[0])
-    lower = fig.add_subplot(grid[1], sharex=main)
+    main = fig.add_subplot(1, 1, 1)
     wavelengths = decomposition['wavelengths_nm']
 
-    # ---- 2 The difference, each haem, the background and the fit ---------------------
+    # ---- 2 The difference, each haem, the background, the fit and the residual -------
+    taken_off = (0.0
+                 if is_background_shown
+                 else np.asarray(decomposition['background_mOD'], dtype=float)
+                 )
     main.plot(wavelengths,
-              decomposition['measured_mOD'],
+              np.asarray(decomposition['measured_mOD'], dtype=float) - taken_off,
               color='black',
               linewidth=style['fitted_line_width'],
               label='Measured',
@@ -180,19 +180,27 @@ def difference_figure_drawer(fig: Figure,
                   linewidth=style['part_line_width'],
                   label=name,
                   )
+    if is_background_shown:
+        main.plot(wavelengths,
+                  decomposition['background_mOD'],
+                  color=style['background_colour'],
+                  linestyle=':',
+                  linewidth=style['part_line_width'],
+                  label='Background',
+                  )
+    main.plot(
+        wavelengths,
+        np.asarray(decomposition['fit_mOD'], dtype=float) - taken_off,
+        color=style['residual_colour'],
+        linestyle='--',
+        linewidth=style['fitted_line_width'],
+        label='Fit (haems + background)' if is_background_shown else 'Fit (haems)',
+        )
     main.plot(wavelengths,
-              decomposition['background_mOD'],
-              color=style['background_colour'],
-              linestyle=':',
-              linewidth=style['part_line_width'],
-              label='Background',
-              )
-    main.plot(wavelengths,
-              decomposition['fit_mOD'],
-              color=style['residual_colour'],
-              linestyle='--',
-              linewidth=style['fitted_line_width'],
-              label='Fit (haems + background)',
+              decomposition['residual_mOD'],
+              color=style['measured_colour'],
+              linewidth=style['residual_line_width'],
+              label='Residual',
               )
     main.axhline(0, color=style['zero_colour'], linewidth=style['zero_line_width'])
     oxidised, reduced = difference['oxidised_region'], difference['reduced_region']
@@ -203,19 +211,9 @@ def difference_figure_drawer(fig: Figure,
                 frameon=False,
                 )
     main.set_ylabel(Y_LABEL)
-    main.tick_params(labelbottom=False)
-
-    # ---- 3 The residual underneath ---------------------------------------------------
-    lower.plot(wavelengths,
-               decomposition['residual_mOD'],
-               color=style['residual_colour'],
-               linewidth=style['residual_line_width'],
-               )
-    lower.axhline(0, color=style['zero_colour'], linewidth=style['zero_line_width'])
-    lower.set_ylabel(RESIDUAL_LABEL)
-    lower.set_xlabel(X_LABEL)
+    main.set_xlabel(X_LABEL)
     setattr(fig, WAVELENGTH_FIGURE_MARK, True)
-    return [main, lower]
+    return [main]
 
 
 # ---- difference_spectrum_builder -----------------------------------------------------

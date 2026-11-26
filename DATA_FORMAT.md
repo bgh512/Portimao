@@ -306,6 +306,7 @@ The settings last saved for a dataset. Returned by `dataset_settings_reader` (`u
 | `'answers'['file_windows']` | Dict[str, dict] | | min | `{file name: {'window_minutes', 'gap_minutes', 'final_gap_minutes', 'quick_minutes', 'delay_minutes', 'each_window'}}` of the files whose averaging regions were fixed by hand with "Apply to all" unticked; they stand in for the dataset's values for that file, and a key missing takes the dataset's (`window_plan_finder`). Empty unless a file was fixed by hand |
 | `'answers'['compare_layout']` | str | | | How a decomposition kept to compare with is shown: `'side'` (a plot of its own headed Old on the left of the plot in use, headed New; the standard) or `'overlaid'` (faint and thin under the plot in use, drawn bold) |
 | `'answers'['difference_spectra']` | bool | | | Whether the plot of a file with both regions shows its difference spectrum (`region_difference`) in place of the standard plot, the switch under the boxes; False (the standard plot) unless changed |
+| `'answers'['difference_background']` | bool | | | Whether that difference spectrum is drawn with its background, and the background as a line, the tick *Show background* beside the switch; False (the background taken off the difference and the fit, so they sit on zero) unless changed |
 | `'answers'['label_mode']` | str | | | What the event labels show (Labels as in the strip), a key of `event_concentrations.LABEL_MODES`: `'chamber'` (the concentration in the chamber, `400 µM KCN`, the standard) or `'added'` (the volume and the stock added, `10 µL of 200 mM KCN`) |
 | `'files'[name]['regions']` | Dict[str, float] | | min | `{'oxidised_start', 'oxidised_end', 'reduced_start', 'reduced_end'}`: the oxidised and the reduced region of the file as times on the original recording, so a later change of the trim leaves them on the same data. A region not chosen has its two edges together; a file with neither chosen has no `'regions'` |
 
@@ -323,6 +324,7 @@ What the five boxes above the plot show (`SettingsStrip`, `utils_viewer/viewer_s
 | `'kept'` | str | | | The kept decomposition in words (the `'text'` of `kept_decomposition`), shown in a line of the strip; `''` when none is kept. Set by the program only |
 | `'compare_layout'` | str | | | How the kept decomposition is shown, the switch beside *Keep new* (shown while one is kept), a key of `viewer_strip.COMPARE_LAYOUT_TEXTS`: `'side'` (Side by side, the standard) or `'overlaid'` (Overlaid). The answer of the same name, saved with the dataset's settings |
 | `'difference_spectra'` | bool | | | The switch *Standard plot / Difference spectrum* under the boxes (`viewer_strip.DIFFERENCE_TEXTS`; the window packs `SettingsStrip.switch_frame` under them). It can be clicked only while the haems are shown and the file shown (`SettingsStrip.shown_file_setter`, from the window's file arrows) is one of the files with both regions given to `strip_choices_setter`. The answer of the same name, saved with the dataset's settings |
+| `'difference_background'` | bool | | | The tick *Show background* on the right of that switch (`viewer_strip.BACKGROUND_TICK_TEXT`). It can be clicked only while the difference spectrum shows. The answer of the same name, saved with the dataset's settings |
 | `'spectra'` | str | | | The spectrometer whose spectra hold the haems (the answer `decomposition_dataset`), e.g. `'Cyt'`; `''` when none is known |
 | `'haem_mode'` | str | | | How the haems are shown: `'delta'` (ΔD), `'percent'` (% oxidised) or `'abs'` (absorbance), the keys of `viewer_strip.HAEM_FORM_TEXTS` (the words of the drop-down) |
 | `'haem_per_od'` | bool | | | Whether the haems are scaled by OD (the answer of the same name); not used for % oxidised |
@@ -516,8 +518,9 @@ The roles of a Difference spectrum (P2), beside `'experiment'` (`difference_form
 
 | Role | Value | Description |
 |---|---|---|
-| `'haem_components'`, `'overall_fit'`, `'residual'` | `'yes'` or `'no'` | Whether the part of each haem, the fit and the residual (a small panel underneath) are drawn; each starts `'yes'` |
-| `'background'`, `'haem_bands'` | `'yes'` or `'no'` | Whether the background and the haem bands are drawn; each starts `'no'` |
+| `'haem_components'`, `'overall_fit'`, `'residual'` | `'yes'` or `'no'` | Whether the part of each haem, the fit and the residual (a grey line) are drawn; each starts `'yes'` |
+| `'background'` | `'yes'` or `'no'` | The tick *Show background*: `'yes'` draws the difference and the fit with the background, and the background itself; `'no'` (as it starts) takes it off both, so they sit on zero |
+| `'haem_bands'` | `'yes'` or `'no'` | Whether the haem bands are drawn; it starts `'no'` |
 
 The roles of a Waterfall (P3) (`waterfall_form_maker`); the first two are read as group drop-downs (`plot_sets_lister`), Group 2 always All together:
 
@@ -1122,7 +1125,7 @@ Project-wide choices, written once. The tables above use these units and symbols
 | Wavelength | nm | none |
 | Oxygen concentration | µM | none |
 | Oxygen consumption rate | µM/min | none |
-| Concentration of an addition | µM | `_uM` in keys; written by `concentration_formatter` as nM, µM, mM or M (four significant figures on a label), and `? µM` when none was given; the Events sheet gives the stock in mM |
+| Concentration of an addition | µM | `_uM` in keys; written on the labels of the plots by `concentration_formatter` in the unit of nM, µM, mM or M that gives a number from 1 to under 1000 (four significant figures; `1.2 mM` from 1200 µM), and `? µM` when none was given; the labels table and the Events sheet keep the stock in mM and the chamber in µM |
 | Volume added | µL | `_uL` in keys |
 | Haem absorbance | mOD | none |
 | Fractions of a range or baseline | % | none |

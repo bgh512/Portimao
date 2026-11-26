@@ -501,14 +501,14 @@ $$a = \frac{s\,v}{V} \qquad c = c_{\mathrm{before}} + a$$
 - An addition with no stock and volume can have its concentration in the chamber typed by hand (in µM). It then counts as $c$, and $a = c - c_{\mathrm{before}}$.
 - An event left out (labelled IGNORE) holds nothing and changes nothing.
 - Each file is worked out on its own.
-- The labels on the plots show $c$ ("In the chamber", the standard) or $v$ and $s$ ("What was added"), chosen with **Labels as** in the strip. $c$ is always written in µM and $s$ in mM, to four significant figures: 1200 µM stays 1200 µM, and a 1 M stock is 1000 mM.
+- The labels on the plots show $c$ ("In the chamber", the standard) or $v$ and $s$ ("What was added"), chosen with **Labels as** in the strip. On a label $c$ and $s$ are each written in the unit (nM, µM, mM or M) that gives a number from 1 to under 1000, to four significant figures: 1200 µM is written 1.2 mM, 0.5 µM is 500 nM, and a 1 M stock is 1 M. The labels table keeps $s$ in mM and $c$ in µM.
 - Each experiment's workbook gives $s$ (in mM), $v$, $a$ and $c$ in its Events sheet.
 
 Example 1: 10 µL of a 200 mM KCN stock. $s = 200$ mM $= 200\,000$ µM, so
 
 $$a = \frac{200\,000 \times 10}{5000} = 400 \text{ µM}$$
 
-and $c = 0 + 400 = 400$ µM. The same again gives $c = 400 + 400 = 800$ µM, and a third time 1200 µM (shown as 1200 µM). 5 µL of a 10 mM BD stock in between gives $\dfrac{10\,000 \times 5}{5000} = 10$ µM of BD, and does not change the KCN.
+and $c = 0 + 400 = 400$ µM. The same again gives $c = 400 + 400 = 800$ µM, and a third time 1200 µM (shown as 1.2 mM). 5 µL of a 10 mM BD stock in between gives $\dfrac{10\,000 \times 5}{5000} = 10$ µM of BD, and does not change the KCN.
 
 Example 2: BD typed by hand as 10 µM in the chamber; then 5 µL of 10 mM BD gives $c = 10 + 10 = 20$ µM; then BD typed as 50 µM gives $a = 50 - 20 = 30$ µM.
 
@@ -532,7 +532,9 @@ The difference is then described as so much of each haem's shape on top of a smo
 
 $$\Delta A = c_1 S_1 + c_2 S_2 + \dots + B$$
 
-The plot shows $\Delta A$ in black, each haem's part $c_i S_i$ in its colour, $B$ dotted, the fit $c_1 S_1 + c_2 S_2 + \dots + B$ dashed, and underneath the residual $\Delta A$ minus the fit.
+The plot shows the difference with the background taken off, $\Delta A - B$, in black, so it sits on zero; each haem's part $c_i S_i$ in its colour; the fit without the background, $c_1 S_1 + c_2 S_2 + \dots$, dashed; and the residual, $\Delta A$ minus the whole fit, as a grey line. With **Show background** ticked it shows $\Delta A$ and the whole fit $c_1 S_1 + c_2 S_2 + \dots + B$ as they are, and $B$ dotted. The residual is the same either way.
+
+Example: at one wavelength $\Delta A = 4$ mOD, the haems' parts add up to 3.5 mOD and $B = 0.25$ mOD. The plot draws the difference at $4 - 0.25 = 3.75$ mOD and the fit at 3.5 mOD; with Show background ticked, the difference at 4 mOD and the fit at $3.5 + 0.25 = 3.75$ mOD. The residual is $4 - 3.75 = 0.25$ mOD both times.
 
 Notes:
 

@@ -18,6 +18,7 @@ import pytest
 import config as settings
 import main as program
 from utils_shared.dataset_workbook_exporter import (_label_plainer,
+                                                    BACKGROUND_OFF,
                                                     BEFORE_STACKING,
                                                     dataset_workbook_exporter,
                                                     dataset_workbook_namer,
@@ -1162,9 +1163,11 @@ def test_the_sheets_of_the_spectra_and_of_a_standard_experiment(tmp_path: Path) 
                                experiments=experiments,
                                )
     _, rows = _headed_table_reader(book['a Difference spectrum'], 'Wavelength (nm)')
+    # without the background ticked it is taken off: 1 - 0.25 and 1 - 0.25 mOD
     assert rows[:2] == [('Wavelength (nm)', 'Measured (mOD)', 'Fit (mOD)'),
-                        (540.0, 1.0, 1.0),
+                        (540.0, 0.75, 0.75),
                         ]
+    assert book['a Difference spectrum']['A3'].value.endswith(BACKGROUND_OFF)
     book, _ = _workbook_reader(tmp_path, _page_maker(('P1',)), experiments=experiments)
     assert book['a Standard experiment']['A2'].value == NOT_PICKED
 

@@ -73,7 +73,8 @@ def concentration_formatter(concentration_um: Any, significant: int = 4) -> str:
     None.
 
     ---- Equations ----
-    mM = uM / 1000; M = uM / 1 000 000; nM = uM × 1000.
+    mM = uM / 1000; M = uM / 1 000 000; nM = uM × 1000. The value is rounded to the
+    significant figures first, so 999.96 µM (1000 µM to four figures) is '1 mM'.
 
     ---- Helpers ----
     None.
@@ -82,7 +83,7 @@ def concentration_formatter(concentration_um: Any, significant: int = 4) -> str:
     # ---- 1 Choose the unit -----------------------------------------------------------
     if concentration_um is None:
         return MISSING_CONCENTRATION
-    value = float(concentration_um)
+    value = float(f'{float(concentration_um):.{significant}g}')
     if abs(value) >= 1_000_000:
         return f'{value / 1_000_000:.{significant}g} M'
     if abs(value) >= 1000:
