@@ -101,6 +101,7 @@ def test_app_carries_program_files() -> None:
                }
     assert targets == {'fits': 'fits',
                        'journals': 'journals',
+                       'layouts': 'layouts',
                        'icon.png': 'assets',
                        'QUESTION_FLOW.md': '.',
                        'mac_report.sh': 'launchers',

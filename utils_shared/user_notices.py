@@ -23,7 +23,6 @@ OWN_MODULES = ('__main__',
                'config',
                'launchers',
                'main',
-               'utils_custom',
                'utils_shared',
                'utils_viewer',
                )

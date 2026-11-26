@@ -353,7 +353,7 @@ def figure_finisher(fig: Figure,
     fig : Figure
         Matplotlib figure.
     config : dict
-        Figure settings dictionary built in custom_config.py.
+        Figure settings dictionary (plot_config_builder, config.py).
     panels : list
         List of (letter, main axes, [axes of the panel]) tuples.
     suptitle : Any

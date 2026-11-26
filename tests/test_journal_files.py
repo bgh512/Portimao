@@ -282,29 +282,29 @@ def test_saved_answers_are_fitted_to_the_journals() -> None:
              'science': {'name': 'Science', 'widths_mm': {1: 57, 2: 121, 3: 184}},
              'wide': {'name': 'Wide Only', 'widths_mm': {2: 100, 3: 150}},
              }
-    answers = {'journal': 'science',
-               'columns': 1.5,
-               'comparison_journal': 'lancet',
-               'comparison_columns': 1.5,
-               'tr_journal': 'wide',
-               'tr_columns': 1,
-               'ho_journal': 'nature',
-               'ho_pub_columns': 2,
-               'height': 0.5,
-               }
+
+    # ---- 1 A width the journal does not take -----------------------------------------
+    answers = {'journal': 'science', 'columns': 1.5, 'height': 0.5}
     fitted, notes = journal_answers_fitter(answers, specs)
-    assert fitted == dict(answers,
-                          columns=1,
-                          comparison_journal='nature',
-                          tr_columns=2,
-                          )
+    assert fitted == dict(answers, columns=1)
     assert answers['columns'] == 1.5  # the answers given are not changed
-    assert notes == [
-        'Science has no figure 1.5 columns wide: a figure saved at that width is now '
-        '1 column wide (57 mm).',
-        "The journal 'lancet' saved with this dataset is not in the journals folder: "
-        'Nature is used in its place.',
-        'Wide Only has no figure 1 column wide: a figure saved at that width is now '
-        '2 columns wide (100 mm).',
-        ]
+    assert notes == ['Science has no figure 1.5 columns wide: a figure saved at that '
+                     'width is now 1 column wide (57 mm).',
+                     ]
     assert journal_answers_fitter(fitted, specs) == (fitted, [])
+
+    # ---- 2 A journal that is no longer there -----------------------------------------
+    answers = {'journal': 'lancet', 'columns': 1.5, 'height': 0.5}
+    fitted, notes = journal_answers_fitter(answers, specs)
+    assert fitted == dict(answers, journal='nature')
+    assert notes == ["The journal 'lancet' saved with this dataset is not in the "
+                     'journals folder: Nature is used in its place.',
+                     ]
+
+    # ---- 3 No width as narrow: the narrowest the journal takes -----------------------
+    answers = {'journal': 'wide', 'columns': 1, 'height': 0.5}
+    fitted, notes = journal_answers_fitter(answers, specs)
+    assert fitted == dict(answers, columns=2)
+    assert notes == ['Wide Only has no figure 1 column wide: a figure saved at that '
+                     'width is now 2 columns wide (100 mm).',
+                     ]

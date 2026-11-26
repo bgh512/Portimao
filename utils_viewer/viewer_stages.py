@@ -32,6 +32,7 @@ from utils_shared.helpers import (file_name_sanitiser,
 from utils_shared.dataset_setup import setup_builder
 from utils_shared.figure_page import (FigurePage,
                                       FigurePageError,
+                                      plain_page_reader,
                                       template_path_finder,
                                       template_saver,
                                       )
@@ -228,6 +229,10 @@ EXPORT_CHOICES = (('summary', 'Export the summary'),
                   )
 PAGE_NUDGE = ('Build the figure on the page on the right; click Continue when it is '
               'ready.')
+SAVED_PAGE_NOTE = ('The page is as you left it the last time this dataset was run: '
+                   'change it, or click Continue to keep it.')
+SAVED_PAGE_PROBLEM = ('The figure page saved with this dataset cannot be read, so Build '
+                      'a figure starts with an empty page.')
 SETUP_NUDGE = ('Fill in the table on the right; click Continue when it says which '
                'experiment is which.')
 WINDOW_NUDGE = ('Type the numbers of the averaging regions in the Time regions box '
@@ -3469,14 +3474,15 @@ def page_stage_runner(layouts_folder: Path,
                       setup: Optional[dict] = None,
                       experiments: Optional[Dict[str, dict]] = None,
                       answers: Optional[dict] = None,
+                      saved_page: Any = None,
                       ) -> FigurePage:
     """
     ---- Summary ----
     Main function to build the page of a dataset figure in the window (Build a figure,
-    6.2): the page starts empty, plots are placed by dragging across its grid, each
-    drawn from the experiments once its form is done, and a template can be loaded or
-    saved; Continue ends the step, after the offer to save a page that was changed as
-    a template.
+    6.2): the page starts as it was saved with the dataset, or empty; plots are placed
+    by dragging across its grid, each drawn from the experiments once its form is
+    done, and a template can be loaded or saved; Continue ends the step, after the
+    offer to save a page that was changed as a template.
 
     ---- Inputs ----
     layouts_folder : Path
@@ -3491,13 +3497,17 @@ def page_stage_runner(layouts_folder: Path,
     answers : Optional[dict]
         The answers of the run, for what the forms offer from them and the plots
         drawn as the run was set up; None for none.
+    saved_page : Any
+        The page saved with the dataset, as its settings file holds it (plain_page,
+        DATA_FORMAT.md); None for a dataset without one. One that cannot be read
+        gives the empty page and one warning.
 
     ---- Globals read ----
-    PAGE_NUDGE.
+    PAGE_NUDGE, SAVED_PAGE_NOTE, SAVED_PAGE_PROBLEM.
 
     ---- Outputs ----
     FigurePage
-        The page as placed; an empty page when there is no window.
+        The page as placed; the page it started from when there is no window.
 
     ---- Globals mutated ----
     None. Changes the window, and writes a template when one is asked for (side
@@ -3512,12 +3522,23 @@ def page_stage_runner(layouts_folder: Path,
     enter_waiter
     guide_step_starter
     info_printer
+    plain_page_reader
+    warning_shower
     """
 
+    # ---- 1 The page to start from ----------------------------------------------------
     guide_step_starter('page')
+    start = FigurePage()
+    if saved_page is not None:
+        try:
+            start = plain_page_reader(saved_page, 'The saved page cannot be used')
+        except FigurePageError:  # the dataset still opens, with the empty page
+            warning_shower(SAVED_PAGE_PROBLEM)
     window = active_gui_getter()
     if window is None:  # the page is built only in the window
-        return FigurePage()
+        return start
+
+    # ---- 2 Build it in the window ----------------------------------------------------
     info_printer('The page on the right is the journal page at its printed size, with '
                  'a grid of 6 × 6 cells. Pick a plot type in the strip above it, then '
                  'drag across the cells it should take; its form opens here.',
@@ -3525,7 +3546,9 @@ def page_stage_runner(layouts_folder: Path,
     info_printer('Load template puts a layout saved before on the page; Save template '
                  'keeps this one for later.',
                  )
-    window.page_shower(FigurePage(), layouts_folder, setup, experiments, answers)
+    if start.plots:
+        info_printer(SAVED_PAGE_NOTE)
+    window.page_shower(start, layouts_folder, setup, experiments, answers)
     enter_waiter('Drag across the grid to place each plot. When the page is ready, '
                  'click Continue.',
                  PAGE_NUDGE,

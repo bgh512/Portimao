@@ -13,12 +13,12 @@ import pytest
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 import utils_viewer.viewer_stages as viewer_stages
-from utils_custom.run_namer import file_name_reader
 from utils_shared.dataset_settings import (dataset_settings_reader,
                                            dataset_settings_saver,
                                            SETTINGS_FILE_NAME,
                                            )
 from utils_shared.dataset_setup import (column_filler,
+                                        file_name_reader,
                                         group_colours_filler,
                                         labels_lister,
                                         replicates_numberer,

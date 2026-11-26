@@ -4,11 +4,10 @@ The set-up of a dataset: which experiment is which (its groups, time point and r
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import re
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_custom.run_namer import file_name_reader
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -24,6 +23,15 @@ GROUP_COUNT = 2  # the group columns the user may name
 COLOUR_PATTERN = re.compile(r'^#[0-9a-fA-F]{6}$')
 SET_JOINER = ' · '
 NO_LABELS = 'no labels'  # the name of the set of the rows with every cell blank
+# What a file name is read for (file_name_reader): run<N> at its end, or a lone number
+# there (wt_2); a number of hours; an addition order, written as its title.
+RUN_NAME_PATTERN = re.compile(r'^(?P<condition>.*?)[\s_-]*run[\s_-]*(?P<run>\d+)\s*$',
+                              re.IGNORECASE,
+                              )
+LAST_NUMBER_PATTERN = re.compile(r'^(?P<condition>.*?)[\s_-]+(?P<run>\d+)\s*$')
+HOURS_PATTERN = re.compile(r'(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b', re.IGNORECASE)
+ORDER_TITLES = {'kcn_then_bd': 'KCN → BD', 'bd_then_kcn': 'BD → KCN'}
+SEPARATORS = ' _-'
 
 
 # ---- SETUP HELPERS -------------------------------------------------------------------
@@ -146,6 +154,69 @@ def column_filler(rows: List[dict], key: str, first: int, last: int) -> List[dic
     return [dict(row, **{key: rows[first][key]}) if low <= place <= high else dict(row)
             for place, row in enumerate(rows)
             ]
+
+
+# ---- file_name_reader ----------------------------------------------------------------
+def file_name_reader(name: str) -> Tuple[str, str, str, Optional[int]]:
+    """
+    ---- Summary ----
+    Main function to read from an experiment name what the dataset set-up table is
+    filled in with: the run number from its end, the time point from a number of
+    hours, and the two groups from what is left.
+
+    ---- Inputs ----
+    name : str
+        Experiment name (the .paf file name without the extension), for example
+        'control-bd_then_kcn-run2', 'knockdown_24hours' or 'WT_8umlDAP_2'.
+
+    ---- Globals read ----
+    HOURS_PATTERN, LAST_NUMBER_PATTERN, ORDER_TITLES, RUN_NAME_PATTERN, SEPARATORS
+    (module constants).
+
+    ---- Outputs ----
+    Tuple[str, str, str, Optional[int]]
+        (Group 1, Group 2, time point, run number). A part the name does not show is
+        '' (None for the run number). The time point is written '<hours> h'; an
+        addition order (bd_then_kcn) is written as in ORDER_TITLES.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The run number: run<N> at the end, else a lone number at the end ----------
+    text, run = str(name).strip(), None
+    for pattern in (RUN_NAME_PATTERN, LAST_NUMBER_PATTERN):
+        match = pattern.match(text)
+        if match:
+            text, run = match.group('condition'), int(match.group('run'))
+            break
+
+    # ---- 2 The time point: a number of hours -----------------------------------------
+    time_point = ''
+    match = HOURS_PATTERN.search(text)
+    if match:
+        time_point = f'{float(match.group(1)):g} h'
+        before = text[:match.start()].rstrip(SEPARATORS)
+        after = text[match.end():].lstrip(SEPARATORS)
+        # what stood round the hours is joined as the name joins its own parts
+        joiner = '-' if '-' in text else '_'
+        text = joiner.join(part for part in (before, after) if part)
+
+    # ---- 3 The groups: split at a hyphen if there is one, else at the first _ --------
+    text = text.strip(SEPARATORS)
+    separator = next((mark for mark in ('-', '_', ' ') if mark in text), None)
+    if separator is None:
+        group_1, group_2 = text, ''
+    else:
+        group_1, group_2 = text.split(separator, 1)
+    group_1, group_2 = group_1.strip(SEPARATORS), group_2.strip(SEPARATORS)
+    return group_1, ORDER_TITLES.get(group_2.lower(), group_2), time_point, run
 
 
 # ---- group_colours_filler ------------------------------------------------------------

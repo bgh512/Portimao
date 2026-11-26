@@ -26,8 +26,10 @@ from utils_shared.figure_page import (figure_file_namer,
                                       figure_page_exporter,
                                       FigurePage,
                                       FigurePageError,
+                                      page_plainer,
                                       PagePlot,
                                       panel_letters_finder,
+                                      plain_page_reader,
                                       plot_lifter,
                                       plot_placer,
                                       plot_remover,
@@ -564,6 +566,62 @@ def test_a_broken_template_is_refused(tmp_path: Path) -> None:
     good_path = tmp_path / 'good.json'
     good_path.write_text(json.dumps(good), encoding='utf-8')
     assert len(template_reader(good_path).plots) == 1
+
+
+# ---- test_a_page_as_plain_values_and_back --------------------------------------------
+def test_a_page_as_plain_values_and_back(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check the plain values of a page: what a template file holds,
+    read back into the same page with every role, and refused with one sentence that
+    starts as asked when they are not a page, or hold a plot that cannot be placed.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Folder given by pytest.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _page_maker
+    """
+
+    page = replace(_page_maker(), journal='science', columns=1, height=0.5)
+    plain = page_plainer(page)
+    assert plain['kind'] == 'Portimao figure template' and plain['version'] == 1
+    assert (plain['journal'], plain['columns'], plain['height']) == ('science', 1, 0.5)
+    assert [entry['type'] for entry in plain['plots']] == [plot.plot_type
+                                                           for plot in page.plots
+                                                           ]
+    path = template_saver(page, tmp_path, 'figure')
+    assert json.loads(path.read_text(encoding='utf-8')) == plain
+    # as a settings file gives it back: through JSON
+    start = 'The saved page cannot be used'
+    assert plain_page_reader(json.loads(json.dumps(plain)), start) == page
+    assert plain_page_reader(page_plainer(FigurePage()), start) == FigurePage()
+    over = dict(plain, plots=plain['plots'] + [plain['plots'][0]])
+    for broken, words in ((None, 'not a template'),
+                          (['a'], 'not a template'),
+                          ({'plots': []}, 'not a template'),
+                          (dict(plain, version=2), 'another version'),
+                          (dict(plain, height='tall'), 'page size'),
+                          (dict(plain, plots='none'), 'no list of plots'),
+                          (over, 'covers plot'),
+                          ):
+        with pytest.raises(FigurePageError, match=words) as caught:
+            plain_page_reader(broken, start)
+        assert str(caught.value).startswith(start)
 
 
 # ---- test_an_empty_page_saves_no_figure ----------------------------------------------

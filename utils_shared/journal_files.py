@@ -43,12 +43,7 @@ NUMBER_NAMES = {'tallest_figure_mm': 'page_height_mm',
                 }
 OPTIONAL_NUMBERS = ('largest_text_pt', 'thinnest_line_pt', 'thickest_line_pt')
 # The journal and the width of each figure in the answers (config.DEFAULT_ANSWERS).
-JOURNAL_ANSWER_PAIRS = (('journal', 'columns'),
-                        ('comparison_journal', 'comparison_columns'),
-                        ('ex_journal', 'ho_ex_columns'),
-                        ('tr_journal', 'tr_columns'),
-                        ('ho_journal', 'ho_pub_columns'),
-                        )
+JOURNAL_ANSWER_PAIRS = (('journal', 'columns'),)
 
 
 # ---- JOURNAL FILE HELPERS ------------------------------------------------------------

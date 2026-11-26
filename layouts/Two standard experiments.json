@@ -1,0 +1,19 @@
+{
+  "kind": "Portimao figure template",
+  "version": 1,
+  "journal": "nature",
+  "columns": 2,
+  "height": 0.6,
+  "plots": [
+    {
+      "type": "P1",
+      "cells": {"row": 0, "column": 0, "rows": 6, "columns": 3},
+      "roles": {"same_scales": "yes"}
+    },
+    {
+      "type": "P1",
+      "cells": {"row": 0, "column": 3, "rows": 6, "columns": 3},
+      "roles": {"same_scales": "yes"}
+    }
+  ]
+}

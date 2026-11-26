@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 import main as program
-from utils_shared.figure_page import FigurePage
+from utils_shared.figure_page import FigurePage, page_plainer, PagePlot, plot_placer
 from utils_shared.questions import UserQuitError
 from utils_shared.run_logging import details_place_setter
 
@@ -598,9 +598,8 @@ def test_a_saved_plot_is_not_drawn_again(tmp_path: Path,
                         'experiment_workbook_exporter',
                         lambda *a, **k: written.append(1),
                         )
-    monkeypatch.setattr(program, 'experiment_preparer', lambda *args: {})
     cfg = settings.Config(dict(settings.DEFAULT_ANSWERS, decompose=False, plot_o2=True))
-    info = {'name': 'run1', 'ignore_start': 0.0, 'ignore_end': 0.0, 'custom': {}}
+    info = {'name': 'run1', 'ignore_start': 0.0, 'ignore_end': 0.0}
 
     # ---- 2 Saved already: not drawn or written again ---------------------------------
     program.experiment_processor(dict(info, is_plot_saved=True, is_workbook_saved=True),
@@ -755,6 +754,74 @@ def test_the_cancel_sentence(tmp_path: Path) -> None:
         f'The data you exported and the plots and workbooks of your files are kept in '
         f'{tmp_path}; nothing else was changed'
         )
+
+
+# ---- test_the_page_is_handed_on_and_saved --------------------------------------------
+def test_the_page_is_handed_on_and_saved(tmp_path: Path,
+                                         monkeypatch: pytest.MonkeyPatch,
+                                         capsys: pytest.CaptureFixture,
+                                         ) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the questions hand the page saved with the dataset
+    to the Build a figure step, and save the page as built with the settings of the
+    dataset once the run is started. Every question, the window and the saving are
+    stood in for.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Data and results folder for the test.
+    monkeypatch : pytest.MonkeyPatch
+        Pytest's tool for the stand-ins.
+    capsys : pytest.CaptureFixture
+        Pytest's capture of what is printed, which is not checked.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _questions_stander
+    _summaries_builder
+    """
+
+    built = plot_placer(FigurePage(), PagePlot('P9', 0, 0, 2, 2, roles={'bars': 'sd'}))
+    before = page_plainer(plot_placer(FigurePage(), PagePlot('P17', 5, 0)))
+    given: List[object] = []
+    written: List[tuple] = []
+
+    def page_runner(*args: object) -> FigurePage:
+        given.append(args[-1])
+        return built
+
+    def settings_saver(*args: object) -> bool:
+        written.append(args)
+        return True
+
+    _questions_stander(monkeypatch)
+    monkeypatch.setattr(program, 'page_stage_runner', page_runner)
+    monkeypatch.setattr(program, 'dataset_settings_saver', settings_saver)
+    page = program.everything_asker(tmp_path,
+                                    _summaries_builder(),
+                                    tmp_path,
+                                    {'page': before},
+                                    )[-1]
+    assert page == built
+    assert given == [before]
+    assert written[0][-1] == page_plainer(built)
+
+    # a dataset never saved hands on no page
+    given.clear()
+    program.everything_asker(tmp_path, _summaries_builder(), tmp_path, {})
+    assert given == [None]
 
 
 # ---- test_the_plots_are_saved_after_the_file_questions -------------------------------

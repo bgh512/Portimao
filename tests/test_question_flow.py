@@ -14,12 +14,11 @@ ROOT = Path(__file__).resolve().parent.parent
 CODE_PATTERNS = ('main.py',
                  'utils_shared/*.py',
                  'utils_viewer/*.py',
-                 'utils_custom/*.py',
                  )
 LIST_NAME = 'QUESTION_FLOW.md'
 QUESTION_NAME = 'question'  # the input every asker and wrapper takes its question in
 NUMBER_NAME = 'number'  # the input a question's own number is given in
-MINIMUM_QUESTIONS = 50  # fewer found than this means the reading itself has broken
+MINIMUM_QUESTIONS = 30  # fewer found than this means the reading itself has broken
 VARYING = '\x00'  # stands for a part filled in at run time ({name}, {time})
 HANDED_ON = '\x01'  # stands for a number handed on from another input
 NUMBERED_SECTIONS = ('1',

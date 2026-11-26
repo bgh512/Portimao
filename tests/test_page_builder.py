@@ -15,6 +15,7 @@ import config as settings
 import utils_viewer.viewer_stages as viewer_stages
 from utils_shared.figure_layout import figure_size_calculator
 from utils_shared.figure_page import (FigurePage,
+                                      page_plainer,
                                       PagePlot,
                                       panel_letters_finder,
                                       plot_lifter,
@@ -370,9 +371,10 @@ def test_the_step_that_builds_the_page(tmp_path: Path,
     ---- Summary ----
     Main function to check the Build a figure step: it starts its step of the guide,
     shows an empty page with the layouts folder, the set-up and the experiments, asks
-    6.2 and gives the page the window holds once Continue is clicked; without a
-    window it gives an empty page and asks nothing. The window and the question are
-    stood in for.
+    6.2 and gives the page the window holds once Continue is clicked; with a page
+    saved with the dataset it shows that page and says so, and with one that cannot
+    be read the empty page after one warning; without a window it gives the page it
+    started from and asks nothing. The window and the question are stood in for.
 
     ---- Inputs ----
     tmp_path : Path
@@ -442,10 +444,50 @@ def test_the_step_that_builds_the_page(tmp_path: Path,
                     ('hidden',),
                     ('offered', built, FigurePage(), tmp_path),
                     ]
+
+    # ---- 2 The page saved with the dataset is the page it starts with ----------------
+    done.clear()
+    saved = plot_placer(FigurePage(journal='science', columns=1, height=0.5),
+                        PagePlot('P1', 0, 0, 2, 3, roles={'experiment': 'Group 1: 1'}),
+                        )
+    told: List[str] = []
+    monkeypatch.setattr(viewer_stages, 'info_printer', lambda text, **kwargs: told.append(text))
+    monkeypatch.setattr(viewer_stages, 'warning_shower', lambda text: done.append(('warned', text)))
+    viewer_stages.page_stage_runner(tmp_path,
+                                    setup,
+                                    experiments,
+                                    answers,
+                                    page_plainer(saved),
+                                    )
+    assert done[1] == ('shown', saved, tmp_path, setup, experiments, answers)
+    assert not any(step[0] == 'warned' for step in done)
+    assert told[-1] == viewer_stages.SAVED_PAGE_NOTE
+
+    # ---- 3 A saved page that cannot be read: the empty page and one warning ----------
+    for broken in ({'plots': 'none'}, ['a'], dict(page_plainer(saved), version=7)):
+        done.clear()
+        told.clear()
+        viewer_stages.page_stage_runner(tmp_path, setup, experiments, answers, broken)
+        assert done[:3] == [('step', 'page'),
+                            ('warned', viewer_stages.SAVED_PAGE_PROBLEM),
+                            ('shown',
+                             FigurePage(),
+                             tmp_path,
+                             setup,
+                             experiments,
+                             answers,
+                             ),
+                            ]
+        assert viewer_stages.SAVED_PAGE_NOTE not in told
+
+    # ---- 4 Without the window the page is as it started ------------------------------
     done.clear()
     monkeypatch.setattr(viewer_stages, 'active_gui_getter', lambda: None)
     assert viewer_stages.page_stage_runner(tmp_path) == FigurePage()
     assert done == [('step', 'page')]
+    assert viewer_stages.page_stage_runner(tmp_path,
+                                           saved_page=page_plainer(saved),
+                                           ) == saved
 
 
 # ---- test_when_the_template_offer_is_made --------------------------------------------

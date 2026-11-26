@@ -26,6 +26,7 @@ BUNDLE_ID = 'io.github.bgh512.portimao'
 # the program's own files read while it runs, and where they go inside the app
 INSIDE = ((ROOT / 'fits', 'fits'),
           (ROOT / 'journals', 'journals'),  # what each journal asks of a figure
+          (ROOT / 'layouts', 'layouts'),  # the ready-made templates of the figures
           (ROOT / 'assets' / 'icon.png', 'assets'),
           (ROOT / 'QUESTION_FLOW.md', '.'),  # its title gives the version
           (ROOT / 'launchers' / 'mac_report.sh', 'launchers'),  # for Copy details

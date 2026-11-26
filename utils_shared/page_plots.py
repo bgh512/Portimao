@@ -101,6 +101,7 @@ FIRST_VIEW = 'delta'
 # What is written in the cells of a plot that cannot be drawn
 NOT_THERE = ('The experiment of this plot is not in this dataset. Open its form (✎) '
              'and pick one.')
+NOT_PICKED = 'No experiment is picked for this plot yet. Open its form (✎) and pick one.'
 NOT_READ = '{} could not be read, so it is not drawn.'
 NO_PANEL = 'No panel of this plot has anything to show. Open its form (✎) and tick one.'
 NO_HAEMS = ('{} has no haems to show as {}. Open the form of this plot (✎) and pick '
@@ -528,6 +529,38 @@ def _haems_lister(answers: dict) -> List[str]:
     if not (full['decompose'] and full['plot_haems']):
         return []
     return list(full['haems'])
+
+
+# ---- _missing_sentence_finder --------------------------------------------------------
+def _missing_sentence_finder(roles: Dict[str, str]) -> str:
+    """
+    ---- Summary ----
+    Helper function to give the sentence of a plot of one experiment that has none to
+    show: no experiment picked yet (a ready-made template, which leaves the pick to
+    the user), or a pick that is not in this dataset.
+
+    ---- Inputs ----
+    roles : Dict[str, str]
+        The roles of the plot.
+
+    ---- Globals read ----
+    NOT_PICKED, NOT_THERE; EXPERIMENT_ROLE (imported).
+
+    ---- Outputs ----
+    str
+        NOT_PICKED when the roles hold no experiment, otherwise NOT_THERE.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return NOT_THERE if roles.get(EXPERIMENT_ROLE) else NOT_PICKED
 
 
 # ---- _sentence_drawer ----------------------------------------------------------------
@@ -2125,6 +2158,56 @@ def _regions_kind_fields_lister(roles: Dict[str, str], answers: dict) -> List[di
     return [choice_field_maker(KIND_KEY, 'Regions', choices, roles, choices[0][0])]
 
 
+# ---- _row_titles_splitter ------------------------------------------------------------
+def _row_titles_splitter(labels: List[str]) -> Tuple[List[str], str]:
+    """
+    ---- Summary ----
+    Helper function to split the y axis titles of the rows of one plot into the name
+    of each row and the words they all end with (the value and its unit), so the unit
+    is written once beside the rows.
+
+    ---- Inputs ----
+    labels : List[str]
+        The title of each row ('Cyt b557 ΔD (mOD)', 'Cyt cc ΔD (mOD)').
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Tuple[List[str], str]
+        (the name of each row, the words they share with a capital first letter):
+        (['Cyt b557', 'Cyt cc'], 'ΔD (mOD)'). The titles as they are and '' for one
+        row, for rows that end with no whole word in common, and when a row would be
+        left without a name.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The shared words are the longest ending every title has, from its first space
+    on, so they start at a whole word.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if len(labels) < 2:
+        return list(labels), ''
+    length = 0
+    shortest = min(len(label) for label in labels)
+    while length < shortest and len({label[-length - 1] for label in labels}) == 1:
+        length += 1
+    ending = labels[0][len(labels[0]) - length:]
+    if ' ' not in ending:
+        return list(labels), ''
+    ending = ending[ending.index(' '):]
+    names = [label[:len(label) - len(ending)].strip() for label in labels]
+    shared = ending.strip()
+    if not shared or not all(names):
+        return list(labels), ''
+    return names, shared[:1].upper() + shared[1:]
+
+
 # ---- _time_points_placer -------------------------------------------------------------
 def _time_points_placer(labels: List[str], title: str) -> dict:
     """
@@ -3045,11 +3128,11 @@ def difference_plot_drawer(fig: Figure,
     roles = plot.roles
     name = role_experiment_finder(context['setup'], roles.get(EXPERIMENT_ROLE, ''))
     if name is None:
-        return _sentence_drawer(fig, room, context, NOT_THERE)
+        return _sentence_drawer(fig, room, context, _missing_sentence_finder(roles))
     experiment = context['experiments'].get(name)
     if experiment is None:
         return _sentence_drawer(fig, room, context, NOT_READ.format(name))
-    parts = experiment.get('difference_parts')
+    parts =experiment.get('difference_parts')
     if parts is None:
         return _sentence_drawer(fig, room, context, NO_DIFFERENCE.format(name))
 
@@ -3693,7 +3776,8 @@ def response_plot_drawer(fig: Figure,
     per experiment, the sets side by side; a bracket with its mark where two sets
     differ in a region. The OCR is one set of axes; the haems are a row per haem
     ticked, each with its own y axis, the names of the regions and the small legend
-    under the last. The
+    under the last; several rows are each named by their haem, with the value and
+    its unit written once beside them. The
     y axis starts at 0 for the OCR as measured, per OD or as % of baseline, and
     holds everything drawn otherwise. With nothing to show, one sentence in the
     cells.
@@ -3713,18 +3797,21 @@ def response_plot_drawer(fig: Figure,
 
     ---- Outputs ----
     List[Axes]
-        The axes of each row, from the top; or those of the sentence.
+        The axes of each row, from the top, then with several rows the unseen axes
+        that hold the value and unit they share; or those of the sentence.
 
     ---- Globals mutated ----
     None. Adds axes to the figure (side effect).
 
     ---- Equations ----
     The region in place i (from 0, the baseline) sits at x = i. With n rows each is
-    (1 - ROW_GAP_SHARE x (n - 1)) / n of the height of the room.
+    (1 - ROW_GAP_SHARE x (n - 1)) / n of the height of the room. The shared title
+    sits label_pad left of the leftmost text of the rows.
 
     ---- Helpers ----
     _columns_drawer
     _floor_finder
+    _row_titles_splitter
     _sentence_drawer
     _spectrum_axes_styler
     _y_range_setter
@@ -3746,6 +3833,9 @@ def response_plot_drawer(fig: Figure,
     gap = ROW_GAP_SHARE * (y1 - y0)
     height = (y1 - y0 - gap * (len(rows) - 1)) / len(rows)
     places = [float(place) for place in range(len(regions))]
+    # several rows are named by their haem only: the value and its unit, the same in
+    # every row, would run into one another up the short axes
+    names, shared = _row_titles_splitter([row['label'] for row in rows])
     axes = []
     for place, row in enumerate(rows):
         top = y1 - place * (height + gap)
@@ -3774,13 +3864,30 @@ def response_plot_drawer(fig: Figure,
         ax.set_xlim(-0.5, len(regions) - 0.5)
         ax.set_xticks(places)
         ax.set_xticklabels(regions)
-        _spectrum_axes_styler(ax, context, '' if is_last else None, row['label'])
+        _spectrum_axes_styler(ax, context, '' if is_last else None, names[place])
         if len(regions) > 3:  # many names side by side run into one another
             for label in ax.get_xticklabels():
                 label.set_rotation(30)
                 label.set_horizontalalignment('right')
         axes.append(ax)
-    return axes
+    if not shared:
+        return axes
+
+    # ---- 3 The value and its unit, once beside the rows ------------------------------
+    # Unseen axes over every row hold it, so it stays centred on the rows when the
+    # page makes them smaller; it sits left of the widest numbers and name of a row.
+    style = context['style']
+    left = min(ax.get_tightbbox().x0 for ax in axes)
+    edge = fig.transFigure.transform((x0, y0))[0]
+    span = fig.add_axes((x0, y0, x1 - x0, y1 - y0), frameon=False)
+    span.set_xticks([])
+    span.set_yticks([])
+    span.set_ylabel(shared,
+                    fontsize=style['fonts']['label'],
+                    fontfamily=context['fonts'],
+                    labelpad=(edge - left) * 72.0 / fig.dpi + style['label_pad'],
+                    )
+    return axes + [span]
 
 
 # ---- standard_form_maker -------------------------------------------------------------
@@ -3914,7 +4021,11 @@ def standard_plot_drawer(fig: Figure,
     # ---- 1 The experiment ------------------------------------------------------------
     name = role_experiment_finder(context['setup'], plot.roles.get(EXPERIMENT_ROLE, ''))
     if name is None:
-        return _sentence_drawer(fig, room, context, NOT_THERE)
+        return _sentence_drawer(fig,
+                                room,
+                                context,
+                                _missing_sentence_finder(plot.roles),
+                                )
     experiment = context['experiments'].get(name)
     if experiment is None:
         return _sentence_drawer(fig, room, context, NOT_READ.format(name))
@@ -4426,7 +4537,7 @@ def trace_plot_drawer(fig: Figure,
     roles, answers = plot.roles, context['answers']
     name = role_experiment_finder(context['setup'], roles.get(EXPERIMENT_ROLE, ''))
     if name is None:
-        return _sentence_drawer(fig, room, context, NOT_THERE)
+        return _sentence_drawer(fig, room, context, _missing_sentence_finder(roles))
     experiment = context['experiments'].get(name)
     if experiment is None:
         return _sentence_drawer(fig, room, context, NOT_READ.format(name))

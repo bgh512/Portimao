@@ -19,7 +19,15 @@ SETTINGS_FILE_NAME = 'portimao_settings.json'
 # Only cells are measured, so the haem amounts, which depend on the size of each shape,
 # are no longer shown: a dataset saved showing them opens showing delta D.
 RETIRED_HAEM_MODES = {'conc': 'delta'}
-RETIRED_HAEM_MODE_KEYS = ('haem_mode', 'ho_haem_mode')
+# The answers of the fixed figures the dataset figure took the place of (side by side,
+# the 2x2 grid, the time response, the haem and OCR response): a dataset saved with
+# them opens without them.
+RETIRED_ANSWER_NAMES = ('plot_comparison',
+                        'plot_exemplar',
+                        'plot_haem_ocr',
+                        'plot_time_response',
+                        )
+RETIRED_ANSWER_STARTS = ('comparison_', 'ex_', 'ho_', 'tr_')
 # Answers saved under a name since changed, by answer: {old name: new name}. The Valencia
 # scatter is now Palencia, and the preset temp_fit_037v is now the Rowan fit 11-2026.
 RENAMED_ANSWERS = {'haem_background': {'valencia': 'palencia'},
@@ -164,18 +172,20 @@ def dataset_settings_reader(folder: Path) -> dict:
         The dataset folder (the folder of the .paf files).
 
     ---- Globals read ----
-    SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RETIRED_HAEM_MODE_KEYS, RENAMED_ANSWERS
-    (module constants).
+    SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RENAMED_ANSWERS, RETIRED_ANSWER_NAMES,
+    RETIRED_ANSWER_STARTS (module constants).
 
     ---- Outputs ----
     dict
         {'export_folder': Optional[Path], 'files': dict, 'answers': dict, 'setup':
-        dict} (DATA_FORMAT.md, dataset_settings); the set-up is empty for a dataset
-        never set up. An empty dict when the dataset was never
+        dict, 'page': Any} (DATA_FORMAT.md, dataset_settings); the set-up is empty
+        for a dataset never set up, and the page is as the file holds it, unchecked
+        (None for none). An empty dict when the dataset was never
         saved or its file cannot be read, so the standard settings are used. A haem
         way of showing no longer offered (RETIRED_HAEM_MODES) is given as its
-        successor, and an answer saved under an old name (RENAMED_ANSWERS) under its
-        new one.
+        successor, an answer saved under an old name (RENAMED_ANSWERS) under its
+        new one, and the answers of the fixed figures that are no longer made
+        (RETIRED_ANSWER_NAMES, RETIRED_ANSWER_STARTS) are left out.
 
     ---- Globals mutated ----
     None. Reads the file (side effect).
@@ -203,20 +213,27 @@ def dataset_settings_reader(folder: Path) -> dict:
                                                         ) else {}
 
     # ---- 3 Read a way of showing the haems no longer offered as its successor --------
-    for key in RETIRED_HAEM_MODE_KEYS:
-        if answers.get(key) in RETIRED_HAEM_MODES:
-            answers[key] = RETIRED_HAEM_MODES[answers[key]]
+    if answers.get('haem_mode') in RETIRED_HAEM_MODES:
+        answers['haem_mode'] = RETIRED_HAEM_MODES[answers['haem_mode']]
 
     # ---- 4 Read an answer saved under an old name as its new name --------------------
     for key, renamed in RENAMED_ANSWERS.items():
         if isinstance(answers.get(key), str) and answers[key] in renamed:
             answers[key] = renamed[answers[key]]
+
+    # ---- 5 Leave out the answers of the figures that are no longer made --------------
+    answers = {key: value
+               for key, value in answers.items()
+               if key not in RETIRED_ANSWER_NAMES
+               and not str(key).startswith(RETIRED_ANSWER_STARTS)
+               }
     return {'export_folder': _export_folder_resolver(Path(folder),
                                                      values.get('export_folder'),
                                                      ),
             'files': files if isinstance(files, dict) else {},
             'answers': answers,
             'setup': saved_setup_reader(values.get('setup')),
+            'page': values.get('page'),
             }
 
 
@@ -226,6 +243,7 @@ def dataset_settings_saver(folder: Path,
                            files: dict,
                            answers: dict,
                            setup: Optional[dict] = None,
+                           page: Optional[dict] = None,
                            ) -> bool:
     """
     ---- Summary ----
@@ -245,6 +263,9 @@ def dataset_settings_saver(folder: Path,
     setup : Optional[dict]
         The dataset set-up table as it is saved (saved_setup, DATA_FORMAT.md, from
         setup_plainer); None or empty writes none.
+    page : Optional[dict]
+        The page of the dataset figure as plain values (plain_page, DATA_FORMAT.md,
+        from page_plainer); None or a page with no plot writes none.
 
     ---- Globals read ----
     SETTINGS_FILE_NAME (module constant).
@@ -269,6 +290,8 @@ def dataset_settings_saver(folder: Path,
               }
     if setup:
         values['setup'] = setup
+    if page and page.get('plots'):
+        values['page'] = page
     try:
         (Path(folder) / SETTINGS_FILE_NAME).write_text(json.dumps(values, indent=2),
                                                        encoding='utf-8',

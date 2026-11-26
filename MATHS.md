@@ -217,7 +217,6 @@ What happens otherwise:
 
 - A file with no regions, or with only one, has no levels and no $P$. Nothing is guessed for it: when % oxidised is chosen for the plots, that file is drawn as $\Delta D$, as its axis says, and the files with both regions are drawn in %.
 - With no file having both regions, % oxidised is not offered at all.
-- A figure that averages files together (the haem and OCR response) offers % oxidised only when every file in it has both regions, so a % is never averaged with a $\Delta D$.
 
 Example: a run is trimmed 2 min from its start. Its regions were marked at 2 to 8 min (oxidised) and 24 to 30 min (reduced) of the recording, which is 0 to 6 min and 22 to 28 min of the trimmed run. The haem is 12 mOD before 10 min, 10 mOD from 10 to 20 min and 4 mOD after: $D_{\mathrm{ox}} = 12$ and $D_{\mathrm{red}} = 4$, so $P$ is 100 %, $\dfrac{10 - 4}{8} \times 100 = 75$ % and 0 %. The same run without its reduced region has no $P$ and is shown as $\Delta D$.
 
@@ -382,7 +381,7 @@ Example 1: a file of 30 min with additions at 10 and 20 min, $w = 2$ min and $g 
 
 Example 2: the same file with $w = 12$ min. The baseline would start at $9.5 - 12 = -2.5$ min, so it starts at 0 and runs to 9.5 min. The region after the first addition would start at $19.5 - 12 = 7.5$ min, before its addition at 10 min, and the last would start at $29.5 - 12 = 17.5$ min, before its addition at 20 min: neither fits, and both are left out.
 
-Checked by: `test_the_windows_fall_before_the_additions` in `tests/test_averaging_windows.py`; the averages inside the regions by `test_averages_around_the_additions` and `test_average_that_does_not_fit` in `tests/test_processing_maths.py`; the averaged spectra of the time response by `test_averaged_spectra_around_the_additions` and `test_baseline_starts_with_the_recording` in `tests/test_summary_maths.py`.
+Checked by: `test_the_windows_fall_before_the_additions` in `tests/test_averaging_windows.py`; the averages inside the regions by `test_averages_around_the_additions` and `test_average_that_does_not_fit` in `tests/test_processing_maths.py`.
 
 ### 7.2 The quick regions
 

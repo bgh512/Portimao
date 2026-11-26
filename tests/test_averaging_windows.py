@@ -1,8 +1,7 @@
 """
 Tests that the averaging windows of both kinds (settled, ending before the next
 addition, and quick, starting after each addition) fall, and follow a pulled edge, as
-worked out by hand, that a figure needing them offers the window step when none are set
-up, and that it asks which kind it uses only when both are.
+worked out by hand.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -15,7 +14,6 @@ import pytest
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_custom.spectral_difference import spectral_averager
 from utils_shared import survey
 from utils_shared.averaging import (baseline_percent_adder,
                                     experiment_averages_calculator,
@@ -180,147 +178,6 @@ def _views_experiment_builder() -> dict:
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
-
-
-# ---- test_a_figure_asks_which_windows_only_with_both_kinds ---------------------------
-def test_a_figure_asks_which_windows_only_with_both_kinds(
-    monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-    """
-    ---- Summary ----
-    Main function to check which kind of window a figure uses: with both kinds set up
-    one question (4.6.2) asks, offering the kind the figure used last time; with one
-    kind the figure uses it and nothing is asked. The question is stood in for.
-
-    ---- Inputs ----
-    monkeypatch : pytest.MonkeyPatch
-        Puts the stand-in for the question in place, and takes it away afterwards.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    asked = []
-    def asker(question: str, options: list, default: str, **kwargs: object) -> str:
-        asked.append(
-            (question, [kind for kind, _ in options], default, kwargs['number']),
-            )
-        return 'quick'
-    monkeypatch.setattr(survey, 'choice_asker', asker)
-    monkeypatch.setattr(survey, 'info_printer', lambda *args, **kwargs: None)
-
-    # ---- 1 Both kinds: the question, with the kind used last time --------------------
-    answers = {'settled_windows': True, 'quick_windows': True}
-    kind = survey.window_kind_asker(answers,
-                                    {'tr_window_kind': 'settled'},
-                                    'tr_window_kind',
-                                    )
-    assert kind == 'quick' and answers['tr_window_kind'] == 'quick'
-    assert asked == [('Which averaging regions should this figure use?',
-                      ['settled', 'quick'],
-                      'settled',
-                      '4.6.2',
-                      ),
-                     ]
-    survey.window_kind_asker(answers, {'ho_window_kind': 'quick'}, 'ho_window_kind')
-    assert asked[-1][2] == 'quick'
-
-    # ---- 2 One kind: it is used, and nothing is asked --------------------------------
-    answers = {'settled_windows': False, 'quick_windows': True}
-    assert survey.window_kind_asker(answers, {}, 'ex_window_kind') == 'quick'
-    answers = {'settled_windows': True, 'quick_windows': False}
-    assert survey.window_kind_asker(answers,
-                                    {'ex_window_kind': 'quick'},
-                                    'ex_window_kind',
-                                    ) == 'settled'
-    assert answers['ex_window_kind'] == 'settled'
-    assert len(asked) == 2
-
-
-# ---- test_a_figure_without_windows_offers_the_window_step ----------------------------
-def test_a_figure_without_windows_offers_the_window_step(
-    monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-    """
-    ---- Summary ----
-    Main function to check what a figure that needs the averaging windows does: with
-    windows set up nothing is asked; with none, one question offers the window step of
-    the processing, and the figure is made only when windows are set up after it. No
-    window or gap is asked for by the figure itself. The question and the window step
-    are stood in for.
-
-    ---- Inputs ----
-    monkeypatch : pytest.MonkeyPatch
-        Puts the stand-in for the question in place, and takes it away afterwards.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    asked, runs = [], []
-    reply = {'answer': True}
-    def asker(question: str, default: bool = False, **kwargs: object) -> bool:
-        asked.append((question, default, kwargs.get('number')))
-        return reply['answer']
-    def adder_maker(answers: dict, is_added: bool):
-        def adder() -> bool:
-            runs.append(is_added)
-            answers['averaging'] = is_added
-            return is_added
-        return adder
-    monkeypatch.setattr(survey, 'yes_no_asker', asker)
-    monkeypatch.setattr(survey, 'info_printer', lambda *args, **kwargs: None)
-
-    # ---- 1 Windows set up: nothing is asked ------------------------------------------
-    answers = {'averaging': True}
-    assert survey.windows_ensurer(answers, adder_maker(answers, True)) is True
-    assert asked == [] and runs == []
-
-    # ---- 2 None, yes, and windows are added ------------------------------------------
-    answers = {'averaging': False}
-    assert survey.windows_ensurer(answers, adder_maker(answers, True)) is True
-    assert asked == [('Do you want to add them now?', True, '4.6.1')]
-    assert runs == [True]
-
-    # ---- 3 None, yes, but the windows are left unticked ------------------------------
-    answers = {'averaging': False}
-    assert survey.windows_ensurer(answers, adder_maker(answers, False)) is False
-    assert runs == [True, False]
-
-    # ---- 4 None, and no: the window step is not run ----------------------------------
-    reply['answer'] = False
-    answers = {'averaging': False}
-    assert survey.windows_ensurer(answers, adder_maker(answers, True)) is False
-    assert len(asked) == 3 and runs == [True, False]
-
-    # ---- 5 None, and the step cannot be run: nothing is asked ------------------------
-    assert survey.windows_ensurer({'averaging': False}, None) is False
-    assert len(asked) == 3
 
 
 # ---- test_a_window_can_be_switched_off_and_set ---------------------------------------
@@ -761,8 +618,8 @@ def test_both_kinds_are_averaged_from_one_baseline() -> None:
     """
     ---- Summary ----
     Main function to check the averages of the settled and the quick windows of one
-    file, their change from the one baseline, what a figure that uses one kind reads,
-    and the averaged spectra of the quick windows.
+    file, their change from the one baseline, and what a figure that uses one kind
+    reads.
 
     ---- Inputs ----
     None.
@@ -781,11 +638,7 @@ def test_both_kinds_are_averaged_from_one_baseline() -> None:
     The trace is 10 before 10 min, 4 until 12, 6 until 20, 1 until 22 and 2 after.
     Baseline 7.5 to 9.5: 10. Settled windows 17.5 to 19.5 and 27.5 to 29.5: 6 and 2,
     so 60 and 20 % of the baseline, -4 and -8 from it. Quick windows 10.5 to 11.5 and
-    20.5 to 21.5: 4 and 1, so 40 and 10 %, -6 and -9. Spectra, one every 0.5 min for
-    12 min with additions at 4 and 8 min: (2, 0) before 4 min, (5, 1) until 6, (3, 1)
-    until 8, (9, 4) until 10 and (7, 4) after; the quick windows 4.5 to 5.5 and 8.5
-    to 9.5 hold three spectra each, (5, 1) and (9, 4), where the settled ones would
-    give (3, 1) and (7, 4).
+    20.5 to 21.5: 4 and 1, so 40 and 10 %, -6 and -9.
 
     ---- Helpers ----
     _response_experiment_builder
@@ -850,44 +703,6 @@ def test_both_kinds_are_averaged_from_one_baseline() -> None:
     assert list(window_kind_picker(long, 'quick')['skipped']) == ['average1',
                                                                   'average2',
                                                                   ]
-
-    # ---- 5 The averaged spectra of the quick windows ---------------------------------
-    times = np.arange(25) * 0.5
-    spectra = np.select([times[:, None] < 4,
-                         times[:, None] < 6,
-                         times[:, None] < 8,
-                         times[:, None] < 10,
-                         ],
-                        [[2.0, 0.0], [5.0, 1.0], [3.0, 1.0], [9.0, 4.0]],
-                        [7.0, 4.0],
-                        )
-    experiment = {'experiment_name': 'spectra',
-                  'raw_spectra': {'Cyt': {'wavelengths': np.array([550.0, 600.0]),
-                                          'time': times,
-                                          'attenuation': spectra,
-                                          },
-                                  },
-                  'metadata': {'events': [{'time': 4.0}, {'time': 8.0}]},
-                  }
-    result = spectral_averager(experiment,
-                               'Cyt',
-                               'attenuation',
-                               window_minutes=2.0,
-                               gap_minutes=0.5,
-                               final_window_gap_minutes=0.5,
-                               kind='quick',
-                               quick_minutes=1.0,
-                               delay_minutes=0.5,
-                               )['spectral_averages']
-    assert list(result['windows']) == ['average0', 'average1', 'average2']
-    assert result['roles'] == {'penultimate': 'average1', 'final': 'average2'}
-    assert [result['windows'][name]['n_spectra'] for name in result['windows']] == [5,
-                                                                                    3,
-                                                                                    3,
-                                                                                    ]
-    assert np.allclose(result['windows']['average0']['mean'], [2.0, 0.0])
-    assert np.allclose(result['windows']['average1']['mean'], [5.0, 1.0])
-    assert np.allclose(result['windows']['average2']['mean'], [9.0, 4.0])
 
 
 # ---- test_the_ocr_is_put_on_its_percent_of_baseline ----------------------------------

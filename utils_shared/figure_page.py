@@ -716,6 +716,58 @@ def figure_page_exporter(page: FigurePage,
     return path, fig
 
 
+# ---- page_plainer --------------------------------------------------------------------
+def page_plainer(page: FigurePage) -> dict:
+    """
+    ---- Summary ----
+    Main function to write a page as plain values, the form it has in a template file
+    and in the settings file of a dataset: its size, and each plot's type, cells and
+    roles.
+
+    ---- Inputs ----
+    page : FigurePage
+        The page.
+
+    ---- Globals read ----
+    TEMPLATE_KIND, TEMPLATE_VERSION.
+
+    ---- Outputs ----
+    dict
+        {'kind', 'version', 'journal', 'columns', 'height', 'plots': [{'type',
+        'cells': {'row', 'column', 'rows', 'columns'}, 'roles'}]} (plain_page,
+        DATA_FORMAT.md).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return {'kind': TEMPLATE_KIND,
+            'version': TEMPLATE_VERSION,
+            'journal': page.journal,
+            'columns': page.columns,
+            'height': page.height,
+            'plots': [{'type': plot.plot_type,
+                       'cells': {'row': plot.row,
+                                 'column': plot.column,
+                                 'rows': plot.n_rows,
+                                 'columns': plot.n_columns,
+                                 },
+                       'roles': dict(plot.roles),
+                       }
+                      for plot in page.plots
+                      ],
+            }
+
+
+# ---- panel_letters_finder------------------------------------------------------------
+
+
 # ---- panel_letters_finder ------------------------------------------------------------
 def panel_letters_finder(page: FigurePage) -> Dict[int, str]:
     """
@@ -753,6 +805,71 @@ def panel_letters_finder(page: FigurePage) -> Dict[int, str]:
     return {index: LETTERS[place % len(LETTERS)]
             for place, index in enumerate(lettered)
             }
+
+
+# ---- plain_page_reader ---------------------------------------------------------------
+def plain_page_reader(content: Any, start: str) -> FigurePage:
+    """
+    ---- Summary ----
+    Main function to read a page from its plain values (page_plainer), as a template
+    file or the settings file of a dataset holds them.
+
+    ---- Inputs ----
+    content : Any
+        The plain values as read from the file (plain_page, DATA_FORMAT.md).
+    start : str
+        How the sentence for a page that cannot be read starts ('The template
+        bars.json cannot be used').
+
+    ---- Globals read ----
+    TEMPLATE_KIND, TEMPLATE_VERSION.
+
+    ---- Outputs ----
+    FigurePage
+        The page. Raises FigurePageError with one plain sentence when the values are
+        not a page saved by Portimao, are of a version this program does not know, or
+        hold a plot that cannot be placed.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _template_plot_reader
+    plot_placer
+    """
+
+    # ---- 1 Check what it is ----------------------------------------------------------
+    if not isinstance(content, dict) or content.get('kind') != TEMPLATE_KIND:
+        raise FigurePageError(f'{start}: it is not a template saved by Portimao.')
+    if content.get('version') != TEMPLATE_VERSION:
+        raise FigurePageError(f'{start}: it was saved by another version of Portimao.')
+
+    # ---- 2 Check the page size -------------------------------------------------------
+    journal = content.get('journal')
+    columns = content.get('columns')
+    height = content.get('height')
+    numbers_ok = all(isinstance(n, (int, float)) and not isinstance(n, bool)
+                     for n in (columns, height)
+                     )
+    if not isinstance(journal, str) or not numbers_ok or not 0 < height <= 1:
+        raise FigurePageError(f'{start}: its page size cannot be read.')
+
+    # ---- 3 Place each plot -----------------------------------------------------------
+    if not isinstance(content.get('plots'), list):
+        raise FigurePageError(f'{start}: it has no list of plots.')
+    page = FigurePage(journal=journal, columns=columns, height=height)
+    for entry in content['plots']:
+        try:
+            page = plot_placer(page, _template_plot_reader(entry))
+        except FigurePageError as exc:
+            raise FigurePageError(f'{start}. {exc}') from exc
+    return page
+
+
+# ---- plot_lifter---------------------------------------------------------------------
 
 
 # ---- plot_lifter ---------------------------------------------------------------------
@@ -881,7 +998,7 @@ def template_reader(path: Path) -> FigurePage:
         The template file.
 
     ---- Globals read ----
-    TEMPLATE_KIND, TEMPLATE_VERSION.
+    None.
 
     ---- Outputs ----
     FigurePage
@@ -896,42 +1013,16 @@ def template_reader(path: Path) -> FigurePage:
     None.
 
     ---- Helpers ----
-    _template_plot_reader
-    plot_placer
+    plain_page_reader
     """
 
-    # ---- 1 Read the file -------------------------------------------------------------
     start = f'The template {path.name} cannot be used'
     try:
         content = json.loads(path.read_text(encoding='utf-8'))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise FigurePageError(f'{start}: it is not a template saved by Portimao.',
                               ) from exc
-    if not isinstance(content, dict) or content.get('kind') != TEMPLATE_KIND:
-        raise FigurePageError(f'{start}: it is not a template saved by Portimao.')
-    if content.get('version') != TEMPLATE_VERSION:
-        raise FigurePageError(f'{start}: it was saved by another version of Portimao.')
-
-    # ---- 2 Check the page size -------------------------------------------------------
-    journal = content.get('journal')
-    columns = content.get('columns')
-    height = content.get('height')
-    numbers_ok = all(isinstance(n, (int, float)) and not isinstance(n, bool)
-                     for n in (columns, height)
-                     )
-    if not isinstance(journal, str) or not numbers_ok or not 0 < height <= 1:
-        raise FigurePageError(f'{start}: its page size cannot be read.')
-
-    # ---- 3 Place each plot -----------------------------------------------------------
-    if not isinstance(content.get('plots'), list):
-        raise FigurePageError(f'{start}: it has no list of plots.')
-    page = FigurePage(journal=journal, columns=columns, height=height)
-    for entry in content['plots']:
-        try:
-            page = plot_placer(page, _template_plot_reader(entry))
-        except FigurePageError as exc:
-            raise FigurePageError(f'{start}. {exc}') from exc
-    return page
+    return plain_page_reader(content, start)
 
 
 # ---- template_saver ------------------------------------------------------------------
@@ -956,7 +1047,7 @@ def template_saver(page: FigurePage,
         True to write over a template of the same name.
 
     ---- Globals read ----
-    TEMPLATE_KIND, TEMPLATE_VERSION.
+    None.
 
     ---- Outputs ----
     Path
@@ -972,6 +1063,7 @@ def template_saver(page: FigurePage,
 
     ---- Helpers ----
     _roles_checker
+    page_plainer
     template_path_finder
     """
 
@@ -987,24 +1079,8 @@ def template_saver(page: FigurePage,
         raise FigurePageError(f'A template called {path.stem} is already there: '
                               f'choose another name, or replace it.',
                               )
-    content = {'kind': TEMPLATE_KIND,
-               'version': TEMPLATE_VERSION,
-               'journal': page.journal,
-               'columns': page.columns,
-               'height': page.height,
-               'plots': [{'type': plot.plot_type,
-                          'cells': {'row': plot.row,
-                                    'column': plot.column,
-                                    'rows': plot.n_rows,
-                                    'columns': plot.n_columns,
-                                    },
-                          'roles': dict(plot.roles),
-                          }
-                         for plot in page.plots
-                         ],
-               }
     folder.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(content, indent=2, ensure_ascii=False) + '\n',
+    path.write_text(json.dumps(page_plainer(page), indent=2, ensure_ascii=False) + '\n',
                     encoding='utf-8',
                     )
     return path

@@ -16,6 +16,12 @@ from utils_shared.dataset_settings import (dataset_settings_reader,
                                            file_settings_merger,
                                            SETTINGS_FILE_NAME,
                                            )
+from utils_shared.figure_page import (FigurePage,
+                                      page_plainer,
+                                      PagePlot,
+                                      plain_page_reader,
+                                      plot_placer,
+                                      )
 from utils_shared.survey import (data_folder_lister,
                                  data_folder_resolver,
                                  free_folder_finder,
@@ -648,10 +654,59 @@ def test_saved_haem_amounts_open_as_delta_d(tmp_path: Path) -> None:
     labels = dict(haem_form_option_builder(True))
     assert labels['delta'].startswith('ΔD (mOD)')
     assert labels['percent'].startswith('% oxidised')
-    old = dict(ANSWERS, haem_mode='conc', ho_haem_mode='conc')
+    old = dict(ANSWERS, haem_mode='conc')
     assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, old)
     answers = dataset_settings_reader(tmp_path)['answers']
-    assert answers == dict(ANSWERS, haem_mode='delta', ho_haem_mode='delta')
+    assert answers == dict(ANSWERS, haem_mode='delta')
+
+
+# ---- test_saved_old_figure_answers_are_left_out --------------------------------------
+def test_saved_old_figure_answers_are_left_out(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a dataset saved with the answers of the fixed figures
+    that are no longer made (side by side, the 2x2 grid, the time response, the haem
+    and OCR response) still opens, without them and with every other answer unchanged,
+    the export choice among them.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    FILES, ANSWERS (module constants).
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    kept = dict(ANSWERS, export_choice='trimmed', export_spectra=True)
+    old = dict(kept,
+               plot_comparison=True,
+               comparison_journal='nature',
+               comparison_columns=1.5,
+               plot_exemplar=True,
+               ex_journal='nature',
+               ex_window_kind='quick',
+               ho_exemplar_run=2,
+               plot_time_response=True,
+               tr_groups=['knockdown', 'control'],
+               tr_window_kind='settled',
+               plot_haem_ocr=True,
+               ho_haems=['Cyt bH'],
+               ho_haem_mode='conc',
+               )
+    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, old)
+    assert dataset_settings_reader(tmp_path)['answers'] == kept
 
 
 # ---- test_saved_old_names_open_with_the_new_ones -------------------------------------
@@ -725,6 +780,67 @@ def test_settings_are_read_back(tmp_path: Path) -> None:
     saved = dataset_settings_reader(tmp_path)
     assert saved['files'] == FILES
     assert saved['answers'] == ANSWERS
+
+
+# ---- test_the_page_is_kept_with_the_dataset ------------------------------------------
+def test_the_page_is_kept_with_the_dataset(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check that the page of the dataset figure is saved with the
+    dataset and read back as the same page, every pick included; that a page with no
+    plot and no page write none; and that a settings file without a page gives none.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    FILES, ANSWERS, SETTINGS_FILE_NAME.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 A page with two plots, one with its pick ----------------------------------
+    pick = 'Group 1: 2, Group 2: 0, time point: 0, replicate: 1'
+    page = plot_placer(FigurePage(journal='science', columns=1, height=0.5),
+                       PagePlot('P1', 0, 0, 2, 3, roles={'experiment': pick}),
+                       )
+    page = plot_placer(page, PagePlot('P9', 2, 0, 2, 2, roles={'group_1': 'Split'}))
+    assert dataset_settings_saver(tmp_path,
+                                  tmp_path / 'results',
+                                  FILES,
+                                  ANSWERS,
+                                  None,
+                                  page_plainer(page),
+                                  )
+    written = json.loads((tmp_path / SETTINGS_FILE_NAME).read_text('utf-8'))
+    assert written['page']['plots'][0]['roles'] == {'experiment': pick}
+    read = dataset_settings_reader(tmp_path)
+    assert plain_page_reader(read['page'], 'The saved page cannot be used') == page
+    assert read['files'] == FILES and read['answers'] == ANSWERS
+
+    # ---- 2 No plot, or no page: none written -----------------------------------------
+    for empty in (page_plainer(FigurePage()), None):
+        assert dataset_settings_saver(tmp_path,
+                                      tmp_path / 'results',
+                                      FILES,
+                                      ANSWERS,
+                                      None,
+                                      empty,
+                                      )
+        written = json.loads((tmp_path / SETTINGS_FILE_NAME).read_text('utf-8'))
+        assert 'page' not in written
+        assert dataset_settings_reader(tmp_path)['page'] is None
 
 
 # ---- test_unwritable_folder_is_reported ----------------------------------------------

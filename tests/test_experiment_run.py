@@ -1,5 +1,5 @@
 """
-Tests of the run of one file: a workbook that cannot be saved does not take the file out of the later figures.
+Tests of the run of one file: a workbook that cannot be saved does not stop the run.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -57,18 +57,18 @@ def _quiet_details() -> Iterator[io.StringIO]:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- test_a_workbook_open_in_excel_keeps_the_file ------------------------------------
-def test_a_workbook_open_in_excel_keeps_the_file(tmp_path: Path,
-                                                 monkeypatch: pytest.MonkeyPatch,
-                                                 capsys: pytest.CaptureFixture,
-                                                 _quiet_details: io.StringIO,
-                                                 ) -> None:
+# ---- test_a_workbook_open_in_excel_does_not_stop_the_run -----------------------------
+def test_a_workbook_open_in_excel_does_not_stop_the_run(tmp_path: Path,
+                                                        monkeypatch: pytest.MonkeyPatch,
+                                                        capsys: pytest.CaptureFixture,
+                                                        _quiet_details: io.StringIO,
+                                                        ) -> None:
     """
     ---- Summary ----
-    Main function to check the run of a file whose workbook is open in Excel: the file
-    is still handed on to the later figures, its name is noted as not saved, and the
-    user is told in one sentence to close the workbook, with Python's own words in the
-    log only. The reading, the plot and the workbook are stood in for.
+    Main function to check the run of a file whose workbook is open in Excel: the run
+    of the file does not fail, its name is noted as not saved, and the user is told in
+    one sentence to close the workbook, with Python's own words in the log only. The
+    reading, the plot and the workbook are stood in for.
 
     ---- Inputs ----
     tmp_path : Path
@@ -116,26 +116,12 @@ def test_a_workbook_open_in_excel_keeps_the_file(tmp_path: Path,
                         )
     monkeypatch.setattr(program, 'experiment_plotter', lambda *args: None)
     monkeypatch.setattr(program, 'experiment_workbook_exporter', exporter)
-    monkeypatch.setattr(program,
-                        'experiment_preparer',
-                        lambda *args: {'time_response': None},
-                        )
-    info = {'name': 'run1',
-            'ignore_start': 5.0,
-            'ignore_end': 0.0,
-            'custom': {},
-            'keep': True,
-            }
+    info = {'name': 'run1', 'ignore_start': 5.0, 'ignore_end': 0.0}
     cfg = settings.Config(dict(settings.DEFAULT_ANSWERS, decompose=False))
 
-    # ---- 2 The file is kept, and named as not saved ----------------------------------
+    # ---- 2 The run of the file goes on, and it is named as not saved -----------------
     unsaved = []
-    result = program.experiment_processor(info, cfg, None, tmp_path, unsaved)
-    assert result == {'experiment': experiment,
-                      'vo2_source': 'raw',
-                      'haem_source': None,
-                      'prepared': {'time_response': None},
-                      }
+    program.experiment_processor(info, cfg, None, tmp_path, unsaved)
     assert unsaved == ['run1']
 
     # ---- 3 One plain sentence on screen, Python's words in the log only --------------

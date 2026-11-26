@@ -32,7 +32,8 @@ from utils_shared.page_data import (caption_lines_builder,
                                     experiment_role_maker,
                                     form_fields_lister,
                                     )
-from utils_shared.page_plots import (bar_numbers_lister,
+from utils_shared.page_plots import (_row_titles_splitter,
+                                     bar_numbers_lister,
                                      before_after_numbers_lister,
                                      mean_lines_lister,
                                      NO_DIFFERENCE,
@@ -44,6 +45,7 @@ from utils_shared.page_plots import (bar_numbers_lister,
                                      NO_TRACE,
                                      NO_VALUES,
                                      NO_WATERFALL,
+                                     NOT_PICKED,
                                      NOT_READ,
                                      NOT_THERE,
                                      response_checks_lister,
@@ -1434,6 +1436,10 @@ def test_a_difference_spectrum_that_cannot_be_drawn_says_why() -> None:
         _, ax = _spectrum_drawer('P2', {'experiment': role}, experiments)
         assert not ax.axison
         assert ' '.join(ax.texts[0].get_text().split()) == sentence
+    # a plot with no experiment picked yet (a ready-made template) asks for one
+    for plot_type in ('P1', 'P2', 'P7'):
+        _, ax = _spectrum_drawer(plot_type, {}, experiments)
+        assert ' '.join(ax.texts[0].get_text().split()) == NOT_PICKED
 
 
 # ---- test_the_form_of_a_waterfall ----------------------------------------------------
@@ -2951,8 +2957,9 @@ def test_a_response_by_region_drawn() -> None:
     mark, at the region where two sets differ; the y axis of the OCR from 0, that
     of a change from baseline and of a haem following the numbers; the names of
     the regions; its small legend; everything inside its cells; a row per haem
-    with the names under the last only; and the sentence of a plot with nothing to
-    show.
+    with the names under the last only, each row named by its haem and the value
+    and its unit written once beside the rows; how the titles of rows are split;
+    and the sentence of a plot with nothing to show.
 
     ---- Inputs ----
     None.
@@ -3024,11 +3031,24 @@ def test_a_response_by_region_drawn() -> None:
     # ---- 3 A row per haem ------------------------------------------------------------
     experiments = _region_haems_adder(_region_experiments_maker())
     fig, _ = _region_drawer('P11', {'response_of': 'haems'}, experiments=experiments)
-    top, bottom = [ax for ax in fig.axes if ax.axison]
+    top, bottom, span = [ax for ax in fig.axes if ax.axison]
     assert top.get_position().y0 > bottom.get_position().y1
-    assert (top.get_ylabel(), bottom.get_ylabel()) == ('Cyt $b_H$ ΔD (mOD)',
-                                                       'Cyt cc ΔD (mOD)',
-                                                       )
+    # each row is named by its haem; the value and its unit are written once, on
+    # unseen axes over both rows, left of everything the rows write
+    assert (top.get_ylabel(), bottom.get_ylabel()) == ('Cyt $b_H$', 'Cyt cc')
+    assert span.get_ylabel() == 'ΔD (mOD)'
+    assert not span.get_frame_on() and not span.lines
+    assert span.get_position().y0 == pytest.approx(bottom.get_position().y0)
+    assert span.get_position().y1 == pytest.approx(top.get_position().y1)
+    renderer = fig._get_renderer()
+    title = span.yaxis.label.get_window_extent(renderer)
+    for ax in (top, bottom):
+        assert title.x1 < ax.get_tightbbox(renderer).x0
+        centre = ax.yaxis.label.get_window_extent(renderer)
+        assert ax.bbox.y0 <= centre.y0 and centre.y1 <= ax.bbox.y1
+    tight = span.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+    assert 0.0 <= tight.x0 and tight.x1 <= 0.5
+    assert 0.5 <= tight.y0 and tight.y1 <= 1.0
     assert top.get_legend() is None and bottom.get_legend() is not None
     low, high = top.get_ylim()
     assert low < -20.0 and high < 0.0  # bH is below 0: its axis does not start at 0
@@ -3050,6 +3070,21 @@ def test_a_response_by_region_drawn() -> None:
     _, ax = _region_drawer('P11', {'response_of': 'haems'})
     assert not ax.axison
     assert ' '.join(ax.texts[0].get_text().split()) == NO_RESPONSE
+
+    # ---- 5 How the titles of the rows are split --------------------------------------
+    splitter = _row_titles_splitter
+    per_od = ['Cyt $b_H$ ΔD (mOD OD$^{-1}$)', 'Cyt $b_L$ ΔD (mOD OD$^{-1}$)']
+    assert splitter(per_od) == (['Cyt $b_H$', 'Cyt $b_L$'], 'ΔD (mOD OD$^{-1}$)')
+    assert splitter(['Cyt a oxidised (%)', 'Cyt cc oxidised (%)']) == (
+        ['Cyt a', 'Cyt cc'],
+        'Oxidised (%)',
+        )
+    # one row, rows that share no whole word, and a row left without a name
+    for labels in (['Cyt a ΔD (mOD)'],
+                   ['OCR (µM)', 'Cyt a (mOD)'],
+                   [' ΔD (mOD)', 'Cyt a ΔD (mOD)'],
+                   ):
+        assert splitter(labels) == (labels, '')
 
 
 # ---- test_a_time_points --------------------------------------------------------------

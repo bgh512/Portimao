@@ -1,4 +1,4 @@
-# Portimao question flow (V2.34)
+# Portimao question flow (V2.35)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -272,19 +272,7 @@ On the plot:
 |---|---|---|
 | 4.6 | Drag the averaging regions on the plot, or type their numbers in the Time regions box, press Continue when ready. (above it, in grey: what the averaging regions are, "The baseline (gold) is the region before the first addition; every other region (blue) is compared with it.", which edge to pull for what, "A change moves every region, on the file shown; ticking Apply to all copies its regions to every file, and it unticks itself when the next file is shown. Untick a number under Use to leave that region out (grey), or untick Averaging regions for none." and "Tick Adjust region manually to change one region of one file: pick it with the buttons beside it, then drag its edges or type its numbers; the other regions are grey until picked.") | **Continue**: one line says the regions chosen (or one line that there are none), one line names the regions set on their own and those left out, one the files with regions of their own, a warning names those that do not fit (not those left out), the plot is redrawn with the regions **(plot)**, then **5.1**. |
 
-Three later figures need the averaging regions: the 2x2 grid (**old 6.3**), the time response (**old 7.1**) and the haem and OCR response (**old 7.2**). They use the regions chosen here and never ask for a region or a gap of their own. When you say yes to one of them and no averaging regions are set up (Averaging regions unticked in 4.6, or no file with an addition), one line says "No averaging regions are set up, and this figure needs them.", and 4.6.1 is asked before the figure's own questions. It keeps this number wherever it is asked. The OCR as % of baseline is offered under OCR as only once the averaging regions are set up, so it never asks.
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| 4.6.1 | Do you want to add them now? `(Y/n)` | **4.6** opens on the plot of every file, by itself (nothing else of the processing is asked again, and the boxes stay greyed out apart from the rows of the averaging regions), with Averaging regions ticked; the guide opens step 13 (Averaging regions) meanwhile, then goes back to the figure. After Continue, with averaging regions set up, the figure's own questions follow; with none still, one line says the figure is not made and the next figure is asked | one line says the figure is not made, and the next figure is asked |
-
-Once averaging regions are added this way they are the dataset's: the later figures do not ask, and they are saved with the dataset.
-
-Each of the three figures uses one kind of averaging region, with the baseline. While the quick regions are hidden only the settled regions can be set up, so 4.6.2 is not asked. With both kinds set up (once the quick regions come back), 4.6.2 is asked before the figure's own questions (after 4.6.1 when that was asked); it keeps this number wherever it is asked, and each figure remembers its own answer. With one kind set up nothing is asked: one line says the figure uses that kind.
-
-| # | Question | Leads to |
-|---|---|---|
-| 4.6.2 | Which averaging regions should this figure use? `(1/2)` 1) Settled, before the next addition; 2) Quick, after each addition | the figure's own questions |
+The plots of the dataset figure that show numbers per region (section 6) use the regions chosen here and never ask for a region or a gap of their own; which kind a plot uses is chosen in its form. The OCR as % of baseline is offered under OCR as only once the averaging regions are set up, so it never asks.
 
 The plots and the workbook of each experiment (section 5) show both kinds: the quick regions green, the settled regions blue and the baseline gold with "Baseline" written above it, and a **Kind** column in the Averages sheet.
 
@@ -319,13 +307,7 @@ How the haems are shown (**Haems as**): ΔD (mOD), the change from the start; % 
 
 ### 5.E Journal and size
 
-The Figure box sets the journal, width and height of this figure, so these questions are not asked here. They are listed because the fixed figures of section 7 ask their own size with them, each with its own default size.
-
-| # | Question | Leads to |
-|---|---|---|
-| 5.7 | Which journal format would you like? 1) None (use the default: Nature, *the figure's default width and height*) 2) Nature 3) Science 4) Cell 5) PNAS 6) ACS journals 7) PLOS ONE (every journal of the `journals` folder) | **None**: the default size is used. **A journal**: **5.7.1** |
-| 5.7.1 | How wide should the figure be? (the widths that journal allows: 1, 1.5 or 2 columns for most, 1, 2 or 3 columns for Science) | **5.7.2** |
-| 5.7.2 | How tall should the figure be, as a fraction of the page height (1 = a full page = *X* mm)? | the figure is drawn at its real size **(plot)** |
+The Figure box sets the journal, width and height of this figure, so nothing is asked here: the number 5.7 is not used.
 
 There is no 5.8: going back is done from the guide. The number 5.9 is kept.
 
@@ -378,7 +360,7 @@ Above the table, **Group 1 is:** and **Group 2 is:** name the two group columns 
 
 The figure of the whole dataset is laid out on a page, which takes the place of the file arrows, the boxes and the plot while the step is open.
 
-- **The page** on the right is the journal page at its printed size, drawn as large as it fits, with a faint grid of 6 × 6 cells. It starts empty: Nature, 2 columns wide and 0.8 of a page tall.
+- **The page** on the right is the journal page at its printed size, drawn as large as it fits, with a faint grid of 6 × 6 cells. For a dataset never run it starts empty: Nature, 2 columns wide and 0.8 of a page tall. The page is saved with the dataset (in `portimao_settings.json`) when the run is started, so a dataset opened again with its saved settings (**1.3**) starts with the page as it was left: every plot, its place, its choices and the experiment picked for it (kept as its place in the set-up table, so a pick follows a change of the table). One line says so ("The page is as you left it the last time this dataset was run: change it, or click Continue to keep it."). A saved page that cannot be read gives the empty page and one warning: "The figure page saved with this dataset cannot be read, so Build a figure starts with an empty page."
 - **The strip** above the page holds the **Journal**, the **Width** and the **Height** of the page (as in the Figure box: every journal of the `journals` folder, the widths it allows, the height as a share of its page), then **Template** with **Load template** and **Save template**, and under them a button for each **plot type** that can be used now: Standard experiment, Difference spectrum, Waterfall, Single trace, Mean trace, Bar chart, Before and after, Response by region, Time points and Space for a drawing. There is no legend to place: each plot has its own small legend.
 - **To place a plot**, drag across the cells it should take: the rectangle is green where it can go and red over another plot. It is always a rectangle of whole cells, and never over another plot (one red line under the strip says which plot is in the way). The plot is of the plot type last clicked in the strip, or a Standard experiment.
 - **The form** of the plot then takes the place of the text on the left: its **Plot type**, in a list, and the **Cells** it takes, then what its plot type asks (a list or a tick for each choice; a Space for a drawing asks nothing), with **Done** and **Cancel**. While it is open, the plot is outlined in blue, a new drag changes its cells and a plot-type button changes its type, which starts its choices afresh. Done keeps the plot with its choices and draws it in its cells; Cancel takes it away. The text comes back after either. A choice is kept as a role (the first label of Group 1, replicate 2), never as a file name, so a template fits another dataset.
@@ -390,18 +372,18 @@ The figure of the whole dataset is laid out on a page, which takes the place of 
 - The four plots of numbers per region (Bar chart, Before and after, Response by region, Time points) share this: the number of an experiment in a region is the mean of its trace over that averaging region, **Baseline** or **After addition 1** to **After addition 10**; **Regions**: Settled (to start with) or Quick, is in the form only in a run with both kinds of averaging region; every experiment is drawn as a dot (or a line) behind the mean of its set, always; **Bars**: SEM (to start with) or SD; **Test**: Student's t-test (to start with) or Welch's t-test, between each pair of sets; **Marks**: Stars (to start with), p values or None. Every p value is Holm-corrected across all the tests of its plot, and a mark is drawn over a bracket only where the corrected p is under 0.05, never "ns" (MATHS.md section 11). A set of one experiment has its dot, no bar and no test. Of the "shown as" lists, only the one that fits the measurement picked is used; an experiment with no number in the region is left out of its set.
 - The form of a **Bar chart** asks: the **Measurement**: OCR (to start with), each haem of the fit while the haems are worked out, and Δψ when the run works it out; **OCR shown as** % of baseline (to start with), As measured, Change from baseline or Per OD (only in a run with OD values); **Haems shown as** and **Δψ shown as**, as in a Single trace; the **Region** (it starts at After addition 1); **Regions**; the list for each group column, as in a Mean trace; **Bars**; **Test**; **Marks**. The plot has one bar per set, the mean, in a light shade of the set's colour, with its SEM or SD and a dot per experiment on top, a bracket with its mark between two sets that differ, and the name of the region under the axis. With no number to show, one sentence in the cells says so.
 - The form of a **Before and after** asks: the same **Measurement** and **shown as** lists (the OCR starts As measured: as % of baseline the baseline of every experiment is 100); **From** (it starts at Baseline) and **To** (After addition 1); **Regions**; the list for each group column; **Marks**. The plot has the sets side by side, each experiment a thin line from its first region to its second, and the mean of each set a thick line with diamonds; inside each set the two regions are compared with a paired t-test, on the experiments that have both numbers, and a bracket with its mark sits over a set whose regions differ. With no number in either region, one sentence in the cells says so.
-- The form of a **Response by region** asks: the **Measurement**: OCR (to start with) or Haems (only in a run that works out the haems); a tick for each haem of the fit (**Haem: …**, all ticked), used when Haems is picked; **OCR shown as** and **Haems shown as**; **Regions**; the list for each group column; **Bars**; **Test**; **Marks**. The plot has every region along the bottom, Baseline then one per addition, named by the addition as it is written on the plot of the first experiment: at each region the sets sit side by side, each with the pale dots of its experiments, its mean and its bar, a line joining the means of a set, and a bracket with its mark between two sets that differ at that region. With Haems, each haem ticked is a row of its own with one legend under the last, and the correction runs across the tests of every row. An experiment with another number of additions than most of the plot is left out, and named in one warning when the figure is saved; another warning names the experiments whose additions are not the ones written under the regions. With no number in any region, one sentence in the cells says so.
+- The form of a **Response by region** asks: the **Measurement**: OCR (to start with) or Haems (only in a run that works out the haems); a tick for each haem of the fit (**Haem: …**, all ticked), used when Haems is picked; **OCR shown as** and **Haems shown as**; **Regions**; the list for each group column; **Bars**; **Test**; **Marks**. The plot has every region along the bottom, Baseline then one per addition, named by the addition as it is written on the plot of the first experiment: at each region the sets sit side by side, each with the pale dots of its experiments, its mean and its bar, a line joining the means of a set, and a bracket with its mark between two sets that differ at that region. With Haems, each haem ticked is a row of its own with one legend under the last, and the correction runs across the tests of every row; with several rows, each is named by its haem ("Cyt b557") and the value with its unit ("ΔD (mOD OD⁻¹)") is written once, beside the rows. An experiment with another number of additions than most of the plot is left out, and named in one warning when the figure is saved; another warning names the experiments whose additions are not the ones written under the regions. With no number in any region, one sentence in the cells says so.
 - The form of a **Time points** asks what the form of a Bar chart asks, without the list of the time point, which is the bottom axis: one **Region** against the time point of each experiment in the set-up table. The plot has a line per set (by Group 1 and Group 2) through its means, with the dots, the bars and the brackets at each time point as in a Response by region. Time points that are all different numbers with the same unit, or none ("2 h", "24 h"), sit at their number, with the unit in the title of the axis; otherwise they are evenly spaced in the order of the table. An experiment without a time point is not drawn. With no experiment that has both a time point and a number, one sentence in the cells says so.
 - A plot is drawn from the experiments as they were saved at Export, inside its cells: its numbers, axis titles and its own small legend never run into the cells of another plot, and the legend sits where it covers no line. A plot type that is not built yet is a grey box with its name. A **Space for a drawing** is empty: on screen it has a faint dashed outline and its name, and the saved figure has only its letter there. Each plot's **letter** is in bold at its top left: a, b, c… from left to right along a row of the grid, then the next row down, by the top left cell of each plot.
 - **Under the page**, for the caption: what each colour (the Group 1 labels), line style (the Group 2 labels) and shade (the time points, from dark to light) on the page means, then one line for each Difference spectrum with its letter and the times of its two regions ("b: reduced, 12.0 to 14.0 min, minus oxidised, 2.0 to 4.0 min.") and one for each Mean trace ("c: each line is the mean of its experiments, the band ± SEM; lined up on addition 1."), and one for each plot of numbers per region with a number to show, written to be copied into the legend of the paper: what its dots and bars are, how many experiments each set has, which set has only one, and the test and the correction its marks come from ("d: Each dot is one experiment, and the bars are the mean ± SEM of each set (control n = 3, knockdown n = 3). The sets were compared with Student's t-test (two-tailed, unpaired), with the Holm correction across the 3 tests of the plot: * p < 0.05, ** p < 0.01, *** p < 0.001; a comparison without a mark gave p ≥ 0.05."); that of a Before and after says each line is one experiment and names the paired t-test, and that of a Time points starts with its region ("Region: after addition 1."). All with **Copy** to put them on the clipboard. While no plot on the page uses them, one line says so and Copy is greyed out.
 - **✎** and **✕** sit in the top right corner of each plot. ✕ removes the plot. ✎ takes it off the page, with its old cells in grey dashes and free again, and opens its form: drag a new rectangle anywhere, its old cells included, to move it or change its size, or change its type; Done keeps it, Cancel puts it back as it was.
 - **Save template** asks, on the left, for a name (**Save**, **Cancel**) and writes the page size and each plot's type, cells and choices in the `layouts` folder, so the layout can be loaded for any dataset. With a template of that name already there it asks first: **Replace it** or **Choose another name**. A page with no plot is not saved.
-- **Load template** puts the template picked in the list beside it on the page. With plots already on the page it asks first: **Replace them** or **Cancel**. A journal or a width of the template that the `journals` folder does not have becomes Nature or 2 columns, and one line says so. A file that is not a template of Portimao, or one that still holds a Legend, is refused in one line, and the page stays as it was.
+- **Load template** puts the template picked in the list beside it on the page. Three ready-made templates are in the list from the start: **Haem and OCR response**, **Time response** and **Two standard experiments**. They hold the plots and their places, not which experiment each shows: a plot of one experiment says "No experiment is picked for this plot yet. Open its form (✎) and pick one." until one is picked. With plots already on the page it asks first: **Replace them** or **Cancel**. A journal or a width of the template that the `journals` folder does not have becomes Nature or 2 columns, and one line says so. A file that is not a template of Portimao, or one that still holds a Legend, is refused in one line, and the page stays as it was.
 - Nothing here opens a window of its own.
 
 | # | Question | Leads to |
 |---|---|---|
-| 6.2 | Drag across the grid to place each plot. When the page is ready, click Continue. (above it, in grey: "The page on the right is the journal page at its printed size, with a grid of 6 × 6 cells. Pick a plot type in the strip above it, then drag across the cells it should take; its form opens here." and "Load template puts a layout saved before on the page; Save template keeps this one for later.") One button, **Continue**. | **Continue**: a form still open is cancelled, the file arrows, the boxes and the plot come back. A page with at least one plot that has changed since it was last saved as a template or loaded from one → **6.3**; otherwise **9.1**. |
+| 6.2 | Drag across the grid to place each plot. When the page is ready, click Continue. (above it, in grey: "The page on the right is the journal page at its printed size, with a grid of 6 × 6 cells. Pick a plot type in the strip above it, then drag across the cells it should take; its form opens here." and "Load template puts a layout saved before on the page; Save template keeps this one for later.") One button, **Continue**. | **Continue**: a form still open is cancelled, the file arrows, the boxes and the plot come back. A page with at least one plot that has changed since it was last saved as a template, loaded from one, or started (the page kept with the dataset) → **6.3**; otherwise **9.1**. |
 | 6.3 | Do you want to save this page as a template, to load it for another dataset? `(y/N)` | **Yes** → **6.4**. **No** → **9.1**. |
 | 6.4 | What should the template be called? (an empty answer is refused: "Type a name for the template.") | A template of that name already there → **6.5**. Otherwise the template is written in the `layouts` folder, one line says so ("Saved the template … It is in the list beside Load template from now on."), then **9.1**. A template that cannot be written says why in one line, then **9.1**. |
 | 6.5 | A template called *name* is already there. Do you want to replace it? `(y/N)` | **Yes**: it is written over, then **9.1**. **No** → **6.4** again. |
@@ -410,117 +392,9 @@ When the run starts, a page with at least one plot is saved in the results folde
 
 ---
 
-## 7. The fixed dataset figures (not asked)
+## 7. The ready-made dataset figures
 
-These questions are not asked: the figure builder of section 6 takes the place of the four fixed figures, which are to come back as templates to load there. They are listed, with **old** before the numbers they had, because the program still holds them.
-
-If nothing is plotted in section 5, a message says these figures reuse the panels chosen for the individual experiment plots and are skipped, and the next step is **old 7.1**.
-
-The boxes are greyed out: these figures ask their own journal and size.
-
-Each figure is drawn from your data once its questions are answered (this reads the files again, so it takes a moment, and the **Plotting data …** sign is on the plot meanwhile) and shown in the plot area. None of these figures is saved to the results folder until the run starts.
-
-### 7.A Two experiments side by side
-
-Old 6.1 is only asked when there are at least 2 files.
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| old 6.1 | Do you want to plot two experiments side by side? `(y/N)` | **old 6.1.1** | **old 6.3** |
-
-| # | Question | Leads to |
-|---|---|---|
-| old 6.1.1 | Which experiment goes on the left? | **old 6.1.2** |
-| old 6.1.2 | Which experiment goes on the right? | **old 6.1.3** |
-| old 6.1.3 | Which journal format would you like? (then, for a journal, how wide and how tall, as in 5.7) | the figure is drawn **(plot)**, then **old 6.2** |
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| old 6.2 | Do you accept this figure? `(Y/n)` (above it: "Click No to change its settings.") | **old 6.3** | **old 6.1** |
-
-If the figure cannot be previewed, a message says so and the figure is kept as it is.
-
-### 7.B Four experiments in a 2x2 grid
-
-Old 6.3 is only asked when there are at least 4 files.
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| old 6.3 | Do you want to plot four experiments in a 2x2 grid (knockdown and control, two addition orders)? `(y/N)` | **old 6.3.1** | **old 7.1** |
-
-File names are read as `<strain>_<order>_run<N>`, for example `knockdown_kcn_then_bd_run1`. If no file name fits, the figure is skipped and the next step is **old 7.1**.
-
-The figure starts at the baseline, so it needs the averaging regions of 4.6. With none set up, **4.6.1** is asked first (section 4.E); without them the figure is not made and the next step is **old 7.1**. With both kinds of averaging region set up, **4.6.2** then asks which kind the figure shows.
-
-| # | Question | Leads to |
-|---|---|---|
-| old 6.3.1 | Which run number should be shown? | **old 6.3.2** |
-| old 6.3.2 | Do you want the run name written faintly on each plot? `(Y/n)` | **old 6.3.3** |
-| old 6.3.3 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then **old 6.4** |
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| old 6.4 | Do you accept this figure? `(Y/n)` (above it: "Click No to change its settings.") | **old 7.1** | **old 6.3** |
-
-### 7.C The summary figures
-
-As for the two figures above, the **Plotting data …** sign is on the plot while each picture is drawn. Both summary figures need the haem fit. If the haems were not decomposed in section 4 (or Haem decomposition was unticked), the fit is asked first, without a number of its own: *Which fit would you like to use?* (a numbered list of the presets of the haem library, then your own fit files in the `fits/` folder; the fit in the Haem decomposition box is the default), then, when the files have more than one spectrometer in common and the one saved is not among them, *Which spectrometer holds the haem spectra?*. Only the fit files are offered here, not the components found from the data. If the `fits/` folder holds no `.csv` file, or the fit cannot be used, a message says so and the figure is skipped. Both figures also average around the events, over the averaging regions of 4.6. With none set up, **4.6.1** is asked after the fit and before the figure's own questions (section 4.E); without them the figure is not made and the next figure is asked. With both kinds of averaging region set up, **4.6.2** then asks which kind the figure averages over; in the time response, the difference spectrum is the last region of that kind minus the one before it.
-
-### 7.D Time response
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| old 7.1 | Do you want to plot a time response? `(y/N)` | **old 7.1.1** | **old 7.2** |
-
-File names need a group word and the hours, for example `control_7hours`.
-
-The figure is built up in the plot window: the drop-down lists the individual experiment plots (marked locked, final) and the time response being built. Panels not chosen yet are empty boxes ("Kinetic trace 1", "Decomposition 1" ...). After every choice below the figure is redrawn **(plot)** and an accept question is asked (shown in the second table).
-
-| # | Question | Leads to |
-|---|---|---|
-| old 7.1.1 | What are the two group words, separated by a comma? | **old 7.1.2**. If there are not exactly two words, if either group has no file, or if fewer than two files have hours in their name, the time response is skipped and the next step is **old 7.2** |
-| old 7.1.2 | Which time points (hours) should be skipped in the waterfall plots? Separate them with commas, or type none. | the waterfalls are drawn **(plot)**, then the accept question, then **old 7.1.3** |
-| old 7.1.3 | Which experiment should the first kinetic trace show? | drawn **(plot)**, accept question, then **old 7.1.4** |
-| old 7.1.4 | Which experiment should the second kinetic trace show? | drawn **(plot)**, accept question, then **old 7.1.5** |
-| old 7.1.5 | Which experiment should decomposition plot 1 show? | drawn **(plot)**, accept question, then **old 7.1.6** |
-| old 7.1.6 | Which experiment should decomposition plot 2 show? | drawn **(plot)**, accept question, then **old 7.1.7** |
-| old 7.1.7 | Which experiment should decomposition plot 3 show? | drawn **(plot)**, accept question, then **old 7.1.8** |
-| old 7.1.8 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then the final accept question |
-
-Each is a yes or no question, `(Y/n)`, with what **n** does on the grey line above it.
-
-| Question | Yes → | No → |
-|---|---|---|
-| Do you accept these waterfall plots? | the next question | **old 7.1.2** again ("Click No to choose the time points again.") |
-| Do you accept this plot? (after each kinetic trace and decomposition plot) | the next question | the same choice again ("Click No to choose another experiment.") |
-| Do you accept this figure? (final) | **old 7.2** | **old 7.1** ("Click No to change its settings.") |
-
-### 7.E Haem and OCR response
-
-| # | Question | Yes → | No → |
-|---|---|---|---|
-| old 7.2 | Do you want to plot a haem and OCR response? `(y/N)` | **old 7.2.1** | **9.1** |
-
-File names need the strain, the addition order and the run number, for example `knockdown_kcn_then_bd_run1`. The files found are listed. If no file name fits, the figure is skipped and the next step is **9.1**.
-
-The figure is built up in the plot window in stages. First only the baseline OCR and the OCR response are drawn, then all the haems are added, then they are redrawn with the haems and order you chose. Each stage has its own accept question (second table).
-
-| # | Question | Leads to |
-|---|---|---|
-| old 7.2.1 | Which OCR would you like to use? 1) OCR (µM min⁻¹) 2) OCR / OD (µM min⁻¹ OD⁻¹), *only offered if you said yes to OD scaling in 3.1* 3) OCR (% of the range) (this figure has a % of baseline of its own) | the OCR plots are drawn **(plot)**, accept question, then **old 7.2.2** |
-| old 7.2.2 | How would you like to show the haems? (the same options as Haems as in the View box, but % oxidised is offered only when every file of the figure has both regions, as the figure averages the files together) | **old 7.2.3** if you said yes to OD scaling in 3.1 and did not choose % oxidised, otherwise all the haems are drawn **(plot)**, accept question, then **old 7.2.4** |
-| old 7.2.3 | Do you want to scale the haems by OD as well? `(Y/n)` | all the haems are drawn **(plot)**, accept question, then **old 7.2.4** |
-| old 7.2.4 | Which haems should get a row, and in which order? | drawn **(plot)**, accept question, then **old 7.2.5** |
-| old 7.2.5 | Which journal format would you like? (then width and height, as in 5.7) | the figure is drawn **(plot)**, then the final accept question |
-
-Each is a yes or no question, `(Y/n)`, with what **n** does on the grey line above it.
-
-| Question | Yes → | No → |
-|---|---|---|
-| Do you accept the OCR plots? | **old 7.2.2** | **old 7.2.1** again ("Click No to choose the OCR again.") |
-| Do you accept these haem plots? | **old 7.2.4** | **old 7.2.2** again ("Click No to choose how to show the haems again.") |
-| Do you accept these haem rows? | **old 7.2.5** | **old 7.2.4** again ("Click No to choose the haems again.") |
-| Do you accept this figure? (final) | **9.1** | **old 7.2** ("Click No to change its settings.") |
+Nothing is asked here, and the number 7 is not used: the time response and the haem and OCR response are templates of the figure builder (**Load template** in section 6: Time response, Haem and OCR response, Two standard experiments).
 
 ---
 

@@ -21,18 +21,15 @@ from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_custom.custom_runner import (exemplar_runner,
-                                        experiment_preparer,
-                                        ocr_and_haem_response_runner,
-                                        time_response_runner,
-                                        )
 from utils_shared.app_messages import SEND_DETAILS, start_problem_shower
-from utils_shared.comparison_plotter import comparison_figure_plotter
 from utils_shared.dataset_settings import dataset_settings_saver, file_settings_merger
 from utils_shared.dataset_setup import setup_plainer
 from utils_shared.experiment_processing import experiment_data_processor
-from utils_shared.figure_layout import figure_size_calculator
-from utils_shared.figure_page import FIGURE_NAME, figure_page_exporter, FigurePage
+from utils_shared.figure_page import (FIGURE_NAME,
+                                      figure_page_exporter,
+                                      FigurePage,
+                                      page_plainer,
+                                      )
 from utils_shared.individual_experiment_exporter import experiment_workbook_exporter
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.journal_files import journal_answers_fitter
@@ -145,92 +142,6 @@ def cancel_sentence_builder(exported: List[Path],
     return (f"The {' and the '.join(kept)} {verb} kept in {export_root}; nothing else "
             f'was changed'
             )
-
-
-# ---- comparison_maker ----------------------------------------------------------------
-def comparison_maker(comparison: dict,
-                     kept: dict,
-                     cfg: settings.Config,
-                     export_root: Path,
-                     ) -> None:
-    """
-    ---- Summary ----
-    Main function to draw the side-by-side figure of two chosen experiments, or to say
-    why it cannot be made.
-
-    ---- Inputs ----
-    comparison : dict
-        Side-by-side settings: {runs: (left, right), columns, height}.
-    kept : dict
-        Results of experiment_processor keyed by experiment name.
-    cfg : settings.Config
-        Figure style and settings derived from the answers (config.py).
-    export_root : Path
-        Results folder.
-
-    ---- Globals read ----
-    settings.Config (the comparison journal is read from the answers).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Writes the comparison figure files and prints the outcome (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    comparison_figure_plotter
-    figure_size_calculator
-    plot_config_builder
-    problem_shower
-    warning_shower
-    """
-
-    # ---- 1 Set up the comparison -----------------------------------------------------
-    cfg = settings.Config(dict(cfg.answers, journal=cfg.answers['comparison_journal']))
-    # The side-by-side figure of the two chosen runs (skipped, with the reason, if
-    # either one failed or they were plotted differently).
-    names = comparison['runs']
-    first, second = (kept.get(name) for name in names)
-    print(f'\nComparison: {names[0]} (a) vs {names[1]} (b)')
-
-    # ---- 2 Check both runs can be compared -------------------------------------------
-    if not (first and second):
-        warning_shower('  Not made: one of the two runs did not finish.')
-        return
-    if (first['vo2_source'], first['haem_source']) != (second['vo2_source'],
-                                                       second['haem_source'],
-                                                       ):
-        warning_shower('  Not made: the two runs were plotted with different data (for '
-                       'example only one has an OD entered).',
-                       )
-        return
-
-    # ---- 3 Draw and save the figure --------------------------------------------------
-    try:
-        size = figure_size_calculator(cfg.SPEC,
-                                      comparison['columns'],
-                                      comparison['height'],
-                                      )
-        stem = comparison_figure_plotter(first['experiment'],
-                                         second['experiment'],
-                                         cfg.plot_config_builder(first['vo2_source'],
-                                                                 first['haem_source'],
-                                                                 ),
-                                         export_root,
-                                         size,
-                                         cfg.SPEC,
-                                         settings.COMPARISON_GAP_PADS,
-                                         )
-        print(f'  Saved {stem} ({size[0] * 25.4:.0f} x {size[1] * 25.4:.0f}'
-              f' mm)',
-              )
-    except Exception as exc:
-        problem_shower('  Not made', exc)
-        plt.close('all')
 
 
 # ---- dataset_figure_saver ------------------------------------------------------------
@@ -384,14 +295,12 @@ def everything_asker(folder: Path,
                      ) -> Tuple[dict,
                                 List[dict],
                                 Optional[dict],
-                                Optional[dict],
-                                Optional[List[str]],
                                 FigurePage,
                                 ]:
     """
     ---- Summary ----
     Main function to ask every question of the run after the files, in numbered
-    sections (trimming and ignoring, analysis, plots, summary figures, export), and to
+    sections (trimming and ignoring, analysis, plots, export, dataset figures), and to
     build the per-file information. The plot and the workbook of every file are saved
     as soon as the figures are finalised and the export chosen (5.9), with the spectra
     when chosen, so the later sections show the plot.
@@ -424,11 +333,9 @@ def everything_asker(folder: Path,
     PLACES, JOURNAL_NAMES (module constants); settings.DEFAULT_ANSWERS.
 
     ---- Outputs ----
-    Tuple[dict, List[dict], Optional[dict], Optional[dict], Optional[List[str]],
-          FigurePage]
-        (answers, per-experiment info dictionaries, fit, side-by-side comparison
-        settings or None, names of the 2x2 grid experiments or None, the page of the
-        dataset figure as built). Raises UserQuitError if the user declines to start.
+    Tuple[dict, List[dict], Optional[dict], FigurePage]
+        (answers, per-experiment info dictionaries, fit, the page of the dataset
+        figure as built). Raises UserQuitError if the user declines to start.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal; writes last_answers.json through
@@ -442,13 +349,13 @@ def everything_asker(folder: Path,
 
     ---- Helpers ----
     active_gui_getter
-    comparison_maker
     dataset_settings_saver
     experiment_files_saver
     file_settings_merger
     haem_name_formatter
     journal_answers_fitter
     last_answers_saver
+    page_plainer
     page_stage_runner
     section_starter
     setup_plainer
@@ -521,9 +428,6 @@ def everything_asker(folder: Path,
     experiment_files_saver(context, saved_plots, active_gui_getter(), saved_workbooks)
 
     # ---- 2.3 Dataset figures ---------------------------------------------------------
-    # The figure builder takes the place of the fixed figures (side by side, the 2x2
-    # grid, the time response, the haem and OCR response), whose questions are no
-    # longer asked; the page is exported with the dataset figures.
     # Which experiment is which comes first: the plots of the page split the
     # experiments into sets by it.
     section_starter('Dataset figures: set-up')
@@ -533,12 +437,10 @@ def everything_asker(folder: Path,
                              setup,
                              context['page_experiments'],
                              answers,
+                             saved.get('page'),
                              )
     if page_data is not None:
         page_data.update(setup=setup, experiments=context['page_experiments'])
-    comparison, exemplar_names = None, None
-    custom = {'time_response': None, 'haem_ocr': None}
-    answers['plot_time_response'] = answers['plot_haem_ocr'] = False
 
     # ---- 3 Read the experiments ------------------------------------------------------
     experiments = []
@@ -556,11 +458,6 @@ def everything_asker(folder: Path,
                 'ignore_start': limits[name]['ignore_start'],
                 'ignore_end': limits[name]['ignore_end'],
                 'regions': regions.get(name),
-                'custom': {'time_response_group': (custom['time_response'] or {}
-                                                   ).get(name),
-                           'haem_ocr': name in (custom['haem_ocr'] or []),
-                           },
-                'exemplar': name in (exemplar_names or []),
                 'has_spectra_csv': has_spectra_csv,
                 'write_spectra': bool(answers['export_spectra'],
                                       ) and not has_spectra_csv,
@@ -568,11 +465,6 @@ def everything_asker(folder: Path,
                 'is_plot_saved': name in saved_plots and fit is plot_fit,
                 'is_workbook_saved': name in saved_workbooks and fit is plot_fit,
                 }
-        info['keep'] = ((bool(comparison) and name in comparison['runs']) or
-                        info['exemplar'] or
-                        bool(info['custom']['time_response_group']) or
-                        info['custom']['haem_ocr']
-                        )
         info.update(details[name])
         experiments.append(info)
 
@@ -653,27 +545,6 @@ def everything_asker(folder: Path,
     print(f"  Individual:       {JOURNAL_NAMES[answers['journal']]}, "
           f"{answers['columns']:g} column(s), height {answers['height']:g} of a page",
           )
-    if comparison:
-        print(f"  Side by side:     {comparison['runs'][0]} (a) vs "
-              f"{comparison['runs'][1]} (b), "
-              f"{JOURNAL_NAMES[answers['comparison_journal']]}, "
-              f"{comparison['columns']:g} column(s), height {comparison['height']:g}",
-              )
-    if exemplar_names:
-        print(f"  2x2 grid:         run {answers['ho_exemplar_run']}, "
-              f"{JOURNAL_NAMES[answers['ex_journal']]}, {answers['ho_ex_columns']:g} "
-              f"column(s), height {answers['ho_ex_height']:g}",
-              )
-    if answers['plot_time_response']:
-        print(f"  Time response:    groups {', '.join(answers['tr_groups'])}, "
-              f"{JOURNAL_NAMES[answers['tr_journal']]}, {answers['tr_columns']:g} "
-              f"column(s), height {answers['tr_height']:g}",
-              )
-    if answers['plot_haem_ocr']:
-        print(f"  Haem and OCR:     {len(custom['haem_ocr'])} file(s), "
-              f"{JOURNAL_NAMES[answers['ho_journal']]}, {answers['ho_pub_columns']:g} "
-              f"column(s), height {answers['ho_pub_height']:g}",
-              )
     spectra_text = {'trimmed': ' + the trimmed csv',
                     'full': ' + the trimmed and full csv',
                     }.get(answers.get('export_choice'), '')
@@ -705,15 +576,16 @@ def everything_asker(folder: Path,
                                                        ),
                                   {k: v
                                    for k, v in answers.items()
-                                   if k not in ('haems', 'ho_haems') or v
+                                   if k != 'haems' or v
                                    },
                                   setup_plainer(setup, saved.get('setup')),
+                                  page_plainer(page),
                                   ):
         print(f'  The settings could not be saved in {folder} (the folder cannot be '
               f'written to), so this dataset will start from the standard settings '
               f'next time.',
               )
-    return answers, experiments, fit, comparison, exemplar_names, page
+    return answers, experiments, fit, page
 
 
 # ---- experiment_file_saver -----------------------------------------------------------
@@ -939,17 +811,17 @@ def experiment_processor(info: dict,
                          fit: Optional[dict],
                          export_root: Path,
                          unsaved: Optional[List[str]] = None,
-                         ) -> Optional[dict]:
+                         ) -> None:
     """
     ---- Summary ----
     Main function to read, process, plot and export one .paf file. Each step reports its
-    own problem so the next step still runs: a figure or a workbook that could not be
-    saved does not take the file out of the later figures.
+    own problem so the next step still runs: a figure that could not be saved does not
+    stop the workbook, and a workbook that could not be saved does not stop the run.
 
     ---- Inputs ----
     info : dict
         Per-file information from everything_asker: path, name, trim and ignore times,
-        OD values, events, custom and keep flags, is_plot_saved and is_workbook_saved
+        OD values, events, is_plot_saved and is_workbook_saved
         (True when the plot or the workbook was saved once the figure was accepted, so
         it is not written again), write_spectra and has_spectra_csv.
     cfg : settings.Config
@@ -967,9 +839,8 @@ def experiment_processor(info: dict,
     plt (matplotlib.pyplot).
 
     ---- Outputs ----
-    Optional[dict]
-        {experiment, vo2_source, haem_source, prepared} when the experiment is needed
-        again for the comparison or special figures (info["keep"]), otherwise None.
+    None
+        Nothing.
 
     ---- Globals mutated ----
     None. Writes the figure and the workbook files, prints progress and adds to
@@ -981,7 +852,6 @@ def experiment_processor(info: dict,
     ---- Helpers ----
     experiment_data_processor
     experiment_plotter
-    experiment_preparer
     experiment_workbook_saver
     plot_config_builder
     problem_shower
@@ -996,11 +866,10 @@ def experiment_processor(info: dict,
     # ---- 2 Read and process the data -------------------------------------------------
     processed = experiment_data_processor(info, cfg, fit)
     experiment = processed['experiment']
-    od_available = processed['od_available']
     vo2_source = processed['vo2_source']
     plotted_haem_source = processed['plotted_haem_source']
 
-    # ---- 6 Plot the experiment -------------------------------------------------------
+    # ---- 3 Plot the experiment -------------------------------------------------------
     # Figure. A plot saved once its questions were accepted is not drawn again.
     if info.get('is_plot_saved'):
         print('  Plot already saved.')
@@ -1020,10 +889,10 @@ def experiment_processor(info: dict,
             problem_shower('  Figure not made', exc)
             plt.close('all')
 
-    # ---- 7 Export the workbook -------------------------------------------------------
+    # ---- 4 Export the workbook -------------------------------------------------------
     # A workbook saved once the figure was accepted is not written again. One that
-    # cannot be written (open in Excel, a full disk) must not lose the file from the
-    # later figures: its data was worked out all the same.
+    # cannot be written (open in Excel, a full disk) does not stop the run: its name
+    # is noted, and the dataset figure still uses the file.
     if info.get('is_workbook_saved'):
         print('  Workbook already saved.')
     elif not experiment_workbook_saver(experiment,
@@ -1034,21 +903,6 @@ def experiment_processor(info: dict,
                                        ):
         if unsaved is not None:
             unsaved.append(name)
-
-    # ---- 8 Prepare the special figures -----------------------------------------------
-    # the special figures
-    prepared = experiment_preparer(experiment, info['custom'], a, fit, od_available)
-    if info.get('keep'):  # needed again for the comparison and special figures
-        experiment['raw_spectra'] = {}
-        for item in prepared.values():
-            if item is not None:
-                item['raw_spectra'] = {}
-        return {'experiment': experiment,
-                'vo2_source': vo2_source,
-                'haem_source': plotted_haem_source,
-                'prepared': prepared,
-                }
-    return None
 
 
 # ---- experiment_workbook_saver -------------------------------------------------------
@@ -1287,8 +1141,8 @@ def program_runner() -> int:
     """
     ---- Summary ----
     Main function to run the program: ask for the files, start the log in the results
-    folder, ask the other questions, process every file, then draw the comparison and
-    special figures. The log keeps each answer from the results folder on, also when
+    folder, ask the other questions, process every file, then save the dataset
+    figure. The log keeps each answer from the results folder on, also when
     the run is cancelled or the window closed part way.
 
     ---- Inputs ----
@@ -1312,7 +1166,6 @@ def program_runner() -> int:
 
     ---- Helpers ----
     cancel_sentence_builder
-    comparison_maker
     dataset_figure_saver
     everything_asker
     experiment_processor
@@ -1323,7 +1176,6 @@ def program_runner() -> int:
     problem_shower
     section_starter
     settings_logger
-    special_figures_maker
     warning_shower
     """
 
@@ -1356,7 +1208,6 @@ def program_runner() -> int:
     log_session = logging_starter(export_root, PROGRAM_TITLE, folder)
     failed = []
     unsaved: List[str] = []  # files whose workbook could not be saved
-    kept = {}
     exported: List[Path] = []  # the trim step's export adds the results folder
     saved_plots: List[str] = []  # the files whose plot is saved before the run
     saved_workbooks: List[str] = []  # the files whose workbook is written before it
@@ -1366,8 +1217,6 @@ def program_runner() -> int:
             (answers,
              experiments,
              fit,
-             comparison,
-             exemplar_names,
              page,
              ) = everything_asker(folder,
                                   summaries,
@@ -1401,18 +1250,13 @@ def program_runner() -> int:
             warning_shower(warning)
         for info in experiments:
             try:
-                result = experiment_processor(info, cfg, fit, export_root, unsaved)
-                if result:
-                    kept[info['name']] = result
+                experiment_processor(info, cfg, fit, export_root, unsaved)
             except Exception as exc:
                 problem_shower(f"  {info['name']} was not finished", exc)
                 failed.append(info['name'])
             finally:
                 plt.close('all')
                 gc.collect()
-        if comparison:
-            comparison_maker(comparison, kept, cfg, export_root)
-        special_figures_maker(kept, cfg, fit, export_root, exemplar_names)
         dataset_figure_saver(page,
                              export_root,
                              page_data.get('setup'),
@@ -1436,113 +1280,6 @@ def program_runner() -> int:
     finally:
         logging_stopper(log_session)
     return 1 if failed or unsaved else 0
-
-
-# ---- special_figures_maker -----------------------------------------------------------
-def special_figures_maker(kept: dict,
-                          cfg: settings.Config,
-                          fit: Optional[dict],
-                          export_root: Path,
-                          exemplar_names: Optional[List[str]],
-                          is_preview: bool = False,
-                          ) -> None:
-    """
-    ---- Summary ----
-    Main function to draw the time response, haem and OCR response and 2x2 grid figures;
-    each is skipped, with the reason, if it cannot be made.
-
-    ---- Inputs ----
-    kept : dict
-        Results of experiment_processor keyed by experiment name.
-    cfg : settings.Config
-        Figure style and settings derived from the answers (config.py).
-    fit : Optional[dict]
-        Fit dictionary from import_fit ({haem_list, data}), or None when the haems are
-        not decomposed.
-    export_root : Path
-        Results folder.
-    exemplar_names : Optional[List[str]]
-        Names of the four experiments of the 2x2 grid, or None.
-    is_preview : bool
-        True to draw the figures only (for the experiment browser): no workbook is
-        written.
-
-    ---- Globals read ----
-    settings.Config; time_response_runner, ocr_and_haem_response_runner and
-    exemplar_runner (imported).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Writes the figure files and prints the outcome (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    exemplar_runner
-    ocr_and_haem_response_runner
-    problem_shower
-    time_response_runner
-    warning_shower
-    """
-
-    # ---- 1 Set up the figures --------------------------------------------------------
-    a = cfg.answers
-    journals = {'time_response': 'tr_journal', 'haem_ocr': 'ho_journal'}
-
-    # ---- 2 Draw the summary figures --------------------------------------------------
-    for key, enabled, title, runner in (('time_response',
-                                         a['plot_time_response'],
-                                         'Time response',
-                                         time_response_runner,
-                                         ),
-                                        ('haem_ocr',
-                                         a['plot_haem_ocr'],
-                                         'Haem and OCR response',
-                                         ocr_and_haem_response_runner,
-                                         ),
-                                        ):
-        if not enabled:
-            continue
-        print(f'\n{title}')
-        prepared = {name: item['prepared'][key]
-                    for name, item in kept.items()
-                    if item['prepared'].get(key) is not None
-                    }
-        if len(prepared) < 2:
-            warning_shower(f'  Not made: only {len(prepared)} file(s) could be '
-                           f'prepared (at least two are needed).',
-                           )
-            continue
-        try:
-            figure_cfg = settings.Config(dict(a, journal=a[journals[key]]))
-            runner(prepared, figure_cfg, a, fit, export_root, is_preview)
-        except Exception as exc:  # one special figure must not stop the others
-            problem_shower('  Not made', exc)
-            plt.close('all')
-
-    # ---- 3 Draw the exemplar figure --------------------------------------------------
-    if a['plot_exemplar']:
-        print('\n2x2 figure')
-        chosen = {name: kept[name] for name in (exemplar_names or []) if name in kept}
-        if len(chosen) < 4:
-            warning_shower(f'  Not made: only {len(chosen)} of the four experiments '
-                           f'finished.',
-                           )
-            return
-        try:
-            exemplar_runner(chosen,
-                            settings.Config(dict(a, journal=a['ex_journal'])),
-                            a,
-                            fit,
-                            export_root,
-                            )
-        except Exception as exc:
-            problem_shower('  Not made', exc)
-            plt.close('all')
 
 
 if __name__ == '__main__':

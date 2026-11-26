@@ -25,7 +25,7 @@ One experiment (one `.paf` file) as passed between the processing functions. Cre
 | `'haem_percent'` | pd.DataFrame | (n_spectra, 2 + n_haems) | % | Optional: only for a file with both an oxidised and a reduced region. % oxidised: `haem_abs` put between each haem's reduced level (0 %) and its oxidised level (100 %) by `percent_oxidised_calculator`; values above 100 and below 0 are kept, and a haem whose two levels are equal has an empty column. `attrs['percent_oxidised']` holds the levels used. The maths is in `MATHS.md` |
 | `'haem_levels'` | dict | | mOD, min | Optional: only for a file with both regions (`haem_levels_finder`). `'oxidised'` and `'reduced'`: `{haem: its level}`, the median of `haem_abs` in that region (mOD); `'oxidised_region'` and `'reduced_region'`: `(start, end)` of the region on the time of the trimmed data (min), kept within the used part of the run |
 | `'delta_psi'` | pd.DataFrame | (n_spectra, 5) | mV | Optional: only when the answer `'delta_psi'` is on, for a file with `haem_percent` whose fit has one bH and one bL. Columns `Time (min)`, `spectrum_index`, `Δψ (mV)` (the membrane potential), `Eh bH (mV)` and `Eh bL (mV)` (the redox potential at each haem), built by `delta_psi_table_builder`; empty (NaN) in a spectrum where bH or bL is less than 10 % or more than 90 % reduced (the two limits of the answers, `config.DELTA_PSI_LIMIT_ANSWERS`, unless changed). `attrs['delta_psi']` holds the numbers used: `'midpoints_mV'`, `'share'`, `'temperature_c'`, `'limits_percent'`, `'bH'` and `'bL'` (the two columns of `haem_percent`) and `'spectra_with_value'`. The maths is in `MATHS.md` |
-| `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; every spectrum has a time, and the transmission is NaN where it cannot be worked out (zero counts in the reference); dropped after the special figures are prepared |
+| `'raw_spectra'` | dict | | | `{dataset: {'wavelengths', 'spectrum_indices', 'time', 'transmission', 'intensity', 'attenuation'}}`; every spectrum has a time, and the transmission is NaN where it cannot be worked out (zero counts in the reference) |
 | `'averages'` | dict | | | Statistics of the averaging regions (see `averages`) |
 
 Example:
@@ -146,7 +146,7 @@ Statistics of the averaging regions of one experiment. Created by `experiment_av
 | `'windows'` | dict | | | `{region name: region record}`; `average0` is the baseline (it starts at the start of the recording when the recording starts later than the region would), then the settled regions `average1` ... one per event (ending before the next addition), then the quick regions `quick1` ... one per event (starting after their own addition) |
 | `'skipped'` | dict | | | `{region name: {start_time, end_time, reason, kind, left_out}}` of the regions that do not fit between two additions (or after the last one), of `average0` when its data span less than `baseline_minimum_seconds` (the run then has no baseline), and of the regions the user left out with their tick (`left_out` True, the reason `averaging.LEFT_OUT_PROBLEM`; `left_out` is missing for `average0`); they have no record in `'windows'`. Those that do not fit are drawn red in the previews; those left out are not drawn, are not warned of, and keep their row in the Averages sheet with empty numbers |
 
-A figure that uses one kind of averaging region reads the averages through `window_kind_picker` (`utils_shared/averaging.py`): the baseline and the regions of that kind only, the quick regions under the names of the settled ones (`quick2` as `average2`). The averages of the haem and OCR response and the 2x2 grid, and the `triplicate` built from them, are in this form.
+`window_kind_picker` (`utils_shared/averaging.py`) gives the averages of one kind of averaging region: the baseline and the regions of that kind only, the quick regions under the names of the settled ones (`quick2` as `average2`).
 
 Region record:
 
@@ -168,63 +168,6 @@ Statistics of one measurement in one averaging region:
 | `'sd'` | float | | as the source | Sample standard deviation (n - 1) over the region |
 | `'delta'` | float | | as the source | Mean minus the mean of `average0` (NaN when the run has no baseline) |
 | `'change'` | float | | % | Mean as a percentage of the mean of `average0` (NaN for delta sources, a zero baseline or a run without a baseline) |
-
-#### `triplicate`
-
-One condition (strain and addition order, e.g. `knockdown_kcn_then_bd`) with its runs combined. Created by `triplicate_averager`, returned as `{condition: triplicate}`.
-
-| Key | Type | Shape | Units | Description |
-|---|---|---|---|---|
-| `'runs'` | dict | | | `{run number: experiment name}` |
-| `'run_numbers'` | List[int] | (n_runs,) | | Run numbers in order |
-| `'windows'` | List[str] | | | Window names in order |
-| `'window_times'` | dict | | min | `{window name: (start, end)}` taken from the first run holding the window |
-| `'settings'` | dict | | | Copy of the `settings` of the runs' `averages` |
-| `'vo2'` | dict | | | `{measurement: {window name: run statistics}}` |
-| `'haem'` | dict | | | `{haem name: {window name: run statistics}}` |
-
-Run statistics of one measurement in one window. The `run_*` values are the per-run window values; the rest are calculated over the runs.
-
-| Key | Type | Shape | Units | Description |
-|---|---|---|---|---|
-| `'run_means'` | dict | | as the source | `{run number: window mean}` |
-| `'run_sds'` | dict | | as the source | `{run number: window SD}` |
-| `'run_changes'` | dict | | % | `{run number: change from baseline}` |
-| `'run_deltas'` | dict | | as the source | `{run number: delta from baseline}` |
-| `'mean'`, `'sd'`, `'sem'`, `'n'` | float, float, float, int | | as the source | Mean, sample SD, SEM (SD / sqrt(n)) and count of the run means |
-| `'change_mean'`, `'change_sd'`, `'change_sem'`, `'change_n'` | float, float, float, int | | % | The same for the run changes |
-| `'delta_mean'`, `'delta_sd'`, `'delta_sem'`, `'delta_n'` | float, float, float, int | | as the source | The same for the run deltas |
-
-#### `test_record`
-
-One significance test drawn on the OCR and haem response figure. Appended to a list by the plotter and written to `ocr_and_haem_response.xlsx`.
-
-| Key | Type | Shape | Units | Description |
-|---|---|---|---|---|
-| `'panel'` | str | | | Panel name, e.g. `haem response bd then kcn` |
-| `'measurement'` | str | | | OCR or haem name |
-| `'metric'` | str | | | Compared statistic (`mean`, `change` or `delta`) |
-| `'window'` | str | | | Window name |
-| `'group_a'`, `'group_b'` | str | | | The two groups compared |
-| `'values_a'`, `'values_b'` | dict | | as the metric | `{run number: value}` of each group (finite values only) |
-| `'t'` | float | | | Student t statistic (equal variances) |
-| `'p'` | float | | | Two-sided p value |
-| `'p_adjusted'` | float | | | p value after the correction across the windows of the panel |
-| `'correction'` | str | | | `holm` or `none` |
-| `'alpha'` | float | | | Significance level |
-| `'significant'` | bool | | | `p_adjusted < alpha` |
-| `'mark'` | str | | | `*`, `**`, `***` or empty |
-
-#### `difference_spectrum` and `difference_decomposition`
-
-Added to each experiment of the time response figure by `utils_custom`.
-
-| Key | Type | Shape | Units | Description |
-|---|---|---|---|---|
-| `'group'` | str | | | Group word of the file name, e.g. `knockdown` |
-| `'spectral_averages'` | dict | | | `{window name: {'time_range', 'wavelengths', 'attenuation'}}` |
-| `'difference_spectrum'` | dict | | | `'wavelengths'` (n_wavelengths,), `'spectrum'` (n_wavelengths,), `'minuend'`, `'subtrahend'` (window names; the spectrum is minuend minus subtrahend) |
-| `'difference_decomposition'` | dict | | | `'haem_names'` (n_haems), `'coefficients'` (n_haems), `'haem_percentages'` (n_haems, %), `'percent_basis'` (signed or absolute), `'filtered_data'`, `'scatter'`, `'no_scatter'`, `'haem_total'` (each n_wavelengths) and `'haem_individual'` (n_haems arrays of n_wavelengths) |
 
 #### `region_difference` and `region_difference_decomposition`
 
@@ -341,13 +284,14 @@ Saved to `last_answers.json` in the user's own folder (`UserPlaces`): the data f
 
 #### `dataset_settings`
 
-The settings last saved for a dataset. Returned by `dataset_settings_reader` (`utils_shared/dataset_settings.py`), written by `dataset_settings_saver` to `portimao_settings.json` in the data folder, and laid over `config.DEFAULT_ANSWERS` (the standard settings) when the dataset is opened again. Empty for a dataset never saved.
+The settings last saved for a dataset. Returned by `dataset_settings_reader` (`utils_shared/dataset_settings.py`), written by `dataset_settings_saver` to `portimao_settings.json` in the data folder, and laid over `config.DEFAULT_ANSWERS` (the standard settings) when the dataset is opened again. Empty for a dataset never saved. A file that still holds the answers of the fixed figures that are no longer made (`plot_comparison`, `plot_exemplar`, `plot_time_response`, `plot_haem_ocr` and every answer starting `comparison_`, `ex_`, `ho_` or `tr_`) is read without them.
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
 | `'export_folder'` | Optional[Path] | | | Results folder; `None` when none was kept or it was a full path on another computer. In the file it is text: relative to the data folder with forward slashes when inside it (`results`), otherwise the full path |
 | `'answers'` | dict | | | Terminal answers |
 | `'setup'` | dict | | | The dataset set-up table as saved (`saved_setup`); empty for a dataset never set up, and not written in the file then |
+| `'page'` | Optional[dict] | | | The page of the dataset figure as it was left when the run was started, in the plain form of a `figure template` (`plain_page`, from `page_plainer`), each experiment picked kept as its role in the set-up table; `None` for a dataset without one, and not written in the file for a page with no plot. It is given as the file holds it, unchecked: `page_stage_runner` reads it with `plain_page_reader`, and one that cannot be read starts Build a figure with the empty page and one warning |
 | `'answers'['delta_psi']` | bool | | | Whether Δψ is worked out for the files with both regions (`utils_shared/delta_psi.py`) and drawn as a panel of the plot of each (the lowest in the standard order); off unless switched on at question 4.5, which is asked only when a file has both regions and the fit has one bH and one bL |
 | `'answers'['panel_order']` | List[str] | (n_panels,) | | The panels of the plot of each file in the order the user moved them to, top first, by their keys: `oxygen`, `vo2`, `delta_psi`, and `haem:` then the name of the haem (`haem:Cyt bH`). Empty for the standard order (oxygen, OCR, the haems a then b then c, Δψ). A panel the order does not know is drawn just above the panel that follows it in the standard order, or at the bottom (`panel_order_placer`); a move made on one file keeps the places of the panels that file does not have (`panel_order_merger`, both in `utils_shared/helpers.py`) |
 | `'answers'['temperature_c']` | float | | °C | Temperature of the runs, for Δψ; asked once per dataset in the import (question 3.1), from 0 to 100, 37 unless changed |
@@ -432,7 +376,7 @@ The events of every file as the labels table (question 3.3) starts and ends them
 
 #### `dataset_setup`
 
-The dataset set-up table: which experiment is which. Built by `setup_builder` (`utils_shared/dataset_setup.py`) from the file names (`file_name_reader`, `utils_custom/run_namer.py`) laid under what was saved, filled in in the window (`SetupTable`, `utils_viewer/viewer_setup.py`; `ViewerGui.setup_shower` and `setup_hider`) and returned by `setup_stage_runner` (`utils_viewer/viewer_stages.py`).
+The dataset set-up table: which experiment is which. Built by `setup_builder` (`utils_shared/dataset_setup.py`) from the file names (`file_name_reader`, in the same file) laid under what was saved, filled in in the window (`SetupTable`, `utils_viewer/viewer_setup.py`; `ViewerGui.setup_shower` and `setup_hider`) and returned by `setup_stage_runner` (`utils_viewer/viewer_stages.py`).
 
 | Key | Type | Shape | Units | Description |
 |---|---|---|---|---|
@@ -967,40 +911,6 @@ a3_037v.csv,1
 | `Wavelength (nm)` | float | nm | Wavelength |
 | `<time> min` | float | see the type | One column per spectrum, headed by its time in minutes to 6 decimals with the trailing zeros dropped (`0.008333 min`, `2 min`), so no two spectra share a heading |
 
-#### `ocr_and_haem_response.xlsx`
-
-| Property | Value |
-|---|---|
-| File type | xlsx (live formulas with stored values) |
-| Sheets | `Notes`, `Baseline OCR`, one sheet per condition, `Tests` |
-| Location and name | `<results>/ocr_and_haem_response.xlsx` |
-
-- **Notes:** how to read the workbook and the formulas used.
-- **Baseline OCR:** the baseline OCR of every run (`Run`, `Experiment`, `Baseline OCR`), then `N`, `Mean`, `SD`, `SEM` per group and the baseline t-test.
-- **One sheet per condition:** for each measurement, a table with one row per window and one column per run (the run means), then `N`, `Mean`, `SD`, `SEM`; the same for the change from baseline. The window times are not repeated per run.
-- **Tests:** one row per test record: group A and B run values, means, variances, pooled variance, `t`, degrees of freedom, `p`, Holm rank, multiplier and adjusted `p`, `alpha` and the mark, so each result can be checked independently.
-
-| Column (Tests) | Type | Units | Description |
-|---|---|---|---|
-| panel, measurement, metric, window | str | | Which comparison the row is |
-| group A / B values, n, mean, variance | float | as the metric | Inputs of the test |
-| `t`, `df`, `p` | float | | Student t-test, equal variances, two-sided |
-| rank, multiplier, `p adjusted` | float | | Holm correction across the windows of the panel |
-| `alpha`, `significant`, mark | | | Result |
-
-#### `time_response.xlsx`
-
-| Property | Value |
-|---|---|
-| File type | xlsx (live formulas with stored values) |
-| Sheets | `Notes`, `Figure panels`, `Difference spectra`, `Haem percentages`, `Waterfall` (when a shared baseline is used) |
-| Location and name | `<results>/time_response.xlsx` |
-
-- **Figure panels:** `Panel`, `Group`, `Time point`, `Experiment` for every experiment drawn.
-- **Difference spectra:** per experiment, the minuend and subtrahend window averages by wavelength and their difference.
-- **Haem percentages:** per experiment, the fitted haem coefficients and the percentages calculated from them.
-- **Waterfall:** the difference spectra with the shared baseline fit (`INTERCEPT` and `SLOPE` formulas) and the corrected spectra.
-
 #### `journal file`
 
 What one journal asks of a figure. Read by `journal_specs_loader` (`utils_shared/journal_files.py`) into `config.JOURNAL_SPECS` when the program starts; a file that cannot be used is left out and named in `config.JOURNAL_PROBLEMS`.
@@ -1045,6 +955,8 @@ The layout of a dataset figure, to use again on any dataset. Written by `templat
 | `version` | whole number | | `1` |
 | `journal`, `columns`, `height` | text, number, number | columns, fraction of the tallest figure | The page size (`FigurePage`) |
 | `plots` | list | | One entry per plot, in the order placed: `{"type": "P9", "cells": {"row": 0, "column": 3, "rows": 2, "columns": 3}, "roles": {"group_1": "Split"}}` (`PagePlot`) |
+
+These values are the plain form of a page, `plain_page`: `page_plainer` writes a page as them and `plain_page_reader` reads them back (both in `utils_shared/figure_page.py`). The settings file of a dataset keeps the page it was left with in the same form (`dataset_settings`, `'page'`).
 
 Refused, with the reason in one sentence naming the file: a file that is not readable JSON or not of this kind; another version; a page size that cannot be read; a plot with no cells, of an unknown type, of the Legend (P16, no longer a plot type), past the edge of the grid or over another plot; a role that names a file (ending in `.paf`, `.csv`, `.xlsx`, `.txt`, `.bin`, `.fit` or `.json`, or holding a folder). A page with such a role is not saved.
 
@@ -1171,7 +1083,7 @@ A move that stops in a way the mover did not foresee adds `The move stopped:` an
 | Property | Value |
 |---|---|
 | File type | `.png` and `.svg` |
-| Location and name | `<results>/<experiment>.*` per experiment, `<results>/2x2_comparison.*`, `<results>/ocr_and_haem_response.*`, `<results>/time_response.*` |
+| Location and name | `<results>/<experiment>.*` per experiment; the dataset figure is a PDF (`dataset figure`) |
 
 ## 2. Conventions
 

@@ -34,7 +34,7 @@ from utils_viewer.viewer_guide import (GUIDE_KEYS,
 
 # ---- CONSTANTS -----------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
-CODE_FOLDERS = ('utils_shared', 'utils_viewer', 'utils_custom')
+CODE_FOLDERS = ('utils_shared', 'utils_viewer')
 # The first question of each step in QUESTION_FLOW.md, in the order of the guide.
 FIRST_QUESTIONS = {'data_folder': '1.1',
                    'results_folder': '1.2',
@@ -104,10 +104,8 @@ def _started_steps_finder() -> List[str]:
             argument = node.args[0] if node.args else None
             if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
                 keys.append(argument.value)
-            elif isinstance(argument, ast.Name) and path.name in ('main.py',
-                                                                  'custom_questions.py',
-                                                                  ):
-                continue  # handing the guide back, or the keys of the summary figures
+            elif isinstance(argument, ast.Name) and path.name == 'main.py':
+                continue  # handing the guide back
             else:
                 keys.append('<not a key>')
     return keys
