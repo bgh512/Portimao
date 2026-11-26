@@ -268,6 +268,7 @@ Everything goes into the results folder you chose:
 | `<experiment>/full/` | Only for a file you trimmed, if you exported with Export full + trimmed csv: the same workbook (and spectra, if chosen) for the whole recording |
 | `dataset_figure_<journal>.pdf` | The dataset figure built on the page in Build a figure, at exactly its printed size, with text you can still change in a drawing program (the fonts are in the file). Written when the page holds at least one plot |
 | `dataset_figure_master_<journal>.pdf` | The same figure on one page of the journal, with a box where its legend goes and grey lines where the text of the paper goes, as for Export master |
+| `dataset_figure_<journal>.xlsx` | The numbers of the dataset figure, to check by hand: a first sheet that lists the plots, a sheet for each Bar chart, Before and after, Response by region and Time points (the number of every experiment, then the n, mean, SD and SEM of each set), and a Tests sheet with every test (t, degrees of freedom, p, corrected p and the mark on the plot). Each mean, SD, SEM, p and corrected p is there twice: as Portimao worked it out, and as an Excel formula over the experiments' cells, so the two can be compared. The other plots have a sheet each too: a Single trace (time and value), a Mean trace (the shared time, every experiment's lined-up trace, then the mean and band of each set, also as Excel formulas), a Difference spectrum (the wavelength, the difference and each part ticked) and a Waterfall (each line before it is stacked). The sheet of a Standard experiment names the experiment's own workbook, where its traces already are |
 | `logs/YYYY_MM_DD-HH_MM_SS.log` | The version, the questions and your answers (from the results folder question on, kept even if Portimao is closed before the run), the settings, then everything printed during the run |
 
 ### 2.8 Finding the haem components from the data (PCA)
@@ -320,6 +321,7 @@ Portimao/
         user_places.py      where your own things are kept: the program folder, or ~/Portimao in the Mac app
         journal_files.py    reads the journals folder, and fits saved answers to the journals there are
         master_page_exporter.py   the master page: a journal page as a PDF with the figure on it
+        dataset_workbook_exporter.py   the workbook of the dataset figure: the numbers of its plots and its tests
         app_updater.py      the Mac app's update at each start, from the newest release on GitHub
         app_messages.py     the Mac app's messages: why it could not start (with Copy details), and where to download a newer version
         pca_fitter.py       principal component analysis of the spectra (components, fit file)

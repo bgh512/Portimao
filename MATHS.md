@@ -780,6 +780,8 @@ $$p'_{(i)} = \min\left(1,\; \max\left(p'_{(i-1)},\; (m - i + 1) \times p_{(i)}\r
 
 A plot with one test is not changed by it. The marks are drawn from the corrected values.
 
+The workbook of the dataset figure (`dataset_figure_<journal>.xlsx`, sheet Tests) repeats this in Excel for each test: its place among the $p$ values of its plot (smallest 1), then $p \times (m - \text{place} + 1)$, then the largest of those products among the tests whose $p$ is not above its own, at most 1.
+
 Example 1: three tests give 0.01, 0.04 and 0.03. Sorted: 0.01, 0.03, 0.04. Corrected: $0.01 \times 3 = 0.03$; $0.03 \times 2 = 0.06$; $0.04 \times 1 = 0.04$, which is under the 0.06 before it, so 0.06. Only the first stays under 0.05.
 
 Example 2: the control (10, 11, 12), knockdown (20, 25, 30) and rescue (11, 12, 13) sets in one region, by Student's t-test: control and knockdown $p = 0.0089$, knockdown and rescue 0.0115, control and rescue 0.2879. Corrected: $0.0089 \times 3 = 0.0268$; $0.0115 \times 2 = 0.0231$, raised to 0.0268; $0.2879 \times 1 = 0.2879$.

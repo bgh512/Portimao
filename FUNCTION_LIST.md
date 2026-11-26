@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.34
+- **Version:** V2.35
 - **Date:** 26/11/2026
 
 ## Contents
@@ -137,6 +137,22 @@
     - [`test_a_settings_file_without_a_usable_setup`](#test_a_settings_file_without_a_usable_setup)
     - [`test_the_headings_of_the_group_columns`](#test_the_headings_of_the_group_columns)
     - [`test_the_step_that_shows_the_table`](#test_the_step_that_shows_the_table)
+- [`tests/test_dataset_workbook.py`](#teststest_dataset_workbookpy)
+    - [`_answers_maker`](#_answers_maker)
+    - [`_experiments_maker`](#_experiments_maker)
+    - [`_page_maker`](#_page_maker)
+    - [`_setup_maker`](#_setup_maker)
+    - [`_headed_table_reader`](#_headed_table_reader)
+    - [`_table_reader`](#_table_reader)
+    - [`_workbook_reader`](#_workbook_reader)
+    - [`test_the_sheets_of_the_workbook`](#test_the_sheets_of_the_workbook)
+    - [`test_the_sheet_of_a_bar_chart`](#test_the_sheet_of_a_bar_chart)
+    - [`test_the_sheet_of_a_before_and_after`](#test_the_sheet_of_a_before_and_after)
+    - [`test_the_sheets_of_a_response_and_of_a_time_points`](#test_the_sheets_of_a_response_and_of_a_time_points)
+    - [`test_a_plot_without_numbers_and_an_experiment_not_read`](#test_a_plot_without_numbers_and_an_experiment_not_read)
+    - [`test_the_sheets_of_the_traces_over_time`](#test_the_sheets_of_the_traces_over_time)
+    - [`test_the_sheets_of_the_spectra_and_of_a_standard_experiment`](#test_the_sheets_of_the_spectra_and_of_a_standard_experiment)
+    - [`test_the_run_saves_the_workbook`](#test_the_run_saves_the_workbook)
 - [`tests/test_delta_psi.py`](#teststest_delta_psipy)
     - [`_calculator`](#_calculator)
     - [`test_delta_psi_is_empty_outside_the_limits`](#test_delta_psi_is_empty_outside_the_limits)
@@ -787,6 +803,28 @@
     - [`sets_lister`](#sets_lister)
     - [`setup_builder`](#setup_builder)
     - [`setup_plainer`](#setup_plainer)
+- [`utils_shared/dataset_workbook_exporter.py`](#utils_shareddataset_workbook_exporterpy)
+    - [`_bar_content_builder`](#_bar_content_builder)
+    - [`_before_after_content_builder`](#_before_after_content_builder)
+    - [`_difference_content_builder`](#_difference_content_builder)
+    - [`_form_lines_lister`](#_form_lines_lister)
+    - [`_label_plainer`](#_label_plainer)
+    - [`_mean_content_builder`](#_mean_content_builder)
+    - [`_minutes_writer`](#_minutes_writer)
+    - [`_response_content_builder`](#_response_content_builder)
+    - [`_set_rows_lister`](#_set_rows_lister)
+    - [`_standard_content_builder`](#_standard_content_builder)
+    - [`_tests_lister`](#_tests_lister)
+    - [`_time_points_content_builder`](#_time_points_content_builder)
+    - [`_trace_content_builder`](#_trace_content_builder)
+    - [`_waterfall_content_builder`](#_waterfall_content_builder)
+    - [`_block_writer`](#_block_writer)
+    - [`_figure_sheet_writer`](#_figure_sheet_writer)
+    - [`_plot_sheet_writer`](#_plot_sheet_writer)
+    - [`_table_writer`](#_table_writer)
+    - [`_tests_sheet_writer`](#_tests_sheet_writer)
+    - [`dataset_workbook_exporter`](#dataset_workbook_exporter)
+    - [`dataset_workbook_namer`](#dataset_workbook_namer)
 - [`utils_shared/delta_psi.py`](#utils_shareddelta_psipy)
     - [`_settings_validator`](#_settings_validator)
     - [`b_haem_column_finder`](#b_haem_column_finder)
@@ -1028,6 +1066,7 @@
     - [`before_after_numbers_lister`](#before_after_numbers_lister)
     - [`before_after_plot_drawer`](#before_after_plot_drawer)
     - [`difference_form_maker`](#difference_form_maker)
+    - [`difference_numbers_lister`](#difference_numbers_lister)
     - [`difference_plot_drawer`](#difference_plot_drawer)
     - [`mean_form_maker`](#mean_form_maker)
     - [`mean_lines_lister`](#mean_lines_lister)
@@ -1038,6 +1077,7 @@
     - [`response_numbers_lister`](#response_numbers_lister)
     - [`response_plot_drawer`](#response_plot_drawer)
     - [`standard_form_maker`](#standard_form_maker)
+    - [`standard_numbers_lister`](#standard_numbers_lister)
     - [`standard_plot_drawer`](#standard_plot_drawer)
     - [`standard_scales_sharer`](#standard_scales_sharer)
     - [`time_points_caption_writer`](#time_points_caption_writer)
@@ -1045,11 +1085,13 @@
     - [`time_points_numbers_lister`](#time_points_numbers_lister)
     - [`time_points_plot_drawer`](#time_points_plot_drawer)
     - [`trace_form_maker`](#trace_form_maker)
+    - [`trace_numbers_lister`](#trace_numbers_lister)
     - [`trace_plot_drawer`](#trace_plot_drawer)
     - [`traces_left_out_lister`](#traces_left_out_lister)
     - [`waterfall_form_maker`](#waterfall_form_maker)
     - [`waterfall_left_out_lister`](#waterfall_left_out_lister)
     - [`waterfall_lines_lister`](#waterfall_lines_lister)
+    - [`waterfall_numbers_lister`](#waterfall_numbers_lister)
     - [`waterfall_plot_drawer`](#waterfall_plot_drawer)
     - [`waterfall_traces_lister`](#waterfall_traces_lister)
 - [`utils_shared/pca_fitter.py`](#utils_sharedpca_fitterpy)
@@ -2635,8 +2677,9 @@ None.
 ---- Summary ----
 Main function to save the dataset figure built on the page: the figure as a PDF of
 its printed size, with text that can still be changed, then its master page, the
-figure on a page of its journal. A page with no plot saves nothing. A file that
-cannot be saved is said in one sentence and the run goes on. An experiment a plot
+figure on a page of its journal, then its workbook, the numbers of its plots and
+its tests. A page with no plot saves nothing. A file that cannot be saved is said
+in one sentence and the run goes on. An experiment a plot
 shows that could not be read when the plots were saved is named in one warning,
 and the plot is drawn without it; so is an experiment a waterfall leaves out for
 having no difference spectrum, and one a mean trace (or a waterfall of traces)
@@ -2661,16 +2704,18 @@ settings.JOURNAL_SPECS; FIGURE_NAME (imported).
 
 ---- Outputs ----
 List[Path]
-    The files saved: none, the figure, or the figure and its master page.
+    The files saved: none when the figure could not be saved; otherwise the
+    figure, then its master page and its workbook, each when it was saved.
 
 ---- Globals mutated ----
-None. Writes the two PDFs and prints the outcome; the details of a problem go to
-the log (side effects).
+None. Writes the two PDFs and the workbook and prints the outcome; the details
+of a problem go to the log (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
+dataset_workbook_exporter
 figure_page_exporter
 master_page_exporter
 page_experiments_lister
@@ -5521,6 +5566,519 @@ None.
 None.
 ```
 
+## `tests/test_dataset_workbook.py`
+
+Tests of the workbook of a dataset figure: its sheets, the numbers of each plot per region and of each test worked out by hand, the Excel formulas beside them, the units in the headings, the one table of each plot without sets (Single trace, Mean trace, Difference spectrum, Waterfall), what the sheet of a Standard experiment says, and what the run does when it cannot be saved.
+
+### MAKERS
+
+#### `_answers_maker`
+
+```text
+---- Summary ----
+Helper function to make the answers of a made-up run that works out no haems,
+with nothing left out at the start or the end.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The answers.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_experiments_maker`
+
+```text
+---- Summary ----
+Helper function to make the slim copies of the made-up dataset (RUNS): each has
+an OCR every quarter minute from 0 to 20 min, at its baseline level until its one
+addition at 10 min and at its other level from then on, a baseline region from 2
+to 8 min and a settled region from 14 to 18 min.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+RUNS; TIME_COLUMN (imported).
+
+---- Outputs ----
+Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_page_maker`
+
+```text
+---- Summary ----
+Helper function to make a page with one plot of each type given, two rows tall
+and three columns wide, placed in reading order so the first is a, the second b.
+
+---- Inputs ----
+plot_types : Tuple[str, ...]
+    The plot types, at most six.
+roles : Optional[Dict[str, str]]
+    The roles of every plot; None for the OCR as measured.
+
+---- Globals read ----
+RAW.
+
+---- Outputs ----
+FigurePage
+    The page.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_setup_maker`
+
+```text
+---- Summary ----
+Helper function to make the set-up of the made-up dataset: three controls, three
+knockdowns and three rescues, each with its time point.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+COLOURS, RUNS.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### READERS
+
+#### `_headed_table_reader`
+
+```text
+---- Summary ----
+Helper function to read the one table of the sheet of a plot without sets: from
+the row whose first cell is the heading of its first column down to the first
+empty row.
+
+---- Inputs ----
+sheet : Any
+    openpyxl worksheet.
+heading : str
+    The heading of the first column of the table.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[int, List[tuple]]
+    (the row of the headings, from 1; the headings, then each row of the table).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_table_reader
+```
+
+#### `_table_reader`
+
+```text
+---- Summary ----
+Helper function to read one table of a sheet: the rows under its title, from its
+headings down to the first empty row.
+
+---- Inputs ----
+sheet : Any
+    openpyxl worksheet.
+title : Optional[str]
+    The text in column A of the row above the headings; None for a table whose
+    headings are in the row ``start``.
+start : int
+    The row to look from (from 1).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[int, List[tuple]]
+    (the row of the headings, from 1; the headings, then each row of the table,
+    each without the empty cells at its end).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_workbook_reader`
+
+```text
+---- Summary ----
+Helper function to write the workbook of a page of the made-up dataset and read
+it back twice: with its formulas, and with the numbers kept beside them.
+
+---- Inputs ----
+tmp_path : Path
+    Folder the workbook is written in.
+page : FigurePage
+    The page.
+setup : Optional[dict]
+    The set-up table; None for that of _setup_maker.
+experiments : Optional[Dict[str, dict]]
+    The slim copies; None for those of _experiments_maker.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (the workbook with its formulas as text, the workbook with the number the
+    program kept in each formula cell), both openpyxl workbooks.
+
+---- Globals mutated ----
+None. Writes the workbook (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_experiments_maker
+_setup_maker
+```
+
+### TESTS
+
+#### `test_the_sheets_of_the_workbook`
+
+```text
+---- Summary ----
+Main function to check the sheets of the workbook of a page with a plot of each
+kind: the Figure sheet first, a sheet for each plot per region named by its
+letter and its type, the Tests sheet last; and what the Figure sheet says of
+each plot (also of a plot type whose numbers nothing lays out, and of a space
+for a drawing), with the caption lines of the whole figure under them. A page
+without a plot is refused.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+NO_NUMBERS, NOT_YET (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_maker
+_table_reader
+_workbook_reader
+```
+
+#### `test_the_sheet_of_a_bar_chart`
+
+```text
+---- Summary ----
+Main function to check the sheet of a Bar chart and its rows of the Tests sheet
+against numbers worked out by hand: every experiment, the n, mean, SD and SEM of
+each set with their Excel formulas, the unit in the headings, and t, the degrees
+of freedom, p and the corrected p of each pair of sets with the formulas that
+repeat p and the correction.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+UNIT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+MATHS.md section 11.5, example 2. Control 10, 11, 12: mean 11, SD 1, SEM
+1 / sqrt(3). Knockdown 20, 25, 30: mean 25, SD 5. Rescue 11, 12, 13: mean 12,
+SD 1. Student's: control and knockdown t = -14 / sqrt(13 x 2 / 3) = -4.756,
+df 4, p = 0.0089; control and rescue t = -1 / sqrt(2 / 3) = -1.225, p = 0.2879;
+knockdown and rescue p = 0.0115. Places 1, 3, 2; p x tests left 0.0089 x 3 =
+0.0268, 0.2879 x 1, 0.0115 x 2 = 0.0231; corrected 0.0268, 0.2879, 0.0268.
+
+---- Helpers ----
+_page_maker
+_table_reader
+_workbook_reader
+```
+
+#### `test_the_sheet_of_a_before_and_after`
+
+```text
+---- Summary ----
+Main function to check the sheet of a Before and after and its rows of the Tests
+sheet against numbers worked out by hand: the two regions of every experiment
+with their difference as a formula, each set in each region, and the paired test
+of each set whose experiments did not all change by the same amount.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+UNIT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+MATHS.md section 11.4. Control: changes -3, -4, -2, mean -3, SD 1, t =
+-3 / (1 / sqrt(3)) = -5.196, df 2, p = 1 - 5.196 / sqrt(27 + 2) = 0.0351.
+Knockdown: changes -2, -1, -3, t = -2 / (1 / sqrt(3)) = -3.464, p = 1 -
+3.464 / sqrt(12 + 2) = 0.0742. Rescue: no change, so no test. Corrected:
+0.0351 x 2 = 0.0702; 0.0742 x 1 = 0.0742.
+
+---- Helpers ----
+_page_maker
+_table_reader
+_workbook_reader
+```
+
+#### `test_the_sheets_of_a_response_and_of_a_time_points`
+
+```text
+---- Summary ----
+Main function to check the sheet of a Response by region (a column per region,
+its tests corrected together) and of a Time points (the experiments of a set at
+one time point one under the other, one without a time point last and in no
+mean), with numbers worked out by hand.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+UNIT.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Response by region: three pairs of sets in each of two regions, so 6 tests; the
+smallest p is multiplied by 6. Time points, at 24 h: control 10, 11 (mean 10.5,
+SD sqrt(0.5)), knockdown 20, 25, rescue 11, 12, so three tests; at 2 h each set
+has one experiment, so none.
+
+---- Helpers ----
+_page_maker
+_table_reader
+_workbook_reader
+```
+
+#### `test_a_plot_without_numbers_and_an_experiment_not_read`
+
+```text
+---- Summary ----
+Main function to check the sheet of a plot with nothing to show (the sentence
+the plot shows, and a Tests sheet that says there is no test), an experiment of
+the set-up that was not read (an empty cell in its set, named on the Figure
+sheet), and the plain text of a label.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+NO_TESTS (imported); NO_VALUES (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_page_maker
+_setup_maker
+_table_reader
+_workbook_reader
+```
+
+#### `test_the_sheets_of_the_traces_over_time`
+
+```text
+---- Summary ----
+Main function to check the sheets of a Single trace and of a Mean trace, worked
+out by hand on the made-up dataset: the trace of one experiment with its time
+from its addition and in the file; the lined-up trace of every experiment
+behind the mean of its set, the mean and the SEM, and the Excel formulas beside
+them; the band as the SD, and no band.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+RAW, UNIT; LINED_UP (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The controls are at 13, 15 and 14 µM min⁻¹ before their addition and at 10, 11
+and 12 after it: means 14 and 11, SD 1, SEM 1 / √3. The knockdowns are at 22, 26
+and 33, then 20, 25 and 30: means 27 and 25.
+
+---- Helpers ----
+_headed_table_reader
+_page_maker
+_setup_maker
+_workbook_reader
+```
+
+#### `test_the_sheets_of_the_spectra_and_of_a_standard_experiment`
+
+```text
+---- Summary ----
+Main function to check the sheets of a Difference spectrum (the difference and
+each part ticked, the haem bands), of a Waterfall (the mean spectrum of each
+time point, each experiment, and a trace of each experiment, all before the
+stacking, with the experiment left out named) and of a Standard experiment (its
+panels and the experiment's own workbook, no numbers copied in; the sentence of
+one without an experiment), on made-up spectra worked out by hand.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+
+---- Globals read ----
+DIFFERENCES, RAW, UNIT, WAVELENGTHS_NM; BEFORE_STACKING, LEFT_OUT_SPECTRA,
+NOT_PICKED, OWN_WORKBOOK, TICK_OFF, TICK_ON, TOGETHER (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The mean of the difference spectra of c1 (1, 4, 2) and c2 (3, 6, 4), the two
+controls at 24 h, is 2, 5, 3 mOD.
+
+---- Helpers ----
+_experiments_maker
+_headed_table_reader
+_page_maker
+_setup_maker
+_table_reader
+_workbook_reader
+```
+
+#### `test_the_run_saves_the_workbook`
+
+```text
+---- Summary ----
+Main function to check what the run does with the workbook of the dataset
+figure: it is saved beside the figure and named on screen; one that is open in
+Excel gives one plain sentence, with the words of Python in the log only, and
+the figure and its master page are still saved.
+
+---- Inputs ----
+tmp_path : Path
+    Folder given by pytest.
+monkeypatch : pytest.MonkeyPatch
+    Stands in for the saving that fails.
+capsys : pytest.CaptureFixture
+    What is shown on screen.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_experiments_maker
+_page_maker
+_setup_maker
+```
+
 ## `tests/test_delta_psi.py`
 
 Tests that delta psi from the b haems comes out as worked out by hand on made-up data.
@@ -8350,8 +8908,8 @@ _page_maker
 
 ```text
 ---- Summary ----
-Main function to check what the run does with a page that holds plots: the figure
-and its master page are saved in the results folder, the master page on the
+Main function to check what the run does with a page that holds plots: the figure,
+its master page and its workbook are saved in the results folder, the master page on the
 journal's page (A4 for Nature, which gives none), and each is named on screen; a
 master page that is open in another program gives one plain sentence, with the
 words of Python in the log only, and the figure is still saved; a figure that
@@ -24300,6 +24858,747 @@ None.
 group_colours_filler
 ```
 
+## `utils_shared/dataset_workbook_exporter.py`
+
+The workbook of a dataset figure: a sheet per plot with the numbers it draws (the number of every experiment behind each mean), and a sheet with every test, each number beside the Excel formula that repeats it.
+
+### CONTENT HELPERS
+
+#### `_bar_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the numbers of a Bar chart for its sheet.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot (bar_numbers_lister).
+
+---- Globals read ----
+NO_VALUES (imported).
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_lines_lister
+_label_plainer
+_set_rows_lister
+_tests_lister
+```
+
+#### `_before_after_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the numbers of a Before and after for its sheet: the
+two regions of each experiment side by side, with their difference as a formula.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot (before_after_numbers_lister).
+
+---- Globals read ----
+NO_PAIRS (imported).
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The difference of an experiment is its value in the second region minus its value
+in the first (MATHS.md section 11.4).
+
+---- Helpers ----
+_form_lines_lister
+_label_plainer
+_set_rows_lister
+_tests_lister
+```
+
+#### `_difference_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the numbers of a Difference spectrum for its sheet:
+the wavelength, then the difference and each part its form ticks.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot (difference_numbers_lister).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_label_plainer
+```
+
+#### `_form_lines_lister`
+
+```text
+---- Summary ----
+Helper function to write the lines at the top of a sheet that say what the form of
+the plot picked: the kind of averaging region, the bars and the test.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot, with its 'kind' and, but for a Before and after,
+    its 'error' and 'test'.
+
+---- Globals read ----
+ERROR_CHOICES, PAIRED_WORDS, TEST_WORDS (imported).
+
+---- Outputs ----
+List[str]
+    The lines.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_label_plainer`
+
+```text
+---- Summary ----
+Helper function to write a text of a plot in plain characters for a cell: a power
+as raised digits ('min$^{-1}$' becomes 'min⁻¹') and a haem name without its
+plotting codes ('Cyt $b_H$' becomes 'Cyt bH').
+
+---- Inputs ----
+text : str
+    The text as the plot draws it.
+
+---- Globals read ----
+POWER_CHARACTERS, POWER_PATTERN.
+
+---- Outputs ----
+str
+    The plain text.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+haem_name_plainer
+```
+
+#### `_mean_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the numbers of a Mean trace for its sheet: the shared
+time, then for each set the lined-up trace of each of its experiments, their
+mean and the band, and beside them the mean and the band as Excel formulas over
+the cells of the experiments in the same row.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot (mean_lines_lister).
+
+---- Globals read ----
+LEFT_OUT_TRACES, LINED_UP; BAND_CHOICES, NO_MEAN (imported).
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None: see _table_writer for the Excel formulas.
+
+---- Helpers ----
+_label_plainer
+_minutes_writer
+```
+
+#### `_minutes_writer`
+
+```text
+---- Summary ----
+Helper function to write a list of times in a line of a sheet.
+
+---- Inputs ----
+times_min : Any
+    The times, in minutes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The times with a comma between them, each with as many decimals as it needs
+    ('0, 5.5').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_response_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the numbers of a Response by region for its sheet: one
+block per row of the plot (the OCR, or each haem), with a column per region.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot (response_numbers_lister).
+
+---- Globals read ----
+NO_RESPONSE (imported).
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_lines_lister
+_label_plainer
+_set_rows_lister
+_tests_lister
+```
+
+#### `_set_rows_lister`
+
+```text
+---- Summary ----
+Helper function to list the experiments of each set one under the other, each
+with its value in each column of the plot, and to note which cells hold the
+values of each set in each column.
+
+---- Inputs ----
+sets : List[dict]
+    The sets of the plot (plot_set, DATA_FORMAT.md).
+values : List[List[List[Optional[float]]]]
+    For each set, for each column of the plot, the value of each of its
+    experiments (None for none).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[List[list], Dict[Tuple[int, str], Tuple[int, int, int]]]
+    (the rows of the table: the name of the set, the experiment, then its value
+    in each column; {(column of the plot, name of the set): (its first row, its
+    last row, its column in the table)}, the rows from 0).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_standard_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the sheet of a Standard experiment: its experiment,
+the panels it draws and where its numbers are, the experiment's own workbook.
+The traces are not copied in, so each number is kept in one place.
+
+---- Inputs ----
+numbers : dict
+    What the plot shows (standard_numbers_lister).
+
+---- Globals read ----
+OWN_WORKBOOK.
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_label_plainer
+file_name_sanitiser
+```
+
+#### `_tests_lister`
+
+```text
+---- Summary ----
+Helper function to list the tests of one block of a plot for the Tests sheet,
+each with the two sets it compares and where their values are.
+
+---- Inputs ----
+statistics : dict
+    The numbers of the block (plot_statistics, DATA_FORMAT.md).
+measurement : str
+    What the block measures, with its unit.
+numbers : dict
+    The numbers of the plot, for its 'marks' and, but for a paired plot, its
+    'test'.
+
+---- Globals read ----
+PAIRED_KIND, PAIRED_NAME, TEST_KINDS; TEST_CHOICES (imported).
+
+---- Outputs ----
+List[dict]
+    One per test: 'measurement', 'column' (its region or time point), 'first'
+    and 'second' (the two sets), 'words' (the test), 'counts' and 'means' (of
+    the two sets), 't', 'df', 'p', 'p_corrected', 'mark' (as on the plot),
+    'kind' (the type Excel's T.TEST takes) and 'keys' (the two sets as
+    _set_rows_lister notes their cells).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_label_plainer
+p_value_marker
+```
+
+#### `_time_points_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the numbers of a Time points for its sheet: the
+experiments of each set in the order of the time points, so those of one set at
+one time point sit one under the other; an experiment without a time point comes
+last in its set and is in no mean.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot (time_points_numbers_lister).
+
+---- Globals read ----
+NO_POINTS (imported).
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_lines_lister
+_label_plainer
+_tests_lister
+```
+
+#### `_trace_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the numbers of a Single trace for its sheet: the
+time as the plot counts it and the value; with time 0 at an addition, also the
+time in the file, which is the one in the experiment's own workbook.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot (trace_numbers_lister).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Time in the file = time on the plot + the time of the addition picked.
+
+---- Helpers ----
+_label_plainer
+_minutes_writer
+```
+
+#### `_waterfall_content_builder`
+
+```text
+---- Summary ----
+Helper function to lay out the numbers of a Waterfall for its sheet: the
+wavelength or the shared time, then each line from the top of the plot down, as
+it is before the stacking. Lines that are not all at the same wavelengths each
+have their own wavelength column.
+
+---- Inputs ----
+numbers : dict
+    The numbers of the plot (waterfall_numbers_lister).
+
+---- Globals read ----
+BEFORE_STACKING, LEFT_OUT_SPECTRA, LEFT_OUT_TRACES.
+
+---- Outputs ----
+dict
+    The content of the sheet (_plot_sheet_writer).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_label_plainer
+_minutes_writer
+```
+
+### SHEET HELPERS
+
+#### `_block_writer`
+
+```text
+---- Summary ----
+Helper function to write one block of a plot's sheet: the table of every
+experiment, then the table of every set with its n, mean, SD and SEM as the
+program worked them out and, beside them, as Excel formulas over the cells of
+its experiments.
+
+---- Inputs ----
+sheet : Any
+    xlsxwriter worksheet.
+formats : dict
+    The cell formats (workbook_formats_builder, with 'bold').
+top : int
+    The first row of the block (from 0).
+block : dict
+    'title' (what it measures; '' for none), 'headings' and 'rows' of the
+    table of experiments (a cell is a text, a number, None for an empty cell,
+    or ('difference', value) for the cell before it minus the one before
+    that), 'ranges' (_set_rows_lister), 'columns' (those of its
+    plot_statistics, DATA_FORMAT.md), 'column_title' (the heading of the
+    column that names them; None to leave it out) and 'label' (the
+    measurement with its unit).
+
+---- Globals read ----
+EXPERIMENTS_TITLE, SETS_TITLE, UNIT_PATTERN.
+
+---- Outputs ----
+Tuple[int, Dict[Tuple[int, str], str]]
+    (the first free row under the block, {(column of the plot, name of the
+    set): the cells of its values, as '$C$6:$C$8'}).
+
+---- Globals mutated ----
+None. Writes to the worksheet (side effect).
+
+---- Equations ----
+Mean: =AVERAGE(cells); SD: =STDEV.S(cells); SEM: =STDEV.S(cells)/SQRT(COUNT(cells))
+(MATHS.md section 11.2).
+
+---- Helpers ----
+_label_plainer
+formula_writer
+number_writer
+```
+
+#### `_figure_sheet_writer`
+
+```text
+---- Summary ----
+Helper function to write the first sheet of the workbook: one row per plot with
+its letter, its plot type, a link to its sheet and its sentences for the
+caption; then the lines of the caption that are of the whole figure, and the
+experiments left out.
+
+---- Inputs ----
+sheet : Any
+    xlsxwriter worksheet.
+formats : dict
+    The cell formats (workbook_formats_builder, with 'bold').
+title : str
+    The title of the sheet.
+listed : List[dict]
+    One per plot, in the order of the letters: 'letter', 'type' (its name),
+    'sheet' (the name of its sheet; '' for none), 'words' (what is said in
+    place of a sheet) and 'caption' (its sentences; '' for none).
+lines : List[str]
+    The caption lines of the whole figure (the colours, line styles, shades).
+notes : List[str]
+    What was left out, one sentence each.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes to the worksheet (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_plot_sheet_writer`
+
+```text
+---- Summary ----
+Helper function to write the sheet of one plot: its title, what its form picked,
+what it left out, then each of its blocks; or, for a plot with nothing to show,
+the sentence the plot shows.
+
+---- Inputs ----
+sheet : Any
+    xlsxwriter worksheet.
+formats : dict
+    The cell formats (workbook_formats_builder, with 'bold').
+name : str
+    The name of the sheet.
+title : str
+    Its title: the letter of the plot and its plot type.
+content : dict
+    'lines' (what the form picked), 'notes' (what was left out), 'sentence'
+    (in place of the numbers; None when there are numbers), 'blocks'
+    (_block_writer, each with its 'tests' from _tests_lister) and, for a plot
+    without sets, 'table' (_table_writer), written under the blocks.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[dict]
+    The tests of the plot (_tests_lister), each with 'cells': the cells of the
+    values of its two sets, with the name of the sheet
+    ("'a Bar chart'!$C$6:$C$8").
+
+---- Globals mutated ----
+None. Writes to the worksheet (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_block_writer
+_table_writer
+```
+
+#### `_table_writer`
+
+```text
+---- Summary ----
+Helper function to write the one table of a plot without sets: a heading per
+column, then its numbers down the rows. A column worked out from the cells
+beside it is written as an Excel formula, with the program's number kept in it.
+
+---- Inputs ----
+sheet : Any
+    xlsxwriter worksheet.
+formats : dict
+    The cell formats (workbook_formats_builder, with 'bold').
+top : int
+    The first row of the table (from 0).
+table : dict
+    'title' ('' for none) and 'columns', each {'heading', 'values': its numbers
+    down the rows (NaN for an empty cell)} and, for a column that is a formula,
+    'formula' (a key of TABLE_FORMULAS) and 'over' (the first and the last
+    column of the table, from 0, it is worked out from, in the same row). The
+    columns need not be as long as one another.
+
+---- Globals read ----
+TABLE_FORMULAS.
+
+---- Outputs ----
+int
+    The first free row under the table.
+
+---- Globals mutated ----
+None. Writes to the worksheet (side effect).
+
+---- Equations ----
+Mean: =AVERAGE(cells); SD: =STDEV.S(cells); SEM: =STDEV.S(cells)/SQRT(COUNT(cells))
+(MATHS.md section 10.3). A formula is written only where the program has a
+number, so a time with no value, or a spread of one experiment, stays empty.
+
+---- Helpers ----
+formula_writer
+number_writer
+```
+
+#### `_tests_sheet_writer`
+
+```text
+---- Summary ----
+Helper function to write the sheet of the tests: one row per test of the figure,
+with t, the degrees of freedom, p and the corrected p as the program worked them
+out and, beside them, p and the corrected p as Excel formulas.
+
+---- Inputs ----
+sheet : Any
+    xlsxwriter worksheet.
+formats : dict
+    The cell formats (workbook_formats_builder, with 'bold').
+plots : List[Tuple[str, List[dict]]]
+    (the letter of a plot, its tests from _plot_sheet_writer), in the order of
+    the letters.
+
+---- Globals read ----
+EXCEL_P_COLUMN, NO_TESTS, PLACE_COLUMN, STEP_COLUMN, TEST_HEADINGS, TEST_NOTES,
+TESTS_SHEET.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes to the worksheet (side effect).
+
+---- Equations ----
+p by Excel: =T.TEST(first set, second set, 2, type), type 1 for the paired test,
+2 for Student's, 3 for Welch's (MATHS.md sections 11.3 and 11.4). With the m
+tests of one plot: place = RANK.EQ(p, the p values of the plot, smallest first);
+step = p x (m - place + 1); corrected p = min(1, the largest step among the
+tests of the plot whose p is not above this one) (MATHS.md section 11.5).
+
+---- Helpers ----
+formula_writer
+number_writer
+```
+
+### MAIN FUNCTIONS
+
+#### `dataset_workbook_exporter`
+
+```text
+---- Summary ----
+Main function to write the workbook of a dataset figure, so its numbers can be
+worked out again by hand: a first sheet that lists the plots, a sheet for each
+plot, and a last sheet with every test. A plot per region (Bar chart, Before
+and after, Response by region, Time points) has the number of every experiment
+and the n, mean, SD and SEM of each set; a Single trace, a Mean trace (with the
+lined-up trace of every experiment behind each mean), a Difference spectrum and
+a Waterfall have one table of what they draw; a Standard experiment names the
+experiment's own workbook, where its traces are. Each mean, SD, SEM, p and
+corrected p is written as the program worked it out and, beside it, as an Excel
+formula over the cells of the experiments. The numbers are those the plots are
+drawn from.
+
+---- Inputs ----
+page : FigurePage
+    The page; it must hold at least one plot.
+folder : Path
+    Folder the workbook is saved in; it is made when missing.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Optional[Dict[str, dict]]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md); None
+    for none.
+answers : Optional[dict]
+    The answers of the run; None for none.
+
+---- Globals read ----
+CONTENT_BUILDERS, FIGURE_SHEET, NO_NUMBERS, NOT_YET, TESTS_SHEET; EMPTY_TYPES,
+PLOT_TYPES (imported).
+
+---- Outputs ----
+Path
+    The workbook that was saved (dataset workbook, DATA_FORMAT.md). Raises
+    FigurePageError for a page with no plot, and OSError when the workbook
+    cannot be written (a PermissionError when it is open in Excel).
+
+---- Globals mutated ----
+None. Writes the workbook (side effect).
+
+---- Equations ----
+None: see _block_writer and _tests_sheet_writer for the Excel formulas.
+
+---- Helpers ----
+_figure_sheet_writer
+_plot_sheet_writer
+_tests_sheet_writer
+caption_lines_builder
+dataset_workbook_namer
+excel_sheet_namer
+page_experiments_lister
+panel_letters_finder
+workbook_formats_builder
+```
+
+#### `dataset_workbook_namer`
+
+```text
+---- Summary ----
+Main function to name the workbook of the dataset figure for a journal: the name
+of the figure's PDF, as an Excel file.
+
+---- Inputs ----
+journal : str
+    The journal as the settings name it (a key of config.JOURNAL_SPECS).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    'dataset_figure_<journal>.xlsx'.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+figure_file_namer
+```
+
 ## `utils_shared/delta_psi.py`
 
 The maths of delta psi, the membrane potential, from how reduced the two b haems (bH
@@ -31249,7 +32548,8 @@ experiment : dict
 plot : PagePlot
     The plot, with its roles.
 context : dict
-    What a plot is drawn with (PLOT_DRAWERS): its 'answers' and 'page' are used.
+    What a plot is drawn with (PLOT_DRAWERS): its 'answers' and 'page' are used;
+    without a 'page', the journal and size of the run are kept.
 
 ---- Globals read ----
 DELTA_PSI_KEY, FIRST_VIEW, HAEM_KEY_START, LABELS_KEY, NO_HAEMS, NO_PANEL,
@@ -32435,7 +33735,8 @@ dict
     'sets': the sets that have a value (plot_set, DATA_FORMAT.md), each with its
     'values'; 'statistics': the numbers of the plot (plot_statistics,
     DATA_FORMAT.md), one column, its sets in the same order; 'label': the title
-    of the y axis; 'region': the name of the region; 'error', 'test' and 'marks':
+    of the y axis; 'region': the name of the region; 'kind': the kind of
+    averaging region read ('settled' or 'quick'); 'error', 'test' and 'marks':
     what the form says.
 
 ---- Globals mutated ----
@@ -32612,7 +33913,8 @@ dict
     in the second region (None for none); 'statistics': the numbers of the plot
     (plot_statistics, DATA_FORMAT.md), paired, its sets in the same order;
     'label': the title of the y axis; 'regions': the names of the two regions;
-    'marks': what the form says.
+    'kind': the kind of averaging region read ('settled' or 'quick'); 'marks':
+    what the form says.
 
 ---- Globals mutated ----
 None.
@@ -32717,6 +34019,52 @@ experiment_field_maker
 tick_field_maker
 ```
 
+#### `difference_numbers_lister`
+
+```text
+---- Summary ----
+Main function to list the numbers of a Difference spectrum: the difference of
+its experiment, reduced minus oxidised, and each part its form ticks, at each
+wavelength; or the sentence the plot shows when it has nothing to draw.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (difference_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run; not used.
+
+---- Globals read ----
+BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY, NO_DIFFERENCE, NOT_READ,
+RESIDUAL_KEY; EXPERIMENT_ROLE (imported).
+
+---- Outputs ----
+dict
+    'sentence': None, or the sentence for an experiment that is not in the
+    dataset, could not be read or has no difference spectrum (then only 'name'
+    is there beside it, None when no experiment is found). Otherwise also
+    'name', 'experiment' (its slim copy), 'parts' (its 'difference_parts'),
+    'wavelengths_nm': np.ndarray (n_wavelengths,), 'columns': (its name, its
+    values in mOD, (n_wavelengths,)) of the difference and of each part ticked,
+    in the order Measured, each haem, Background, Fit, Residual,
+    'has_residual': whether the residual is ticked, and 'bands': {haem: (from,
+    to) in nm} when the haem bands are ticked, otherwise {}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None. Everything is in mOD (MATHS.md section 9).
+
+---- Helpers ----
+_missing_sentence_finder
+_tick_reader
+role_experiment_finder
+```
+
 #### `difference_plot_drawer`
 
 ```text
@@ -32740,9 +34088,9 @@ context : dict
     What a plot is drawn with (PLOT_DRAWERS).
 
 ---- Globals read ----
-BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY, NO_DIFFERENCE, NOT_READ,
-NOT_THERE, RESIDUAL_KEY; settings.COMPONENT_FIGURE_STYLE; EXPERIMENT_ROLE,
-RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, X_LABEL, Y_LABEL (imported).
+BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY;
+settings.COMPONENT_FIGURE_STYLE; RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, X_LABEL,
+Y_LABEL (imported).
 
 ---- Outputs ----
 List[Axes]
@@ -32759,8 +34107,8 @@ None. Everything is in mOD (MATHS.md section 9).
 _sentence_drawer
 _spectrum_axes_styler
 _tick_reader
+difference_numbers_lister
 haem_bands_drawer
-role_experiment_finder
 ```
 
 #### `mean_form_maker`
@@ -32827,11 +34175,14 @@ BAND_CHOICES, BAND_KEY (imported).
 ---- Outputs ----
 dict
     What _sets_aligner gives ('times_min', 'additions_min', 'breaks_min',
-    'left_out', 'label', 'events', 'zero', ...), with 'lines': one per set that
-    has an experiment kept, each {'label': the name of the set with how many
-    experiments its mean is of ('control (n = 3)'), 'colour', 'line_style',
-    'mean': np.ndarray (n_times,), 'spread': the SEM or the SD at each time
-    (n_times,), or None for no band}.
+    'left_out', 'label', 'events', 'zero', ...), with 'band' (the band picked,
+    a key of BAND_CHOICES), 'time_label' (the title of the time axis) and
+    'lines': one per set that has an experiment kept, each {'label': the name
+    of the set with how many experiments its mean is of ('control (n = 3)'),
+    'name': the name of the set, 'names': its experiments kept, 'traces': their
+    lined-up traces, np.ndarray (n_experiments, n_times), 'colour',
+    'line_style', 'mean': np.ndarray (n_times,), 'spread': the SEM or the SD at
+    each time (n_times,), or None for no band}.
 
 ---- Globals mutated ----
 None.
@@ -32841,6 +34192,7 @@ See traces_aligner and traces_averager (MATHS.md section 10).
 
 ---- Helpers ----
 _sets_aligner
+_time_label_writer
 plot_sets_lister
 traces_averager
 ```
@@ -32886,7 +34238,6 @@ _breaks_drawer
 _sentence_drawer
 _spectrum_axes_styler
 _tick_reader
-_time_label_writer
 line_breaker
 mean_lines_lister
 ```
@@ -33045,7 +34396,8 @@ dict
     name of each region, 'Baseline' then each addition as the first experiment
     has it; 'statistics': the columns and the tests of every row in one, for
     the caption; 'left_out' and 'differing': the experiments _additions_checker
-    names; 'error', 'test' and 'marks': what the form says.
+    names; 'kind': the kind of averaging region read ('settled' or 'quick');
+    'error', 'test' and 'marks': what the form says.
 
 ---- Globals mutated ----
 None.
@@ -33161,6 +34513,47 @@ choice_field_maker
 experiment_field_maker
 name_simplifier
 tick_field_maker
+```
+
+#### `standard_numbers_lister`
+
+```text
+---- Summary ----
+Main function to say what a Standard experiment shows: its experiment, the
+panels it draws and the view of its haems; or the sentence the plot shows when
+it has nothing to draw. Its traces are those of the experiment's own workbook.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (standard_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+FIRST_VIEW, NOT_READ, VIEW_CHOICES, VIEW_KEY; EXPERIMENT_ROLE (imported).
+
+---- Outputs ----
+dict
+    'sentence': None, or the sentence for an experiment that is not in the
+    dataset or could not be read, or a plot with nothing to show; 'name': the
+    experiment, None when none is found; 'panels': the panels drawn, from the
+    top ('Oxygen', 'OCR', each haem by its name, 'Δψ'), [] with a sentence;
+    'view': how the haems are shown ('ΔD'), None when no haem panel is drawn.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_missing_sentence_finder
+_standard_config_builder
+role_experiment_finder
 ```
 
 #### `standard_plot_drawer`
@@ -33348,8 +34741,9 @@ dict
     order drawn; 'time_points', 'places', 'unit', 'ticks' and 'title': the
     time points and where they sit (_time_points_placer); 'label': the title
     of the y axis; 'trace' and 'value': the measurement, as trace_reader takes
-    it; 'region': the name of the region; 'error', 'test' and 'marks': what
-    the form says.
+    it; 'region': the name of the region; 'kind': the kind of averaging region
+    read ('settled' or 'quick'); 'error', 'test' and 'marks': what the form
+    says.
 
 ---- Globals mutated ----
 None.
@@ -33454,6 +34848,58 @@ experiment_field_maker
 tick_field_maker
 ```
 
+#### `trace_numbers_lister`
+
+```text
+---- Summary ----
+Main function to list the numbers of a Single trace: one trace of its experiment
+in the value picked, with its time counted from the addition picked (or from the
+start of the recording); or the sentence the plot shows when it has nothing to
+draw.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (trace_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+NO_TRACE, NOT_READ; EXPERIMENT_ROLE (imported).
+
+---- Outputs ----
+dict
+    'sentence': None, or the sentence for an experiment that is not in the
+    dataset or could not be read, or that has nothing for the trace and value
+    picked (then only 'name' is there beside it, None when no experiment is
+    found). Otherwise also 'name', 'experiment' (its slim copy), 'trace' (the
+    trace picked), 'times_min' and 'values': np.ndarray (n_points,), the times
+    from the addition picked, 'shift_min' (the time of that addition on the
+    experiment's own clock), 'additions_min' (the additions, on the times of
+    the plot), 'label' (the title of the y axis with its unit) and 'time_label'
+    (that of the time axis).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+t = x - a, with x a time on the experiment's own clock and a the time of the
+addition picked (its last addition when it has fewer; 0 for the start of the
+recording or a file without additions).
+
+---- Helpers ----
+_missing_sentence_finder
+_per_od_checker
+_time_label_writer
+_trace_roles_reader
+additions_lister
+role_experiment_finder
+trace_reader
+```
+
 #### `trace_plot_drawer`
 
 ```text
@@ -33477,8 +34923,7 @@ context : dict
     What a plot is drawn with (PLOT_DRAWERS).
 
 ---- Globals read ----
-LABELS_KEY, NO_TRACE, NOT_READ, NOT_THERE, REGIONS_KEY; EXPERIMENT_ROLE
-(imported).
+LABELS_KEY, REGIONS_KEY.
 
 ---- Outputs ----
 List[Axes]
@@ -33488,23 +34933,16 @@ List[Axes]
 None. Adds axes to the figure (side effect).
 
 ---- Equations ----
-t = x - a, with x a time on the experiment's own clock and a the time of the
-addition picked (its last addition when it has fewer; 0 for the start of the
-recording or a file without additions).
+None: see trace_numbers_lister.
 
 ---- Helpers ----
 _additions_drawer
-_per_od_checker
 _regions_drawer
 _sentence_drawer
 _spectrum_axes_styler
 _tick_reader
-_time_label_writer
 _trace_colour_finder
-_trace_roles_reader
-additions_lister
-role_experiment_finder
-trace_reader
+trace_numbers_lister
 ```
 
 #### `traces_left_out_lister`
@@ -33666,6 +35104,49 @@ _waterfall_roles_reader
 colour_shader
 plot_sets_lister
 spectra_averager
+```
+
+#### `waterfall_numbers_lister`
+
+```text
+---- Summary ----
+Main function to list the numbers of a Waterfall, of difference spectra or of
+traces alike: each of its lines from the top down, as it is before the plot
+moves it to stack them; or the sentence the plot shows when it has no line.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (waterfall_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+NO_MEAN, NO_WATERFALL, SPECTRUM_ROLE, TRACE_KEY; X_LABEL, Y_LABEL (imported).
+
+---- Outputs ----
+dict
+    'sentence': None, or the sentence of a waterfall without a line;
+    'is_spectra': True for difference spectra, False for traces; 'x_label': the
+    title of the wavelength or time axis; 'label': what a line measures, with
+    its unit; 'lines': each {'label', 'x': its wavelengths in nm or the shared
+    times in minutes, 'values'}, np.ndarray (n_points,) both; 'left_out': the
+    experiments left out; 'additions_min': the shared times of the additions of
+    a waterfall of traces, [] for spectra.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None: see waterfall_lines_lister and waterfall_traces_lister.
+
+---- Helpers ----
+_time_label_writer
+waterfall_lines_lister
+waterfall_traces_lister
 ```
 
 #### `waterfall_plot_drawer`

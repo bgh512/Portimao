@@ -842,8 +842,8 @@ def test_the_run_saves_the_figure_and_its_master_page(tmp_path: Path,
                                                       ) -> None:
     """
     ---- Summary ----
-    Main function to check what the run does with a page that holds plots: the figure
-    and its master page are saved in the results folder, the master page on the
+    Main function to check what the run does with a page that holds plots: the figure,
+    its master page and its workbook are saved in the results folder, the master page on the
     journal's page (A4 for Nature, which gives none), and each is named on screen; a
     master page that is open in another program gives one plain sentence, with the
     words of Python in the log only, and the figure is still saved; a figure that
@@ -878,7 +878,8 @@ def test_the_run_saves_the_figure_and_its_master_page(tmp_path: Path,
     page = _page_maker()
     figure = tmp_path / 'dataset_figure_nature.pdf'
     master = tmp_path / 'dataset_figure_master_nature.pdf'
-    assert program.dataset_figure_saver(page, tmp_path) == [figure, master]
+    workbook = tmp_path / 'dataset_figure_nature.xlsx'
+    assert program.dataset_figure_saver(page, tmp_path) == [figure, master, workbook]
     boxes = re.findall(rb'/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]',
                        master.read_bytes(),
                        )
@@ -898,7 +899,7 @@ def test_the_run_saves_the_figure_and_its_master_page(tmp_path: Path,
     details_place_setter(log, 'the test log')
     try:
         monkeypatch.setattr(program, 'master_page_exporter', refuser)
-        assert program.dataset_figure_saver(page, tmp_path) == [figure]
+        assert program.dataset_figure_saver(page, tmp_path) == [figure, workbook]
         shown = ' '.join(capsys.readouterr().out.split())
         assert ('The master page of the dataset figure was not saved: '
                 'dataset_figure_master_nature.pdf could not be opened or saved, perhaps '

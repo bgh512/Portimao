@@ -24,6 +24,7 @@ import config as settings
 from utils_shared.app_messages import SEND_DETAILS, start_problem_shower
 from utils_shared.dataset_settings import dataset_settings_saver, file_settings_merger
 from utils_shared.dataset_setup import setup_plainer
+from utils_shared.dataset_workbook_exporter import dataset_workbook_exporter
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.figure_page import (FIGURE_NAME,
                                       figure_page_exporter,
@@ -155,8 +156,9 @@ def dataset_figure_saver(page: FigurePage,
     ---- Summary ----
     Main function to save the dataset figure built on the page: the figure as a PDF of
     its printed size, with text that can still be changed, then its master page, the
-    figure on a page of its journal. A page with no plot saves nothing. A file that
-    cannot be saved is said in one sentence and the run goes on. An experiment a plot
+    figure on a page of its journal, then its workbook, the numbers of its plots and
+    its tests. A page with no plot saves nothing. A file that cannot be saved is said
+    in one sentence and the run goes on. An experiment a plot
     shows that could not be read when the plots were saved is named in one warning,
     and the plot is drawn without it; so is an experiment a waterfall leaves out for
     having no difference spectrum, and one a mean trace (or a waterfall of traces)
@@ -181,16 +183,18 @@ def dataset_figure_saver(page: FigurePage,
 
     ---- Outputs ----
     List[Path]
-        The files saved: none, the figure, or the figure and its master page.
+        The files saved: none when the figure could not be saved; otherwise the
+        figure, then its master page and its workbook, each when it was saved.
 
     ---- Globals mutated ----
-    None. Writes the two PDFs and prints the outcome; the details of a problem go to
-    the log (side effects).
+    None. Writes the two PDFs and the workbook and prints the outcome; the details
+    of a problem go to the log (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    dataset_workbook_exporter
     figure_page_exporter
     master_page_exporter
     page_experiments_lister
@@ -269,6 +273,7 @@ def dataset_figure_saver(page: FigurePage,
           )
 
     # ---- 2 Its master page -----------------------------------------------------------
+    saved = [path]
     try:
         master = master_page_exporter(figure,
                                       spec,
@@ -278,9 +283,26 @@ def dataset_figure_saver(page: FigurePage,
                                       )
     except Exception as exc:  # the figure itself is saved
         problem_shower('  The master page of the dataset figure was not saved', exc)
-        return [path]
-    print(f'  Saved {master.name} (the figure on a page of the journal)')
-    return [path, master]
+    else:
+        print(f'  Saved {master.name} (the figure on a page of the journal)')
+        saved.append(master)
+
+    # ---- 3 Its workbook --------------------------------------------------------------
+    try:
+        workbook = dataset_workbook_exporter(page,
+                                             export_root,
+                                             setup,
+                                             experiments,
+                                             answers,
+                                             )
+    except Exception as exc:  # the figure itself is saved
+        problem_shower('  The workbook of the dataset figure was not saved', exc)
+    else:
+        print(f'  Saved {workbook.name} (the numbers of the figure and its tests, to '
+              f'check by hand)',
+              )
+        saved.append(workbook)
+    return saved
 
 
 # ---- everything_asker ----------------------------------------------------------------

@@ -1,4 +1,4 @@
-# Portimao question flow (V2.35)
+# Portimao question flow (V2.36)
 
 Every question in the order it is asked, with where each answer leads. The question text is the text on screen.
 
@@ -388,7 +388,7 @@ The figure of the whole dataset is laid out on a page, which takes the place of 
 | 6.4 | What should the template be called? (an empty answer is refused: "Type a name for the template.") | A template of that name already there → **6.5**. Otherwise the template is written in the `layouts` folder, one line says so ("Saved the template … It is in the list beside Load template from now on."), then **9.1**. A template that cannot be written says why in one line, then **9.1**. |
 | 6.5 | A template called *name* is already there. Do you want to replace it? `(y/N)` | **Yes**: it is written over, then **9.1**. **No** → **6.4** again. |
 
-When the run starts, a page with at least one plot is saved in the results folder as `dataset_figure_<journal>.pdf`: the figure at exactly its printed size, drawn as lines and text with its fonts in the file, so the text can still be changed in a drawing program. A character the journal's font does not have (a subscript, a raised minus) is drawn in the next font that has it, as on the plot of one file. Its master page, `dataset_figure_master_<journal>.pdf`, is the same figure on one page of the journal, as **Export master** makes for one experiment. An empty page saves neither. A PDF that cannot be written (open in another program) is said in one sentence and the run goes on.
+When the run starts, a page with at least one plot is saved in the results folder as `dataset_figure_<journal>.pdf`: the figure at exactly its printed size, drawn as lines and text with its fonts in the file, so the text can still be changed in a drawing program. A character the journal's font does not have (a subscript, a raised minus) is drawn in the next font that has it, as on the plot of one file. Its master page, `dataset_figure_master_<journal>.pdf`, is the same figure on one page of the journal, as **Export master** makes for one experiment. Its workbook, `dataset_figure_<journal>.xlsx`, holds the numbers of the figure so they can be checked by hand: a sheet for each Bar chart, Before and after, Response by region and Time points with the number of every experiment and the n, mean, SD and SEM of each set, and a Tests sheet with t, the degrees of freedom, p and the corrected p of every test, each beside the Excel formula that repeats it. The other plots have a sheet each too: a Single trace its time and value; a Mean trace the shared time, the lined-up trace of every experiment, and the mean and band of each set beside their Excel formulas; a Difference spectrum the wavelength, the difference and each part ticked; a Waterfall each line before it is stacked; a Standard experiment one sentence naming the experiment's own workbook, where its traces are. An empty page saves none of the three. A file that cannot be written (open in another program) is said in one sentence and the run goes on.
 
 ---
 
@@ -400,7 +400,7 @@ Nothing is asked here, and the number 7 is not used: the time response and the h
 
 ## 8. Dataset export
 
-Nothing is asked here: the workbook of each experiment, and its spectra, are written in the experiment export (**5.9**). The number 8 is kept for the dataset workbook still to come.
+Nothing is asked here: the workbook of each experiment, and its spectra, are written in the experiment export (**5.9**). The workbook of the dataset figure is written with the figure (section 6).
 
 ---
 

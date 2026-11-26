@@ -639,7 +639,8 @@ def _standard_config_builder(experiment: dict,
     plot : PagePlot
         The plot, with its roles.
     context : dict
-        What a plot is drawn with (PLOT_DRAWERS): its 'answers' and 'page' are used.
+        What a plot is drawn with (PLOT_DRAWERS): its 'answers' and 'page' are used;
+        without a 'page', the journal and size of the run are kept.
 
     ---- Globals read ----
     DELTA_PSI_KEY, FIRST_VIEW, HAEM_KEY_START, LABELS_KEY, NO_HAEMS, NO_PANEL,
@@ -666,12 +667,10 @@ def _standard_config_builder(experiment: dict,
     """
 
     # ---- 1 The run's settings at the page's journal and size -------------------------
-    page, roles = context['page'], plot.roles
-    answers = dict(context['answers'],
-                   journal=page.journal,
-                   columns=page.columns,
-                   height=page.height,
-                   )
+    page, roles = context.get('page'), plot.roles
+    answers = dict(context['answers'])
+    if page is not None:
+        answers.update(journal=page.journal, columns=page.columns, height=page.height)
     cfg = settings.Config(answers)
     answers = cfg.answers
 
@@ -2493,7 +2492,8 @@ def bar_numbers_lister(setup: Optional[dict],
         'sets': the sets that have a value (plot_set, DATA_FORMAT.md), each with its
         'values'; 'statistics': the numbers of the plot (plot_statistics,
         DATA_FORMAT.md), one column, its sets in the same order; 'label': the title
-        of the y axis; 'region': the name of the region; 'error', 'test' and 'marks':
+        of the y axis; 'region': the name of the region; 'kind': the kind of
+        averaging region read ('settled' or 'quick'); 'error', 'test' and 'marks':
         what the form says.
 
     ---- Globals mutated ----
@@ -2516,13 +2516,13 @@ def bar_numbers_lister(setup: Optional[dict],
 
     trace, value = _measurement_reader(roles, answers, VO2_VALUES[0][0])
     region, words = _region_reader(roles, REGION_KEY, 1)
-    is_per_od = _per_od_checker(answers)
+    is_per_od, kind = _per_od_checker(answers), _kind_reader(roles, answers)
     sets = set_values_lister(plot_sets_lister(setup, roles),
                              experiments,
                              trace,
                              value,
                              region,
-                             _kind_reader(roles, answers),
+                             kind,
                              is_per_od,
                              )
     sets = [one for one in sets if any(number is not None for number in one['values'])]
@@ -2536,6 +2536,7 @@ def bar_numbers_lister(setup: Optional[dict],
             'statistics': plot_statistics_builder(columns, test),
             'label': _y_label_finder(sets, experiments, trace, value, is_per_od),
             'region': words,
+            'kind': kind,
             'error': _choice_reader(roles, ERROR_KEY, ERROR_CHOICES),
             'test': test,
             'marks': _choice_reader(roles, MARKS_KEY, MARK_CHOICES),
@@ -2830,7 +2831,8 @@ def before_after_numbers_lister(setup: Optional[dict],
         in the second region (None for none); 'statistics': the numbers of the plot
         (plot_statistics, DATA_FORMAT.md), paired, its sets in the same order;
         'label': the title of the y axis; 'regions': the names of the two regions;
-        'marks': what the form says.
+        'kind': the kind of averaging region read ('settled' or 'quick'); 'marks':
+        what the form says.
 
     ---- Globals mutated ----
     None.
@@ -2877,6 +2879,7 @@ def before_after_numbers_lister(setup: Optional[dict],
             'statistics': paired_statistics_builder(sets, words),
             'label': _y_label_finder(sets, experiments, trace, value, is_per_od),
             'regions': words,
+            'kind': kind,
             'marks': _choice_reader(roles, MARKS_KEY, MARK_CHOICES),
             }
 
@@ -3074,6 +3077,90 @@ def difference_form_maker(setup: dict,
             ]
 
 
+# ---- difference_numbers_lister -------------------------------------------------------
+def difference_numbers_lister(setup: Optional[dict],
+                              roles: Dict[str, str],
+                              experiments: Dict[str, dict],
+                              answers: dict,
+                              ) -> dict:
+    """
+    ---- Summary ----
+    Main function to list the numbers of a Difference spectrum: the difference of
+    its experiment, reduced minus oxidised, and each part its form ticks, at each
+    wavelength; or the sentence the plot shows when it has nothing to draw.
+
+    ---- Inputs ----
+    setup : Optional[dict]
+        The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+    roles : Dict[str, str]
+        The roles of the plot (difference_form_maker).
+    experiments : Dict[str, dict]
+        {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+    answers : dict
+        The answers of the run; not used.
+
+    ---- Globals read ----
+    BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY, NO_DIFFERENCE, NOT_READ,
+    RESIDUAL_KEY; EXPERIMENT_ROLE (imported).
+
+    ---- Outputs ----
+    dict
+        'sentence': None, or the sentence for an experiment that is not in the
+        dataset, could not be read or has no difference spectrum (then only 'name'
+        is there beside it, None when no experiment is found). Otherwise also
+        'name', 'experiment' (its slim copy), 'parts' (its 'difference_parts'),
+        'wavelengths_nm': np.ndarray (n_wavelengths,), 'columns': (its name, its
+        values in mOD, (n_wavelengths,)) of the difference and of each part ticked,
+        in the order Measured, each haem, Background, Fit, Residual,
+        'has_residual': whether the residual is ticked, and 'bands': {haem: (from,
+        to) in nm} when the haem bands are ticked, otherwise {}.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None. Everything is in mOD (MATHS.md section 9).
+
+    ---- Helpers ----
+    _missing_sentence_finder
+    _tick_reader
+    role_experiment_finder
+    """
+
+    # ---- 1 The experiment and its difference spectrum --------------------------------
+    name = role_experiment_finder(setup, roles.get(EXPERIMENT_ROLE, ''))
+    if name is None:
+        return {'sentence': _missing_sentence_finder(roles), 'name': None}
+    experiment = experiments.get(name)
+    if experiment is None:
+        return {'sentence': NOT_READ.format(name), 'name': name}
+    parts = experiment.get('difference_parts')
+    if parts is None:
+        return {'sentence': NO_DIFFERENCE.format(name), 'name': name}
+
+    # ---- 2 The difference and what is ticked -----------------------------------------
+    columns = [('Measured', parts['measured_mOD'])]
+    if _tick_reader(roles, COMPONENTS_KEY, True):
+        columns += list(parts['haems_mOD'].items())
+    if _tick_reader(roles, BACKGROUND_KEY, False):
+        columns.append(('Background', parts['background_mOD']))
+    if _tick_reader(roles, FIT_KEY, True):
+        columns.append(('Fit', parts['fit_mOD']))
+    has_residual = _tick_reader(roles, RESIDUAL_KEY, True)
+    if has_residual:
+        columns.append(('Residual', parts['residual_mOD']))
+    has_bands = _tick_reader(roles, BANDS_KEY, False)
+    return {'sentence': None,
+            'name': name,
+            'experiment': experiment,
+            'parts': parts,
+            'wavelengths_nm': np.asarray(parts['wavelengths_nm'], dtype=float),
+            'columns': columns,
+            'has_residual': has_residual,
+            'bands': dict(experiment.get('haem_bands') or {}) if has_bands else {},
+            }
+
+
 # ---- difference_plot_drawer ----------------------------------------------------------
 def difference_plot_drawer(fig: Figure,
                            room: Tuple[float, float, float, float],
@@ -3101,9 +3188,9 @@ def difference_plot_drawer(fig: Figure,
         What a plot is drawn with (PLOT_DRAWERS).
 
     ---- Globals read ----
-    BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY, NO_DIFFERENCE, NOT_READ,
-    NOT_THERE, RESIDUAL_KEY; settings.COMPONENT_FIGURE_STYLE; EXPERIMENT_ROLE,
-    RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, X_LABEL, Y_LABEL (imported).
+    BACKGROUND_KEY, BANDS_KEY, COMPONENTS_KEY, FIT_KEY;
+    settings.COMPONENT_FIGURE_STYLE; RESIDUAL_HEIGHT_SHARE, RESIDUAL_LABEL, X_LABEL,
+    Y_LABEL (imported).
 
     ---- Outputs ----
     List[Axes]
@@ -3120,25 +3207,24 @@ def difference_plot_drawer(fig: Figure,
     _sentence_drawer
     _spectrum_axes_styler
     _tick_reader
+    difference_numbers_lister
     haem_bands_drawer
-    role_experiment_finder
     """
 
     # ---- 1 The experiment and its difference spectrum --------------------------------
     roles = plot.roles
-    name = role_experiment_finder(context['setup'], roles.get(EXPERIMENT_ROLE, ''))
-    if name is None:
-        return _sentence_drawer(fig, room, context, _missing_sentence_finder(roles))
-    experiment = context['experiments'].get(name)
-    if experiment is None:
-        return _sentence_drawer(fig, room, context, NOT_READ.format(name))
-    parts =experiment.get('difference_parts')
-    if parts is None:
-        return _sentence_drawer(fig, room, context, NO_DIFFERENCE.format(name))
+    found = difference_numbers_lister(context['setup'],
+                                      roles,
+                                      context['experiments'],
+                                      context['answers'],
+                                      )
+    if found['sentence'] is not None:
+        return _sentence_drawer(fig, room, context, found['sentence'])
+    experiment, parts = found['experiment'], found['parts']
 
     # ---- 2 The panels: the spectrum, and the residual underneath ---------------------
     x0, y0, x1, y1 = room
-    has_residual = _tick_reader(roles, RESIDUAL_KEY, True)
+    has_residual = found['has_residual']
     if has_residual:
         grid = GridSpec(2,
                         1,
@@ -3292,11 +3378,14 @@ def mean_lines_lister(setup: Optional[dict],
     ---- Outputs ----
     dict
         What _sets_aligner gives ('times_min', 'additions_min', 'breaks_min',
-        'left_out', 'label', 'events', 'zero', ...), with 'lines': one per set that
-        has an experiment kept, each {'label': the name of the set with how many
-        experiments its mean is of ('control (n = 3)'), 'colour', 'line_style',
-        'mean': np.ndarray (n_times,), 'spread': the SEM or the SD at each time
-        (n_times,), or None for no band}.
+        'left_out', 'label', 'events', 'zero', ...), with 'band' (the band picked,
+        a key of BAND_CHOICES), 'time_label' (the title of the time axis) and
+        'lines': one per set that has an experiment kept, each {'label': the name
+        of the set with how many experiments its mean is of ('control (n = 3)'),
+        'name': the name of the set, 'names': its experiments kept, 'traces': their
+        lined-up traces, np.ndarray (n_experiments, n_times), 'colour',
+        'line_style', 'mean': np.ndarray (n_times,), 'spread': the SEM or the SD at
+        each time (n_times,), or None for no band}.
 
     ---- Globals mutated ----
     None.
@@ -3306,6 +3395,7 @@ def mean_lines_lister(setup: Optional[dict],
 
     ---- Helpers ----
     _sets_aligner
+    _time_label_writer
     plot_sets_lister
     traces_averager
     """
@@ -3322,13 +3412,22 @@ def mean_lines_lister(setup: Optional[dict],
             continue
         averages = traces_averager(found['values'][rows])
         lines.append({'label': f"{entry['name']} (n = {len(rows)})",
+                      'name': entry['name'],
+                      'names': [found['kept'][row][1] for row in rows],
+                      'traces': found['values'][rows],
                       'colour': entry['colour'],
                       'line_style': entry['line_style'],
                       'mean': averages['mean'],
                       'spread': averages.get(band),
                       },
                      )
-    return dict(found, lines=lines)
+    return dict(found,
+                lines=lines,
+                band=band,
+                time_label=_time_label_writer(found['zero'],
+                                              len(found['additions_min']),
+                                              ),
+                )
 
 
 # ---- mean_plot_drawer ----------------------------------------------------------------
@@ -3376,7 +3475,6 @@ def mean_plot_drawer(fig: Figure,
     _sentence_drawer
     _spectrum_axes_styler
     _tick_reader
-    _time_label_writer
     line_breaker
     mean_lines_lister
     """
@@ -3423,13 +3521,7 @@ def mean_plot_drawer(fig: Figure,
                       _tick_reader(plot.roles, LABELS_KEY, True),
                       )
     _breaks_drawer(ax, breaks, context)
-    _spectrum_axes_styler(ax,
-                          context,
-                          _time_label_writer(found['zero'],
-                                             len(found['additions_min']),
-                                             ),
-                          found['label'],
-                          )
+    _spectrum_axes_styler(ax, context, found['time_label'], found['label'])
     return [ax]
 
 
@@ -3661,7 +3753,8 @@ def response_numbers_lister(setup: Optional[dict],
         name of each region, 'Baseline' then each addition as the first experiment
         has it; 'statistics': the columns and the tests of every row in one, for
         the caption; 'left_out' and 'differing': the experiments _additions_checker
-        names; 'error', 'test' and 'marks': what the form says.
+        names; 'kind': the kind of averaging region read ('settled' or 'quick');
+        'error', 'test' and 'marks': what the form says.
 
     ---- Globals mutated ----
     None.
@@ -3756,6 +3849,7 @@ def response_numbers_lister(setup: Optional[dict],
                            },
             'left_out': checked['left_out'],
             'differing': checked['differing'],
+            'kind': kind,
             'error': _choice_reader(roles, ERROR_KEY, ERROR_CHOICES),
             'test': test,
             'marks': _choice_reader(roles, MARKS_KEY, MARK_CHOICES),
@@ -3968,6 +4062,85 @@ def standard_form_maker(setup: dict,
                                 ),
                ]
     return fields
+
+
+# ---- standard_numbers_lister ---------------------------------------------------------
+def standard_numbers_lister(setup: Optional[dict],
+                            roles: Dict[str, str],
+                            experiments: Dict[str, dict],
+                            answers: dict,
+                            ) -> dict:
+    """
+    ---- Summary ----
+    Main function to say what a Standard experiment shows: its experiment, the
+    panels it draws and the view of its haems; or the sentence the plot shows when
+    it has nothing to draw. Its traces are those of the experiment's own workbook.
+
+    ---- Inputs ----
+    setup : Optional[dict]
+        The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+    roles : Dict[str, str]
+        The roles of the plot (standard_form_maker).
+    experiments : Dict[str, dict]
+        {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+    answers : dict
+        The answers of the run.
+
+    ---- Globals read ----
+    FIRST_VIEW, NOT_READ, VIEW_CHOICES, VIEW_KEY; EXPERIMENT_ROLE (imported).
+
+    ---- Outputs ----
+    dict
+        'sentence': None, or the sentence for an experiment that is not in the
+        dataset or could not be read, or a plot with nothing to show; 'name': the
+        experiment, None when none is found; 'panels': the panels drawn, from the
+        top ('Oxygen', 'OCR', each haem by its name, 'Δψ'), [] with a sentence;
+        'view': how the haems are shown ('ΔD'), None when no haem panel is drawn.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _missing_sentence_finder
+    _standard_config_builder
+    role_experiment_finder
+    """
+
+    # ---- 1 The experiment ------------------------------------------------------------
+    empty = {'panels': [], 'view': None}
+    name = role_experiment_finder(setup, roles.get(EXPERIMENT_ROLE, ''))
+    if name is None:
+        return dict(empty, sentence=_missing_sentence_finder(roles), name=None)
+    experiment = experiments.get(name)
+    if experiment is None:
+        return dict(empty, sentence=NOT_READ.format(name), name=name)
+    config, _, problem = _standard_config_builder(experiment,
+                                                  PagePlot('P1', 0, 0, roles=roles),
+                                                  {'answers': answers},
+                                                  )
+    if problem is not None:
+        return dict(empty, sentence=problem, name=name)
+
+    # ---- 2 Its panels, from the top --------------------------------------------------
+    panels = []
+    if config['PLOT_SET_AND_MEASURED_O2']:
+        panels.append('Oxygen')
+    if config['PLOT_VO2']:
+        panels.append('OCR')
+    haems = [str(panel['haems'][0]) for panel in config['HAEM_PANELS']]
+    panels += haems
+    if config['PLOT_DELTA_PSI'] and 'delta_psi' in experiment:
+        panels.append('Δψ')
+    views = dict(VIEW_CHOICES)
+    view = roles.get(VIEW_KEY) if roles.get(VIEW_KEY) in views else FIRST_VIEW
+    return {'sentence': None,
+            'name': name,
+            'panels': panels,
+            'view': views[view] if haems else None,
+            }
 
 
 # ---- standard_plot_drawer ------------------------------------------------------------
@@ -4240,8 +4413,9 @@ def time_points_numbers_lister(setup: Optional[dict],
         order drawn; 'time_points', 'places', 'unit', 'ticks' and 'title': the
         time points and where they sit (_time_points_placer); 'label': the title
         of the y axis; 'trace' and 'value': the measurement, as trace_reader takes
-        it; 'region': the name of the region; 'error', 'test' and 'marks': what
-        the form says.
+        it; 'region': the name of the region; 'kind': the kind of averaging region
+        read ('settled' or 'quick'); 'error', 'test' and 'marks': what the form
+        says.
 
     ---- Globals mutated ----
     None.
@@ -4266,14 +4440,14 @@ def time_points_numbers_lister(setup: Optional[dict],
     # ---- 1 The value and the time point of each experiment ---------------------------
     trace, value = _measurement_reader(roles, answers, VO2_VALUES[0][0])
     region, words = _region_reader(roles, REGION_KEY, 1)
-    is_per_od = _per_od_checker(answers)
+    is_per_od, kind = _per_od_checker(answers), _kind_reader(roles, answers)
     sets = set_values_lister(
         plot_sets_lister(setup, dict(roles, **{STACK_KEY: TOGETHER})),
         experiments,
         trace,
         value,
         region,
-        _kind_reader(roles, answers),
+        kind,
         is_per_od,
         )
     rows = [row for row in (setup or {}).get('rows') or [] if row['use']]
@@ -4330,6 +4504,7 @@ def time_points_numbers_lister(setup: Optional[dict],
             'trace': trace,
             'value': value,
             'region': words,
+            'kind': kind,
             'error': _choice_reader(roles, ERROR_KEY, ERROR_CHOICES),
             'test': test,
             'marks': _choice_reader(roles, MARKS_KEY, MARK_CHOICES),
@@ -4476,6 +4651,92 @@ def trace_form_maker(setup: dict,
             )
 
 
+# ---- trace_numbers_lister ------------------------------------------------------------
+def trace_numbers_lister(setup: Optional[dict],
+                         roles: Dict[str, str],
+                         experiments: Dict[str, dict],
+                         answers: dict,
+                         ) -> dict:
+    """
+    ---- Summary ----
+    Main function to list the numbers of a Single trace: one trace of its experiment
+    in the value picked, with its time counted from the addition picked (or from the
+    start of the recording); or the sentence the plot shows when it has nothing to
+    draw.
+
+    ---- Inputs ----
+    setup : Optional[dict]
+        The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+    roles : Dict[str, str]
+        The roles of the plot (trace_form_maker).
+    experiments : Dict[str, dict]
+        {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+    answers : dict
+        The answers of the run.
+
+    ---- Globals read ----
+    NO_TRACE, NOT_READ; EXPERIMENT_ROLE (imported).
+
+    ---- Outputs ----
+    dict
+        'sentence': None, or the sentence for an experiment that is not in the
+        dataset or could not be read, or that has nothing for the trace and value
+        picked (then only 'name' is there beside it, None when no experiment is
+        found). Otherwise also 'name', 'experiment' (its slim copy), 'trace' (the
+        trace picked), 'times_min' and 'values': np.ndarray (n_points,), the times
+        from the addition picked, 'shift_min' (the time of that addition on the
+        experiment's own clock), 'additions_min' (the additions, on the times of
+        the plot), 'label' (the title of the y axis with its unit) and 'time_label'
+        (that of the time axis).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    t = x - a, with x a time on the experiment's own clock and a the time of the
+    addition picked (its last addition when it has fewer; 0 for the start of the
+    recording or a file without additions).
+
+    ---- Helpers ----
+    _missing_sentence_finder
+    _per_od_checker
+    _time_label_writer
+    _trace_roles_reader
+    additions_lister
+    role_experiment_finder
+    trace_reader
+    """
+
+    # ---- 1 The experiment and its trace ----------------------------------------------
+    name = role_experiment_finder(setup, roles.get(EXPERIMENT_ROLE, ''))
+    if name is None:
+        return {'sentence': _missing_sentence_finder(roles), 'name': None}
+    experiment = experiments.get(name)
+    if experiment is None:
+        return {'sentence': NOT_READ.format(name), 'name': name}
+    trace, value, zero = _trace_roles_reader(roles, answers)
+    read = trace_reader(experiment, trace, value, _per_od_checker(answers))
+    if read is None or not np.isfinite(read['values']).any():
+        return {'sentence': NO_TRACE.format(name), 'name': name}
+
+    # ---- 2 Its time, from the addition picked ----------------------------------------
+    additions = additions_lister(experiment)
+    shift = 0.0
+    if zero is not None and additions:
+        shift = additions[min(zero, len(additions) - 1)]
+    return {'sentence': None,
+            'name': name,
+            'experiment': experiment,
+            'trace': trace,
+            'times_min': read['times_min'] - shift,
+            'values': read['values'],
+            'shift_min': shift,
+            'additions_min': [moment - shift for moment in additions],
+            'label': read['label'],
+            'time_label': _time_label_writer(zero, len(additions)),
+            }
+
+
 # ---- trace_plot_drawer ---------------------------------------------------------------
 def trace_plot_drawer(fig: Figure,
                       room: Tuple[float, float, float, float],
@@ -4503,8 +4764,7 @@ def trace_plot_drawer(fig: Figure,
         What a plot is drawn with (PLOT_DRAWERS).
 
     ---- Globals read ----
-    LABELS_KEY, NO_TRACE, NOT_READ, NOT_THERE, REGIONS_KEY; EXPERIMENT_ROLE
-    (imported).
+    LABELS_KEY, REGIONS_KEY.
 
     ---- Outputs ----
     List[Axes]
@@ -4514,51 +4774,35 @@ def trace_plot_drawer(fig: Figure,
     None. Adds axes to the figure (side effect).
 
     ---- Equations ----
-    t = x - a, with x a time on the experiment's own clock and a the time of the
-    addition picked (its last addition when it has fewer; 0 for the start of the
-    recording or a file without additions).
+    None: see trace_numbers_lister.
 
     ---- Helpers ----
     _additions_drawer
-    _per_od_checker
     _regions_drawer
     _sentence_drawer
     _spectrum_axes_styler
     _tick_reader
-    _time_label_writer
     _trace_colour_finder
-    _trace_roles_reader
-    additions_lister
-    role_experiment_finder
-    trace_reader
+    trace_numbers_lister
     """
 
-    # ---- 1 The experiment and its trace ----------------------------------------------
+    # ---- 1 The experiment and its trace, its time from the addition picked -----------
     roles, answers = plot.roles, context['answers']
-    name = role_experiment_finder(context['setup'], roles.get(EXPERIMENT_ROLE, ''))
-    if name is None:
-        return _sentence_drawer(fig, room, context, _missing_sentence_finder(roles))
-    experiment = context['experiments'].get(name)
-    if experiment is None:
-        return _sentence_drawer(fig, room, context, NOT_READ.format(name))
-    trace, value, zero = _trace_roles_reader(roles, answers)
-    read = trace_reader(experiment, trace, value, _per_od_checker(answers))
-    if read is None or not np.isfinite(read['values']).any():
-        return _sentence_drawer(fig, room, context, NO_TRACE.format(name))
+    found = trace_numbers_lister(context['setup'],
+                                 roles,
+                                 context['experiments'],
+                                 answers,
+                                 )
+    if found['sentence'] is not None:
+        return _sentence_drawer(fig, room, context, found['sentence'])
+    experiment, times, shift = found['experiment'], found['times_min'], found['shift_min']
 
-    # ---- 2 Its time, from the addition picked ----------------------------------------
-    additions = additions_lister(experiment)
-    shift = 0.0
-    if zero is not None and additions:
-        shift = additions[min(zero, len(additions) - 1)]
-    times = read['times_min'] - shift
-
-    # ---- 3 The trace, the regions and the additions ----------------------------------
+    # ---- 2 The trace, the regions and the additions ----------------------------------
     x0, y0, x1, y1 = room
     ax = fig.add_axes((x0, y0, x1 - x0, y1 - y0))
     ax.plot(times,
-            read['values'],
-            color=_trace_colour_finder(trace, answers),
+            found['values'],
+            color=_trace_colour_finder(found['trace'], answers),
             linewidth=context['style']['line_width'],
             )
     ax.set_xlim(float(times[0]), float(times[-1]))
@@ -4568,16 +4812,12 @@ def trace_plot_drawer(fig: Figure,
                     key=lambda event: event['time'],
                     )
     _additions_drawer(ax,
-                      [moment - shift for moment in additions],
+                      found['additions_min'],
                       events,
                       context,
                       _tick_reader(roles, LABELS_KEY, True),
                       )
-    _spectrum_axes_styler(ax,
-                          context,
-                          _time_label_writer(zero, len(additions)),
-                          read['label'],
-                          )
+    _spectrum_axes_styler(ax, context, found['time_label'], found['label'])
     return [ax]
 
 
@@ -4862,6 +5102,86 @@ def waterfall_lines_lister(setup: Optional[dict],
                       },
                      )
     return lines, left_out
+
+
+# ---- waterfall_numbers_lister --------------------------------------------------------
+def waterfall_numbers_lister(setup: Optional[dict],
+                             roles: Dict[str, str],
+                             experiments: Dict[str, dict],
+                             answers: dict,
+                             ) -> dict:
+    """
+    ---- Summary ----
+    Main function to list the numbers of a Waterfall, of difference spectra or of
+    traces alike: each of its lines from the top down, as it is before the plot
+    moves it to stack them; or the sentence the plot shows when it has no line.
+
+    ---- Inputs ----
+    setup : Optional[dict]
+        The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+    roles : Dict[str, str]
+        The roles of the plot (waterfall_form_maker).
+    experiments : Dict[str, dict]
+        {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+    answers : dict
+        The answers of the run.
+
+    ---- Globals read ----
+    NO_MEAN, NO_WATERFALL, SPECTRUM_ROLE, TRACE_KEY; X_LABEL, Y_LABEL (imported).
+
+    ---- Outputs ----
+    dict
+        'sentence': None, or the sentence of a waterfall without a line;
+        'is_spectra': True for difference spectra, False for traces; 'x_label': the
+        title of the wavelength or time axis; 'label': what a line measures, with
+        its unit; 'lines': each {'label', 'x': its wavelengths in nm or the shared
+        times in minutes, 'values'}, np.ndarray (n_points,) both; 'left_out': the
+        experiments left out; 'additions_min': the shared times of the additions of
+        a waterfall of traces, [] for spectra.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None: see waterfall_lines_lister and waterfall_traces_lister.
+
+    ---- Helpers ----
+    _time_label_writer
+    waterfall_lines_lister
+    waterfall_traces_lister
+    """
+
+    # ---- 1 Difference spectra --------------------------------------------------------
+    if roles.get(TRACE_KEY, SPECTRUM_ROLE) == SPECTRUM_ROLE:
+        lines, left_out = waterfall_lines_lister(setup, roles, experiments)
+        return {'sentence': None if lines else NO_WATERFALL,
+                'is_spectra': True,
+                'x_label': X_LABEL,
+                'label': Y_LABEL,
+                'lines': [{'label': line['label'],
+                           'x': np.asarray(line['wavelengths_nm'], dtype=float),
+                           'values': np.asarray(line['values_mOD'], dtype=float),
+                           }
+                          for line in lines
+                          ],
+                'left_out': left_out,
+                'additions_min': [],
+                }
+
+    # ---- 2 Traces --------------------------------------------------------------------
+    found = waterfall_traces_lister(setup, roles, experiments, answers)
+    lines = [{'label': line['label'], 'x': found['times_min'], 'values': line['values']}
+             for line in found['lines']
+             if np.isfinite(line['values']).any()
+             ]
+    return {'sentence': None if lines else NO_MEAN,
+            'is_spectra': False,
+            'x_label': _time_label_writer(found['zero'], len(found['additions_min'])),
+            'label': found['label'],
+            'lines': lines,
+            'left_out': found['left_out'],
+            'additions_min': list(found['additions_min']),
+            }
 
 
 # ---- waterfall_plot_drawer -----------------------------------------------------------
