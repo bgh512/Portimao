@@ -42,6 +42,10 @@ BACKDROP_MARK = 'is_backdrop'
 # lacks (Arial has no subscripts and no raised minus) is drawn in the first of these
 # that has it, in place of an empty box
 FALLBACK_FONTS = ('Liberation Sans', 'DejaVu Sans')
+# How the name of a font collection file ends (several fonts in one file). A figure
+# never names a font kept in one: on a Mac, Helvetica is, and a text with a raised
+# minus or a subscript drawn in it stops the drawing ("failed to load glyph")
+COLLECTION_ENDINGS = ('.ttc', '.otc', '.dfont')
 # what the user is told each text size of the figures is (figure_style_builder's
 # 'fonts'), in the warning about a journal's text sizes; panel letters follow the journal
 TEXT_NAMES = {'tick': 'tick labels and legends',
@@ -57,19 +61,22 @@ TEXT_NAMES = {'tick': 'tick labels and legends',
 def _installed_fonts_lister(families: Sequence[str]) -> List[str]:
     """
     ---- Summary ----
-    Helper function to list the font names that are on this computer.
+    Helper function to list the font names that are on this computer and that a
+    figure can be drawn in.
 
     ---- Inputs ----
     families : Sequence[str]
         Font names.
 
     ---- Globals read ----
-    None. Reads the list of installed fonts (side effect).
+    COLLECTION_ENDINGS (module constant). Reads the list of installed fonts (side
+    effect).
 
     ---- Outputs ----
     List[str]
         The names that are installed, in the order given; a name given twice is
-        kept once.
+        kept once. A font kept in a collection file is left out, as the plotting
+        library cannot draw every figure in one.
 
     ---- Globals mutated ----
     None.
@@ -84,8 +91,10 @@ def _installed_fonts_lister(families: Sequence[str]) -> List[str]:
     installed = []
     for family in dict.fromkeys(families):
         try:
-            findfont(family, fallback_to_default=False)
+            path = findfont(family, fallback_to_default=False)
         except ValueError:  # that font is not on this computer
+            continue
+        if str(path).lower().endswith(COLLECTION_ENDINGS):
             continue
         installed.append(family)
     return installed
@@ -700,8 +709,9 @@ def font_family_lister(families: List[str],
     """
     ---- Summary ----
     Main function to list the fonts a figure names: the journal's first font that is
-    on this computer, then the fallback fonts that are, so a character the journal's
-    font cannot draw (a subscript, a raised minus) is drawn in the next one that can.
+    on this computer and can be drawn in, then the fallback fonts that are, so a
+    character the journal's font cannot draw (a subscript, a raised minus) is drawn
+    in the next one that can.
 
     ---- Inputs ----
     families : List[str]
@@ -714,12 +724,13 @@ def font_family_lister(families: List[str],
 
     ---- Outputs ----
     List[str]
-        The journal's first installed font, then the installed fallbacks in their
-        order; a name given twice is kept once. The journal's other choices are left
-        out: text is drawn in the first font anyway, and one of them asked for a
-        character it lacks stops the drawing on a Mac (Helvetica there is a
-        collection file). ['sans-serif'] when no name is installed, which is the
-        plotting library's own font.
+        The journal's first usable font, then the usable fallbacks in their order; a
+        name given twice is kept once. A font kept in a collection file is not
+        usable (_installed_fonts_lister): on a Mac a journal that asks for
+        Helvetica, then Arial, is drawn in Arial, as it is on Windows, where there
+        is no Helvetica. The journal's other choices are left out, as text is drawn
+        in the first font anyway. ['sans-serif'] when no name is usable, which is
+        the plotting library's own font.
 
     ---- Globals mutated ----
     None.

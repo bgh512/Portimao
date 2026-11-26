@@ -500,15 +500,26 @@ def test_fonts_a_figure_names(monkeypatch: pytest.MonkeyPatch) -> None:
     None.
     """
 
-    installed = set()
+    installed, files = set(), {}
 
     def font_finder(family: str, fallback_to_default: bool = True) -> str:
         if family not in installed:
             raise ValueError(f'{family} is not installed.')
-        return family + '.ttf'
+        return files.get(family, family + '.ttf')
 
     monkeypatch.setattr(figure_layout, 'findfont', font_finder)
     journal, fallbacks = ['Arial', 'Helvetica'], ('Liberation Sans', 'DejaVu Sans')
+
+    # a Mac keeps Helvetica in a collection file, which a figure is never drawn in:
+    # a journal that asks for it first is drawn in its next choice, or the fallback
+    files = {'Helvetica': '/System/Library/Fonts/Helvetica.ttc'}
+    installed.update({'Arial', 'Helvetica', 'DejaVu Sans'})
+    assert font_family_lister(['Helvetica', 'Arial'], fallbacks) == ['Arial',
+                                                                     'DejaVu Sans',
+                                                                     ]
+    assert font_family_lister(['Helvetica'], fallbacks) == ['DejaVu Sans']
+    files.clear()
+    installed.clear()
 
     # a Mac: both of the journal's fonts, one fallback
     installed.update({'Arial', 'Helvetica', 'DejaVu Sans'})

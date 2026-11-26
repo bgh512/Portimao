@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.36
+- **Version:** V2.37
 - **Date:** 26/11/2026
 
 ## Contents
@@ -26671,19 +26671,22 @@ Journal-aware figure sizing and automatic layout.
 
 ```text
 ---- Summary ----
-Helper function to list the font names that are on this computer.
+Helper function to list the font names that are on this computer and that a
+figure can be drawn in.
 
 ---- Inputs ----
 families : Sequence[str]
     Font names.
 
 ---- Globals read ----
-None. Reads the list of installed fonts (side effect).
+COLLECTION_ENDINGS (module constant). Reads the list of installed fonts (side
+effect).
 
 ---- Outputs ----
 List[str]
     The names that are installed, in the order given; a name given twice is
-    kept once.
+    kept once. A font kept in a collection file is left out, as the plotting
+    library cannot draw every figure in one.
 
 ---- Globals mutated ----
 None.
@@ -27035,8 +27038,9 @@ None.
 ```text
 ---- Summary ----
 Main function to list the fonts a figure names: the journal's first font that is
-on this computer, then the fallback fonts that are, so a character the journal's
-font cannot draw (a subscript, a raised minus) is drawn in the next one that can.
+on this computer and can be drawn in, then the fallback fonts that are, so a
+character the journal's font cannot draw (a subscript, a raised minus) is drawn
+in the next one that can.
 
 ---- Inputs ----
 families : List[str]
@@ -27049,12 +27053,13 @@ None. Reads the list of installed fonts (side effect).
 
 ---- Outputs ----
 List[str]
-    The journal's first installed font, then the installed fallbacks in their
-    order; a name given twice is kept once. The journal's other choices are left
-    out: text is drawn in the first font anyway, and one of them asked for a
-    character it lacks stops the drawing on a Mac (Helvetica there is a
-    collection file). ['sans-serif'] when no name is installed, which is the
-    plotting library's own font.
+    The journal's first usable font, then the usable fallbacks in their order; a
+    name given twice is kept once. A font kept in a collection file is not
+    usable (_installed_fonts_lister): on a Mac a journal that asks for
+    Helvetica, then Arial, is drawn in Arial, as it is on Windows, where there
+    is no Helvetica. The journal's other choices are left out, as text is drawn
+    in the first font anyway. ['sans-serif'] when no name is usable, which is
+    the plotting library's own font.
 
 ---- Globals mutated ----
 None.
