@@ -4,26 +4,48 @@ Reads Espana Scientific Software `.paf` files, plots every experiment and the co
 
 Made by Beatrixette.
 
-**Feedback:** to report a problem or ask for a change, open the [Issues page](https://github.com/bgh512/Portimao/issues) and click **New issue** (a free GitHub account is needed). When Portimao does not start on a Mac, choose **Mac problem** and paste the Mac report into it (section 2.3, entry 8).
+**Feedback:** to report a problem or ask for a change, open the [Issues page](https://github.com/bgh512/Portimao/issues) and click **New issue** (a free GitHub account is needed). When Portimao does not start on a Mac, choose **Mac problem** and paste the Mac report into it (section 2.3, entry 11).
 
 ## 1. Installation
 
 ### 1.1 On a Mac: the app
 
-Portimao for the Mac is an app that carries everything it needs (there is no Python to install) and updates itself each time it starts. It needs macOS 14 (Sonoma) or newer.
+Portimao for the Mac is an app that carries everything it needs (there is no Python to install) and updates itself each time it starts.
 
-1. Open Terminal: press Cmd + Space, type `Terminal` and press Enter.
+**Before you start**
+
+- The Mac needs macOS 14 (Sonoma) or newer. To see yours: Apple menu > About This Mac, which shows the macOS version and the chip (*Chip: Apple M1*, M2, M3 ... is Apple Silicon; *Processor: ... Intel* is Intel). Both chips work, and the install picks the right app by itself.
+- The Mac needs the internet for the install.
+- No password and no administrator are needed: everything goes into your own home folder.
+
+**Install**
+
+1. Open Terminal: press Cmd + Space, type `Terminal` and press Enter. You should see a window with a line of text ending in `%` or `$`.
 2. Paste this line and press Enter:
 
     ```bash
     curl -fsSL https://raw.githubusercontent.com/bgh512/Portimao/main/install_mac.sh | bash
     ```
 
-The line picks the app for your Mac's chip (Apple Silicon or Intel), puts Portimao in your own Applications folder and opens it. No password is asked, and macOS shows no warning. From then on, open Portimao from Launchpad, or with Spotlight (Cmd + Space, type `Portimao`); drag it to the Dock to keep it there. Pasting the line again puts the newest version in place of the one there.
+    You should see, one after the other: `Downloading Portimao for Apple Silicon Macs ...` (or `Intel Macs`) with a bar that fills, `Unpacking it ...`, then `Portimao V... is installed in your Applications folder and is opening.` No password is asked, and macOS shows no warning. If you see another sentence instead, it says what went wrong and what to do; then paste the line again.
+3. Portimao opens by itself: its icon shows in the Dock, then its window, with the first question in the guide on the left. If the icon shows and vanishes, or the window stays empty, see section 2.3.
+4. From then on, open Portimao from Launchpad, or with Spotlight (Cmd + Space, type `Portimao`); drag it to the Dock to keep it there. Terminal can be closed.
+
+Pasting the line again puts the newest version in place of the one there. Each step above is run on GitHub's own Macs (macOS 15, both chips) at every change to Portimao, through to the app's window; what Finder, Launchpad and the Dock show a person is not checked there.
+
+**Starting again from nothing (wiping an old copy).** Only for a clean start: the line alone already replaces an old app.
+
+1. Close Portimao (Cmd + Q).
+2. Move every Portimao app to the Bin: the one in your own Applications folder (in Finder: Go > Home, then Applications), and any other in the main Applications folder, in Downloads or on the Desktop (a link there from an older install goes too). Spotlight (Cmd + Space, type `Portimao`) shows whether one is left.
+3. Open the Portimao folder in your home folder (in Finder: Go > Home, then Portimao) and decide what to keep:
+    - Keep: your data folders, your own fits in `fits/`, any journal file you changed in `journals/` and any template you saved in `layouts/`.
+    - Can go: `logs/`, `last_answers.json` (only the folder used last), and the program files of an install from before the app (`main.py`, `launchers`, `utils_shared` and the like), which the app does not use.
+    - To wipe everything, move what you keep somewhere else and move the whole Portimao folder to the Bin. The app makes a new one at its next start, with the fits, journals and templates that come with it.
+4. Install with the line, as above.
 
 **By hand**, without Terminal:
 
-1. Find your Mac's chip: Apple menu > About This Mac. *Chip: Apple M1* (or M2, M3 ...) is Apple Silicon; *Processor: ... Intel* is Intel.
+1. Find your Mac's chip (Before you start, above).
 2. On the [Releases page](https://github.com/bgh512/Portimao/releases/latest), download `Portimao-mac-apple-silicon.zip` or `Portimao-mac-intel.zip`.
 3. Double-click the zip in Downloads, then drag Portimao into the Applications folder (in Finder: Go > Applications).
 4. Open Portimao from the Applications folder. The first time, macOS says it cannot check it: click *Open Anyway* as section 2.3, entry 1, says. This is needed only once.
@@ -32,6 +54,7 @@ The line picks the app for your Mac's chip (Apple Silicon or Intel), puts Portim
 
 - `fits/`: the haem fits: the haem library in `haems/` (one file per haem), the presets in `presets/` (sets of library haems, such as the standard fit). Your own fit goes in `fits/` itself (its layout is in `DATA_FORMAT.md`, under "fit csv").
 - `journals/`: what each journal asks of a figure, one small file per journal, which you can correct or add to (see "Journals" further down).
+- `layouts/`: the templates of the dataset figures, the ready-made ones and those you save.
 - Your data folders: a folder of `.paf` files put here is offered as a button at the first question. Any other folder is chosen under Other folder…: type or drag in its path, or click Browse… to pick it.
 - `logs/`: what the app did, which the Mac report shows.
 - `last_answers.json`: the folder used last.
@@ -43,7 +66,7 @@ The line picks the app for your Mac's chip (Apple Silicon or Intel), puts Portim
 - Your fits, data folders, logs and last answers stay in the Portimao folder, which is where the app looks for them. If your folder was somewhere else, its fits and last answers are also copied into the Portimao folder in your home folder.
 - A note beside the app says where everything is.
 
-A Mac older than macOS 14 cannot run the app: it goes on starting the old way, from the *Portimao* file on the Desktop (section 2.3, entry 7). A copy installed from a zip file does not update itself: install the app with the line above, then move your own fits and data folders into the Portimao folder in your home folder.
+A Mac older than macOS 14 cannot run the app: it goes on starting the old way, from the *Portimao* file on the Desktop (section 2.3, entry 10). A copy installed from a zip file does not update itself: install the app with the line above, then move your own fits and data folders into the Portimao folder in your home folder.
 
 ### 1.2 Windows and Linux, using GitHub (recommended)
 
@@ -185,25 +208,55 @@ Windows may show a "do you trust this software" warning the first time, because 
 
 ### 2.3 If Portimao does not start on a Mac
 
-Find what you see below and do what its entry says. If nothing here helps, run the Mac report (entry 8) and send it, as under **Feedback** at the top.
+Find what you see below and try what its entry says, in the order given. If nothing here helps, run the Mac report (entry 11) and send it, as under **Feedback** at the top. Entries 3 to 5 have not been followed on a real Mac yet: each step in them is something the app or the install line is seen to do on GitHub's own Macs.
 
-1. **"Portimao" Not Opened, or "Apple could not verify Portimao is free of malware".** Only after installing by hand: the line never asks this. Click Done, open System Settings > Privacy & Security, scroll down to the message about Portimao, click *Open Anyway* and confirm with your password, then open Portimao again. On macOS 14 (Sonoma) you can instead right-click (or Control-click) Portimao in the Applications folder, choose Open, then Open again. Needed only once.
+1. **"Portimao" Not Opened, "cannot be opened", or "Apple could not verify Portimao is free of malware".** Only after installing by hand: the line never asks this. Try in this order:
+    - Click Done, open System Settings > Privacy & Security, scroll down to the message about Portimao, click *Open Anyway* and confirm with your password, then open Portimao again. Needed only once.
+    - On macOS 14 (Sonoma) you can instead right-click (or Control-click) Portimao in the Applications folder, choose Open, then Open again.
+    - If Privacy & Security shows no message about Portimao: open Portimao once more so that macOS refuses it again, then go straight back to Privacy & Security.
+    - If there is still no message: move Portimao to the Bin and install it with the line (section 1.1), after which macOS does not ask at all.
 2. **"Portimao is damaged and can't be opened".** The download was cut short, or the zip was unpacked by a program other than Finder. Move Portimao to the Bin and install it with the line (section 1.1).
-3. **"Portimao V... is out, but this copy could not update itself".** Portimao starts as it is; the reason is in brackets:
+3. **Portimao shows in the Dock and vanishes, with no message.** Try in this order:
+    - Wait a minute. When a newer version is out, Portimao closes by itself after a small "Updating Portimao" window and the new version opens in its place.
+    - Open Portimao again from Launchpad or Spotlight.
+    - Check that the Mac has macOS 14 or newer (entry 7).
+    - Paste the install line again (section 1.1): it puts a whole new app in place of the one there.
+    - Start it from Terminal, which shows what Portimao says as it stops. Paste this line and press Enter, then copy everything it prints:
+
+        ```bash
+        ~/Applications/Portimao.app/Contents/MacOS/Portimao
+        ```
+
+    - Run the Mac report (entry 11) and send it with what the line above printed. On the one Mac where this was seen (with V2.3.2), the cause is not known yet.
+4. **The window opens but stays empty.** Try in this order:
+    - Close Portimao (Cmd + Q) and open it again.
+    - Paste the install line again (section 1.1).
+    - Run the Mac report (entry 11) and send it.
+
+    The app carries its own window parts, so the Mac's own Python does not matter here; a copy run from source with the Python that comes with macOS does draw an empty window (entry 10).
+5. **An old version opens.** The version is shown in Portimao's window. Try in this order:
+    - If a message says this copy could not update itself, see entry 6.
+    - Check the internet connection, close Portimao and open it again: each start looks for a newer version.
+    - Look for a second Portimao: Spotlight (Cmd + Space, type `Portimao`) lists every copy. Keep only the one in your own Applications folder (in Finder: Go > Home, then Applications) and move the others, and any old link on the Desktop, to the Bin.
+    - Paste the install line again (section 1.1): it always fetches the newest version.
+    - Run the Mac report (entry 11) and send it: it shows the end of the update's log.
+6. **"Portimao V... is out, but this copy could not update itself".** Portimao starts as it is; the reason is in brackets:
     - *macOS opened it from a temporary copy*: Portimao was opened where it was downloaded. Drag it into the Applications folder and open it from there.
     - *its folder cannot be written to*: Portimao is in a folder you cannot change, often the main Applications folder of a Mac you are not an administrator of. Install it with the line, which puts it in your own Applications folder, then move the old one to the Bin.
     - *the download did not finish*: check the internet connection; the next start tries again.
-4. **"Portimao needs macOS 14 or newer", or Portimao does not open on an older Mac.** Apple menu > About This Mac shows the macOS version. Update macOS if the Mac can take it (System Settings > General > Software Update), then install Portimao again. A Mac that cannot have macOS 14 runs Portimao the old way (entry 7).
-5. **macOS asks whether Portimao may open Documents, Desktop or Downloads (or a network or external drive).** Click Allow: Portimao reads your `.paf` files and saves the results there. If you clicked Don't Allow, open System Settings > Privacy & Security > Files and Folders, switch the folder on under Portimao, then open Portimao again.
-6. **"Portimao could not start", "Portimao's window could not open" or "Portimao stopped because of a problem".** Click *Copy details*: the Mac report is copied and the **Mac problem** form opens on the Issues page. Paste the report there (Cmd + V) and send it.
-7. **A Mac older than macOS 14 (the old way).** Portimao starts from its folder, from the *Portimao* file on the Desktop (a Terminal window opens while it starts). It needs Python 3.12 or newer from [python.org](https://www.python.org/downloads/): the Python that comes with macOS draws a blank window. After installing a newer Python, delete the hidden folder `.venv_unix` in the Portimao folder (in Finder, Cmd + Shift + . shows hidden files) and open Portimao again. The first start downloads the packages Portimao needs; when it says they could not be installed, check the internet connection or try another network. A box asking to install the "command line developer tools" can be answered Install (Portimao uses them to update itself) or Not Now.
-8. **Nothing happens at all, or nothing above helps: the Mac report.** Open Terminal (Cmd + Space, type `Terminal`, press Enter), paste this line and press Enter:
+7. **"Portimao needs macOS 14 or newer", or Portimao does not open on an older Mac.** Apple menu > About This Mac shows the macOS version. Update macOS if the Mac can take it (System Settings > General > Software Update), then install Portimao again. A Mac that cannot have macOS 14 runs Portimao the old way (entry 10).
+8. **macOS asks whether Portimao may open Documents, Desktop or Downloads (or a network or external drive).** Click Allow: Portimao reads your `.paf` files and saves the results there. If you clicked Don't Allow, open System Settings > Privacy & Security > Files and Folders, switch the folder on under Portimao, then open Portimao again.
+9. **"Portimao could not start", "Portimao's window could not open" or "Portimao stopped because of a problem".** Click *Copy details*: the Mac report is copied and the **Mac problem** form opens on the Issues page. Paste the report there (Cmd + V) and send it.
+10. **A Mac older than macOS 14 (the old way).** Portimao starts from its folder, from the *Portimao* file on the Desktop (a Terminal window opens while it starts). It needs Python 3.12 or newer from [python.org](https://www.python.org/downloads/): the Python that comes with macOS draws a blank window. After installing a newer Python, delete the hidden folder `.venv_unix` in the Portimao folder (in Finder, Cmd + Shift + . shows hidden files) and open Portimao again. The first start downloads the packages Portimao needs; when it says they could not be installed, check the internet connection or try another network. A box asking to install the "command line developer tools" can be answered Install (Portimao uses them to update itself) or Not Now.
+11. **Nothing happens at all, or nothing above helps: the Mac report.** Open Terminal (Cmd + Space, type `Terminal`, press Enter), paste this line and press Enter:
 
     ```bash
     sh ~/Applications/Portimao.app/Contents/Resources/launchers/mac_report.sh
     ```
 
-    If you put Portimao in the main Applications folder by hand, leave out the `~` at the start of the line. On a Mac older than macOS 14 the line is `sh ~/Portimao/launchers/mac_report.sh`. The report is printed and copied by itself: paste it (Cmd + V) into the **Mac problem** form on the [Issues page](https://github.com/bgh512/Portimao/issues). The report only reads; it changes nothing on the Mac. It shows where Portimao is, which includes your Mac user name; change it before sending if you prefer.
+    If you put Portimao in the main Applications folder by hand, leave out the `~` at the start of the line. On a Mac older than macOS 14 the line is `sh ~/Portimao/launchers/mac_report.sh`. The report is printed and copied by itself: paste it (Cmd + V) into the **Mac problem** form on the [Issues page](https://github.com/bgh512/Portimao/issues). The report only reads; it changes nothing on the Mac. It shows the macOS version and chip, where Portimao is (which includes your Mac user name; change it before sending if you prefer), whether macOS flags it, and the end of Portimao's logs.
+
+    **Where the logs are.** In the `logs` folder of the Portimao folder in your home folder (in Finder: Go > Home, then Portimao, then logs): `launch.log` (everything Portimao printed, start after start), `update.log` (each look for a newer version) and `move_to_app.log` (the move from an install before the app). They can be sent as they are.
 
 ### 2.4 Changing the icon
 

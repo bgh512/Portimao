@@ -367,15 +367,18 @@ class Config:
 
         # ---- 3 Build the matplotlib settings -----------------------------------------
         style, fonts, spec = self.STYLE, self.FONTS, self.SPEC
-        fallback_fonts = list(FALLBACK_FONTS)
         # The fonts are named one by one, those on this computer only: text is drawn
-        # in the first, and a character it lacks (Arial has no subscripts and no
-        # raised minus) in the next that has it. Under the one name 'sans-serif' such
-        # a character is drawn as an empty box.
-        self.RC_PARAMS = {'font.family': font_family_lister(spec['font_family']
-                                                            + fallback_fonts,
-                                                            ),
-                          'font.sans-serif': spec['font_family'] + fallback_fonts,
+        # in the journal's first, and a character it lacks (Arial has no subscripts
+        # and no raised minus) in the fallback font that has it. Under the one name
+        # 'sans-serif' such a character is drawn as an empty box. The journal's
+        # other choices are not named: see font_family_lister.
+        named_fonts = font_family_lister(spec['font_family'], FALLBACK_FONTS)
+        self.RC_PARAMS = {'font.family': named_fonts,
+                          'font.sans-serif': [font
+                                              for font in named_fonts
+                                              if font != 'sans-serif'
+                                              ]
+                          + list(FALLBACK_FONTS),
                           'font.size': fonts['tick'],
                           'axes.labelsize': fonts['label'],
                           'axes.titlesize': fonts['title'],

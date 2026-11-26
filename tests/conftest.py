@@ -1,6 +1,7 @@
 """
-Makes the program's folders importable from the tests, however pytest is started, and
-keeps every window shut while the tests run.
+Makes the program's folders importable from the tests, however pytest is started,
+keeps every window shut while the tests run, and names the font file that fails when a
+figure cannot be drawn.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -8,7 +9,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Sequence
 
 try:
     import tkinter
@@ -84,6 +85,75 @@ class HiddenPopen(subprocess.Popen):
 # ---- CONFTEST HELPERS ----------------------------------------------------------------
 
 
+# ---- _glyph_fault_lister -------------------------------------------------------------
+def _glyph_fault_lister(text: str, families: Sequence[str]) -> str:
+    """
+    ---- Summary ----
+    Helper function to say which font file fails on which character of a text, for
+    the message of a test whose figure could not be drawn: each character is loaded
+    from the first of the fonts that has it, as the plotting library does.
+
+    ---- Inputs ----
+    text : str
+        The text that was drawn.
+    families : Sequence[str]
+        The font names the figure named, in their order.
+
+    ---- Globals read ----
+    None. Reads the font files (side effect).
+
+    ---- Outputs ----
+    str
+        One line per font named with its file, then one per character that failed
+        ('U+208B in <file>: <what the font reader said>') or that no font has.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # the plotting library is imported here, after pytest_configure chose its backend
+    from matplotlib import font_manager
+    from matplotlib.backends.backend_agg import get_hinting_flag
+    from matplotlib.ft2font import FT2Font
+
+    # ---- 1 Open the fonts named ------------------------------------------------------
+    lines, fonts = [], []
+    for family in families:
+        try:
+            path = font_manager.findfont(family, fallback_to_default=False)
+        except ValueError:
+            lines.append(f'{family}: not on this computer')
+            continue
+        lines.append(f'{family}: {path}')
+        try:
+            fonts.append((path, FT2Font(path)))
+        except (OSError, RuntimeError) as error:
+            lines.append(f'{path} cannot be opened: {error}')
+
+    # ---- 2 Load each character from the first font that has it -----------------------
+    for character in sorted(set(text)):
+        code = f'U+{ord(character):04X}'
+        holders = [(path, font)
+                   for path, font in fonts
+                   if font.get_char_index(ord(character))
+                   ]
+        if not holders:
+            lines.append(f'{code} is in none of these fonts')
+            continue
+        path, font = holders[0]
+        try:
+            font.load_char(ord(character), flags=get_hinting_flag())
+        except RuntimeError as error:
+            lines.append(f'{code} in {path}: {error}')
+    return '\n'.join(lines)
+
+
 # ---- _window_refuser -----------------------------------------------------------------
 def _window_refuser(*args: Any, **kwargs: Any) -> None:
     """
@@ -117,6 +187,14 @@ def _window_refuser(*args: Any, **kwargs: Any) -> None:
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- glyph_fault_lister --------------------------------------------------------------
+@pytest.fixture
+def glyph_fault_lister() -> Callable[[str, Sequence[str]], str]:
+    """Main function to give a test the font file that fails. See _glyph_fault_lister."""
+
+    return _glyph_fault_lister
 
 
 # ---- pytest_configure ----------------------------------------------------------------

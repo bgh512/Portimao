@@ -10,12 +10,14 @@ from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
+from utils_shared import figure_layout
 from utils_shared.figure_layout import (axes_room_fitter,
                                         figure_canvas_fitter,
                                         figure_lines_fitter,
                                         figure_size_calculator,
                                         figure_style_builder,
                                         figure_style_checker,
+                                        font_family_lister,
                                         line_width_fitter,
                                         plot_legend_placer,
                                         )
@@ -467,6 +469,70 @@ def test_axes_are_fitted_into_their_room() -> None:
     axes_room_fitter(fig, [small], (0.62, 0.2, 1.0, 0.9))
     assert small.get_position().bounds == pytest.approx((0.75, 0.4, 0.1, 0.2))
     axes_room_fitter(fig, [], room)  # nothing to fit
+
+
+# ---- test_fonts_a_figure_names -------------------------------------------------------
+def test_fonts_a_figure_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    ---- Summary ----
+    Main function to check the fonts a figure names, with the fonts on the computer
+    stood in for: the journal's first installed font, then the installed fallback
+    fonts; never the journal's second choice once the first is there; a name kept
+    once; the plotting library's own font when none is installed.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        pytest's tool to stand in for the fonts on the computer.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. figure_layout.findfont is stood in for during the test.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    installed = set()
+
+    def font_finder(family: str, fallback_to_default: bool = True) -> str:
+        if family not in installed:
+            raise ValueError(f'{family} is not installed.')
+        return family + '.ttf'
+
+    monkeypatch.setattr(figure_layout, 'findfont', font_finder)
+    journal, fallbacks = ['Arial', 'Helvetica'], ('Liberation Sans', 'DejaVu Sans')
+
+    # a Mac: both of the journal's fonts, one fallback
+    installed.update({'Arial', 'Helvetica', 'DejaVu Sans'})
+    assert font_family_lister(journal, fallbacks) == ['Arial', 'DejaVu Sans']
+    assert font_family_lister(journal) == ['Arial']
+    # the journal's first font is missing: its second is the one drawn in
+    installed.discard('Arial')
+    assert font_family_lister(journal, fallbacks) == ['Helvetica', 'DejaVu Sans']
+    # every font, in the order given
+    installed.update({'Arial', 'Liberation Sans'})
+    assert font_family_lister(journal, fallbacks) == ['Arial',
+                                                      'Liberation Sans',
+                                                      'DejaVu Sans',
+                                                      ]
+    # a journal whose font is a fallback too
+    assert font_family_lister(['DejaVu Sans'], fallbacks) == ['DejaVu Sans',
+                                                              'Liberation Sans',
+                                                              ]
+    # none of the journal's fonts, then nothing at all
+    installed.difference_update({'Arial', 'Helvetica'})
+    assert font_family_lister(journal, fallbacks) == ['Liberation Sans', 'DejaVu Sans']
+    installed.clear()
+    assert font_family_lister(journal, fallbacks) == ['sans-serif']
+    assert font_family_lister([], ()) == ['sans-serif']
 
 
 # ---- test_a_small_legend_hides_nothing -----------------------------------------------

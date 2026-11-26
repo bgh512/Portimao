@@ -587,11 +587,9 @@ def figure_page_drawer(page: FigurePage,
     # ---- 1 Make the page at its printed size -----------------------------------------
     width_in, height_in = figure_size_calculator(spec, page.columns, page.height)
     fig = Figure(figsize=(width_in, height_in))
-    # the journal's fonts, then the ones that draw what they lack (a subscript, a
+    # the journal's font, then the ones that draw what it lacks (a subscript, a
     # raised minus), so no character of a label is an empty box
-    fonts = font_family_lister(list(spec.get('font_family') or ['sans-serif'])
-                               + list(FALLBACK_FONTS),
-                               )
+    fonts = font_family_lister(list(spec.get('font_family') or []), FALLBACK_FONTS)
     letter_pt = spec['panel_letter_pt']
     case = spec.get('panel_letter_case', 'lower')
     gap_x = PLOT_GAP_MM / MM_PER_INCH / width_in

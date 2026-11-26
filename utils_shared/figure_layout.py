@@ -4,7 +4,7 @@ Journal-aware figure sizing and automatic layout.
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import math
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
@@ -51,6 +51,44 @@ TEXT_NAMES = {'tick': 'tick labels and legends',
 
 
 # ---- FIGURE LAYOUT HELPERS -----------------------------------------------------------
+
+
+# ---- _installed_fonts_lister ---------------------------------------------------------
+def _installed_fonts_lister(families: Sequence[str]) -> List[str]:
+    """
+    ---- Summary ----
+    Helper function to list the font names that are on this computer.
+
+    ---- Inputs ----
+    families : Sequence[str]
+        Font names.
+
+    ---- Globals read ----
+    None. Reads the list of installed fonts (side effect).
+
+    ---- Outputs ----
+    List[str]
+        The names that are installed, in the order given; a name given twice is
+        kept once.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    installed = []
+    for family in dict.fromkeys(families):
+        try:
+            findfont(family, fallback_to_default=False)
+        except ValueError:  # that font is not on this computer
+            continue
+        installed.append(family)
+    return installed
 
 
 # ---- _renderer_getter ----------------------------------------------------------------
@@ -656,24 +694,32 @@ def figure_style_checker(spec: dict, fonts: dict) -> List[str]:
 
 
 # ---- font_family_lister --------------------------------------------------------------
-def font_family_lister(families: List[str]) -> List[str]:
+def font_family_lister(families: List[str],
+                       fallbacks: Sequence[str] = (),
+                       ) -> List[str]:
     """
     ---- Summary ----
-    Main function to list the fonts of a figure that are on this computer, in the
-    order given, so a character the first font cannot draw (a subscript, a raised
-    minus) is drawn in the next one that can.
+    Main function to list the fonts a figure names: the journal's first font that is
+    on this computer, then the fallback fonts that are, so a character the journal's
+    font cannot draw (a subscript, a raised minus) is drawn in the next one that can.
 
     ---- Inputs ----
     families : List[str]
-        Font names, the wanted one first and the fallbacks after it.
+        The journal's font names, the wanted one first and its other choices after it.
+    fallbacks : Sequence[str]
+        The fonts named after the journal's, for the characters it lacks; () for none.
 
     ---- Globals read ----
     None. Reads the list of installed fonts (side effect).
 
     ---- Outputs ----
     List[str]
-        The names that are installed, in the same order; a name given twice is kept
-        once. ['sans-serif'] when none is, which is the plotting library's own font.
+        The journal's first installed font, then the installed fallbacks in their
+        order; a name given twice is kept once. The journal's other choices are left
+        out: text is drawn in the first font anyway, and one of them asked for a
+        character it lacks stops the drawing on a Mac (Helvetica there is a
+        collection file). ['sans-serif'] when no name is installed, which is the
+        plotting library's own font.
 
     ---- Globals mutated ----
     None.
@@ -682,17 +728,15 @@ def font_family_lister(families: List[str]) -> List[str]:
     None.
 
     ---- Helpers ----
-    None.
+    _installed_fonts_lister
     """
 
-    installed = []
-    for family in dict.fromkeys(families):
-        try:
-            findfont(family, fallback_to_default=False)
-        except ValueError:  # that font is not on this computer
-            continue
-        installed.append(family)
-    return installed or ['sans-serif']
+    journal = _installed_fonts_lister(families)[:1]
+    named = journal + [family
+                       for family in _installed_fonts_lister(fallbacks)
+                       if family not in journal
+                       ]
+    return named or ['sans-serif']
 
 
 # ---- gap_space_calculator ------------------------------------------------------------

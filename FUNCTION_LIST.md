@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.35
+- **Version:** V2.36
 - **Date:** 26/11/2026
 
 ## Contents
@@ -54,7 +54,9 @@
     - [`program_runner`](#program_runner)
 - [`tests/conftest.py`](#testsconftestpy)
     - [`HiddenPopen`](#hiddenpopen)
+    - [`_glyph_fault_lister`](#_glyph_fault_lister)
     - [`_window_refuser`](#_window_refuser)
+    - [`glyph_fault_lister`](#glyph_fault_lister)
     - [`pytest_configure`](#pytest_configure)
 - [`tests/test_app_updater.py`](#teststest_app_updaterpy)
     - [`_app_maker`](#_app_maker)
@@ -236,6 +238,7 @@
     - [`test_journal_with_no_largest_text`](#test_journal_with_no_largest_text)
     - [`test_lines_kept_to_what_the_journal_takes`](#test_lines_kept_to_what_the_journal_takes)
     - [`test_axes_are_fitted_into_their_room`](#test_axes_are_fitted_into_their_room)
+    - [`test_fonts_a_figure_names`](#test_fonts_a_figure_names)
     - [`test_a_small_legend_hides_nothing`](#test_a_small_legend_hides_nothing)
 - [`tests/test_figure_page.py`](#teststest_figure_pagepy)
     - [`_page_maker`](#_page_maker)
@@ -358,6 +361,7 @@
     - [`test_number_and_unit_get_a_space`](#test_number_and_unit_get_a_space)
     - [`test_symbols_are_drawn_by_the_figure_settings`](#test_symbols_are_drawn_by_the_figure_settings)
     - [`test_symbols_can_be_drawn_in_the_figures`](#test_symbols_can_be_drawn_in_the_figures)
+    - [`test_the_fonts_of_a_failed_figure_are_named`](#test_the_fonts_of_a_failed_figure_are_named)
     - [`test_tidy_label_stays_as_it_is`](#test_tidy_label_stays_as_it_is)
 - [`tests/test_launcher.py`](#teststest_launcherpy)
     - [`_git_stand_in_maker`](#_git_stand_in_maker)
@@ -855,6 +859,7 @@
     - [`event_settings_merger`](#event_settings_merger)
     - [`experiment_data_processor`](#experiment_data_processor)
 - [`utils_shared/figure_layout.py`](#utils_sharedfigure_layoutpy)
+    - [`_installed_fonts_lister`](#_installed_fonts_lister)
     - [`_renderer_getter`](#_renderer_getter)
     - [`_legend_cover_checker`](#_legend_cover_checker)
     - [`axes_room_fitter`](#axes_room_fitter)
@@ -3132,7 +3137,7 @@ warning_shower
 
 ## `tests/conftest.py`
 
-Makes the program's folders importable from the tests, however pytest is started, and
+Makes the program's folders importable from the tests, however pytest is started,
 
 ### CLASSES
 
@@ -3184,6 +3189,38 @@ None.
 
 ### CONFTEST HELPERS
 
+#### `_glyph_fault_lister`
+
+```text
+---- Summary ----
+Helper function to say which font file fails on which character of a text, for
+the message of a test whose figure could not be drawn: each character is loaded
+from the first of the fonts that has it, as the plotting library does.
+
+---- Inputs ----
+text : str
+    The text that was drawn.
+families : Sequence[str]
+    The font names the figure named, in their order.
+
+---- Globals read ----
+None. Reads the font files (side effect).
+
+---- Outputs ----
+str
+    One line per font named with its file, then one per character that failed
+    ('U+208B in <file>: <what the font reader said>') or that no font has.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_window_refuser`
 
 ```text
@@ -3214,6 +3251,12 @@ None.
 ```
 
 ### MAIN FUNCTIONS
+
+#### `glyph_fault_lister`
+
+```text
+Main function to give a test the font file that fails. See _glyph_fault_lister.
+```
 
 #### `pytest_configure`
 
@@ -8416,6 +8459,35 @@ as tall as the lower, before and after.
 None.
 ```
 
+#### `test_fonts_a_figure_names`
+
+```text
+---- Summary ----
+Main function to check the fonts a figure names, with the fonts on the computer
+stood in for: the journal's first installed font, then the installed fallback
+fonts; never the journal's second choice once the first is there; a name kept
+once; the plotting library's own font when none is installed.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    pytest's tool to stand in for the fonts on the computer.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. figure_layout.findfont is stood in for during the test.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_a_small_legend_hides_nothing`
 
 ```text
@@ -11769,11 +11841,14 @@ None.
 ---- Summary ----
 Main function to check that a figure drawn with the program's own settings draws
 every symbol: a character the journal's font lacks (Arial has no subscripts and no
-raised minus) is taken from the next font, not drawn as an empty box.
+raised minus) is taken from the next font, not drawn as an empty box. A figure
+that cannot be drawn at all says which font file failed on which character.
 
 ---- Inputs ----
 journal : str
     Key of the journal whose figure settings are used.
+glyph_fault_lister : Callable[[str, Sequence[str]], str]
+    Says which font file fails on which character (conftest.py).
 
 ---- Globals read ----
 SYMBOLS, SUPERSCRIPT_TABLE (imported); settings.DEFAULT_ANSWERS.
@@ -11804,6 +11879,34 @@ None.
 
 ---- Globals read ----
 FALLBACK_FONTS (module constant); settings.JOURNAL_SPECS.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Reads the font files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_fonts_of_a_failed_figure_are_named`
+
+```text
+---- Summary ----
+Main function to check what a test says of a figure that could not be drawn: each
+font named with its file, a font that is not on this computer, a character no
+font has, and no line for a character that loads.
+
+---- Inputs ----
+glyph_fault_lister : Callable[[str, Sequence[str]], str]
+    Says which font file fails on which character (conftest.py).
+
+---- Globals read ----
+None.
 
 ---- Outputs ----
 None.
@@ -16251,14 +16354,17 @@ _region_setup_maker
 Main function to check that a plot per region whose group labels, time points
 and addition hold the characters the journal's font lacks (a raised minus and
 plus, subscripts) is saved without one drawn as an empty box: the page names
-the fallback fonts after the journal's.
+the fallback fonts after the journal's. A page that cannot be drawn at all says
+which font file failed on which character.
 
 ---- Inputs ----
 plot_type : str
     'P9' to 'P12'.
+glyph_fault_lister : Callable[[str, Sequence[str]], str]
+    Says which font file fails on which character (conftest.py).
 
 ---- Globals read ----
-None.
+FALLBACK_FONTS, STANDARD_SPEC (imported).
 
 ---- Outputs ----
 None
@@ -26561,6 +26667,34 @@ Journal-aware figure sizing and automatic layout.
 
 ### FIGURE LAYOUT HELPERS
 
+#### `_installed_fonts_lister`
+
+```text
+---- Summary ----
+Helper function to list the font names that are on this computer.
+
+---- Inputs ----
+families : Sequence[str]
+    Font names.
+
+---- Globals read ----
+None. Reads the list of installed fonts (side effect).
+
+---- Outputs ----
+List[str]
+    The names that are installed, in the order given; a name given twice is
+    kept once.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_renderer_getter`
 
 ```text
@@ -26900,21 +27034,27 @@ None.
 
 ```text
 ---- Summary ----
-Main function to list the fonts of a figure that are on this computer, in the
-order given, so a character the first font cannot draw (a subscript, a raised
-minus) is drawn in the next one that can.
+Main function to list the fonts a figure names: the journal's first font that is
+on this computer, then the fallback fonts that are, so a character the journal's
+font cannot draw (a subscript, a raised minus) is drawn in the next one that can.
 
 ---- Inputs ----
 families : List[str]
-    Font names, the wanted one first and the fallbacks after it.
+    The journal's font names, the wanted one first and its other choices after it.
+fallbacks : Sequence[str]
+    The fonts named after the journal's, for the characters it lacks; () for none.
 
 ---- Globals read ----
 None. Reads the list of installed fonts (side effect).
 
 ---- Outputs ----
 List[str]
-    The names that are installed, in the same order; a name given twice is kept
-    once. ['sans-serif'] when none is, which is the plotting library's own font.
+    The journal's first installed font, then the installed fallbacks in their
+    order; a name given twice is kept once. The journal's other choices are left
+    out: text is drawn in the first font anyway, and one of them asked for a
+    character it lacks stops the drawing on a Mac (Helvetica there is a
+    collection file). ['sans-serif'] when no name is installed, which is the
+    plotting library's own font.
 
 ---- Globals mutated ----
 None.
@@ -26923,7 +27063,7 @@ None.
 None.
 
 ---- Helpers ----
-None.
+_installed_fonts_lister
 ```
 
 #### `gap_space_calculator`

@@ -5,6 +5,7 @@ Tests of the tidy form of an event label, and that the figures can draw its symb
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import io
 import warnings
+from typing import Callable, Sequence
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib
@@ -191,16 +192,22 @@ def test_number_and_unit_get_a_space() -> None:
 
 # ---- test_symbols_are_drawn_by_the_figure_settings -----------------------------------
 @pytest.mark.parametrize('journal', sorted(settings.JOURNAL_SPECS))
-def test_symbols_are_drawn_by_the_figure_settings(journal: str) -> None:
+def test_symbols_are_drawn_by_the_figure_settings(
+    journal: str,
+    glyph_fault_lister: Callable[[str, Sequence[str]], str],
+    ) -> None:
     """
     ---- Summary ----
     Main function to check that a figure drawn with the program's own settings draws
     every symbol: a character the journal's font lacks (Arial has no subscripts and no
-    raised minus) is taken from the next font, not drawn as an empty box.
+    raised minus) is taken from the next font, not drawn as an empty box. A figure
+    that cannot be drawn at all says which font file failed on which character.
 
     ---- Inputs ----
     journal : str
         Key of the journal whose figure settings are used.
+    glyph_fault_lister : Callable[[str, Sequence[str]], str]
+        Says which font file fails on which character (conftest.py).
 
     ---- Globals read ----
     SYMBOLS, SUPERSCRIPT_TABLE (imported); settings.DEFAULT_ANSWERS.
@@ -226,7 +233,12 @@ def test_symbols_are_drawn_by_the_figure_settings(journal: str) -> None:
         fig = Figure()
         fig.text(0.5, 0.5, text)
         fig.legend(handles=[Line2D([], [], label=text)])
-        fig.savefig(io.BytesIO(), format='png')
+        try:
+            fig.savefig(io.BytesIO(), format='png')
+        except RuntimeError as error:  # a font file that cannot give a character
+            pytest.fail(f'The figure could not be drawn ({error}).\n'
+                        + glyph_fault_lister(text, cfg.RC_PARAMS['font.family']),
+                        )
 
 
 # ---- test_symbols_can_be_drawn_in_the_figures ----------------------------------------
@@ -284,6 +296,45 @@ def test_symbols_can_be_drawn_in_the_figures() -> None:
                if not any(font.get_char_index(ord(c)) for font in fonts)
                ]
     assert not missing, 'No figure font can draw: ' + ', '.join(missing)
+
+
+# ---- test_the_fonts_of_a_failed_figure_are_named -------------------------------------
+def test_the_fonts_of_a_failed_figure_are_named(
+    glyph_fault_lister: Callable[[str, Sequence[str]], str],
+    ) -> None:
+    """
+    ---- Summary ----
+    Main function to check what a test says of a figure that could not be drawn: each
+    font named with its file, a font that is not on this computer, a character no
+    font has, and no line for a character that loads.
+
+    ---- Inputs ----
+    glyph_fault_lister : Callable[[str, Sequence[str]], str]
+        Says which font file fails on which character (conftest.py).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Reads the font files (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # DejaVu Sans comes with the plotting library, so it is on every computer
+    lines = glyph_fault_lister('a₂\U000F0000', ['No Such Font', 'DejaVu Sans']).split(
+        '\n',
+        )
+    assert lines[0] == 'No Such Font: not on this computer'
+    assert lines[1].startswith('DejaVu Sans: ') and 'DejaVuSans' in lines[1]
+    assert lines[2:] == ['U+F0000 is in none of these fonts']
 
 
 # ---- test_tidy_label_stays_as_it_is --------------------------------------------------

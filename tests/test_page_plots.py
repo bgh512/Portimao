@@ -5,7 +5,7 @@ Tests of the plot types of a dataset figure on made-up experiments, drawn off sc
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import io
 import warnings
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib
@@ -26,7 +26,10 @@ from utils_shared.figure_page import (figure_page_drawer,
                                       plot_placer,
                                       )
 from utils_shared.journal_files import STANDARD_SPEC
-from utils_shared.figure_layout import BACKDROP_MARK, font_family_lister
+from utils_shared.figure_layout import (BACKDROP_MARK,
+                                        FALLBACK_FONTS,
+                                        font_family_lister,
+                                        )
 from utils_shared.page_data import (caption_lines_builder,
                                     colour_shader,
                                     experiment_role_maker,
@@ -1240,7 +1243,7 @@ def test_a_standard_experiment_has_the_font_of_the_page() -> None:
     _page_drawer
     """
 
-    fonts = font_family_lister(STANDARD_SPEC['font_family'])
+    fonts = font_family_lister(STANDARD_SPEC['font_family'], FALLBACK_FONTS)
     with matplotlib.rc_context({'font.family': ['Courier New']}):  # the run's journal
         fig, _ = _page_drawer([('c1', {}), ('k1', {})])
         fig.set_size_inches(*(2 * fig.get_size_inches()))  # more room: new numbers
@@ -2378,20 +2381,26 @@ def test_the_numbers_of_a_bar_chart() -> None:
 
 # ---- test_a_page_draws_the_special_characters ----------------------------------------
 @pytest.mark.parametrize('plot_type', ['P9', 'P10', 'P11', 'P12'])
-def test_a_page_draws_the_special_characters(plot_type: str) -> None:
+def test_a_page_draws_the_special_characters(
+    plot_type: str,
+    glyph_fault_lister: Callable[[str, Sequence[str]], str],
+    ) -> None:
     """
     ---- Summary ----
     Main function to check that a plot per region whose group labels, time points
     and addition hold the characters the journal's font lacks (a raised minus and
     plus, subscripts) is saved without one drawn as an empty box: the page names
-    the fallback fonts after the journal's.
+    the fallback fonts after the journal's. A page that cannot be drawn at all says
+    which font file failed on which character.
 
     ---- Inputs ----
     plot_type : str
         'P9' to 'P12'.
+    glyph_fault_lister : Callable[[str, Sequence[str]], str]
+        Says which font file fails on which character (conftest.py).
 
     ---- Globals read ----
-    None.
+    FALLBACK_FONTS, STANDARD_SPEC (imported).
 
     ---- Outputs ----
     None
@@ -2419,10 +2428,21 @@ def test_a_page_draws_the_special_characters(plot_type: str) -> None:
     experiments = _region_experiments_maker()
     for experiment in experiments.values():
         experiment['metadata']['events'][0]['label'] = 'H₃PO₄ · 2 × 10⁻³ M'
+    fonts = font_family_lister(STANDARD_SPEC['font_family'], FALLBACK_FONTS)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')
-        fig, _ = _region_drawer(plot_type, {}, setup=setup, experiments=experiments)
-        fig.savefig(io.BytesIO(), format='png')
+        try:
+            fig, _ = _region_drawer(plot_type,
+                                    {},
+                                    setup=setup,
+                                    experiments=experiments,
+                                    )
+            fig.savefig(io.BytesIO(), format='png')
+        except RuntimeError as error:  # a font file that cannot give a character
+            labels = ''.join(list(names.values()) + ['2 h⁻¹ 24 h⁻¹ H₃PO₄ · 2 × 10⁻³ M'])
+            pytest.fail(f'The page could not be drawn ({error}).\n'
+                        + glyph_fault_lister(labels, fonts),
+                        )
     drawn = ''.join(text.get_text() for text in fig.findobj(Text))
     assert '⁻' in drawn  # the labels are on the page
     assert not [str(found.message) for found in caught if 'Glyph' in str(found.message)]
