@@ -38,6 +38,10 @@ LINE_CHECK_POINTS = 8
 # The attribute of something drawn faintly behind a plot (a haem band): a legend may
 # sit over it, as it hides nothing there
 BACKDROP_MARK = 'is_backdrop'
+# The fonts every figure names after the journal's own: a character the journal's font
+# lacks (Arial has no subscripts and no raised minus) is drawn in the first of these
+# that has it, in place of an empty box
+FALLBACK_FONTS = ('Liberation Sans', 'DejaVu Sans')
 # what the user is told each text size of the figures is (figure_style_builder's
 # 'fonts'), in the warning about a journal's text sizes; panel letters follow the journal
 TEXT_NAMES = {'tick': 'tick labels and legends',

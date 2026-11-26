@@ -18,6 +18,7 @@ from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.figure_layout import (axes_room_fitter,
+                                        FALLBACK_FONTS,
                                         figure_size_calculator,
                                         figure_style_builder,
                                         font_family_lister,
@@ -33,8 +34,8 @@ GRID_ROWS = 6
 GRID_COLUMNS = 6
 STANDARD_COLUMNS = 2  # a new page is two columns wide
 STANDARD_HEIGHT = 0.8  # and 0.8 of the journal's tallest figure
-# Every plot type of the builder by its number; the first ones (FIRST_TYPES) are built
-# in E1 and E2, the others later.
+# Every plot type of the builder by its number; the first ones (FIRST_TYPES) are the
+# ones offered in the strip of the page, the others are not built yet.
 PLOT_TYPES = {'P1': 'Standard experiment',
               'P2': 'Difference spectrum',
               'P3': 'Waterfall',
@@ -64,7 +65,6 @@ FIRST_TYPES = ('P1',
                'P10',
                'P11',
                'P12',
-               'P13',
                'P17',
                )
 # A plot type that was taken out, with the sentence a template that still holds one is
@@ -556,7 +556,7 @@ def figure_page_drawer(page: FigurePage,
 
     ---- Globals read ----
     EMPTY_TYPES, GRID_COLUMNS, GRID_ROWS, MM_PER_INCH, PLOT_DRAWERS, PLOT_GAP_MM,
-    SCALE_SHARERS.
+    SCALE_SHARERS; FALLBACK_FONTS (imported).
 
     ---- Outputs ----
     Tuple[Figure, Dict[int, Axes]]
@@ -587,7 +587,11 @@ def figure_page_drawer(page: FigurePage,
     # ---- 1 Make the page at its printed size -----------------------------------------
     width_in, height_in = figure_size_calculator(spec, page.columns, page.height)
     fig = Figure(figsize=(width_in, height_in))
-    fonts = font_family_lister(spec.get('font_family') or ['sans-serif'])
+    # the journal's fonts, then the ones that draw what they lack (a subscript, a
+    # raised minus), so no character of a label is an empty box
+    fonts = font_family_lister(list(spec.get('font_family') or ['sans-serif'])
+                               + list(FALLBACK_FONTS),
+                               )
     letter_pt = spec['panel_letter_pt']
     case = spec.get('panel_letter_case', 'lower')
     gap_x = PLOT_GAP_MM / MM_PER_INCH / width_in

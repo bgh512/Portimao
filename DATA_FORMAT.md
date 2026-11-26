@@ -601,6 +601,36 @@ The roles of the plots over time, a Single trace (P7, with `'experiment'`; `trac
 
 The lines of a Mean trace, from `mean_lines_lister` (`utils_shared/page_plots.py`): a dictionary with `'times_min'` (np.ndarray, (n_times,), the shared times, one a second), `'additions_min'` and `'breaks_min'` (the shared times of the additions and of the breaks), `'left_out'` (the experiments left out), `'label'` (the title of the y axis), `'events'` (the additions of the first experiment kept, for their labels), `'zero'` (which addition is time 0, from 0; None for the start) and `'lines'`, one per set with an experiment kept: `'label'` (`'control (n = 3)'`), `'colour'`, `'line_style'`, `'mean'` (np.ndarray, (n_times,)) and `'spread'` (the SEM or SD, (n_times,); None for no band). `waterfall_traces_lister` gives the same with lines of `'label'`, `'colour'` and `'values'`. The maths is in `utils_shared/trace_alignment.py` (`trace_reader`, `traces_aligner`, `traces_averager`).
 
+The roles of the plots of numbers per region, beside the group drop-downs: a Bar chart (P9, `bar_form_maker`), a Before and after (P10, `before_after_form_maker`), a Response by region (P11, `response_form_maker`) and a Time points (P12, `time_points_form_maker`: the roles of a Bar chart without `'time_point'`, which is its x axis; its sets are by Group 1 and Group 2 only). One that is not in the roles, or that this run does not have, is as the plot starts:
+
+| Role | Value | Description |
+|---|---|---|
+| `'trace'` | `'vo2'`, `'haem_<name>'` or `'delta_psi'` | P9, P10, P12: the measurement, as the trace of a Mean trace without the oxygen (`'oxygen'` is read as `'vo2'`); starts `'vo2'` (`_measurement_reader`) |
+| `'response_of'` | `'vo2'` or `'haems'` | P11 only: the OCR, or a row per haem ticked (offered only in a run that works out the haems); starts `'vo2'` |
+| `'panel_haem_<name>'` | `'yes'` or `'no'` | P11 only: whether a haem has a row when `'response_of'` is `'haems'`, one for each haem of the fit, keyed as in a Standard experiment; starts `'yes'` |
+| `'vo2_value'`, `'haem_view'`, `'delta_psi_value'` | as in a Mean trace | How the OCR, a haem and Δψ are shown, the one that fits the measurement being the one used. `'vo2_value'` starts `'baseline'`, in a Before and after `'raw'` (as % of baseline its baseline is 100 for every experiment). P11 has no `'delta_psi_value'` |
+| `'region'` | `'baseline'` or `'addition 1'` … `'addition 10'` | P9, P12: the averaging region the numbers are from, the baseline or the one after an addition; starts `'addition 1'` (`_region_reader`) |
+| `'region_from'`, `'region_to'` | as `'region'` | P10 only: its two regions; start `'baseline'` and `'addition 1'` |
+| `'region_kind'` | `'settled'` or `'quick'` | The kind of averaging region read; asked only in a run with both kinds, otherwise the one the run has (`_kind_reader`); starts `'settled'` |
+| `'bars'` | `'sem'` or `'sd'` | P9, P11, P12: what the bars show (`ERROR_CHOICES`, `utils_shared/region_statistics.py`); starts `'sem'` |
+| `'test'` | `'student'` or `'welch'` | P9, P11, P12: the test between each pair of sets (`TEST_CHOICES`); starts `'student'`. A Before and after always uses the paired t-test |
+| `'marks'` | `'stars'`, `'p'` or `'none'` | The marks over the brackets (`MARK_CHOICES`); starts `'stars'` |
+
+The numbers of each, which the drawer, the caption line and the dataset workbook read, are a dictionary from `bar_numbers_lister`, `before_after_numbers_lister`, `response_numbers_lister` or `time_points_numbers_lister` (`utils_shared/page_plots.py`), each taking (the set-up, the roles, the slim experiments, the answers of the run):
+
+| Key | In | Description |
+|---|---|---|
+| `'sets'` | P9, P10, P12 | The sets that have a number (`plot_set`), each with `'values'` (one per experiment of its `'names'`, None for none). P10: `'before'` and `'after'` in place of `'values'`. P12: also `'points'`, the time point of each experiment (`''` for none) |
+| `'statistics'` | all | The `plot_statistics` of the plot: one column (P9), two columns, paired (P10), a column per time point in the order drawn (P12), or the columns and tests of every row in one, for the caption (P11) |
+| `'rows'` | P11 | One per measurement that has a number (the OCR, or each haem ticked): `'trace'` and `'value'` (as `trace_reader` takes them), `'label'` (the title of its y axis), `'sets'` (each `plot_set` with `'regions'`: the number of each of its experiments in each region) and its own `'statistics'` (a column per region), its `'p_corrected'` corrected across the tests of every row |
+| `'regions'` | P10, P11 | P10: the names of its two regions. P11: `'Baseline'`, then each addition as written on the plot of the first experiment kept |
+| `'region'` | P9, P12 | The name of the region (`'Baseline'`, `'After addition 1'`) |
+| `'label'` | P9, P10, P12 | The title of the y axis, with its unit |
+| `'time_points'`, `'places'`, `'unit'`, `'ticks'`, `'title'` | P12 | The time points in the order drawn, where each sits on the x axis (its number when all are different numbers with one unit or none, otherwise 0, 1, 2…), that unit, the tick labels and the title of the axis (`_time_points_placer`) |
+| `'trace'`, `'value'` | P12 | The measurement and how it is shown, as `trace_reader` takes them |
+| `'left_out'`, `'differing'` | P11 | The experiments left out for another number of additions than most, and those kept whose additions are written otherwise than the first one's (`_additions_checker`); `response_checks_lister` gathers both over a page for the warnings at saving |
+| `'error'`, `'test'`, `'marks'` | as asked | What the form says of the bars, the test and the marks |
+
 One line of a Waterfall, listed from the top down by `waterfall_lines_lister` (`utils_shared/page_plots.py`): `'label'` (the time point with how many experiments its mean is of, `'2 h (n = 3)'`, or the experiment name), `'colour'` (`'#rrggbb'`: the colour of the set, or the colour of the group made lighter down the stack), `'wavelengths_nm'` and `'values_mOD'` (np.ndarray, (n_wavelengths,)), before the stacking (`spectra_stacker`).
 
 #### `page_experiment`
@@ -629,6 +659,20 @@ One set of experiments a plot shows, from its group drop-downs. Listed by `plot_
 | `'line_style'` | str | | | `'-'`, `'--'`, `':'` or `'-.'` by the place of its Group 2 label in its column, when Group 2 is split; otherwise `'-'` |
 | `'shade'` | float | | share of white | 0 for the first time point to 0.7 for the last, by the place of its time point in its column, when the time point is split; otherwise 0 |
 | `'colour'` | str | | | The base colour with that share of white mixed in (`colour_shader`): what the set is drawn in |
+
+#### `plot_statistics`
+
+The numbers of one plot per region of a dataset figure (a Bar chart, Before and after, Response by region, Time points). Built by `plot_statistics_builder`, or by `paired_statistics_builder` for a Before and after (`utils_shared/region_statistics.py`), from the value of each experiment in a region (`region_value_reader`, `set_values_lister`, which adds `'values'` to each `plot_set`: one per experiment of its `'names'`, None for an experiment without one). The maths is in `MATHS.md` section 11.
+
+| Key | Type | Shape | Units | Description |
+|---|---|---|---|---|
+| `'columns'` | List[dict] | (n_columns,) | | One per region (or time point) along the plot: `'label'` (its name) and `'sets'`, one per set: `'name'`, `'values'` (List[float], the experiments counted), `'n'`, `'mean'`, `'sd'` and `'sem'` (in the unit of the value shown; the mean NaN for an empty set, the SD and SEM for a set of fewer than two). A Before and after has two columns |
+| `'tests'` | List[dict] | (n_tests,) | | One per comparison that could be tested: `'t'`, `'df'`, `'p'` (two-tailed) and `'p_corrected'` (Holm, across every test of the plot). Between sets: also `'column'` (from 0), `'first'` and `'second'` (the names of the two sets). Paired: also `'set'` (its name) and `'n'` (the experiments with both values). A set with one experiment is in no test |
+| `'is_paired'` | bool | | | True for a Before and after |
+
+The mark of a test is `p_value_marker` of its `'p_corrected'`; the legend sentence of the plot is `legend_sentence_writer`.
+
+What a plot adds to the caption lines under the page, after its letter, comes from its plot type's entry in `CAPTION_WRITERS` (`utils_shared/page_data.py`, filled by `utils_shared/page_plots.py` beside `FORM_MAKERS`): a function of (the plot, the set-up, the slim experiments, the answers of the run) that gives the sentences on one line, or None for a plot with nothing to show. P9 to P12 have one (`bar_caption_writer`, `before_after_caption_writer`, `response_caption_writer`, `time_points_caption_writer`), each the legend sentence of its numbers; `caption_lines_builder` calls them.
 
 #### `form_field`
 

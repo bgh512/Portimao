@@ -40,7 +40,10 @@ from utils_shared.master_page_exporter import master_page_exporter
 from utils_shared.output_capture import output_capturer
 from utils_shared.page_data import experiment_slimmer, page_experiments_lister
 # loading page_plots also adds the plot types to the page
-from utils_shared.page_plots import traces_left_out_lister, waterfall_left_out_lister
+from utils_shared.page_plots import (response_checks_lister,
+                                     traces_left_out_lister,
+                                     waterfall_left_out_lister,
+                                     )
 from utils_shared.questions import (guide_step_starter,
                                     info_printer,
                                     section_starter,
@@ -281,6 +284,7 @@ def dataset_figure_saver(page: FigurePage,
     master_page_exporter
     page_experiments_lister
     problem_shower
+    response_checks_lister
     traces_left_out_lister
     warning_shower
     waterfall_left_out_lister
@@ -319,6 +323,23 @@ def dataset_figure_saver(page: FigurePage,
                        f'additions than the other experiments of the plot, so '
                        f"{'its' if len(left_out) == 1 else 'their'} additions cannot "
                        f'be lined up with theirs.',
+                       )
+    checks = response_checks_lister(page, setup, experiments or {}, answers or {})
+    left_out, differing = checks['left_out'], checks['differing']
+    if left_out:
+        warning_shower(f"  The response by region is worked out without "
+                       f"{', '.join(left_out)}: "
+                       f"{'it has' if len(left_out) == 1 else 'they have'} another "
+                       f'number of additions than most experiments of the plot, so '
+                       f"{'its' if len(left_out) == 1 else 'their'} regions are not "
+                       f'the same as theirs.',
+                       )
+    if differing:
+        warning_shower(f'  The regions of the response by region are named by the '
+                       f'additions of the first experiment of the plot, but '
+                       f"{', '.join(differing)} "
+                       f"{'has' if len(differing) == 1 else 'have'} other additions. "
+                       f'Check that the experiments of the plot belong together.',
                        )
     try:
         path, figure = figure_page_exporter(page,

@@ -585,6 +585,7 @@ class PageBuilder:
         self._caption_text = '\n'.join(caption_lines_builder(page,
                                                              self._setup,
                                                              self._experiments,
+                                                             self._answers,
                                                              ),
                                        )
         self._caption_words.configure(text=self._caption_text or NO_CAPTION)

@@ -62,7 +62,7 @@ SPLIT_WORDS = 'Split: each label on its own'
 TICK_ON, TICK_OFF = 'yes', 'no'
 # The plot types that show sets of experiments (the group drop-downs) and the ones that
 # show one experiment (the experiment picker)
-SET_TYPES = ('P3', 'P8', 'P9', 'P10', 'P11', 'P12', 'P13')
+SET_TYPES = ('P3', 'P8', 'P9', 'P10', 'P11', 'P12')
 # The plot type whose plots each add a caption line with the times of their two
 # regions, and that line
 DIFFERENCE_TYPE = 'P2'
@@ -86,6 +86,11 @@ START_WORDS = 'the start of each recording'
 # answers being the answers of the run (config.DEFAULT_ANSWERS); a plot type that is
 # not here asks nothing. Each plot type adds its own (utils_shared/page_plots.py).
 FORM_MAKERS: Dict[str, Callable[[dict, Dict[str, str], dict], List[dict]]] = {}
+# What a plot of each type adds to the caption lines after its letter, {plot type:
+# (plot, setup, experiments, answers) -> the sentences, or None for nothing}; a plot
+# type that is not here adds nothing this way. Each plot type adds its own
+# (utils_shared/page_plots.py).
+CAPTION_WRITERS: Dict[str, Callable[..., Optional[str]]] = {}
 # Group 2 is told apart by the line style and the time point by the shade: the first
 # time point in the colour itself, the last with LIGHTEST_SHADE of white mixed in
 LINE_STYLES = ('-', '--', ':', '-.')
@@ -260,6 +265,7 @@ def _rows_lister(setup: Optional[dict]) -> List[dict]:
 def caption_lines_builder(page: FigurePage,
                           setup: Optional[dict],
                           experiments: Optional[Dict[str, dict]] = None,
+                          answers: Optional[dict] = None,
                           ) -> List[str]:
     """
     ---- Summary ----
@@ -267,9 +273,10 @@ def caption_lines_builder(page: FigurePage,
     style and shade on the page means: one line for the colours of the Group 1 labels,
     one for the line styles of the Group 2 labels and one for the shades of the time
     points, each only when a plot of the page uses it. Each Difference spectrum (P2)
-    then adds a line with its letter and the times of its two regions, and each Mean
+    then adds a line with its letter and the times of its two regions, each Mean
     trace (P8) a line with its letter, what its lines and bands are and what it is
-    lined up on.
+    lined up on, and each plot whose type has a caption writer (the plots per
+    region) a line with its letter and the sentences of that writer.
 
     ---- Inputs ----
     page : FigurePage
@@ -278,20 +285,25 @@ def caption_lines_builder(page: FigurePage,
         The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
     experiments : Optional[Dict[str, dict]]
         {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), for the
-        regions of the difference spectra; None for none.
+        regions of the difference spectra and the numbers of the plots per region;
+        None for none.
+    answers : Optional[dict]
+        The answers of the run, for the plots per region; None for none.
 
     ---- Globals read ----
-    ADDITION_PATTERN, ADDITION_WORDS, BAND_CHOICES, BAND_KEY, DIFFERENCE_TYPE,
-    DIFFERENCE_WORDS, EXPERIMENT_ROLE, LINE_STYLE_WORDS, MEAN_BAND_WORDS, MEAN_TYPE,
-    MEAN_WORDS, SET_TYPES, START_ROLE, START_WORDS, ZERO_KEY.
+    ADDITION_PATTERN, ADDITION_WORDS, BAND_CHOICES, BAND_KEY, CAPTION_WRITERS,
+    DIFFERENCE_TYPE, DIFFERENCE_WORDS, EXPERIMENT_ROLE, LINE_STYLE_WORDS,
+    MEAN_BAND_WORDS, MEAN_TYPE, MEAN_WORDS, SET_TYPES, START_ROLE, START_WORDS,
+    ZERO_KEY.
 
     ---- Outputs ----
     List[str]
         The lines, such as 'Colours (strain): control, blue; knockdown, red-orange.',
-        'b: reduced, 12.0 to 14.0 min, minus oxidised, 2.0 to 4.0 min.' and 'c: each
+        'b: reduced, 12.0 to 14.0 min, minus oxidised, 2.0 to 4.0 min.', 'c: each
         line is the mean of its experiments, the band ± SEM; lined up on addition
-        1.'; empty when no plot of the page shows sets of experiments, a difference
-        spectrum or a mean trace.
+        1.' and 'd: Each dot is one experiment, and the bars are the mean ± SEM of
+        each set (control n = 3).'; empty when no plot of the page shows sets of
+        experiments, a difference spectrum or a mean trace.
 
     ---- Globals mutated ----
     None.
@@ -372,6 +384,15 @@ def caption_lines_builder(page: FigurePage,
                                        START_WORDS if zero == START_ROLE else zero,
                                        ),
                      )
+
+    # ---- 5 What each plot with a caption writer says of itself -----------------------
+    for index, plot in enumerate(page.plots):
+        writer = CAPTION_WRITERS.get(plot.plot_type)
+        if writer is None:
+            continue
+        sentences = writer(plot, setup, experiments or {}, answers or {})
+        if sentences:
+            lines.append(f'{letters[index]}: {sentences}')
     return lines
 
 

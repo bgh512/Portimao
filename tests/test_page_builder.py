@@ -220,7 +220,8 @@ def test_the_page_fits_the_plot_area() -> None:
     assert page_box_finder((1000, 600), (8.0, 6.0)) == pytest.approx(96.0)
     assert page_box_finder((600, 1000), (8.0, 6.0)) == pytest.approx(72.0)
     assert page_box_finder((20, 20), (8.0, 6.0)) == 10.0
-    page = plot_placer(FigurePage(), PagePlot('P9', 0, 0, 3, 3))
+    # a plot type that is not built yet, so it is drawn as its grey stand-in
+    page = plot_placer(FigurePage(), PagePlot('P14', 0, 0, 3, 3))
     spec = settings.JOURNAL_SPECS[page.journal]
     width_in, height_in = figure_size_calculator(spec, page.columns, page.height)
     picture = page_picture_maker(page, spec, 50.0)

@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.32
-- **Date:** 25/11/2026
+- **Version:** V2.33
+- **Date:** 26/11/2026
 
 ## Contents
 
@@ -471,6 +471,11 @@
     - [`_answers_maker`](#_answers_maker)
     - [`_experiment_maker`](#_experiment_maker)
     - [`_page_drawer`](#_page_drawer)
+    - [`_region_drawer`](#_region_drawer)
+    - [`_region_haems_adder`](#_region_haems_adder)
+    - [`_region_points_setup_maker`](#_region_points_setup_maker)
+    - [`_region_experiments_maker`](#_region_experiments_maker)
+    - [`_region_setup_maker`](#_region_setup_maker)
     - [`_setup_maker`](#_setup_maker)
     - [`_spectrum_drawer`](#_spectrum_drawer)
     - [`_spectrum_experiments_maker`](#_spectrum_experiments_maker)
@@ -495,6 +500,17 @@
     - [`test_the_lines_of_a_mean_trace`](#test_the_lines_of_a_mean_trace)
     - [`test_a_mean_trace_drawn`](#test_a_mean_trace_drawn)
     - [`test_a_waterfall_of_traces`](#test_a_waterfall_of_traces)
+    - [`test_the_forms_of_the_plots_per_region`](#test_the_forms_of_the_plots_per_region)
+    - [`test_the_numbers_of_a_bar_chart`](#test_the_numbers_of_a_bar_chart)
+    - [`test_a_page_draws_the_special_characters`](#test_a_page_draws_the_special_characters)
+    - [`test_a_bar_chart_drawn`](#test_a_bar_chart_drawn)
+    - [`test_a_before_and_after`](#test_a_before_and_after)
+    - [`test_the_plots_per_region_add_their_sentences_to_the_caption`](#test_the_plots_per_region_add_their_sentences_to_the_caption)
+    - [`test_the_forms_of_a_response_by_region_and_of_a_time_points`](#test_the_forms_of_a_response_by_region_and_of_a_time_points)
+    - [`test_the_numbers_of_a_response_by_region`](#test_the_numbers_of_a_response_by_region)
+    - [`test_a_response_by_region_drawn`](#test_a_response_by_region_drawn)
+    - [`test_a_time_points`](#test_a_time_points)
+    - [`test_a_response_and_a_time_points_add_their_sentences_to_the_caption`](#test_a_response_and_a_time_points_add_their_sentences_to_the_caption)
 - [`tests/test_panel_order.py`](#teststest_panel_orderpy)
     - [`_figure_drawer`](#_figure_drawer)
     - [`test_a_click_on_an_arrow_changes_the_order_kept_and_redraws`](#test_a_click_on_an_arrow_changes_the_order_kept_and_redraws)
@@ -577,6 +593,16 @@
     - [`test_regions_never_overlap`](#test_regions_never_overlap)
     - [`test_shaded_regions`](#test_shaded_regions)
     - [`test_starting_edges`](#test_starting_edges)
+- [`tests/test_region_statistics.py`](#teststest_region_statisticspy)
+    - [`_experiment_maker`](#_experiment_maker)
+    - [`test_a_set_of_one_is_drawn_but_not_tested`](#test_a_set_of_one_is_drawn_but_not_tested)
+    - [`test_each_pair_of_sets_is_tested`](#test_each_pair_of_sets_is_tested)
+    - [`test_the_holm_correction`](#test_the_holm_correction)
+    - [`test_the_marks`](#test_the_marks)
+    - [`test_the_mean_sd_and_sem_of_a_set`](#test_the_mean_sd_and_sem_of_a_set)
+    - [`test_the_paired_test_of_before_and_after`](#test_the_paired_test_of_before_and_after)
+    - [`test_the_two_tests_between_sets`](#test_the_two_tests_between_sets)
+    - [`test_the_value_of_an_experiment_in_a_region`](#test_the_value_of_an_experiment_in_a_region)
 - [`tests/test_run_logging.py`](#teststest_run_loggingpy)
     - [`_typist_maker`](#_typist_maker)
     - [`_fresh_numbering`](#_fresh_numbering)
@@ -759,47 +785,6 @@
     - [`_tick_label_builder`](#_tick_label_builder)
     - [`_window_orderer`](#_window_orderer)
     - [`ocr_and_haem_response_figure_plotter`](#ocr_and_haem_response_figure_plotter)
-- [`utils_custom/publication_plotter.py`](#utils_custompublication_plotterpy)
-    - [`_axes_styler`](#_axes_styler)
-    - [`_baseline_bar_plotter`](#_baseline_bar_plotter)
-    - [`_block_gap_calculator`](#_block_gap_calculator)
-    - [`_column_chooser`](#_column_chooser)
-    - [`_condition_indexer`](#_condition_indexer)
-    - [`_crop_start_finder`](#_crop_start_finder)
-    - [`_exemplar_gap_calculator`](#_exemplar_gap_calculator)
-    - [`_exemplar_plotter`](#_exemplar_plotter)
-    - [`_exemplar_selector`](#_exemplar_selector)
-    - [`_experiment_classifier`](#_experiment_classifier)
-    - [`_experiment_cropper`](#_experiment_cropper)
-    - [`_figure_finisher`](#_figure_finisher)
-    - [`_haem_block_plotter`](#_haem_block_plotter)
-    - [`_haem_label_finder`](#_haem_label_finder)
-    - [`_haem_label_pad_calculator`](#_haem_label_pad_calculator)
-    - [`_haem_row_selector`](#_haem_row_selector)
-    - [`_haem_source_finder`](#_haem_source_finder)
-    - [`_layout_validator`](#_layout_validator)
-    - [`_legend_handle_builder`](#_legend_handle_builder)
-    - [`_mean_ylim_setter`](#_mean_ylim_setter)
-    - [`_measurement_finder`](#_measurement_finder)
-    - [`_metric_field_selector`](#_metric_field_selector)
-    - [`_ocr_block_plotter`](#_ocr_block_plotter)
-    - [`_outside_bar_drawer`](#_outside_bar_drawer)
-    - [`_p_value_adjuster`](#_p_value_adjuster)
-    - [`_reference_level_finder`](#_reference_level_finder)
-    - [`_reference_selector`](#_reference_selector)
-    - [`_response_axes_preparer`](#_response_axes_preparer)
-    - [`_response_metric_checker`](#_response_metric_checker)
-    - [`_response_series_drawer`](#_response_series_drawer)
-    - [`_response_window_tester`](#_response_window_tester)
-    - [`_row_ylim_sharer`](#_row_ylim_sharer)
-    - [`_significance_bar_drawer`](#_significance_bar_drawer)
-    - [`_significance_formatter`](#_significance_formatter)
-    - [`_test_bar_drawer`](#_test_bar_drawer)
-    - [`_tick_label_builder`](#_tick_label_builder)
-    - [`_window_orderer`](#_window_orderer)
-    - [`exemplar_figure_plotter`](#exemplar_figure_plotter)
-    - [`publication_figure_plotter`](#publication_figure_plotter)
-    - [`publication_figure_saver`](#publication_figure_saver)
 - [`utils_custom/run_namer.py`](#utils_customrun_namerpy)
     - [`_group_matcher`](#_group_matcher)
     - [`_natural_sorter`](#_natural_sorter)
@@ -1143,14 +1128,47 @@
     - [`_trace_roles_reader`](#_trace_roles_reader)
     - [`_vo2_values_lister`](#_vo2_values_lister)
     - [`_waterfall_traces_drawer`](#_waterfall_traces_drawer)
+    - [`_additions_checker`](#_additions_checker)
+    - [`_bracket_drawer`](#_bracket_drawer)
+    - [`_choice_reader`](#_choice_reader)
+    - [`_columns_drawer`](#_columns_drawer)
+    - [`_floor_finder`](#_floor_finder)
+    - [`_kind_reader`](#_kind_reader)
+    - [`_kinds_lister`](#_kinds_lister)
+    - [`_mark_height_finder`](#_mark_height_finder)
+    - [`_measurement_fields_lister`](#_measurement_fields_lister)
+    - [`_measurement_reader`](#_measurement_reader)
+    - [`_region_field_maker`](#_region_field_maker)
+    - [`_region_reader`](#_region_reader)
+    - [`_regions_kind_fields_lister`](#_regions_kind_fields_lister)
+    - [`_time_points_placer`](#_time_points_placer)
+    - [`_y_label_finder`](#_y_label_finder)
+    - [`_y_range_setter`](#_y_range_setter)
+    - [`bar_caption_writer`](#bar_caption_writer)
+    - [`bar_form_maker`](#bar_form_maker)
+    - [`bar_numbers_lister`](#bar_numbers_lister)
+    - [`bar_plot_drawer`](#bar_plot_drawer)
+    - [`before_after_caption_writer`](#before_after_caption_writer)
+    - [`before_after_form_maker`](#before_after_form_maker)
+    - [`before_after_numbers_lister`](#before_after_numbers_lister)
+    - [`before_after_plot_drawer`](#before_after_plot_drawer)
     - [`difference_form_maker`](#difference_form_maker)
     - [`difference_plot_drawer`](#difference_plot_drawer)
     - [`mean_form_maker`](#mean_form_maker)
     - [`mean_lines_lister`](#mean_lines_lister)
     - [`mean_plot_drawer`](#mean_plot_drawer)
+    - [`response_caption_writer`](#response_caption_writer)
+    - [`response_checks_lister`](#response_checks_lister)
+    - [`response_form_maker`](#response_form_maker)
+    - [`response_numbers_lister`](#response_numbers_lister)
+    - [`response_plot_drawer`](#response_plot_drawer)
     - [`standard_form_maker`](#standard_form_maker)
     - [`standard_plot_drawer`](#standard_plot_drawer)
     - [`standard_scales_sharer`](#standard_scales_sharer)
+    - [`time_points_caption_writer`](#time_points_caption_writer)
+    - [`time_points_form_maker`](#time_points_form_maker)
+    - [`time_points_numbers_lister`](#time_points_numbers_lister)
+    - [`time_points_plot_drawer`](#time_points_plot_drawer)
     - [`trace_form_maker`](#trace_form_maker)
     - [`trace_plot_drawer`](#trace_plot_drawer)
     - [`traces_left_out_lister`](#traces_left_out_lister)
@@ -1237,6 +1255,22 @@
     - [`reference_level_finder`](#reference_level_finder)
     - [`start_level_finder`](#start_level_finder)
     - [`window_seconds_calculator`](#window_seconds_calculator)
+- [`utils_shared/region_statistics.py`](#utils_sharedregion_statisticspy)
+    - [`_finite_values_lister`](#_finite_values_lister)
+    - [`_p_value_finder`](#_p_value_finder)
+    - [`_region_namer`](#_region_namer)
+    - [`_counts_teller`](#_counts_teller)
+    - [`_names_joiner`](#_names_joiner)
+    - [`legend_sentence_writer`](#legend_sentence_writer)
+    - [`p_value_marker`](#p_value_marker)
+    - [`p_values_corrector`](#p_values_corrector)
+    - [`paired_statistics_builder`](#paired_statistics_builder)
+    - [`pairs_tester`](#pairs_tester)
+    - [`plot_statistics_builder`](#plot_statistics_builder)
+    - [`region_value_reader`](#region_value_reader)
+    - [`set_statistics_calculator`](#set_statistics_calculator)
+    - [`set_values_lister`](#set_values_lister)
+    - [`sets_tester`](#sets_tester)
 - [`utils_shared/run_logging.py`](#utils_sharedrun_loggingpy)
     - [`_Tee`](#_tee)
     - [`answer_logger`](#answer_logger)
@@ -1603,7 +1637,8 @@ answers : dict
 
 ---- Globals read ----
 DEFAULT_ANSWERS, JOURNAL_SPECS, BASE_FONT_PT, SPACING, LINE_WIDTH_PT (module
-constants); make_style, check_style, figure_size_inches (imported).
+constants); make_style, check_style, figure_size_inches, FALLBACK_FONTS
+(imported).
 
 ---- Outputs ----
 None
@@ -2809,6 +2844,7 @@ figure_page_exporter
 master_page_exporter
 page_experiments_lister
 problem_shower
+response_checks_lister
 traces_left_out_lister
 warning_shower
 waterfall_left_out_lister
@@ -8202,10 +8238,10 @@ _page_maker
 
 ```text
 ---- Summary ----
-Main function to check the page as drawn: a grey stand-in named by its plot type
-over the cells of each plot whose plot type is not built yet, one sentence over
-those of a standard experiment and of a mean trace with no experiment to show, a
-Space for a
+Main function to check the page as drawn: one sentence over the cells of a bar
+chart, of a standard experiment and of a mean trace with no experiment to show,
+a grey stand-in named by its plot type over those of a plot whose plot type is
+not built yet, a Space for a
 drawing left empty, and the letters bold at the journal's size, at the top left
 of their plots, lower case for Nature and upper case for a journal that asks for
 it.
@@ -14704,7 +14740,7 @@ _setup_maker
 
 ## `tests/test_page_plots.py`
 
-Tests of the plot types of a dataset figure on made-up experiments, drawn off screen: the form of the Standard experiment, its panels, its views, its ticks, its sentences and the scales its plots share; the form, the lines and the sentences of the Difference spectrum; the form, the lines, the stacking and the sentence of the Waterfall, also of traces; the forms, the lines, the bands and the sentences of the Single trace and the Mean trace, worked out by hand.
+Tests of the plot types of a dataset figure on made-up experiments, drawn off screen: the form of the Standard experiment, its panels, its views, its ticks, its sentences and the scales its plots share; the form, the lines and the sentences of the Difference spectrum; the form, the lines, the stacking and the sentence of the Waterfall, also of traces; the forms, the lines, the bands and the sentences of the Single trace and the Mean trace; the forms, the numbers, the drawing and the caption lines of the Bar chart, the Before and after, the Response by region and the Time points, worked out by hand.
 
 ### MAKERS
 
@@ -14802,6 +14838,162 @@ _experiment_maker
 _setup_maker
 experiment_role_maker
 figure_page_drawer
+```
+
+#### `_region_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a page with one plot per region of the made-up dataset
+of REGION_RUNS, three columns wide and three rows tall at the top left.
+
+---- Inputs ----
+plot_type : str
+    'P9' to 'P12'.
+roles : Dict[str, str]
+    The roles of the plot.
+answers : Optional[dict]
+    The answers of the run; None for those of _answers_maker.
+setup : Optional[dict]
+    The set-up table; None for that of _region_setup_maker.
+experiments : Optional[Dict[str, dict]]
+    The slim copies; None for those of _region_experiments_maker.
+
+---- Globals read ----
+STANDARD_SPEC (imported).
+
+---- Outputs ----
+Tuple[Figure, Axes]
+    (the figure, the first axes of the plot; the others are in the figure).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_region_experiments_maker
+_region_setup_maker
+figure_page_drawer
+```
+
+#### `_region_haems_adder`
+
+```text
+---- Summary ----
+Helper function to give each made-up experiment of the plots per region its two
+haems in ΔD: bH at minus its OCR, cc at half its OCR.
+
+---- Inputs ----
+experiments : Dict[str, dict]
+    The slim copies of _region_experiments_maker; changed.
+
+---- Globals read ----
+HAEMS; TIME_COLUMN (imported).
+
+---- Outputs ----
+Dict[str, dict]
+    The same slim copies.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_region_points_setup_maker`
+
+```text
+---- Summary ----
+Helper function to make the set-up of the plots per region with time points:
+the first two controls and the first two knockdowns at the late one, the third
+of each at the early one, and none for the experiment of the third group.
+
+---- Inputs ----
+early : str
+    The time point of c3 and k3.
+late : str
+    The time point of c1, c2, k1 and k2.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_region_setup_maker
+```
+
+#### `_region_experiments_maker`
+
+```text
+---- Summary ----
+Helper function to make the slim copies of the made-up dataset of the plots per
+region (REGION_RUNS): each has an OCR every quarter minute from 0 to 20 min, at
+its baseline level until its one addition at 10 min, at its quick level until
+11.5 min and at its settled level from then on; the same as % of its baseline;
+a baseline region from 2 to 8 min, a quick region from 10.5 to 11 min and a
+settled region from 14 to 18 min.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+REGION_RUNS; TIME_COLUMN (imported).
+
+---- Outputs ----
+Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_region_setup_maker`
+
+```text
+---- Summary ----
+Helper function to make the set-up of the made-up dataset of the plots per
+region: three controls, three knockdowns and one experiment of a third group.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE, GREEN, ORANGE, REGION_RUNS.
+
+---- Outputs ----
+dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `_setup_maker`
@@ -15589,6 +15781,395 @@ _series_setup_maker
 _spectrum_drawer
 _trace_experiments_maker
 _value_finder
+```
+
+#### `test_the_forms_of_the_plots_per_region`
+
+```text
+---- Summary ----
+Main function to check what the forms of a Bar chart and of a Before and after
+ask and how they start: the measurement without the oxygen, the "shown as"
+lists, the region or the two regions, the groups, the bars, the test and the
+marks; the kind of region only in a run with both kinds; and what a plot keeps.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_region_setup_maker
+```
+
+#### `test_the_numbers_of_a_bar_chart`
+
+```text
+---- Summary ----
+Main function to check the numbers of a Bar chart, worked out by hand: the value
+of each experiment in the region picked, of the kind picked or the only kind the
+run has; the mean, SD and SEM of each set; the one test, between the two sets of
+more than one experiment; a set without a value left out; and what the form says
+of the bars, the test and the marks.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+After the addition, settled: controls 4, 5, 6 (mean 5, SD 1, SEM 1 / sqrt(3));
+knockdowns 8, 9, 10 (mean 9, SD 1). Student's: sp² = 1, e = sqrt(2 / 3),
+t = -4 / 0.8165 = -4.899, df = 4, p = 0.0080. Quick: controls 7, 8, 9. As % of
+baseline the controls are 40, 500 / 12 and 600 / 14.
+
+---- Helpers ----
+_answers_maker
+_region_experiments_maker
+_region_setup_maker
+```
+
+#### `test_a_page_draws_the_special_characters`
+
+```text
+---- Summary ----
+Main function to check that a plot per region whose group labels, time points
+and addition hold the characters the journal's font lacks (a raised minus and
+plus, subscripts) is saved without one drawn as an empty box: the page names
+the fallback fonts after the journal's.
+
+---- Inputs ----
+plot_type : str
+    'P9' to 'P12'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_region_drawer
+_region_experiments_maker
+_region_points_setup_maker
+```
+
+#### `test_a_bar_chart_drawn`
+
+```text
+---- Summary ----
+Main function to check a Bar chart as drawn: a bar and an error bar for each set
+of more than one experiment and none for the set of one; a dot per experiment in
+the colour of its set; one bracket with its mark, between the two sets that
+differ, above everything under it; the y axis from 0 holding every dot, bar and
+mark; the names of the sets and of the region; no small legend; everything
+inside its cells. Then the SD and the p value, no marks, a plot whose numbers go
+below 0, two sets that do not differ, and the sentence of a plot with nothing to
+show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE, GREEN, ORANGE; NO_VALUES (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The numbers of test_the_numbers_of_a_bar_chart. Everything drawn runs from 0 to
+10, so a bracket sits 0.07 x 10 = 0.7 above the highest thing under it (the
+knockdown at 10): at 10.7, its ends down to 10.35. p = 0.0080 gives **. As a
+change from baseline the controls are -6, -7, -8 and the knockdowns -1, -2, -3
+(t = -5 / 0.8165 = -6.124, df = 4, p = 0.0036, **), the single one -10: the
+bars come down from 0, so the bracket sits at 0 + 0.7 = 0.7. In the baseline the two means are 12 and 11
+with an SD of 2: t = 0.61, no mark.
+
+---- Helpers ----
+_region_drawer
+colour_shader
+```
+
+#### `test_a_before_and_after`
+
+```text
+---- Summary ----
+Main function to check a Before and after, worked out by hand: its numbers (each
+experiment in its two regions, the paired test inside each set of more than one
+experiment, corrected across the sets); as drawn, a thin line per experiment and
+a named mean line per set, the set of one experiment named by its one line; a
+bracket only over the set whose two regions differ; the y axis holding
+everything; the names of the regions under each set; its small legend;
+everything inside its cells; no marks; and the sentence of a plot with nothing
+to show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE, GREEN, ORANGE; NO_PAIRS (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Controls: 10 to 4, 12 to 5, 14 to 6; changes -6, -7, -8: mean -7, SD 1,
+t = -7 x sqrt(3) = -12.12, df = 2, p = 1 - 12.12 / sqrt(12.12² + 2) = 0.0067.
+Knockdowns: 9 to 8, 11 to 9, 13 to 10; changes -1, -2, -3: t = -2 x sqrt(3)
+= -3.46, p = 1 - 3.46 / sqrt(3.46² + 2) = 0.074. Holm: 2 x 0.0067 = 0.013 (*),
+then 0.074 (no mark). Everything drawn runs from 4 to 20, so the bracket of the
+controls sits 0.07 x 16 = 1.12 above their highest value, 14: at 15.12. The
+sets are 2.6 apart.
+
+---- Helpers ----
+_answers_maker
+_region_drawer
+_region_experiments_maker
+_region_setup_maker
+```
+
+#### `test_the_plots_per_region_add_their_sentences_to_the_caption`
+
+```text
+---- Summary ----
+Main function to check the caption line of a Bar chart and of a Before and
+after: its letter, what is drawn, n of each set, the set of one experiment, the
+test, the correction when there is more than one test, and the marks; nothing
+of the test with no marks; and no line for a plot with nothing to show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The Bar chart has one test (controls against knockdowns); the Before and after
+two (one inside each set of three).
+
+---- Helpers ----
+_answers_maker
+_region_experiments_maker
+_region_setup_maker
+```
+
+#### `test_the_forms_of_a_response_by_region_and_of_a_time_points`
+
+```text
+---- Summary ----
+Main function to check what the forms of a Response by region and of a Time
+points ask and how they start: the OCR or the haems with a tick per haem, only
+the OCR in a run without haems; a Time points as a Bar chart, without the
+drop-down of the time point.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_maker
+_region_points_setup_maker
+_region_setup_maker
+```
+
+#### `test_the_numbers_of_a_response_by_region`
+
+```text
+---- Summary ----
+Main function to check the numbers of a Response by region, worked out by hand:
+a column per region, named by the additions of the first experiment; the value
+of each experiment in each; the tests of each region corrected across the whole
+plot, across the rows of the haems too; an experiment with another number of
+additions left out and named; an experiment with another addition named; and
+the rows of the haems ticked.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Baseline: controls 10, 12, 14, knockdowns 9, 11, 13 (SD 2 each): t = 1 /
+sqrt(4 x 2 / 3) = 0.61, p = 0.57. After the addition: p = 0.00805
+(test_the_numbers_of_a_bar_chart). Holm over the 2 tests: 2 x 0.00805 = 0.0161
+and 0.57. With the two haems (bH = -OCR, cc = OCR / 2) the same two p values
+come twice: Holm over the 4 tests gives 4 x 0.00805 = 0.0322 for both small
+ones.
+
+---- Helpers ----
+_answers_maker
+_region_experiments_maker
+_region_haems_adder
+_region_setup_maker
+```
+
+#### `test_a_response_by_region_drawn`
+
+```text
+---- Summary ----
+Main function to check a Response by region as drawn: a named line per set
+through its means, the sets side by side at each region; one bracket with its
+mark, at the region where two sets differ; the y axis of the OCR from 0, that
+of a change from baseline and of a haem following the numbers; the names of
+the regions; its small legend; everything inside its cells; a row per haem
+with the names under the last only; and the sentence of a plot with nothing to
+show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE, GREEN, ORANGE; NO_RESPONSE (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Three sets sit at -0.2, 0 and +0.2 of their region. Everything drawn runs from
+4 to 20, so the bracket sits 0.07 x 16 = 1.12 above the highest thing under it
+after the addition (the knockdown at 10): at 11.12, its ends down to 10.56,
+from x = 0.8 to x = 1. The corrected p is 0.0161: *.
+
+---- Helpers ----
+_region_drawer
+_region_experiments_maker
+_region_haems_adder
+```
+
+#### `test_a_time_points`
+
+```text
+---- Summary ----
+Main function to check a Time points, worked out by hand: its sets by group,
+each experiment at its time point; time points that are numbers in the order
+and at the place of their number, others evenly in the order of the table; the
+one test, at the time point where both sets have two experiments; as drawn,
+the lines, the bracket, the axes and the text; and the sentence of a plot with
+nothing to show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BLUE, ORANGE; NO_POINTS (imported).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Equations ----
+After the addition, at 24 h: controls 4, 5 (mean 4.5), knockdowns 8, 9 (mean
+8.5), SD sqrt(0.5) each: t = -4 / sqrt(0.5) = -5.66, df = 2, p = 1 - 5.66 /
+sqrt(5.66² + 2) = 0.030 (*). At 2 h: one control (6) and one knockdown (10).
+The time points are 22 apart, so the two sets sit at -4.4 and +4.4 of each.
+Everything drawn runs from 4 to 10, so the bracket sits 0.07 x 6 = 0.42 above
+the knockdowns at 24 h (9): at 9.42.
+
+---- Globals mutated ----
+None.
+
+---- Helpers ----
+_answers_maker
+_region_drawer
+_region_experiments_maker
+_region_points_setup_maker
+```
+
+#### `test_a_response_and_a_time_points_add_their_sentences_to_the_caption`
+
+```text
+---- Summary ----
+Main function to check the caption line of a Response by region and of a Time
+points: its letter, the region of a Time points, what is drawn, n of each set
+(a range when it differs between columns), the sets of one experiment, the
+test, the correction when there is more than one test, and the marks.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+The Response by region has two tests (one per region); the Time points one (at
+24 h).
+
+---- Helpers ----
+_answers_maker
+_region_experiments_maker
+_region_points_setup_maker
 ```
 
 ## `tests/test_panel_order.py`
@@ -17889,6 +18470,279 @@ region becomes 5 to 12; the reduced one becomes 55 to 55, so it is parked at 55.
 
 ---- Helpers ----
 None.
+```
+
+## `tests/test_region_statistics.py`
+
+Tests of the numbers of the plots per region of a dataset figure, worked out by hand on made-up experiments (the numbers of MATHS.md section 11): the value of an experiment in a region, the mean, SD and SEM of a set, Student's, Welch's and the paired t-test, the Holm correction, the marks and the legend sentence.
+
+### MAKERS
+
+#### `_experiment_maker`
+
+```text
+---- Summary ----
+Helper function to make the slim copy of a made-up experiment at 0 to 5 min,
+with the baseline from 0 to 1 min, the quick region of its one addition from 2
+to 3 min and the settled one from 4 to 5 min: an OCR of 10, 10, 4, 4, 6, 6 µM
+min⁻¹ (times the scale; half of it per OD); bH 80, 80, 60, 60, 50, 50 %
+oxidised; Δψ 130, 130, none, 120, 118, 118 mV.
+
+---- Inputs ----
+scale : float
+    What the OCR is multiplied by.
+
+---- Globals read ----
+B_HAEM; DELTA_PSI_COLUMN, TIME_COLUMN (imported).
+
+---- Outputs ----
+dict
+    The slim copy (page_experiment, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `test_a_set_of_one_is_drawn_but_not_tested`
+
+```text
+---- Summary ----
+Main function to check a set with one experiment: it keeps its value and its
+mean, has no SD and no SEM, is in no test, and the legend sentence says so.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CONTROL, KNOCKDOWN.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_each_pair_of_sets_is_tested`
+
+```text
+---- Summary ----
+Main function to check a plot of three sets in two columns: each pair of sets is
+tested in each column, and the Holm correction counts every test of the plot.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CONTROL, KNOCKDOWN, P_TOLERANCE, RESCUE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+First column: control and knockdown p = 0.008934, control and rescue 0.287864,
+knockdown and rescue 0.011548. Holm over those three: 0.008934 x 3 = 0.026802;
+0.011548 x 2 = 0.023096, raised to 0.026802; 0.287864 x 1. With a second column
+of control against 10, 12, 11 (the same mean, so t = 0 and p = 1) beside control
+against knockdown: 0.008934 x 2 = 0.017868, and 1 x 1 = 1.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_holm_correction`
+
+```text
+---- Summary ----
+Main function to check the Holm correction on the examples of MATHS.md section
+11.5: the smallest p value times the number of tests, the next times one fewer,
+never under the one before, never over 1, and a comparison that was not tested
+not counted.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+0.01, 0.04, 0.03: sorted 0.01, 0.03, 0.04; 0.01 x 3 = 0.03, 0.03 x 2 = 0.06,
+0.04 x 1 = 0.04 raised to 0.06. 0.5, 0.6: 0.5 x 2 = 1, 0.6 x 1 raised to 1.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_marks`
+
+```text
+---- Summary ----
+Main function to check the mark over a comparison: stars or the p value where
+the two differ, and nothing, never "ns", where they do not or were not tested.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_mean_sd_and_sem_of_a_set`
+
+```text
+---- Summary ----
+Main function to check the mean, the SD and the SEM of the two sets of MATHS.md
+section 11.2, an experiment without a value not counted.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CONTROL, KNOCKDOWN.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+10, 11, 12: mean 11, SD sqrt((1 + 0 + 1) / 2) = 1, SEM 1 / sqrt(3) = 0.577.
+20, 25, 30: mean 25, SD sqrt((25 + 0 + 25) / 2) = 5, SEM 5 / sqrt(3) = 2.887.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_paired_test_of_before_and_after`
+
+```text
+---- Summary ----
+Main function to check the paired t-test of MATHS.md section 11.4, the numbers
+of a Before and after plot, and its legend sentence.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+P_TOLERANCE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Before 10, 12, 14 and after 7, 8, 12: d = -3, -4, -2; mean -3, SD 1; t = -3 /
+(1 / sqrt(3)) = -5.196; df = 2; p = 1 - 5.196152 / sqrt(5.196152² + 2) =
+0.035099.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_two_tests_between_sets`
+
+```text
+---- Summary ----
+Main function to check Student's and Welch's t-test on the two sets of MATHS.md
+section 11.3, by hand and against scipy's own.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+CONTROL, KNOCKDOWN, P_TOLERANCE.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Student's: sp² = (2 x 1 + 2 x 25) / 4 = 13; e = sqrt(13 x 2 / 3) = 2.943920;
+t = (11 - 25) / 2.943920 = -4.755564; df = 4; p = 0.008934. Welch's: e =
+sqrt(1 / 3 + 25 / 3) = 2.943920, the same t; df = 8.666667² / (0.333333² / 2 +
+8.333333² / 2) = 75.111111 / 34.777778 = 2.159744; p = 0.035635.
+
+---- Helpers ----
+None.
+```
+
+#### `test_the_value_of_an_experiment_in_a_region`
+
+```text
+---- Summary ----
+Main function to check the value of a made-up experiment in each region, in each
+value it can be shown in (the numbers of MATHS.md section 11.1), nothing for
+what it does not have, a haem never as % of baseline, and the values of the
+experiments of a set.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+OCR: baseline 10, quick region 4, settled region 6; from baseline 6 - 10 = -4;
+% of baseline 6 / 10 x 100 = 60 and 4 / 10 x 100 = 40; per OD 6 / 2 = 3. Δψ:
+settled (118 + 118) / 2 = 118, change 118 - 130 = -12; the quick region has one
+spectrum with a value, 120.
+
+---- Helpers ----
+_experiment_maker
 ```
 
 ## `tests/test_run_logging.py`
@@ -23546,1407 +24400,6 @@ _response_metric_checker
 experiment_classifier
 figure_finisher
 warning_shower
-```
-
-## `utils_custom/publication_plotter.py`
-
-Publication figure (baseline OCR, OCR response, haem response), exemplars.
-
-### PUBLICATION PLOTTER HELPERS
-
-#### `_axes_styler`
-
-```text
----- Summary ----
-Helper function to apply the tick, grid and spine style of the response and baseline
-panels.
-
----- Inputs ----
-ax : Axes
-    Matplotlib axes to draw on.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-tick_size : float
-    Tick label size in points.
-pad : Optional[float]
-    Tick label pad in points, or None for the default.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Changes the style of ``ax`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_baseline_bar_plotter`
-
-```text
----- Summary ----
-Helper function to draw the baseline OCR (average0) bar chart per group, with every
-run overlaid and a Student t-test bracket between the two groups.
-
----- Inputs ----
-ax : Axes
-    Matplotlib axes to draw on.
-experiments : dict
-    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
-strains : tuple
-    Group names (rows or bars), in drawing order.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Draws on ``ax`` (side effect).
-
----- Equations ----
-Bar height = mean of the run baselines; error bar = SEM = SD / sqrt(n). Student
-t-test with equal variances between the two groups.
-
----- Helpers ----
-_axes_styler
-_column_chooser
-_experiment_classifier
-_significance_bar_drawer
-_significance_formatter
-finite_float_converter
-```
-
-#### `_block_gap_calculator`
-
-```text
----- Summary ----
-Helper function to calculate the gap below each block of the publication figure
-(each gap is sized for what it holds) and the gap between the response columns.
-
----- Inputs ----
-config : dict
-    Figure settings dictionary built in custom_config.py.
-blocks : list
-    Block names from top to bottom ('baseline', 'ocr_response', 'haem_response').
-n_columns : int
-    Number of addition-order columns.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (gaps in points, one per block but the last; wspace as a GridSpec fraction).
-
----- Globals mutated ----
-None.
-
----- Equations ----
-A gap above the first response block = x tick labels + 0.5 unit + title and legend
-row + 1.0 unit. The gap between the OCR and haem responses = two-line tick labels +
-0.5 unit + the significance bars' headroom + 0.5 unit. column_gap = 5 x 0.55 tick +
-0.5 unit + 1.5 unit (points).
-
----- Helpers ----
-gap_space_calculator
-```
-
-#### `_column_chooser`
-
-```text
----- Summary ----
-Helper function to choose the OCR column: the preferred one if set, else VoO2, else
-the first available.
-
----- Inputs ----
-available : Iterable
-    Column names that are available.
-preferred : Optional[str]
-    Column requested in the settings, or None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Optional[str]
-    Chosen column name, or None if none is available.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_condition_indexer`
-
-```text
----- Summary ----
-Helper function to map each (strain, order) pair to its condition name in the
-triplicate results.
-
----- Inputs ----
-triplicates : dict
-    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
-
----- Globals read ----
-None.
-
----- Outputs ----
-dict
-    {(strain, order): condition name}. Raises ValueError if two conditions match one
-    pair.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-condition_classifier
-```
-
-#### `_crop_start_finder`
-
-```text
----- Summary ----
-Helper function to find the time at which an exemplar crop begins.
-
----- Inputs ----
-experiment : dict
-    Experiment dictionary, as defined in DATA_FORMAT.md.
-mode : str
-    'baseline' (start of the average0 window) or 'first_addition'.
-before_minutes : float
-    Minutes kept before the first addition.
-margin_minutes : float
-    Extra minutes kept before the baseline window.
-
----- Globals read ----
-None.
-
----- Outputs ----
-float
-    Crop start time in minutes.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_exemplar_gap_calculator`
-
-```text
----- Summary ----
-Helper function to calculate the gap between rows and between columns of the
-exemplar quadrants.
-
----- Inputs ----
-config : dict
-    Figure settings dictionary built in custom_config.py.
-individual_config : dict
-    Individual-experiment plot settings, as returned by Config.plot_config in
-    config.py.
-n_rows : int
-    Number of group rows.
-n_columns : int
-    Number of addition-order columns.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (hspace, wspace) as GridSpec fractions.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-row_gap = 1.2 tick + 0.5 unit + label pad + 1.2 label + 1.0 unit; column_gap = lines
-x 1.2 label + y label pad + 5 x 0.55 tick + 0.5 unit + 1.5 unit (points) for one
-column, 1.5 unit when there are several (the later columns have no y labels).
-
----- Helpers ----
-gap_space_calculator
-```
-
-#### `_exemplar_plotter`
-
-```text
----- Summary ----
-Helper function to draw one experiment exactly as the individual plotter does.
-
----- Inputs ----
-fig : Figure
-    Matplotlib figure.
-subplot_spec : SubplotSpec
-    Grid cell the experiment is drawn in.
-experiment : dict
-    Experiment dictionary, as defined in DATA_FORMAT.md.
-individual_config : dict
-    Individual-experiment plot settings, as returned by Config.plot_config in
-    config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-list
-    Axes of the stacked panels.
-
----- Globals mutated ----
-None. Adds axes to ``fig`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-experiment_drawer
-```
-
-#### `_exemplar_selector`
-
-```text
----- Summary ----
-Helper function to pick the experiment of one run number for every (strain, order)
-cell.
-
----- Inputs ----
-experiments : dict
-    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
-run : int
-    Run number shown for each condition.
-
----- Globals read ----
-None.
-
----- Outputs ----
-dict
-    {(strain, order): experiment}. Raises ValueError if two experiments match one
-    cell.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-_experiment_classifier
-```
-
-#### `_experiment_classifier`
-
-```text
----- Summary ----
-Helper function to identify the strain, addition order and run number from an
-experiment name.
-
----- Inputs ----
-name : str
-    Experiment name such as 'control_kcn_then_bd_run1'.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (strain, order, run); entries are None where they cannot be identified.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-condition_classifier
-run_name_parser
-```
-
-#### `_experiment_cropper`
-
-```text
----- Summary ----
-Helper function to copy an experiment cropped to begin at a chosen time, with time
-measured from there.
-
----- Inputs ----
-experiment : dict
-    Experiment dictionary, as defined in DATA_FORMAT.md.
-start : float
-    Time in minutes at which the crop begins.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (cropped experiment copy, last time in minutes).
-
----- Globals mutated ----
-None.
-
----- Equations ----
-t_new = t - start; rows with t_new < 0 are dropped.
-
----- Helpers ----
-time_getter
-```
-
-#### `_figure_finisher`
-
-```text
----- Summary ----
-Helper function to fit the margins to the drawn content, add the panel letters at
-the top-left of each panel and fit again.
-
----- Inputs ----
-fig : Figure
-    Matplotlib figure.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-panels : list
-    List of (letter, main axes, [axes of the panel]) tuples.
-suptitle : Any
-    Figure title text object, or None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Resizes the layout of ``fig`` and adds text to it (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-figure_canvas_fitter
-panel_letter_adder
-```
-
-#### `_haem_block_plotter`
-
-```text
----- Summary ----
-Helper function to draw the haem response: one row per haem, one column per addition
-order, a line per group.
-
----- Inputs ----
-fig : Figure
-    Matplotlib figure.
-spec : SubplotSpec
-    Grid cell the block is drawn in.
-orders : tuple
-    Addition-order names (columns), in drawing order.
-strains : tuple
-    Group names (rows or bars), in drawing order.
-triplicates : dict
-    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
-conditions : dict
-    Lookup {(strain, order): condition name}.
-references : dict
-    Lookup {order: experiment or None} used for the event tick labels.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-rows : list
-    Haem row dictionaries {haem, label}.
-haem_source : str
-    Haem source key, for example 'delta_abs_od'.
-tests : Optional[list]
-    List collecting t-test comparisons, or None to skip the tests.
-bars_above : bool
-    True draws the top row's significance bars in the white space above the block
-    (between it and the block above) instead of inside the axes.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (grid of axes [row][column], invisible axes carrying the shared y label).
-
----- Globals mutated ----
-None. Adds axes to ``fig`` and appends to ``tests`` (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_haem_label_finder
-_haem_label_pad_calculator
-_mean_ylim_setter
-_measurement_finder
-_outside_bar_drawer
-_reference_level_finder
-_response_axes_preparer
-_response_series_drawer
-_response_window_tester
-_row_ylim_sharer
-_tick_label_builder
-_window_orderer
-```
-
-#### `_haem_label_finder`
-
-```text
----- Summary ----
-Helper function to find the shared y label of the haem response rows.
-
----- Inputs ----
-config : dict
-    Figure settings dictionary built in custom_config.py.
-metric : str
-    Response metric: 'delta', 'change' or 'value'.
-haem_source : str
-    Haem source key, for example 'delta_abs_od'.
-
----- Globals read ----
-None.
-
----- Outputs ----
-str
-    Label text from HAEM_RESPONSE_AXIS_LABELS for the metric and source.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_haem_label_pad_calculator`
-
-```text
----- Summary ----
-Helper function to calculate the points between the shared haem label and the haem
-axes.
-
----- Inputs ----
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-float
-    Label pad in points.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-pad = 1.2 label font + 0.5 unit + 5 x 0.55 tick font + 0.5 unit (points).
-
----- Helpers ----
-None.
-```
-
-#### `_haem_row_selector`
-
-```text
----- Summary ----
-Helper function to select the haem response rows to draw, in the order listed in
-HAEM_RESPONSE_SHOW.
-
----- Inputs ----
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-list
-    Row dictionaries {haem, label}. Every row is returned when HAEM_RESPONSE_SHOW is
-    empty. Entries are matched to a row label or haem name ignoring case and
-    punctuation.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-name_simplifier
-```
-
-#### `_haem_source_finder`
-
-```text
----- Summary ----
-Helper function to find the haem source that every condition's averages were
-calculated from.
-
----- Inputs ----
-triplicates : dict
-    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
-
----- Globals read ----
-None.
-
----- Outputs ----
-str
-    Haem source key, for example 'delta_abs_od'. Raises ValueError if the conditions
-    differ.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_layout_validator`
-
-```text
----- Summary ----
-Helper function to check that the layout options of the publication figure are
-recognised and to return the group and order lists.
-
----- Inputs ----
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-ORDER_TITLES, BLOCK_NAMES, RESPONSE_METRICS (module constants).
-
----- Outputs ----
-tuple
-    (orders, strains): addition orders (columns) and groups (rows), as tuples.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_legend_handle_builder`
-
-```text
----- Summary ----
-Helper function to build legend entries showing each group's colour, line style and
-marker.
-
----- Inputs ----
-strains : tuple
-    Group names (rows or bars), in drawing order.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-list
-    Line2D handles, one per group.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_mean_ylim_setter`
-
-```text
----- Summary ----
-Helper function to set the y range of a response panel from the group means (and
-the baseline level) only, so that a single outlier run or a very large error bar
-does not stretch the axis. Points and error bars beyond the range are clipped.
-
----- Inputs ----
-ax : Axes
-    Response panel, with the series already drawn.
-series_list : list
-    One list of window statistics per strain, as drawn by _response_series_drawer.
-metric : str
-    Response metric, which decides the field holding the mean.
-baseline_level : Optional[float]
-    Reference level that must stay in view (for example 100 for % of baseline).
-margin : float
-    Fraction of the mean range added above and below.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None.
-
----- Globals mutated ----
-None. Sets the y limits of ``ax`` (side effect); does nothing when no mean is
-finite.
-
----- Equations ----
-low = min(means) - margin x range; high = max(means) + margin x range, where the
-range is max(means) - min(means) (at least 1 % of the largest absolute mean). When
-all means are on one side of the baseline, the baseline side gets a 3 % margin.
-
----- Helpers ----
-_metric_field_selector
-```
-
-#### `_measurement_finder`
-
-```text
----- Summary ----
-Helper function to find the column matching a wanted name, ignoring case and
-punctuation.
-
----- Inputs ----
-available : Iterable
-    Column names that are available.
-wanted : str
-    Name to look for.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Optional[str]
-    Matching column name, or None.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-name_simplifier
-```
-
-#### `_metric_field_selector`
-
-```text
----- Summary ----
-Helper function to name the keys of the triplicate statistics used by a response
-metric.
-
----- Inputs ----
-metric : str
-    Response metric: 'delta', 'change' or 'value'.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (mean key, sem key, n key, per-run values key).
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_ocr_block_plotter`
-
-```text
----- Summary ----
-Helper function to draw the OCR response (percent of each run's baseline, mean and
-SEM across runs), one axes per addition order.
-
----- Inputs ----
-fig : Figure
-    Matplotlib figure.
-spec : SubplotSpec
-    Grid cell the block is drawn in.
-orders : tuple
-    Addition-order names (columns), in drawing order.
-strains : tuple
-    Group names (rows or bars), in drawing order.
-triplicates : dict
-    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
-conditions : dict
-    Lookup {(strain, order): condition name}.
-references : dict
-    Lookup {order: experiment or None} used for the event tick labels.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-tests : Optional[list]
-    List collecting t-test comparisons, or None to skip the tests.
-
----- Globals read ----
-None.
-
----- Outputs ----
-list
-    The axes, one per addition order.
-
----- Globals mutated ----
-None. Adds axes to ``fig`` and appends to ``tests`` (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_column_chooser
-_response_axes_preparer
-_response_series_drawer
-_response_window_tester
-_row_ylim_sharer
-_tick_label_builder
-_window_orderer
-```
-
-#### `_outside_bar_drawer`
-
-```text
----- Summary ----
-Helper function to draw the significance bars stored by _response_window_tester in
-the white space just above an axes, so the plot keeps its full height.
-
----- Inputs ----
-ax : Axes
-    Response panel whose y range is final.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Draws on ``ax`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_test_bar_drawer
-```
-
-#### `_p_value_adjuster`
-
-```text
----- Summary ----
-Helper function to adjust a list of p values for multiple comparisons.
-
----- Inputs ----
-p_values : Iterable
-    Raw p values.
-method : str
-    'none', 'bonferroni' or 'holm'.
-
----- Globals read ----
-None.
-
----- Outputs ----
-np.ndarray
-    Adjusted p values, same order as the input.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-Bonferroni: p_adj = min(n p, 1). Holm: sort ascending, p_adj(i) = min(max over j <=
-i of (n - j) p(j), 1) with j counted from 0.
-
----- Helpers ----
-None.
-```
-
-#### `_reference_level_finder`
-
-```text
----- Summary ----
-Helper function to find the height of the dashed reference line of the haem
-response.
-
----- Inputs ----
-metric : str
-    Response metric: 'delta', 'change' or 'value'.
-haem_source : str
-    Haem source key, for example 'delta_abs_od'.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Optional[float]
-    0 for a change, 100 for percent of baseline, 0 for a delta abs value, otherwise
-    None.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_reference_selector`
-
-```text
----- Summary ----
-Helper function to pick, for each addition order, the first run of the first
-available group (used for the event tick labels).
-
----- Inputs ----
-experiments : dict
-    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
-triplicates : dict
-    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
-conditions : dict
-    Lookup {(strain, order): condition name}.
-orders : tuple
-    Addition-order names (columns), in drawing order.
-strains : tuple
-    Group names (rows or bars), in drawing order.
-
----- Globals read ----
-None.
-
----- Outputs ----
-dict
-    {order: experiment or None}.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_response_axes_preparer`
-
-```text
----- Summary ----
-Helper function to draw the baseline reference line and set the window ticks of a
-response panel.
-
----- Inputs ----
-ax : Axes
-    Matplotlib axes to draw on.
-window_names : list
-    Averaging window names, for example ['average0', 'average1'].
-tick_labels : list
-    Tick label of every window.
-show_xlabels : bool
-    True to write the tick labels.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-baseline_level : Optional[float]
-    Height of the reference line, or None for no line.
-
----- Globals read ----
-None.
-
----- Outputs ----
-np.ndarray
-    x positions of the windows.
-
----- Globals mutated ----
-None. Changes the style of ``ax`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_axes_styler
-```
-
-#### `_response_metric_checker`
-
-```text
----- Summary ----
-Helper function to reject a percent-of-baseline response for the delta abs sources,
-which start at 0.
-
----- Inputs ----
-metric : str
-    Response metric: 'delta', 'change' or 'value'.
-haem_source : str
-    Haem source key, for example 'delta_abs_od'.
-
----- Globals read ----
-DELTA_HAEM_SOURCES (schema constant).
-
----- Outputs ----
-None
-    Nothing. Raises ValueError for the combination that is not allowed.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_response_series_drawer`
-
-```text
----- Summary ----
-Helper function to plot every run as a point, the mean as a line and SEM error bars
-for one group.
-
----- Inputs ----
-ax : Axes
-    Matplotlib axes to draw on.
-x : Iterable
-    x positions of the windows.
-stats_list : list
-    Statistics dictionary (or None) for each window.
-style : dict
-    Group style: colour, linestyle, marker.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-label : Optional[str]
-    Unused legend text.
-metric : str
-    Response metric: 'delta', 'change' or 'value'.
-offset : float
-    Horizontal shift in x units so groups sit side by side.
-
----- Globals read ----
-None.
-
----- Outputs ----
-bool
-    True if anything was drawn.
-
----- Globals mutated ----
-None. Draws on ``ax`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_metric_field_selector
-```
-
-#### `_response_window_tester`
-
-```text
----- Summary ----
-Helper function to run a Student t-test between the two groups at every window of a
-response panel and mark the significant windows.
-
----- Inputs ----
-ax : Axes
-    Matplotlib axes to draw on.
-x : np.ndarray
-    x positions of the windows.
-windows : list
-    Window names.
-series_by_strain : dict
-    {strain: [statistics per window]}.
-strains : tuple
-    Group names (rows or bars), in drawing order.
-metric : str
-    Response metric: 'delta', 'change' or 'value'.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-panel_name : str
-    Panel name written to the test table.
-tests : list
-    List collecting one dictionary per t-test comparison.
-outside : bool
-    True keeps the axis range as it is and stores the marks on ``ax`` for
-    _outside_bar_drawer, which draws them in the space above the axes.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Appends one dictionary per comparison to ``tests`` and draws on ``ax`` (side
-effects); with ``outside`` it sets ``ax.outside_marks`` instead of drawing.
-
----- Equations ----
-Equal-variance Student t-test per window; p values adjusted across the windows of
-the panel (RESPONSE_TEST_CORRECTION); significant if p_adj < RESPONSE_TEST_ALPHA.
-
----- Helpers ----
-_metric_field_selector
-_p_value_adjuster
-_test_bar_drawer
-```
-
-#### `_row_ylim_sharer`
-
-```text
----- Summary ----
-Helper function to give every axes in a row the union of their y ranges.
-
----- Inputs ----
-axes_row : list
-    Axes of one row.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Sets the y limits of the axes (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_significance_bar_drawer`
-
-```text
----- Summary ----
-Helper function to draw a bracket between two x positions with text centred above
-it.
-
----- Inputs ----
-ax : Axes
-    Matplotlib axes to draw on.
-x_left : float
-    Left end of the bracket (data units).
-x_right : float
-    Right end of the bracket (data units).
-y : float
-    Height of the bracket (data units).
-text : str
-    Text written above the bracket.
-tick_size : float
-    Tick label size in points.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Draws on ``ax`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_significance_formatter`
-
-```text
----- Summary ----
-Helper function to format a p value as stars or as text.
-
----- Inputs ----
-p_value : float
-    p value.
-style : str
-    'stars' or 'p'.
-
----- Globals read ----
-None.
-
----- Outputs ----
-str
-    '***', '**', '*' or 'ns' (stars style) or the p value text.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_test_bar_drawer`
-
-```text
----- Summary ----
-Helper function to draw a small bracket joining the two groups' points at one window
-with text above it.
-
----- Inputs ----
-ax : Axes
-    Matplotlib axes to draw on.
-x_left : float
-    Left end (data units).
-x_right : float
-    Right end (data units).
-y : float
-    Data height the clearances are measured from.
-text : str
-    Stars written above the bracket.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Draws on ``ax`` (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-_offset_transformer
-```
-
-#### `_tick_label_builder`
-
-```text
----- Summary ----
-Helper function to build the x tick labels of the averaging windows: Baseline, then
-the addition that precedes each window.
-
----- Inputs ----
-experiment : Optional[dict]
-    Reference experiment whose events label the windows, or None.
-window_names : list
-    Averaging window names, for example ['average0', 'average1'].
-mode : str
-    What the labels show (Labels as in the strip): 'chamber' or 'added'.
-
----- Globals read ----
-None.
-
----- Outputs ----
-list
-    One label per window; additions are written as label, then the concentration
-    in the chamber or the volume and stock added.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-event_amount_writer
-finite_float_converter
-```
-
-#### `_window_orderer`
-
-```text
----- Summary ----
-Helper function to list the averaging windows present in any condition of one
-addition order.
-
----- Inputs ----
-order : str
-    Addition order name.
-strains : tuple
-    Group names (rows or bars), in drawing order.
-triplicates : dict
-    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
-conditions : dict
-    Lookup {(strain, order): condition name}.
-
----- Globals read ----
-None.
-
----- Outputs ----
-list
-    Window names in numerical order.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-### MAIN FUNCTIONS
-
-#### `exemplar_figure_plotter`
-
-```text
----- Summary ----
-Main function to build the exemplar figure: one run per condition, each drawn by the
-individual plotter in its own quadrant.
-
----- Inputs ----
-experiments : dict
-    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
-config : dict
-    Exemplar figure settings from custom_config.exemplar_config_builder.
-individual_config : dict
-    Individual-experiment plot settings, as returned by Config.plot_config in
-    config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (fig, axes); axes maps (strain, order) to its list of axes and 'letters' to
-    {letter: experiment name}.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-_crop_start_finder
-_exemplar_gap_calculator
-_exemplar_plotter
-_exemplar_selector
-_experiment_cropper
-_figure_finisher
-experiment_title_builder
-stack_legend_drawer
-watermark_style_builder
-```
-
-#### `publication_figure_plotter`
-
-```text
----- Summary ----
-Main function to build the publication figure: baseline OCR, OCR response and haem
-response blocks.
-
----- Inputs ----
-experiments : dict
-    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
-triplicates : dict
-    Across-run statistics from triplicate_averager.
-config : dict
-    Publication figure settings from custom_config.publication_config_builder.
-
----- Globals read ----
-None.
-
----- Outputs ----
-tuple
-    (fig, axes); axes holds 'baseline', 'ocr_response', 'haem_response' and
-    'letters' ({letter: panel name}).
-
----- Globals mutated ----
-None. Stores the t-test table on the returned figure as ``fig.response_tests``.
-
----- Equations ----
-None.
-
----- Helpers ----
-_baseline_bar_plotter
-_block_gap_calculator
-_condition_indexer
-_experiment_classifier
-_figure_finisher
-_haem_block_plotter
-_haem_row_selector
-_haem_source_finder
-_layout_validator
-_legend_handle_builder
-_ocr_block_plotter
-_panel_labeller
-_reference_selector
-_response_metric_checker
-```
-
-#### `publication_figure_saver`
-
-```text
----- Summary ----
-Main function to save a publication or exemplar figure at its exact size, plus the
-t-test table when there is one.
-
----- Inputs ----
-fig : Figure
-    Figure returned by publication_figure_plotter or exemplar_figure_plotter.
-export_root : Path
-    Results folder.
-config : dict
-    Figure settings dictionary built in custom_config.py.
-
----- Globals read ----
-None.
-
----- Outputs ----
-list
-    Paths of the files written.
-
----- Globals mutated ----
-None. Writes the figure under <export_root>/<OUTPUT_SUBFOLDER> and the test table
-under <export_root>/<DATA_SUBFOLDER> (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-figure_saver
 ```
 
 ## `utils_custom/run_namer.py`
@@ -31002,7 +30455,7 @@ answers : Optional[dict]
 
 ---- Globals read ----
 EMPTY_TYPES, GRID_COLUMNS, GRID_ROWS, MM_PER_INCH, PLOT_DRAWERS, PLOT_GAP_MM,
-SCALE_SHARERS.
+SCALE_SHARERS; FALLBACK_FONTS (imported).
 
 ---- Outputs ----
 Tuple[Figure, Dict[int, Axes]]
@@ -35148,9 +34601,10 @@ Main function to write, for the caption of the figure, what each colour, line
 style and shade on the page means: one line for the colours of the Group 1 labels,
 one for the line styles of the Group 2 labels and one for the shades of the time
 points, each only when a plot of the page uses it. Each Difference spectrum (P2)
-then adds a line with its letter and the times of its two regions, and each Mean
+then adds a line with its letter and the times of its two regions, each Mean
 trace (P8) a line with its letter, what its lines and bands are and what it is
-lined up on.
+lined up on, and each plot whose type has a caption writer (the plots per
+region) a line with its letter and the sentences of that writer.
 
 ---- Inputs ----
 page : FigurePage
@@ -35159,20 +34613,25 @@ setup : Optional[dict]
     The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
 experiments : Optional[Dict[str, dict]]
     {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md), for the
-    regions of the difference spectra; None for none.
+    regions of the difference spectra and the numbers of the plots per region;
+    None for none.
+answers : Optional[dict]
+    The answers of the run, for the plots per region; None for none.
 
 ---- Globals read ----
-ADDITION_PATTERN, ADDITION_WORDS, BAND_CHOICES, BAND_KEY, DIFFERENCE_TYPE,
-DIFFERENCE_WORDS, EXPERIMENT_ROLE, LINE_STYLE_WORDS, MEAN_BAND_WORDS, MEAN_TYPE,
-MEAN_WORDS, SET_TYPES, START_ROLE, START_WORDS, ZERO_KEY.
+ADDITION_PATTERN, ADDITION_WORDS, BAND_CHOICES, BAND_KEY, CAPTION_WRITERS,
+DIFFERENCE_TYPE, DIFFERENCE_WORDS, EXPERIMENT_ROLE, LINE_STYLE_WORDS,
+MEAN_BAND_WORDS, MEAN_TYPE, MEAN_WORDS, SET_TYPES, START_ROLE, START_WORDS,
+ZERO_KEY.
 
 ---- Outputs ----
 List[str]
     The lines, such as 'Colours (strain): control, blue; knockdown, red-orange.',
-    'b: reduced, 12.0 to 14.0 min, minus oxidised, 2.0 to 4.0 min.' and 'c: each
+    'b: reduced, 12.0 to 14.0 min, minus oxidised, 2.0 to 4.0 min.', 'c: each
     line is the mean of its experiments, the band ± SEM; lined up on addition
-    1.'; empty when no plot of the page shows sets of experiments, a difference
-    spectrum or a mean trace.
+    1.' and 'd: Each dot is one experiment, and the bars are the mean ± SEM of
+    each set (control n = 3).'; empty when no plot of the page shows sets of
+    experiments, a difference spectrum or a mean trace.
 
 ---- Globals mutated ----
 None.
@@ -36452,7 +35911,928 @@ spectra_stacker
 waterfall_traces_lister
 ```
 
+### REGION HELPERS
+
+#### `_additions_checker`
+
+```text
+---- Summary ----
+Helper function to check that the experiments of a plot of every region have the
+same additions: those with another number of additions than most are left out,
+and those whose additions are not written as the first one's are named.
+
+---- Inputs ----
+names : List[str]
+    The experiments of the plot, in the order of its sets.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md); an
+    experiment that is not there is not looked at.
+answers : dict
+    The answers of the run, for how the additions are written (label_mode).
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+dict
+    'kept': the experiments with the number of additions most have (with a tie,
+    the number met first); 'left_out': the others that were read; 'additions':
+    the additions of the first experiment kept, each as written on the plot of
+    one file, in order of time; 'differing': the experiments kept whose
+    additions are written otherwise.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+event_text_writer
+```
+
+#### `_bracket_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a bracket between two places of a plot per region, with
+its mark (stars or a p value) above its middle.
+
+---- Inputs ----
+ax : Axes
+    The axes of the plot.
+ends : Tuple[float, float]
+    The x of its two ends.
+height : float
+    The y of its flat part.
+drop : float
+    How far its two ends come down from there, in the unit of the y axis.
+mark : str
+    The mark.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'style' and 'fonts' are used.
+
+---- Globals read ----
+MARK_COLOUR.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_choice_reader`
+
+```text
+---- Summary ----
+Helper function to read a drop-down of fixed choices from the roles of a plot:
+the first choice when the roles hold none of them.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles of the plot.
+key : str
+    The name of the drop-down in the roles.
+choices : tuple
+    (the role kept, the words shown) of each choice.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The role.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_columns_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the sets of a plot with several columns (the regions of
+a Response by region, the time points of a Time points): for each set a line
+through its mean in each column, with its SEM or SD where it has more than one
+experiment, and a paler dot per experiment; the sets side by side at each
+column. A bracket with its mark joins two sets at a column only where they
+differ (corrected p under 0.05).
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+ax : Axes
+    The axes to draw on.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room these axes have, as fractions of the figure.
+sets : List[dict]
+    The sets drawn (plot_set, DATA_FORMAT.md), each with at least one value.
+statistics : dict
+    The numbers (plot_statistics, DATA_FORMAT.md), one column per place.
+places : List[float]
+    The x of each column.
+unit : float
+    The distance between two columns next to each other, on the x axis.
+shown : Tuple[str, str, bool]
+    (the bars, 'sem' or 'sd'; the marks, 'stars', 'p' or 'none'; True to name
+    the lines, so the page gives the axes their small legend).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'style' and 'fonts' are used.
+
+---- Globals read ----
+BRACKET_STEP_SHARE, CAP_WIDTH_PT, DODGE_SHARE, DOT_SHADE, DOT_SPREAD_SHARE,
+DOT_WIDTHS, MARK_COLOUR.
+
+---- Outputs ----
+Tuple[float, float]
+    (the lowest, the highest thing drawn, the marks included), in the unit of
+    the y axis.
+
+---- Globals mutated ----
+None. Draws on the axes (side effect).
+
+---- Equations ----
+The set in place i of n (from 0) sits at x + (i / (n - 1) - 0.5) x DODGE_SHARE
+x unit, at x for one set. Its error bar runs from mean - e to mean + e, with e
+the SEM or the SD (MATHS.md section 11.2). A bracket sits BRACKET_STEP_SHARE of
+the height of everything drawn above the highest thing under it; the narrowest
+brackets are drawn first.
+
+---- Helpers ----
+_bracket_drawer
+_mark_height_finder
+colour_shader
+p_value_marker
+```
+
+#### `_floor_finder`
+
+```text
+---- Summary ----
+Helper function to find where the y axis of a plot of several columns starts:
+at 0 for the OCR as measured, per OD or as % of baseline, and at the lowest
+thing drawn for a change from baseline, a haem or Δψ.
+
+---- Inputs ----
+trace : str
+    The measurement, as trace_reader takes it.
+value : str
+    The value it is shown in.
+lowest : float
+    The lowest thing drawn.
+
+---- Globals read ----
+CHANGE_VALUE, VO2_TRACE (imported).
+
+---- Outputs ----
+float
+    The start of the axis, before the room _y_range_setter adds.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_kind_reader`
+
+```text
+---- Summary ----
+Helper function to find the kind of averaging region a plot per region reads:
+the one picked in a run with both kinds, otherwise the one the run has.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles of the plot.
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+KIND_KEY, REGION_KINDS.
+
+---- Outputs ----
+str
+    'settled' or 'quick'; 'settled' for a run with neither.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_kinds_lister
+```
+
+#### `_kinds_lister`
+
+```text
+---- Summary ----
+Helper function to list the kinds of averaging region the run has.
+
+---- Inputs ----
+answers : dict
+    The answers of the run; a missing one is as in config.DEFAULT_ANSWERS.
+
+---- Globals read ----
+REGION_KINDS; settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+List[str]
+    'settled' and 'quick', each only when the run has it.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_mark_height_finder`
+
+```text
+---- Summary ----
+Helper function to work out how tall a mark over a bracket is on the y axis, so
+the next bracket and the top of the axis clear it.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS): its 'style' is used.
+span : float
+    The height of everything drawn, in the unit of the y axis.
+
+---- Globals read ----
+AXES_HEIGHT_SHARE.
+
+---- Outputs ----
+float
+    The height of one line of text, in the unit of the y axis.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+height = span x the size of the text in points / (AXES_HEIGHT_SHARE x the height
+of the room in points).
+
+---- Helpers ----
+None.
+```
+
+#### `_measurement_fields_lister`
+
+```text
+---- Summary ----
+Helper function to make the drop-downs of the measurement of a plot per region:
+the measurement (the OCR, each haem of the fit, Δψ when the run works it out)
+and how the OCR, the haems and Δψ are shown, the one that fits the measurement
+picked being the one used.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles the plot has so far.
+answers : dict
+    The answers of the run.
+vo2_start : str
+    The value a new plot shows the OCR in (a role of VO2_VALUES).
+
+---- Globals read ----
+FIRST_VIEW, PSI_VALUE_KEY, TRACE_KEY, VIEW_CHOICES, VIEW_KEY, VO2_VALUE_KEY;
+OXYGEN_TRACE, PSI_TRACE, PSI_VALUES, VO2_TRACE (imported).
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_fit_haems_lister
+_trace_choices_lister
+_vo2_values_lister
+choice_field_maker
+```
+
+#### `_measurement_reader`
+
+```text
+---- Summary ----
+Helper function to read from the roles of a plot per region its measurement and
+the value that fits it; whatever the roles do not hold, or this run does not
+have, is as a new plot starts.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles of the plot.
+answers : dict
+    The answers of the run.
+vo2_start : str
+    The value a new plot shows the OCR in (a role of VO2_VALUES).
+
+---- Globals read ----
+TRACE_KEY, VO2_VALUE_KEY; OXYGEN_TRACE, VO2_TRACE (imported).
+
+---- Outputs ----
+Tuple[str, str]
+    (the measurement, as trace_reader takes it; its value).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_trace_roles_reader
+_vo2_values_lister
+```
+
+#### `_region_field_maker`
+
+```text
+---- Summary ----
+Helper function to make the drop-down of an averaging region: the baseline, then
+the region after each addition.
+
+---- Inputs ----
+key : str
+    The name the drop-down has in the roles of the plot.
+label : str
+    The words beside the drop-down.
+roles : Dict[str, str]
+    The roles the plot has so far.
+start : int
+    The region a new plot starts at: 0 for the baseline, 1 for the region after
+    the first addition, and so on.
+
+---- Globals read ----
+ADDITIONS_OFFERED, AFTER_WORDS, BASELINE_ROLE, BASELINE_WORDS; ADDITION_WORDS
+(imported).
+
+---- Outputs ----
+dict
+    The field (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_field_maker
+```
+
+#### `_region_reader`
+
+```text
+---- Summary ----
+Helper function to read an averaging region from the roles of a plot.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles of the plot.
+key : str
+    The name of the region's drop-down in the roles.
+start : int
+    The region of a plot whose roles hold none.
+
+---- Globals read ----
+ADDITIONS_OFFERED, AFTER_WORDS, BASELINE_ROLE, BASELINE_WORDS; ADDITION_PATTERN
+(imported).
+
+---- Outputs ----
+Tuple[int, str]
+    (the region: 0 for the baseline, 1 for the region after the first addition,
+    and so on; its name, 'Baseline' or 'After addition 1').
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_regions_kind_fields_lister`
+
+```text
+---- Summary ----
+Helper function to make the "Regions" drop-down (settled or quick) of a plot per
+region, only in a run with both kinds.
+
+---- Inputs ----
+roles : Dict[str, str]
+    The roles the plot has so far.
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+KIND_KEY, REGION_KINDS.
+
+---- Outputs ----
+List[dict]
+    The one field (form_field, DATA_FORMAT.md), or none.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_kinds_lister
+choice_field_maker
+```
+
+#### `_time_points_placer`
+
+```text
+---- Summary ----
+Helper function to place the time points of a Time points along its x axis: at
+their number when each is a different number (with the same unit after it, or
+none), otherwise evenly in the order given.
+
+---- Inputs ----
+labels : List[str]
+    The time points, in the order of the set-up table.
+title : str
+    The name of the time point column.
+
+---- Globals read ----
+TIME_POINT_PATTERN.
+
+---- Outputs ----
+dict
+    'labels': the time points in the order drawn; 'places': the x of each;
+    'unit': the smallest distance between two of them (1 for one time point);
+    'ticks': what is written under each; 'title': the title of the x axis, with
+    the unit in brackets when the time points are numbers with one.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+As numbers: '2 h', '24 h' and '4 h' sit at x = 2, 4 and 24. Otherwise the time
+point in place i (from 0) sits at x = i.
+
+---- Helpers ----
+None.
+```
+
+#### `_y_label_finder`
+
+```text
+---- Summary ----
+Helper function to find the title of the y axis of a plot per region, with its
+unit: that of the measurement in the first experiment that has it.
+
+---- Inputs ----
+sets : List[dict]
+    The sets of the plot (plot_set, DATA_FORMAT.md).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+trace : str
+    The measurement, as trace_reader takes it.
+value : str
+    The value it is shown in.
+is_per_od : bool
+    True when the run shows its haems per OD.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The title; '' when no experiment has the measurement in that value.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+trace_reader
+```
+
+#### `_y_range_setter`
+
+```text
+---- Summary ----
+Helper function to set the y axis of a plot per region so that it holds
+everything drawn, with a little room above and below.
+
+---- Inputs ----
+ax : Axes
+    The axes of the plot.
+low : float
+    The lowest thing drawn.
+high : float
+    The highest thing drawn, the marks included.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the axes (side effect).
+
+---- Equations ----
+The axis runs from low - 0.05 x (high - low) to high + 0.05 x (high - low); an
+end at 0 stays at 0. When high = low, the room is 0.05 x |high|, or 1 at 0.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
+
+#### `bar_caption_writer`
+
+```text
+---- Summary ----
+Main function to write the sentences a Bar chart (P9) adds to the caption: what
+its dots and bars are, how many experiments each set has, and the test and the
+correction its marks come from.
+
+---- Inputs ----
+plot : PagePlot
+    The plot, with its roles (bar_form_maker).
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    The sentences on one line; None for a plot with nothing to show.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+bar_numbers_lister
+legend_sentence_writer
+```
+
+#### `bar_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Bar chart (P9) asks: the measurement
+(the OCR) and how the OCR (% of baseline), the haems (ΔD) and Δψ (mV) are shown,
+the one that fits the measurement being the one used; the region (after the
+first addition); the kind of region, only in a run with both kinds; the group
+drop-downs (split by Group 1); the bars (SEM); the test (Student's); and the
+marks (stars).
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run, for its haems, its OD values, whether it works out
+    Δψ and its kinds of averaging region.
+
+---- Globals read ----
+ERROR_KEY, MARKS_KEY, REGION_KEY, TEST_KEY; ERROR_CHOICES, MARK_CHOICES,
+TEST_CHOICES, VO2_VALUES (imported).
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_measurement_fields_lister
+_region_field_maker
+_regions_kind_fields_lister
+choice_field_maker
+group_fields_lister
+```
+
+#### `bar_numbers_lister`
+
+```text
+---- Summary ----
+Main function to work out the numbers of a Bar chart: the value of every
+experiment of its sets in the region picked, then the mean, SD and SEM of each
+set and the test of each pair of sets. A set without a value is left out.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (bar_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+ERROR_KEY, MARKS_KEY, REGION_KEY, TEST_KEY; ERROR_CHOICES, MARK_CHOICES,
+TEST_CHOICES, VO2_VALUES (imported).
+
+---- Outputs ----
+dict
+    'sets': the sets that have a value (plot_set, DATA_FORMAT.md), each with its
+    'values'; 'statistics': the numbers of the plot (plot_statistics,
+    DATA_FORMAT.md), one column, its sets in the same order; 'label': the title
+    of the y axis; 'region': the name of the region; 'error', 'test' and 'marks':
+    what the form says.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See region_value_reader and plot_statistics_builder (MATHS.md section 11).
+
+---- Helpers ----
+_choice_reader
+_kind_reader
+_measurement_reader
+_per_od_checker
+_region_reader
+_y_label_finder
+plot_sets_lister
+plot_statistics_builder
+set_values_lister
+```
+
+#### `bar_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Bar chart (P9) into the room of its cells: for each set
+a bar up to the mean of its experiments in the region picked, with its SEM or
+SD, and a dot per experiment in the colour of the set; a set of one experiment
+has its dot and no bar. A bracket with its mark joins two sets only where they
+differ (corrected p under 0.05). The y axis holds 0, every dot, bar and mark.
+With nothing to show, one sentence in the cells.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (bar_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+BAR_SHADE, BAR_WIDTH, BRACKET_STEP_SHARE, CAP_WIDTH_PT, DOT_WIDTHS, DOTS_WIDTH,
+MARK_COLOUR, NO_VALUES.
+
+---- Outputs ----
+List[Axes]
+    The one set of axes of the plot, or of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+A bar runs from 0 to the mean, its error bar from mean - e to mean + e, with e
+the SEM or the SD (MATHS.md section 11.2). The n dots of a set are spread evenly
+over DOTS_WIDTH around the middle of its bar. A bracket sits BRACKET_STEP_SHARE
+of the height of everything drawn above the highest thing under it (0 for a bar
+that goes down from 0); the narrowest brackets are drawn first.
+
+---- Helpers ----
+_bracket_drawer
+_mark_height_finder
+_sentence_drawer
+_spectrum_axes_styler
+_y_range_setter
+bar_numbers_lister
+colour_shader
+p_value_marker
+```
+
+#### `before_after_caption_writer`
+
+```text
+---- Summary ----
+Main function to write the sentences a Before and after (P10) adds to the
+caption: what its lines are, how many experiments each set has, and the test and
+the correction its marks come from.
+
+---- Inputs ----
+plot : PagePlot
+    The plot, with its roles (before_after_form_maker).
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    The sentences on one line; None for a plot with nothing to show.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+before_after_numbers_lister
+legend_sentence_writer
+```
+
+#### `before_after_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Before and after (P10) asks: the
+measurement (the OCR) and how the OCR (as measured), the haems (ΔD) and Δψ (mV)
+are shown, the one that fits the measurement being the one used; the two regions
+(from the baseline, to after the first addition); the kind of region, only in a
+run with both kinds; the group drop-downs (split by Group 1); and the marks
+(stars).
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run, for its haems, its OD values, whether it works out
+    Δψ and its kinds of averaging region.
+
+---- Globals read ----
+FROM_KEY, MARKS_KEY, PAIRED_VO2_VALUE, TO_KEY; MARK_CHOICES (imported).
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_measurement_fields_lister
+_region_field_maker
+_regions_kind_fields_lister
+choice_field_maker
+group_fields_lister
+```
+
+#### `before_after_numbers_lister`
+
+```text
+---- Summary ----
+Main function to work out the numbers of a Before and after: the value of every
+experiment of its sets in each of the two regions picked, then the mean of each
+set in each region and the paired test between the two regions inside each set.
+A set without a value in either region is left out.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (before_after_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+FROM_KEY, MARKS_KEY, PAIRED_VO2_VALUE, TO_KEY; MARK_CHOICES (imported).
+
+---- Outputs ----
+dict
+    'sets': the sets that have a value (plot_set, DATA_FORMAT.md), each with
+    'before' and 'after', the value of each of its experiments in the first and
+    in the second region (None for none); 'statistics': the numbers of the plot
+    (plot_statistics, DATA_FORMAT.md), paired, its sets in the same order;
+    'label': the title of the y axis; 'regions': the names of the two regions;
+    'marks': what the form says.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See region_value_reader and paired_statistics_builder (MATHS.md section 11).
+
+---- Helpers ----
+_choice_reader
+_kind_reader
+_measurement_reader
+_per_od_checker
+_region_reader
+_y_label_finder
+paired_statistics_builder
+plot_sets_lister
+set_values_lister
+```
+
+#### `before_after_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Before and after (P10) into the room of its cells: the
+sets side by side, each with its two regions; every experiment a thin line with
+a dot at each end, from its value in the first region to its value in the
+second, in the colour and line style of its set; the mean of each set of more
+than one experiment a thicker line with a diamond at each end, named, so the
+page gives the plot its small legend. A bracket with its mark sits over a set
+only where its two regions differ (paired test, corrected p under 0.05). The y
+axis holds every dot, mean and mark. With nothing to show, one sentence in the
+cells.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (before_after_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+BRACKET_STEP_SHARE, DOT_WIDTHS, MARK_COLOUR, NO_PAIRS, PAIR_ALPHA, PAIR_STEP.
+
+---- Outputs ----
+List[Axes]
+    The one set of axes of the plot, or of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+The set in place i (from 0) has its first region at x = PAIR_STEP x i and its
+second at x = PAIR_STEP x i + 1. An experiment with a value in one region only is
+a single dot. A bracket sits BRACKET_STEP_SHARE of the height of everything
+drawn above the highest value of its set.
+
+---- Helpers ----
+_bracket_drawer
+_mark_height_finder
+_sentence_drawer
+_spectrum_axes_styler
+_y_range_setter
+before_after_numbers_lister
+p_value_marker
+```
 
 #### `difference_form_maker`
 
@@ -36663,6 +37043,233 @@ line_breaker
 mean_lines_lister
 ```
 
+#### `response_caption_writer`
+
+```text
+---- Summary ----
+Main function to write the sentences a Response by region (P11) adds to the
+caption: what its dots and bars are, how many experiments each set has, and the
+test and the correction its marks come from, across every row of the plot.
+
+---- Inputs ----
+plot : PagePlot
+    The plot, with its roles (response_form_maker).
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    The sentences on one line; None for a plot with nothing to show.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+legend_sentence_writer
+response_numbers_lister
+```
+
+#### `response_checks_lister`
+
+```text
+---- Summary ----
+Main function to list what the Responses by region of a page say of their
+experiments: those left out for another number of additions than most of their
+plot, and those whose additions are not the ones written under the regions.
+
+---- Inputs ----
+page : FigurePage
+    The page.
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, List[str]]
+    'left_out' and 'differing': the experiment names, each once, in the order
+    first met.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+response_numbers_lister
+```
+
+#### `response_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Response by region (P11) asks: what it
+shows (the OCR, or the haems in a run that works them out); a tick per haem, all
+on; how the OCR (% of baseline) and the haems (ΔD) are shown; the kind of
+region, only in a run with both kinds; the group drop-downs (split by Group 1);
+the bars (SEM); the test (Student's); and the marks (stars).
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run, for its haems, its OD values and its kinds of
+    averaging region.
+
+---- Globals read ----
+ERROR_KEY, FIRST_VIEW, HAEM_KEY_START, HAEMS_ROLE, MARKS_KEY, RESPONSE_KEY,
+TEST_KEY, VIEW_CHOICES, VIEW_KEY, VO2_VALUE_KEY; ERROR_CHOICES, MARK_CHOICES,
+TEST_CHOICES, VO2_TRACE, VO2_VALUES (imported).
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_fit_haems_lister
+_haem_namer
+_regions_kind_fields_lister
+_vo2_values_lister
+choice_field_maker
+group_fields_lister
+name_simplifier
+tick_field_maker
+```
+
+#### `response_numbers_lister`
+
+```text
+---- Summary ----
+Main function to work out the numbers of a Response by region: for the OCR, or
+for each haem ticked (a row each), the value of every experiment of its sets in
+the baseline and in the region after each addition, then the mean, SD and SEM
+of each set and the test of each pair of sets in each region, corrected across
+every test of the plot, all its rows together. An experiment with another
+number of additions than most is left out; a set without a value is left out
+of its row, and of a region where it has none.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (response_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+BASELINE_WORDS, ERROR_KEY, HAEM_KEY_START, HAEMS_ROLE, MARKS_KEY, RESPONSE_KEY,
+TEST_KEY, TRACE_KEY; ERROR_CHOICES, HAEM_TRACE_START, MARK_CHOICES,
+TEST_CHOICES, VO2_TRACE, VO2_VALUES (imported).
+
+---- Outputs ----
+dict
+    'rows': one per measurement that has a value, each with its 'trace' and
+    'value' (as trace_reader takes them), its 'label' (the title of its y
+    axis), its 'sets' (plot_set, DATA_FORMAT.md, each with 'regions': the value
+    of each of its experiments in each region) and its 'statistics'
+    (plot_statistics, DATA_FORMAT.md, a column per region); 'regions': the
+    name of each region, 'Baseline' then each addition as the first experiment
+    has it; 'statistics': the columns and the tests of every row in one, for
+    the caption; 'left_out' and 'differing': the experiments _additions_checker
+    names; 'error', 'test' and 'marks': what the form says.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See region_value_reader, plot_statistics_builder and p_values_corrector
+(MATHS.md section 11).
+
+---- Helpers ----
+_additions_checker
+_choice_reader
+_fit_haems_lister
+_kind_reader
+_measurement_reader
+_per_od_checker
+_tick_reader
+_y_label_finder
+name_simplifier
+p_values_corrector
+plot_sets_lister
+plot_statistics_builder
+set_values_lister
+```
+
+#### `response_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Response by region (P11) into the room of its cells:
+every region along the bottom, the baseline then each addition by its name; for
+each set a line through its mean in each region, with its SEM or SD and a dot
+per experiment, the sets side by side; a bracket with its mark where two sets
+differ in a region. The OCR is one set of axes; the haems are a row per haem
+ticked, each with its own y axis, the names of the regions and the small legend
+under the last. The
+y axis starts at 0 for the OCR as measured, per OD or as % of baseline, and
+holds everything drawn otherwise. With nothing to show, one sentence in the
+cells.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (response_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+MARK_COLOUR, NO_RESPONSE, ROW_GAP_SHARE.
+
+---- Outputs ----
+List[Axes]
+    The axes of each row, from the top; or those of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+The region in place i (from 0, the baseline) sits at x = i. With n rows each is
+(1 - ROW_GAP_SHARE x (n - 1)) / n of the height of the room.
+
+---- Helpers ----
+_columns_drawer
+_floor_finder
+_sentence_drawer
+_spectrum_axes_styler
+_y_range_setter
+response_numbers_lister
+```
+
 #### `standard_form_maker`
 
 ```text
@@ -36783,6 +37390,178 @@ height / 2 to its own middle + height / 2 (haem_ylim_sharer).
 ---- Helpers ----
 _tick_reader
 haem_ylim_sharer
+```
+
+#### `time_points_caption_writer`
+
+```text
+---- Summary ----
+Main function to write the sentences a Time points (P12) adds to the caption:
+the region its values are from, what its dots and bars are, how many
+experiments each set has, and the test and the correction its marks come from.
+
+---- Inputs ----
+plot : PagePlot
+    The plot, with its roles (time_points_form_maker).
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    The sentences on one line; None for a plot with nothing to show.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+legend_sentence_writer
+time_points_numbers_lister
+```
+
+#### `time_points_form_maker`
+
+```text
+---- Summary ----
+Main function to list what the form of a Time points (P12) asks: what the form
+of a Bar chart asks, without the drop-down of the time point, which is the x
+axis of the plot. See bar_form_maker.
+
+---- Inputs ----
+setup : dict
+    The set-up table (dataset_setup, DATA_FORMAT.md).
+roles : Dict[str, str]
+    The roles the plot has so far; empty for a new plot.
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+STACK_KEY.
+
+---- Outputs ----
+List[dict]
+    The fields in the order shown (form_field, DATA_FORMAT.md).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+bar_form_maker
+```
+
+#### `time_points_numbers_lister`
+
+```text
+---- Summary ----
+Main function to work out the numbers of a Time points: the value of every
+experiment of its sets (by Group 1 and Group 2, never by time point) in the
+region picked, put at the time point the set-up table gives the experiment;
+then the mean, SD and SEM of each set at each time point and the test of each
+pair of sets at each time point. An experiment without a time point is not
+drawn; a set without a value is left out, and left out of a time point where
+it has none.
+
+---- Inputs ----
+setup : Optional[dict]
+    The set-up table (dataset_setup, DATA_FORMAT.md); None for none.
+roles : Dict[str, str]
+    The roles of the plot (time_points_form_maker).
+experiments : Dict[str, dict]
+    {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+answers : dict
+    The answers of the run.
+
+---- Globals read ----
+ERROR_KEY, MARKS_KEY, REGION_KEY, STACK_KEY, TEST_KEY, TIME_POINT_WORDS;
+ERROR_CHOICES, MARK_CHOICES, TEST_CHOICES, TOGETHER, VO2_VALUES (imported).
+
+---- Outputs ----
+dict
+    'sets': the sets that have a value at a time point (plot_set,
+    DATA_FORMAT.md), each with its 'values' and 'points' (the value and the
+    time point of each of its experiments); 'statistics': the numbers of the
+    plot (plot_statistics, DATA_FORMAT.md), a column per time point in the
+    order drawn; 'time_points', 'places', 'unit', 'ticks' and 'title': the
+    time points and where they sit (_time_points_placer); 'label': the title
+    of the y axis; 'trace' and 'value': the measurement, as trace_reader takes
+    it; 'region': the name of the region; 'error', 'test' and 'marks': what
+    the form says.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See region_value_reader and plot_statistics_builder (MATHS.md section 11).
+
+---- Helpers ----
+_choice_reader
+_kind_reader
+_measurement_reader
+_per_od_checker
+_region_reader
+_time_points_placer
+_y_label_finder
+group_columns_lister
+plot_sets_lister
+plot_statistics_builder
+set_values_lister
+```
+
+#### `time_points_plot_drawer`
+
+```text
+---- Summary ----
+Main function to draw a Time points (P12) into the room of its cells: the time
+points of the set-up table along the bottom, at their number when they are
+numbers; for each set a line through its mean at each time point, with its SEM
+or SD and a dot per experiment, the sets side by side; a bracket with its mark
+where two sets differ at a time point. The y axis starts at 0 for the OCR as
+measured, per OD or as % of baseline, and holds everything drawn otherwise.
+With nothing to show, one sentence in the cells.
+
+---- Inputs ----
+fig : Figure
+    The figure of the page.
+room : Tuple[float, float, float, float]
+    (x0, y0, x1, y1) of the room of the plot, as fractions of the figure.
+plot : PagePlot
+    The plot, with its roles (time_points_form_maker).
+context : dict
+    What a plot is drawn with (PLOT_DRAWERS).
+
+---- Globals read ----
+MARK_COLOUR, NO_POINTS.
+
+---- Outputs ----
+List[Axes]
+    The one set of axes of the plot, or of the sentence.
+
+---- Globals mutated ----
+None. Adds axes to the figure (side effect).
+
+---- Equations ----
+The x axis runs from the first time point - unit / 2 to the last + unit / 2,
+with unit the smallest distance between two time points (_time_points_placer).
+
+---- Helpers ----
+_columns_drawer
+_floor_finder
+_sentence_drawer
+_spectrum_axes_styler
+_y_range_setter
+time_points_numbers_lister
 ```
 
 #### `trace_form_maker`
@@ -39791,6 +40570,533 @@ seconds = n_points x median time between neighbouring points (min) x 60.
 
 ---- Helpers ----
 None.
+```
+
+## `utils_shared/region_statistics.py`
+
+The numbers of the plots per region of a dataset figure: the value of each experiment in an averaging region, the mean, SD and SEM of each set, the t-tests between sets and between two regions, the Holm correction, the marks and the legend sentence.
+
+### NUMBER HELPERS
+
+#### `_finite_values_lister`
+
+```text
+---- Summary ----
+Helper function to keep the values of a set that are numbers: an experiment
+without a value (None, NaN) is left out.
+
+---- Inputs ----
+values : Sequence[Optional[float]]
+    One value per experiment.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    The values that are numbers, shape (n,).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_p_value_finder`
+
+```text
+---- Summary ----
+Helper function to find the two-tailed p value of a t.
+
+---- Inputs ----
+t_value : float
+    The t of the test.
+freedom : float
+    Its degrees of freedom.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    The chance of a t at least that far from 0, either side, when the two means
+    are really the same.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+p = 2 x (the share of the t distribution with that many degrees of freedom that
+lies above |t|).
+
+---- Helpers ----
+None.
+```
+
+#### `_region_namer`
+
+```text
+---- Summary ----
+Helper function to name an averaging region as experiment['averages'] does.
+
+---- Inputs ----
+region : int
+    0 for the baseline, 1 for the region of the first addition, and so on.
+kind : str
+    'settled' or 'quick'.
+
+---- Globals read ----
+BASELINE_NAME, REGION_STARTS.
+
+---- Outputs ----
+str
+    'average0', 'average2', 'quick1' ... Raises ValueError for a kind that is
+    neither, or a region under 0.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### SENTENCE HELPERS
+
+#### `_counts_teller`
+
+```text
+---- Summary ----
+Helper function to list how many experiments each set has in each column of a
+plot.
+
+---- Inputs ----
+columns : Sequence[dict]
+    The columns of the plot (plot_statistics, DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, List[int]]
+    {the name of the set: its n in each column that has it}, in the order first
+    seen.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_names_joiner`
+
+```text
+---- Summary ----
+Helper function to write a list of names as words: 'a', 'a and b', 'a, b and c'.
+
+---- Inputs ----
+names : Sequence[str]
+    The names, at least one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The names in one phrase.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `legend_sentence_writer`
+
+```text
+---- Summary ----
+Main function to write the sentences of a plot per region for the legend of the
+paper: what the dots and bars are, how many experiments each set has, which set
+has only one, and which test and correction the marks come from.
+
+---- Inputs ----
+statistics : dict
+    The numbers of the plot (plot_statistics, DATA_FORMAT.md), from
+    plot_statistics_builder or paired_statistics_builder.
+error : str
+    What the bars show, 'sem' or 'sd'; not used for a paired plot, which has no
+    bars.
+test : str
+    The test between sets, 'student' or 'welch'; not used for a paired plot.
+marks : str
+    'stars', 'p' or 'none'; with 'none' nothing is said of the test.
+
+---- Globals read ----
+ERROR_CHOICES, P_WORDS, PAIRED_WORDS, STARS_WORDS, TEST_WORDS.
+
+---- Outputs ----
+str
+    The sentences, on one line. Raises ValueError for bars, a test or marks that
+    are not known.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_counts_teller
+_names_joiner
+```
+
+#### `p_value_marker`
+
+```text
+---- Summary ----
+Main function to give the mark drawn over a comparison: stars or the p value
+where the two differ, and nothing where they do not (never "ns").
+
+---- Inputs ----
+p_value : Optional[float]
+    The corrected p value of the comparison; None for one that was not tested.
+marks : str
+    'stars', 'p' or 'none'.
+
+---- Globals read ----
+SIGNIFICANT_BELOW, STAR_LIMITS.
+
+---- Outputs ----
+str
+    '***', '**' or '*'; or 'p = 0.018', 'p < 0.001'; '' for no mark. Raises
+    ValueError for marks that are not known.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Stars: *** for p < 0.001, ** for p < 0.01, * for p < 0.05 (MATHS.md section
+11.6).
+
+---- Helpers ----
+None.
+```
+
+#### `p_values_corrector`
+
+```text
+---- Summary ----
+Main function to correct the p values of every test of one plot with Holm's
+rule, so the chance of a mark by luck anywhere on the plot stays under 1 in 20.
+
+---- Inputs ----
+p_values : Sequence[Optional[float]]
+    The p value of each test; None for a comparison that was not tested, which
+    is not counted.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Optional[float]]
+    The corrected p values, in the order given; None where None was given.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+With the m p values sorted smallest first, p_(1) <= ... <= p_(m): corrected
+p_(i) = min(1, max(corrected p_(i-1), (m - i + 1) x p_(i))) (MATHS.md section
+11.5).
+
+---- Helpers ----
+None.
+```
+
+#### `paired_statistics_builder`
+
+```text
+---- Summary ----
+Main function to work out the numbers of a Before and after plot: each set in
+its two regions, the paired t-test between the two regions inside each set, and
+the Holm correction across the sets.
+
+---- Inputs ----
+sets : Sequence[dict]
+    One per set: 'name', and 'before' and 'after', the value of each of its
+    experiments in the first and in the second region, in the same order (None
+    for an experiment without one).
+labels : Sequence[str]
+    The names of the two regions.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The numbers of the plot (plot_statistics, DATA_FORMAT.md) with 'is_paired'
+    True: two columns, and one test per set with at least two experiments that
+    have both values, each with the 'set' it is of.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See pairs_tester and p_values_corrector.
+
+---- Helpers ----
+p_values_corrector
+pairs_tester
+set_statistics_calculator
+```
+
+#### `pairs_tester`
+
+```text
+---- Summary ----
+Main function to test whether the experiments of one set changed from one region
+to another, with the paired t-test: each experiment is compared with itself.
+
+---- Inputs ----
+before : Sequence[Optional[float]]
+    The value of each experiment in the first region; None for none.
+after : Sequence[Optional[float]]
+    Its value in the second region, in the same order.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[dict]
+    't', 'df', 'p' (two-tailed, not corrected) and 'n' (the experiments with
+    both values); None when fewer than two experiments have both, or when every
+    experiment changed by exactly the same amount (no spread to test against).
+    Raises ValueError when the two lists are not the same length.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+d_i = after_i - before_i; t = mean(d) / (SD(d) / sqrt(n)); df = n - 1 (MATHS.md
+section 11.4).
+
+---- Helpers ----
+_p_value_finder
+```
+
+#### `plot_statistics_builder`
+
+```text
+---- Summary ----
+Main function to work out the numbers of a plot per region: the mean, SD and SEM
+of each set in each column (a region, or a time point), the t-test of each pair
+of sets in each column, and the Holm correction across every test of the plot.
+
+---- Inputs ----
+columns : Sequence[dict]
+    One per column of the plot: 'label' (its name) and 'sets', each with its
+    'name' and 'values' (one per experiment; None for an experiment without
+    one).
+test : str
+    'student' or 'welch'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    The numbers of the plot (plot_statistics, DATA_FORMAT.md): 'columns', each
+    with its 'label' and the statistics of its 'sets'; 'tests', one per pair of
+    sets that could be tested, with its 'column' (from 0), 'first' and 'second'
+    (the names of the two sets), 't', 'df', 'p' and 'p_corrected'; 'is_paired'
+    False.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+See set_statistics_calculator, sets_tester and p_values_corrector.
+
+---- Helpers ----
+p_values_corrector
+set_statistics_calculator
+sets_tester
+```
+
+#### `region_value_reader`
+
+```text
+---- Summary ----
+Main function to read the value of one experiment in one averaging region: the
+mean, over the region, of the trace in the value picked.
+
+---- Inputs ----
+experiment : Optional[dict]
+    The slim copy of the experiment (page_experiment, DATA_FORMAT.md); None for
+    an experiment that is not there.
+trace : str
+    The trace, as trace_reader takes it: the OCR, Δψ or a haem.
+value : str
+    The value it is shown in, as trace_reader takes it. A haem has no % of
+    baseline and no change from baseline.
+region : int
+    0 for the baseline, 1 for the region of the first addition, and so on.
+kind : str
+    'settled' or 'quick'; the baseline is the same for both.
+is_per_od : bool
+    True when the run shows its haems per OD.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    The value, in the unit of the value picked; None when the file does not have
+    that region (too few additions, a region that does not fit or was left out),
+    does not have the trace in that value, or has no measurement inside the
+    region.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+value = (y_1 + ... + y_k) / k, with y the trace in the value picked at the k
+times inside the region that have a number (MATHS.md section 11.1).
+
+---- Helpers ----
+_region_namer
+trace_reader
+```
+
+#### `set_statistics_calculator`
+
+```text
+---- Summary ----
+Main function to work out the mean, the spread (SD) and the standard error of
+the mean (SEM) of the experiments of one set.
+
+---- Inputs ----
+values : Sequence[Optional[float]]
+    The value of each experiment; None for an experiment without one, which is
+    not counted.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    'values' (the numbers counted, List[float]), 'n', 'mean', 'sd' and 'sem';
+    the mean is NaN for an empty set, the SD and the SEM for a set of fewer than
+    two.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+mean = (y_1 + ... + y_n) / n; SD = sqrt(((y_1 - mean)² + ... + (y_n - mean)²) /
+(n - 1)); SEM = SD / sqrt(n) (MATHS.md section 11.2).
+
+---- Helpers ----
+_finite_values_lister
+```
+
+#### `set_values_lister`
+
+```text
+---- Summary ----
+Main function to give each set of a plot the value of each of its experiments in
+one averaging region.
+
+---- Inputs ----
+sets : Sequence[dict]
+    The sets of the plot, from the set-up table (plot_set, DATA_FORMAT.md); not
+    changed.
+experiments : Dict[str, dict]
+    {experiment name: its slim copy (page_experiment, DATA_FORMAT.md)}.
+trace : str
+    The trace, as region_value_reader takes it.
+value : str
+    The value it is shown in.
+region : int
+    0 for the baseline, 1 for the region of the first addition, and so on.
+kind : str
+    'settled' or 'quick'.
+is_per_od : bool
+    True when the run shows its haems per OD.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[dict]
+    A copy of each set with 'values': one per experiment of its 'names', in that
+    order, None for an experiment that is not there or has no value in that
+    region.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+region_value_reader
+```
+
+#### `sets_tester`
+
+```text
+---- Summary ----
+Main function to test whether two sets of experiments differ, with Student's
+t-test (the two sets are taken to scatter equally, and their spreads are pooled)
+or Welch's (each set keeps its own spread).
+
+---- Inputs ----
+first : Sequence[Optional[float]]
+    The value of each experiment of one set; None for none.
+second : Sequence[Optional[float]]
+    The same for the other set.
+test : str
+    'student' or 'welch'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[dict]
+    't', 'df' and 'p' (two-tailed, not corrected); None when either set has
+    fewer than two experiments, or when neither set has any spread. Raises
+    ValueError for a test that is not known.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+With n, m and s the number, mean and SD of each set, t = (m1 - m2) / e.
+Student's: sp² = ((n1 - 1) s1² + (n2 - 1) s2²) / (n1 + n2 - 2); e = sqrt(sp² x
+(1 / n1 + 1 / n2)); df = n1 + n2 - 2. Welch's: e = sqrt(s1² / n1 + s2² / n2);
+df = (s1² / n1 + s2² / n2)² / ((s1² / n1)² / (n1 - 1) + (s2² / n2)² / (n2 - 1))
+(MATHS.md section 11.3).
+
+---- Helpers ----
+_finite_values_lister
+_p_value_finder
 ```
 
 ## `utils_shared/run_logging.py`

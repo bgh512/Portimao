@@ -1,8 +1,10 @@
 """
-Tests of the plot types of a dataset figure on made-up experiments, drawn off screen: the form of the Standard experiment, its panels, its views, its ticks, its sentences and the scales its plots share; the form, the lines and the sentences of the Difference spectrum; the form, the lines, the stacking and the sentence of the Waterfall, also of traces; the forms, the lines, the bands and the sentences of the Single trace and the Mean trace, worked out by hand.
+Tests of the plot types of a dataset figure on made-up experiments, drawn off screen: the form of the Standard experiment, its panels, its views, its ticks, its sentences and the scales its plots share; the form, the lines and the sentences of the Difference spectrum; the form, the lines, the stacking and the sentence of the Waterfall, also of traces; the forms, the lines, the bands and the sentences of the Single trace and the Mean trace; the forms, the numbers, the drawing and the caption lines of the Bar chart, the Before and after, the Response by region and the Time points, worked out by hand.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import io
+import warnings
 from typing import Dict, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
@@ -25,15 +27,28 @@ from utils_shared.figure_page import (figure_page_drawer,
                                       )
 from utils_shared.journal_files import STANDARD_SPEC
 from utils_shared.figure_layout import BACKDROP_MARK, font_family_lister
-from utils_shared.page_data import experiment_role_maker, form_fields_lister
-from utils_shared.page_plots import (mean_lines_lister,
+from utils_shared.page_data import (caption_lines_builder,
+                                    colour_shader,
+                                    experiment_role_maker,
+                                    form_fields_lister,
+                                    )
+from utils_shared.page_plots import (bar_numbers_lister,
+                                     before_after_numbers_lister,
+                                     mean_lines_lister,
                                      NO_DIFFERENCE,
                                      NO_MEAN,
+                                     NO_PAIRS,
                                      NO_PANEL,
+                                     NO_POINTS,
+                                     NO_RESPONSE,
                                      NO_TRACE,
+                                     NO_VALUES,
                                      NO_WATERFALL,
                                      NOT_READ,
                                      NOT_THERE,
+                                     response_checks_lister,
+                                     response_numbers_lister,
+                                     time_points_numbers_lister,
                                      traces_left_out_lister,
                                      waterfall_left_out_lister,
                                      waterfall_lines_lister,
@@ -72,6 +87,18 @@ OCR_RUNS = {'a1': (4.0, [10.0, 16.0], 20.0),
             'a4': (8.0, [10.0], 20.0),
             'k1': (10.0, [10.0, 15.0], 20.0),
             }
+# the made-up dataset of the plots per region: the group of each experiment and its
+# OCR (µM min⁻¹) in its baseline, in its quick region and in its settled region after
+# its one addition
+REGION_RUNS = {'c1': ('control', (10.0, 7.0, 4.0)),
+               'c2': ('control', (12.0, 8.0, 5.0)),
+               'c3': ('control', (14.0, 9.0, 6.0)),
+               'k1': ('knockdown', (9.0, 8.5, 8.0)),
+               'k2': ('knockdown', (11.0, 10.0, 9.0)),
+               'k3': ('knockdown', (13.0, 11.5, 10.0)),
+               's1': ('single', (20.0, 15.0, 10.0)),
+               }
+ORANGE, GREEN = '#d55e00', '#009e73'
 
 
 # ---- MAKERS --------------------------------------------------------------------------
@@ -259,6 +286,241 @@ def _page_drawer(roles_by_name: List[Tuple[str, Dict[str, str]]],
         elif not ax.axison:
             panels[place]['sentence'] = ax
     return fig, panels
+
+
+# ---- _region_drawer ------------------------------------------------------------------
+def _region_drawer(plot_type: str,
+                   roles: Dict[str, str],
+                   answers: Optional[dict] = None,
+                   setup: Optional[dict] = None,
+                   experiments: Optional[Dict[str, dict]] = None,
+                   ) -> Tuple[Figure, Axes]:
+    """
+    ---- Summary ----
+    Helper function to draw a page with one plot per region of the made-up dataset
+    of REGION_RUNS, three columns wide and three rows tall at the top left.
+
+    ---- Inputs ----
+    plot_type : str
+        'P9' to 'P12'.
+    roles : Dict[str, str]
+        The roles of the plot.
+    answers : Optional[dict]
+        The answers of the run; None for those of _answers_maker.
+    setup : Optional[dict]
+        The set-up table; None for that of _region_setup_maker.
+    experiments : Optional[Dict[str, dict]]
+        The slim copies; None for those of _region_experiments_maker.
+
+    ---- Globals read ----
+    STANDARD_SPEC (imported).
+
+    ---- Outputs ----
+    Tuple[Figure, Axes]
+        (the figure, the first axes of the plot; the others are in the figure).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _answers_maker
+    _region_experiments_maker
+    _region_setup_maker
+    figure_page_drawer
+    """
+
+    page = plot_placer(FigurePage(),
+                       PagePlot(plot_type,
+                                row=0,
+                                column=0,
+                                n_rows=3,
+                                n_columns=3,
+                                roles=roles,
+                                ),
+                       )
+    fig, axes = figure_page_drawer(
+        page,
+        STANDARD_SPEC,
+        _region_setup_maker() if setup is None else setup,
+        _region_experiments_maker() if experiments is None else experiments,
+        _answers_maker() if answers is None else answers,
+        )
+    return fig, axes[0]
+
+
+# ---- _region_haems_adder -------------------------------------------------------------
+def _region_haems_adder(experiments: Dict[str, dict]) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Helper function to give each made-up experiment of the plots per region its two
+    haems in ΔD: bH at minus its OCR, cc at half its OCR.
+
+    ---- Inputs ----
+    experiments : Dict[str, dict]
+        The slim copies of _region_experiments_maker; changed.
+
+    ---- Globals read ----
+    HAEMS; TIME_COLUMN (imported).
+
+    ---- Outputs ----
+    Dict[str, dict]
+        The same slim copies.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    for experiment in experiments.values():
+        ocr = experiment['VoO2']
+        experiment['haem_delta_abs'] = pd.DataFrame({TIME_COLUMN: ocr[TIME_COLUMN],
+                                                     HAEMS[0]: -ocr['VoO2'],
+                                                     HAEMS[1]: ocr['VoO2'] / 2.0,
+                                                     },
+                                                    )
+    return experiments
+
+
+# ---- _region_points_setup_maker ------------------------------------------------------
+def _region_points_setup_maker(early: str, late: str) -> dict:
+    """
+    ---- Summary ----
+    Helper function to make the set-up of the plots per region with time points:
+    the first two controls and the first two knockdowns at the late one, the third
+    of each at the early one, and none for the experiment of the third group.
+
+    ---- Inputs ----
+    early : str
+        The time point of c3 and k3.
+    late : str
+        The time point of c1, c2, k1 and k2.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    dict
+        The set-up table (dataset_setup, DATA_FORMAT.md).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _region_setup_maker
+    """
+
+    setup = _region_setup_maker()
+    for row in setup['rows']:
+        if row['name'] in ('c3', 'k3'):
+            row['time_point'] = early
+        elif row['name'] != 's1':
+            row['time_point'] = late
+    return setup
+
+
+# ---- _region_experiments_maker -------------------------------------------------------
+def _region_experiments_maker() -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Helper function to make the slim copies of the made-up dataset of the plots per
+    region (REGION_RUNS): each has an OCR every quarter minute from 0 to 20 min, at
+    its baseline level until its one addition at 10 min, at its quick level until
+    11.5 min and at its settled level from then on; the same as % of its baseline;
+    a baseline region from 2 to 8 min, a quick region from 10.5 to 11 min and a
+    settled region from 14 to 18 min.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    REGION_RUNS; TIME_COLUMN (imported).
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {experiment name: its slim copy} (page_experiment, DATA_FORMAT.md).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    experiments = {}
+    for name, (_, (before, quick, after)) in REGION_RUNS.items():
+        times = np.arange(0.0, 20.125, 0.25)
+        ocr = np.where(times < 10.0, before, np.where(times < 11.5, quick, after))
+        percent = pd.DataFrame({TIME_COLUMN: times, 'VoO2': ocr / before * 100.0})
+        percent.attrs['baseline_percent'] = {'start_time': 2.0,
+                                             'end_time': 8.0,
+                                             'baseline_mean': {'VoO2': before},
+                                             }
+        windows = {'average0': {'start_time': 2.0, 'end_time': 8.0},
+                   'quick1': {'start_time': 10.5, 'end_time': 11.0},
+                   'average1': {'start_time': 14.0, 'end_time': 18.0},
+                   }
+        experiments[name] = {'experiment_name': name,
+                             'VoO2': pd.DataFrame({TIME_COLUMN: times, 'VoO2': ocr}),
+                             'VoO2_baseline': percent,
+                             'metadata': {'events': [{'time': 10.0, 'label': 'KCN'}]},
+                             'averages': {'windows': windows},
+                             }
+    return experiments
+
+
+# ---- _region_setup_maker -------------------------------------------------------------
+def _region_setup_maker() -> dict:
+    """
+    ---- Summary ----
+    Helper function to make the set-up of the made-up dataset of the plots per
+    region: three controls, three knockdowns and one experiment of a third group.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    BLUE, GREEN, ORANGE, REGION_RUNS.
+
+    ---- Outputs ----
+    dict
+        The set-up table (dataset_setup, DATA_FORMAT.md).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return {'group_names': ['strain', ''],
+            'colours': {'control': BLUE, 'knockdown': ORANGE, 'single': GREEN},
+            'rows': [{'name': name,
+                      'use': True,
+                      'group_1': group,
+                      'group_2': '',
+                      'time_point': '',
+                      'run': int(name[1:]),
+                      }
+                     for name, (group, _) in REGION_RUNS.items()
+                     ],
+            }
 
 
 # ---- _setup_maker --------------------------------------------------------------------
@@ -1895,3 +2157,1071 @@ def test_a_waterfall_of_traces() -> None:
     assert ax.get_ylabel() == 'OCR (µM min$^{-1}$), stacked'
     assert [text.get_text() for text in ax.texts] == ['add 1', 'add 2', '//']
     assert not ax.patches  # no haem bands behind traces
+
+
+# ---- test_the_forms_of_the_plots_per_region ------------------------------------------
+def test_the_forms_of_the_plots_per_region() -> None:
+    """
+    ---- Summary ----
+    Main function to check what the forms of a Bar chart and of a Before and after
+    ask and how they start: the measurement without the oxygen, the "shown as"
+    lists, the region or the two regions, the groups, the bars, the test and the
+    marks; the kind of region only in a run with both kinds; and what a plot keeps.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _answers_maker
+    _region_setup_maker
+    """
+
+    # ---- 1 A Bar chart ---------------------------------------------------------------
+    setup = _region_setup_maker()
+    fields = form_fields_lister('P9', setup, {}, _answers_maker())
+    assert [(field['key'], field['label'], field['value']) for field in fields] == [
+        ('trace', 'Measurement', 'vo2'),
+        ('vo2_value', 'OCR shown as', 'baseline'),
+        ('haem_view', 'Haems shown as', 'delta'),
+        ('delta_psi_value', 'Δψ shown as', 'raw'),
+        ('region', 'Region', 'addition 1'),
+        ('group_1', 'strain', 'Split'),
+        ('bars', 'Bars', 'sem'),
+        ('test', 'Test', 'student'),
+        ('marks', 'Marks', 'stars'),
+        ]
+    assert fields[0]['choices'] == [('vo2', 'OCR'),
+                                    ('haem_cytbh', 'Cyt bH'),
+                                    ('haem_cytcc', 'Cyt cc'),
+                                    ('delta_psi', 'Δψ'),
+                                    ]
+    assert fields[4]['choices'][:3] == [('baseline', 'Baseline'),
+                                        ('addition 1', 'After addition 1'),
+                                        ('addition 2', 'After addition 2'),
+                                        ]
+    assert len(fields[4]['choices']) == 11
+    assert fields[6]['choices'] == [('sem', 'SEM'), ('sd', 'SD')]
+    assert fields[7]['choices'] == [('student', "Student's t-test"),
+                                    ('welch', "Welch's t-test"),
+                                    ]
+    assert fields[8]['choices'] == [('stars', 'Stars'),
+                                    ('p', 'p values'),
+                                    ('none', 'None'),
+                                    ]
+    kept = {'trace': 'haem_cytcc', 'region': 'addition 3', 'bars': 'sd', 'marks': 'p'}
+    values = {field['key']: field['value']
+              for field in form_fields_lister('P9', setup, kept, _answers_maker())
+              }
+    assert {key: values[key] for key in kept} == kept
+
+    # ---- 2 The kind of region, only in a run with both -------------------------------
+    both = form_fields_lister('P9', setup, {}, _answers_maker(quick_windows=True))
+    assert [field['key'] for field in both][4:6] == ['region', 'region_kind']
+    assert both[5]['label'] == 'Regions' and both[5]['value'] == 'settled'
+    assert both[5]['choices'] == [('settled', 'Settled'), ('quick', 'Quick')]
+    quick_only = _answers_maker(quick_windows=True, settled_windows=False)
+    assert 'region_kind' not in [field['key']
+                                 for field in form_fields_lister('P9',
+                                                                 setup,
+                                                                 {},
+                                                                 quick_only,
+                                                                 )
+                                 ]
+
+    # ---- 3 A Before and after --------------------------------------------------------
+    plain = _answers_maker(decompose=False, delta_psi=False, quick_windows=True)
+    fields = form_fields_lister('P10', setup, {}, plain)
+    assert [(field['key'], field['label'], field['value']) for field in fields] == [
+        ('trace', 'Measurement', 'vo2'),
+        ('vo2_value', 'OCR shown as', 'raw'),
+        ('region_from', 'From', 'baseline'),
+        ('region_to', 'To', 'addition 1'),
+        ('region_kind', 'Regions', 'settled'),
+        ('group_1', 'strain', 'Split'),
+        ('marks', 'Marks', 'stars'),
+        ]
+    assert fields[0]['choices'] == [('vo2', 'OCR')]
+
+
+# ---- test_the_numbers_of_a_bar_chart -------------------------------------------------
+def test_the_numbers_of_a_bar_chart() -> None:
+    """
+    ---- Summary ----
+    Main function to check the numbers of a Bar chart, worked out by hand: the value
+    of each experiment in the region picked, of the kind picked or the only kind the
+    run has; the mean, SD and SEM of each set; the one test, between the two sets of
+    more than one experiment; a set without a value left out; and what the form says
+    of the bars, the test and the marks.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    After the addition, settled: controls 4, 5, 6 (mean 5, SD 1, SEM 1 / sqrt(3));
+    knockdowns 8, 9, 10 (mean 9, SD 1). Student's: sp² = 1, e = sqrt(2 / 3),
+    t = -4 / 0.8165 = -4.899, df = 4, p = 0.0080. Quick: controls 7, 8, 9. As % of
+    baseline the controls are 40, 500 / 12 and 600 / 14.
+
+    ---- Helpers ----
+    _answers_maker
+    _region_experiments_maker
+    _region_setup_maker
+    """
+
+    # ---- 1 After the addition, as measured -------------------------------------------
+    setup, experiments = _region_setup_maker(), _region_experiments_maker()
+    answers = _answers_maker()
+    found = bar_numbers_lister(setup, {'vo2_value': 'raw'}, experiments, answers)
+    assert [(one['name'], one['values'], one['colour']) for one in found['sets']] == [
+        ('control', [4.0, 5.0, 6.0], BLUE),
+        ('knockdown', [8.0, 9.0, 10.0], ORANGE),
+        ('single', [10.0], GREEN),
+        ]
+    control, knockdown, single = found['statistics']['columns'][0]['sets']
+    assert (control['n'], control['mean'], control['sd']) == (3, 5.0, 1.0)
+    assert control['sem'] == pytest.approx(1.0 / np.sqrt(3.0))
+    assert (knockdown['mean'], single['n'], single['mean']) == (9.0, 1, 10.0)
+    (result,) = found['statistics']['tests']
+    assert (result['first'], result['second'], result['df']) == ('control',
+                                                                 'knockdown',
+                                                                 4.0,
+                                                                 )
+    assert result['t'] == pytest.approx(-4.0 / np.sqrt(2.0 / 3.0))
+    assert result['p_corrected'] == pytest.approx(0.00805, abs=5e-5)
+    assert (found['label'], found['region']) == ('OCR (µM min$^{-1}$)',
+                                                 'After addition 1',
+                                                 )
+    assert (found['error'], found['test'], found['marks']) == ('sem',
+                                                               'student',
+                                                               'stars',
+                                                               )
+
+    # ---- 2 Another region, another kind, another value -------------------------------
+    roles = {'vo2_value': 'raw', 'region': 'baseline', 'bars': 'sd', 'test': 'welch'}
+    found = bar_numbers_lister(setup, dict(roles, marks='p'), experiments, answers)
+    assert [one['values'] for one in found['sets']] == [[10.0, 12.0, 14.0],
+                                                        [9.0, 11.0, 13.0],
+                                                        [20.0],
+                                                        ]
+    assert (found['region'], found['error'], found['test'], found['marks']) == (
+        'Baseline',
+        'sd',
+        'welch',
+        'p',
+        )
+    roles = {'vo2_value': 'raw', 'region_kind': 'quick'}
+    both = _answers_maker(quick_windows=True)
+    assert bar_numbers_lister(setup, roles, experiments, both)['sets'][0]['values'] == [
+        7.0,
+        8.0,
+        9.0,
+        ]
+    # the kind picked counts only in a run that has it
+    assert bar_numbers_lister(setup,
+                              roles,
+                              experiments,
+                              answers,
+                              )['sets'][0]['values'] == [4.0,
+                                                         5.0,
+                                                         6.0,
+                                                         ]
+    quick_only = _answers_maker(quick_windows=True, settled_windows=False)
+    found = bar_numbers_lister(setup, {'vo2_value': 'raw'}, experiments, quick_only)
+    assert found['sets'][0]['values'] == [7.0, 8.0, 9.0]
+    found = bar_numbers_lister(setup, {}, experiments, answers)
+    assert found['sets'][0]['values'] == pytest.approx(
+        [40.0, 500.0 / 12.0, 600.0 / 14.0],
+        )
+    assert found['label'] == 'OCR (% of baseline)'
+
+    # ---- 3 A set without a value is left out -----------------------------------------
+    del experiments['s1']
+    experiments['k2'] = None
+    found = bar_numbers_lister(setup, {'vo2_value': 'raw'}, experiments, answers)
+    assert [(one['name'], one['values']) for one in found['sets']] == [
+        ('control', [4.0, 5.0, 6.0]),
+        ('knockdown', [8.0, None, 10.0]),
+        ]
+    assert found['statistics']['columns'][0]['sets'][1]['n'] == 2
+    found = bar_numbers_lister(setup, {'region': 'addition 2'}, experiments, answers)
+    assert found['sets'] == [] and found['statistics']['tests'] == []
+
+
+# ---- test_a_page_draws_the_special_characters ----------------------------------------
+@pytest.mark.parametrize('plot_type', ['P9', 'P10', 'P11', 'P12'])
+def test_a_page_draws_the_special_characters(plot_type: str) -> None:
+    """
+    ---- Summary ----
+    Main function to check that a plot per region whose group labels, time points
+    and addition hold the characters the journal's font lacks (a raised minus and
+    plus, subscripts) is saved without one drawn as an empty box: the page names
+    the fallback fonts after the journal's.
+
+    ---- Inputs ----
+    plot_type : str
+        'P9' to 'P12'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _region_drawer
+    _region_experiments_maker
+    _region_points_setup_maker
+    """
+
+    setup = _region_points_setup_maker('2 h⁻¹', '24 h⁻¹')
+    names = {'control': 'wild type, O₂', 'knockdown': 'Δcyd 8 µg mL⁻¹, Na⁺'}
+    for row in setup['rows']:
+        row['group_1'] = names.get(row['group_1'], row['group_1'])
+    setup['colours'] = {names.get(label, label): colour
+                        for label, colour in setup['colours'].items()
+                        }
+    experiments = _region_experiments_maker()
+    for experiment in experiments.values():
+        experiment['metadata']['events'][0]['label'] = 'H₃PO₄ · 2 × 10⁻³ M'
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        fig, _ = _region_drawer(plot_type, {}, setup=setup, experiments=experiments)
+        fig.savefig(io.BytesIO(), format='png')
+    drawn = ''.join(text.get_text() for text in fig.findobj(Text))
+    assert '⁻' in drawn  # the labels are on the page
+    assert not [str(found.message) for found in caught if 'Glyph' in str(found.message)]
+
+
+# ---- test_a_bar_chart_drawn ----------------------------------------------------------
+def test_a_bar_chart_drawn() -> None:
+    """
+    ---- Summary ----
+    Main function to check a Bar chart as drawn: a bar and an error bar for each set
+    of more than one experiment and none for the set of one; a dot per experiment in
+    the colour of its set; one bracket with its mark, between the two sets that
+    differ, above everything under it; the y axis from 0 holding every dot, bar and
+    mark; the names of the sets and of the region; no small legend; everything
+    inside its cells. Then the SD and the p value, no marks, a plot whose numbers go
+    below 0, two sets that do not differ, and the sentence of a plot with nothing to
+    show.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    BLUE, GREEN, ORANGE; NO_VALUES (imported).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The numbers of test_the_numbers_of_a_bar_chart. Everything drawn runs from 0 to
+    10, so a bracket sits 0.07 x 10 = 0.7 above the highest thing under it (the
+    knockdown at 10): at 10.7, its ends down to 10.35. p = 0.0080 gives **. As a
+    change from baseline the controls are -6, -7, -8 and the knockdowns -1, -2, -3
+    (t = -5 / 0.8165 = -6.124, df = 4, p = 0.0036, **), the single one -10: the
+    bars come down from 0, so the bracket sits at 0 + 0.7 = 0.7. In the baseline the two means are 12 and 11
+    with an SD of 2: t = 0.61, no mark.
+
+    ---- Helpers ----
+    _region_drawer
+    colour_shader
+    """
+
+    # ---- 1 The bars, the error bars and the dots -------------------------------------
+    fig, ax = _region_drawer('P9', {'vo2_value': 'raw'})
+    assert [bar.get_x() + bar.get_width() / 2.0 for bar in ax.patches] == pytest.approx(
+        [0.0, 1.0],
+        )
+    assert [bar.get_height() for bar in ax.patches] == pytest.approx([5.0, 9.0])
+    assert [matplotlib.colors.to_hex(bar.get_facecolor()) for bar in ax.patches] == [
+        colour_shader(BLUE, 0.65),
+        colour_shader(ORANGE, 0.65),
+        ]
+    assert [matplotlib.colors.to_hex(bar.get_edgecolor()) for bar in ax.patches] == [
+        BLUE,
+        ORANGE,
+        ]
+    dots = [group
+            for group in ax.collections
+            if isinstance(group, matplotlib.collections.PathCollection)
+            ]
+    assert [matplotlib.colors.to_hex(group.get_facecolor()[0]) for group in dots] == [
+        BLUE,
+        ORANGE,
+        GREEN,
+        ]
+    assert np.asarray(dots[0].get_offsets()) == pytest.approx(np.array([[-0.15, 4.0],
+                                                                        [0.0, 5.0],
+                                                                        [0.15, 6.0],
+                                                                        ],
+                                                                       ),
+                                                              )
+    assert dots[2].get_offsets().tolist() == [[2.0, 10.0]]
+    errors = [group.get_segments()[0]
+              for group in ax.collections
+              if isinstance(group, matplotlib.collections.LineCollection)
+              ]
+    sem = 1.0 / np.sqrt(3.0)
+    assert np.asarray(errors) == pytest.approx(np.array([[[0.0, 5.0 - sem],
+                                                          [0.0, 5.0 + sem],
+                                                          ],
+                                                         [[1.0, 9.0 - sem],
+                                                          [1.0, 9.0 + sem],
+                                                          ],
+                                                         ],
+                                                        ),
+                                               )
+
+    # ---- 2 The bracket, the axes and the text ----------------------------------------
+    (bracket,) = [line for line in ax.lines if getattr(line, 'is_bracket', False)]
+    assert bracket.get_xdata().tolist() == [0.0, 0.0, 1.0, 1.0]
+    assert bracket.get_ydata().tolist() == pytest.approx([10.35, 10.7, 10.7, 10.35])
+    (mark,) = ax.texts
+    assert mark.get_text() == '**' and mark.get_position() == pytest.approx((0.5, 10.7))
+    renderer = fig._get_renderer()
+    low, high = ax.get_ylim()
+    assert low == 0.0 and high > 10.7
+    assert mark.get_window_extent(renderer).y1 <= ax.get_window_extent(renderer).y1
+    assert [label.get_text() for label in ax.get_xticklabels()] == ['control',
+                                                                    'knockdown',
+                                                                    'single',
+                                                                    ]
+    assert ax.get_xlabel() == 'After addition 1'
+    assert ax.get_ylabel() == 'OCR (µM min$^{-1}$)'
+    assert ax.get_legend() is None
+    tight = ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+    assert 0.0 <= tight.x0 and tight.x1 <= 0.5
+    assert 0.5 <= tight.y0 and tight.y1 <= 1.0
+
+    # ---- 3 The SD, the p value and no marks ------------------------------------------
+    _, ax = _region_drawer('P9', {'vo2_value': 'raw', 'bars': 'sd', 'marks': 'p'})
+    first = next(group.get_segments()[0]
+                 for group in ax.collections
+                 if isinstance(group, matplotlib.collections.LineCollection)
+                 )
+    assert np.asarray(first) == pytest.approx(np.array([[0.0, 4.0], [0.0, 6.0]]))
+    assert [text.get_text() for text in ax.texts] == ['p = 0.008']
+    _, ax = _region_drawer('P9', {'vo2_value': 'raw', 'marks': 'none'})
+    assert not ax.texts
+    assert not [line for line in ax.lines if getattr(line, 'is_bracket', False)]
+
+    # ---- 4 Numbers below 0, and two sets that do not differ --------------------------
+    _, ax = _region_drawer('P9', {'vo2_value': 'change'})
+    assert [bar.get_height() for bar in ax.patches] == pytest.approx([-7.0, -2.0])
+    (bracket,) = [line for line in ax.lines if getattr(line, 'is_bracket', False)]
+    assert bracket.get_ydata().tolist() == pytest.approx([0.35, 0.7, 0.7, 0.35])
+    low, high = ax.get_ylim()
+    assert low < -10.0 and high > 0.7
+    assert ax.get_ylabel() == 'Change in OCR (µM min$^{-1}$)'
+    _, ax = _region_drawer('P9', {'vo2_value': 'raw', 'region': 'baseline'})
+    assert [bar.get_height() for bar in ax.patches] == pytest.approx([12.0, 11.0])
+    assert not ax.texts and ax.get_xlabel() == 'Baseline'
+    assert ax.get_ylim()[1] > 20.0  # the one experiment of the third set
+
+    # ---- 5 One set of one experiment, and nothing to show ----------------------------
+    _, ax = _region_drawer('P9', {'vo2_value': 'raw', 'group_1': 'Only label 3'})
+    assert not ax.patches and len(ax.collections) == 1
+    _, ax = _region_drawer('P9', {'trace': 'delta_psi'})
+    assert not ax.axison
+    assert ' '.join(ax.texts[0].get_text().split()) == NO_VALUES
+
+
+# ---- test_a_before_and_after ---------------------------------------------------------
+def test_a_before_and_after() -> None:
+    """
+    ---- Summary ----
+    Main function to check a Before and after, worked out by hand: its numbers (each
+    experiment in its two regions, the paired test inside each set of more than one
+    experiment, corrected across the sets); as drawn, a thin line per experiment and
+    a named mean line per set, the set of one experiment named by its one line; a
+    bracket only over the set whose two regions differ; the y axis holding
+    everything; the names of the regions under each set; its small legend;
+    everything inside its cells; no marks; and the sentence of a plot with nothing
+    to show.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    BLUE, GREEN, ORANGE; NO_PAIRS (imported).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Controls: 10 to 4, 12 to 5, 14 to 6; changes -6, -7, -8: mean -7, SD 1,
+    t = -7 x sqrt(3) = -12.12, df = 2, p = 1 - 12.12 / sqrt(12.12² + 2) = 0.0067.
+    Knockdowns: 9 to 8, 11 to 9, 13 to 10; changes -1, -2, -3: t = -2 x sqrt(3)
+    = -3.46, p = 1 - 3.46 / sqrt(3.46² + 2) = 0.074. Holm: 2 x 0.0067 = 0.013 (*),
+    then 0.074 (no mark). Everything drawn runs from 4 to 20, so the bracket of the
+    controls sits 0.07 x 16 = 1.12 above their highest value, 14: at 15.12. The
+    sets are 2.6 apart.
+
+    ---- Helpers ----
+    _answers_maker
+    _region_drawer
+    _region_experiments_maker
+    _region_setup_maker
+    """
+
+    # ---- 1 The numbers ---------------------------------------------------------------
+    setup, experiments = _region_setup_maker(), _region_experiments_maker()
+    found = before_after_numbers_lister(setup, {}, experiments, _answers_maker())
+    assert [(one['name'], one['before'], one['after']) for one in found['sets']] == [
+        ('control', [10.0, 12.0, 14.0], [4.0, 5.0, 6.0]),
+        ('knockdown', [9.0, 11.0, 13.0], [8.0, 9.0, 10.0]),
+        ('single', [20.0], [10.0]),
+        ]
+    assert found['regions'] == ['Baseline', 'After addition 1']
+    assert found['label'] == 'OCR (µM min$^{-1}$)' and found['marks'] == 'stars'
+    first, second = found['statistics']['tests']
+    assert (first['set'], first['n'], first['df']) == ('control', 3, 2.0)
+    assert first['t'] == pytest.approx(-7.0 * np.sqrt(3.0))
+    assert first['p_corrected'] == pytest.approx(
+        2.0 * (1.0 - 7.0 * np.sqrt(3.0) / np.sqrt(149.0)),
+        )
+    assert second['set'] == 'knockdown'
+    assert second['p_corrected'] == pytest.approx(1.0 - np.sqrt(12.0 / 14.0))
+    roles = {'region_from': 'addition 1', 'region_to': 'baseline', 'marks': 'none'}
+    found = before_after_numbers_lister(setup, roles, experiments, _answers_maker())
+    assert found['sets'][0]['before'] == [4.0, 5.0, 6.0]
+    assert found['regions'] == ['After addition 1', 'Baseline']
+    assert found['marks'] == 'none'
+
+    # ---- 2 The lines -----------------------------------------------------------------
+    fig, ax = _region_drawer('P10', {})
+    named = [line for line in ax.lines if not line.get_label().startswith('_')]
+    assert [(line.get_label(), line.get_color()) for line in named] == [
+        ('control', BLUE),
+        ('knockdown', ORANGE),
+        ('single', GREEN),
+        ]
+    assert [(list(line.get_xdata()), list(line.get_ydata())) for line in named] == [
+        ([0.0, 1.0], [12.0, 5.0]),
+        (pytest.approx([2.6, 3.6]), [11.0, 9.0]),
+        (pytest.approx([5.2, 6.2]), [20.0, 10.0]),
+        ]
+    single = [line for line in ax.lines if line.get_label() == '_one']
+    assert [list(line.get_ydata()) for line in single] == [[10.0, 4.0],
+                                                           [12.0, 5.0],
+                                                           [14.0, 6.0],
+                                                           [9.0, 8.0],
+                                                           [11.0, 9.0],
+                                                           [13.0, 10.0],
+                                                           ]
+    assert {line.get_color() for line in single[:3]} == {BLUE}
+    assert named[0].get_linewidth() > single[0].get_linewidth()
+
+    # ---- 3 The bracket, the axes and the text ----------------------------------------
+    (bracket,) = [line for line in ax.lines if getattr(line, 'is_bracket', False)]
+    assert bracket.get_xdata().tolist() == [0.0, 0.0, 1.0, 1.0]
+    assert bracket.get_ydata().tolist() == pytest.approx([14.56, 15.12, 15.12, 14.56])
+    (mark,) = ax.texts
+    assert mark.get_text() == '*'
+    low, high = ax.get_ylim()
+    assert low < 4.0 and high > 20.0
+    assert [label.get_text() for label in ax.get_xticklabels()] == ['Baseline',
+                                                                    'After\naddition 1',
+                                                                    ] * 3
+    assert ax.get_xticks().tolist() == pytest.approx([0.0, 1.0, 2.6, 3.6, 5.2, 6.2])
+    assert ax.get_ylabel() == 'OCR (µM min$^{-1}$)'
+    assert ax.get_legend() is not None
+    tight = ax.get_tightbbox(fig._get_renderer()).transformed(
+        fig.transFigure.inverted(),
+        )
+    assert 0.0 <= tight.x0 and tight.x1 <= 0.5
+    assert 0.5 <= tight.y0 and tight.y1 <= 1.0
+
+    # ---- 4 No marks, and nothing to show ---------------------------------------------
+    _, ax = _region_drawer('P10', {'marks': 'none'})
+    assert not ax.texts
+    _, ax = _region_drawer('P10', {'trace': 'delta_psi'})
+    assert not ax.axison
+    assert ' '.join(ax.texts[0].get_text().split()) == NO_PAIRS
+
+
+# ---- test_the_plots_per_region_add_their_sentences_to_the_caption --------------------
+def test_the_plots_per_region_add_their_sentences_to_the_caption() -> None:
+    """
+    ---- Summary ----
+    Main function to check the caption line of a Bar chart and of a Before and
+    after: its letter, what is drawn, n of each set, the set of one experiment, the
+    test, the correction when there is more than one test, and the marks; nothing
+    of the test with no marks; and no line for a plot with nothing to show.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The Bar chart has one test (controls against knockdowns); the Before and after
+    two (one inside each set of three).
+
+    ---- Helpers ----
+    _answers_maker
+    _region_experiments_maker
+    _region_setup_maker
+    """
+
+    setup, experiments = _region_setup_maker(), _region_experiments_maker()
+    answers = _answers_maker()
+    page = plot_placer(FigurePage(), PagePlot('P9', 0, 0, roles={'bars': 'sd'}))
+    page = plot_placer(page, PagePlot('P10', 1, 0, roles={}))
+    page = plot_placer(page, PagePlot('P9', 2, 0, roles={'trace': 'delta_psi'}))
+    counts = '(control n = 3, knockdown n = 3, single n = 1)'
+    marks = ('* p < 0.05, ** p < 0.01, *** p < 0.001; a comparison without a mark gave '
+             'p ≥ 0.05.')
+    assert caption_lines_builder(page, setup, experiments, answers) == [
+        'Colours (strain): control, blue; knockdown, red-orange; single, green.',
+        'a: Each dot is one experiment, and the bars are the mean ± SD of each set '
+        f'{counts}. single has one experiment in a region, so it has no bar and was '
+        "not tested. The sets were compared with Student's t-test (two-tailed, "
+        f'unpaired): {marks}',
+        'b: Each line is one experiment, and the mean of each set is marked '
+        f'{counts}. single has one experiment, so it was not tested. The two regions '
+        'of each set were compared with a paired t-test (two-tailed), with the Holm '
+        f'correction across the 2 tests of the plot: {marks}',
+        ]
+    page = plot_placer(FigurePage(), PagePlot('P10', 0, 0, roles={'marks': 'none'}))
+    assert caption_lines_builder(page, setup, experiments, answers)[1] == (
+        f'a: Each line is one experiment, and the mean of each set is marked {counts}. '
+        'single has one experiment, so it was not tested.'
+        )
+    # without the experiments or the answers there is nothing to say
+    assert len(caption_lines_builder(page, setup)) == 1
+
+
+# ---- test_the_forms_of_a_response_by_region_and_of_a_time_points ---------------------
+def test_the_forms_of_a_response_by_region_and_of_a_time_points() -> None:
+    """
+    ---- Summary ----
+    Main function to check what the forms of a Response by region and of a Time
+    points ask and how they start: the OCR or the haems with a tick per haem, only
+    the OCR in a run without haems; a Time points as a Bar chart, without the
+    drop-down of the time point.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _answers_maker
+    _region_points_setup_maker
+    _region_setup_maker
+    """
+
+    # ---- 1 A Response by region ------------------------------------------------------
+    setup = _region_setup_maker()
+    fields = form_fields_lister('P11', setup, {}, _answers_maker())
+    assert [(field['key'], field['label'], field['value']) for field in fields] == [
+        ('response_of', 'Measurement', 'vo2'),
+        ('panel_haem_cytbh', 'Haem: Cyt bH', 'yes'),
+        ('panel_haem_cytcc', 'Haem: Cyt cc', 'yes'),
+        ('vo2_value', 'OCR shown as', 'baseline'),
+        ('haem_view', 'Haems shown as', 'delta'),
+        ('group_1', 'strain', 'Split'),
+        ('bars', 'Bars', 'sem'),
+        ('test', 'Test', 'student'),
+        ('marks', 'Marks', 'stars'),
+        ]
+    assert fields[0]['choices'] == [('vo2', 'OCR'), ('haems', 'Haems')]
+    kept = {'response_of': 'haems', 'panel_haem_cytcc': 'no', 'haem_view': 'percent'}
+    values = {field['key']: field['value']
+              for field in form_fields_lister('P11', setup, kept, _answers_maker())
+              }
+    assert {key: values[key] for key in kept} == kept
+    plain = _answers_maker(decompose=False, quick_windows=True)
+    fields = form_fields_lister('P11', setup, {}, plain)
+    assert [field['key'] for field in fields] == ['response_of',
+                                                  'vo2_value',
+                                                  'region_kind',
+                                                  'group_1',
+                                                  'bars',
+                                                  'test',
+                                                  'marks',
+                                                  ]
+    assert fields[0]['choices'] == [('vo2', 'OCR')]
+
+    # ---- 2 A Time points -------------------------------------------------------------
+    setup = _region_points_setup_maker('2 h', '24 h')
+    bar_keys = [field['key']
+                for field in form_fields_lister('P9', setup, {}, _answers_maker())
+                ]
+    assert 'time_point' in bar_keys
+    fields = form_fields_lister('P12', setup, {}, _answers_maker())
+    assert [field['key'] for field in fields] == [key
+                                                  for key in bar_keys
+                                                  if key != 'time_point'
+                                                  ]
+    values = {field['key']: field['value'] for field in fields}
+    assert (values['trace'], values['region'], values['group_1']) == ('vo2',
+                                                                      'addition 1',
+                                                                      'Split',
+                                                                      )
+
+
+# ---- test_the_numbers_of_a_response_by_region ----------------------------------------
+def test_the_numbers_of_a_response_by_region() -> None:
+    """
+    ---- Summary ----
+    Main function to check the numbers of a Response by region, worked out by hand:
+    a column per region, named by the additions of the first experiment; the value
+    of each experiment in each; the tests of each region corrected across the whole
+    plot, across the rows of the haems too; an experiment with another number of
+    additions left out and named; an experiment with another addition named; and
+    the rows of the haems ticked.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Baseline: controls 10, 12, 14, knockdowns 9, 11, 13 (SD 2 each): t = 1 /
+    sqrt(4 x 2 / 3) = 0.61, p = 0.57. After the addition: p = 0.00805
+    (test_the_numbers_of_a_bar_chart). Holm over the 2 tests: 2 x 0.00805 = 0.0161
+    and 0.57. With the two haems (bH = -OCR, cc = OCR / 2) the same two p values
+    come twice: Holm over the 4 tests gives 4 x 0.00805 = 0.0322 for both small
+    ones.
+
+    ---- Helpers ----
+    _answers_maker
+    _region_experiments_maker
+    _region_haems_adder
+    _region_setup_maker
+    """
+
+    # ---- 1 The OCR, as measured ------------------------------------------------------
+    setup, experiments = _region_setup_maker(), _region_experiments_maker()
+    answers = _answers_maker()
+    found = response_numbers_lister(setup, {'vo2_value': 'raw'}, experiments, answers)
+    assert found['regions'] == ['Baseline', 'KCN']
+    (row,) = found['rows']
+    assert (row['trace'], row['value'], row['label']) == ('vo2',
+                                                          'raw',
+                                                          'OCR (µM min$^{-1}$)',
+                                                          )
+    assert [(one['name'], one['regions']) for one in row['sets']] == [
+        ('control', [[10.0, 12.0, 14.0], [4.0, 5.0, 6.0]]),
+        ('knockdown', [[9.0, 11.0, 13.0], [8.0, 9.0, 10.0]]),
+        ('single', [[20.0], [10.0]]),
+        ]
+    columns = row['statistics']['columns']
+    assert [column['label'] for column in columns] == ['Baseline', 'KCN']
+    assert [one['mean'] for one in columns[0]['sets']] == [12.0, 11.0, 20.0]
+    first, second = row['statistics']['tests']
+    assert (first['column'], second['column']) == (0, 1)
+    assert first['t'] == pytest.approx(1.0 / np.sqrt(8.0 / 3.0))
+    assert first['p_corrected'] == pytest.approx(first['p'])
+    assert second['p_corrected'] == pytest.approx(2.0 * second['p'])
+    assert second['p_corrected'] == pytest.approx(0.0161, abs=1e-4)
+    assert found['statistics']['tests'] == [first, second]
+    assert (found['left_out'], found['differing']) == ([], [])
+    assert (found['error'], found['test'], found['marks']) == ('sem',
+                                                               'student',
+                                                               'stars',
+                                                               )
+
+    # ---- 2 Another number of additions, and another addition -------------------------
+    experiments['c2']['metadata']['events'].append({'time': 15.0, 'label': 'TMPD'})
+    experiments['k1']['metadata']['events'][0]['label'] = 'azide'
+    found = response_numbers_lister(setup, {'vo2_value': 'raw'}, experiments, answers)
+    assert (found['left_out'], found['differing']) == (['c2'], ['k1'])
+    assert found['regions'] == ['Baseline', 'KCN']
+    assert found['rows'][0]['sets'][0]['regions'] == [[10.0, None, 14.0],
+                                                      [4.0, None, 6.0],
+                                                      ]
+    page = plot_placer(FigurePage(), PagePlot('P11', 0, 0, roles={}))
+    page = plot_placer(page, PagePlot('P9', 1, 0, roles={}))
+    assert response_checks_lister(page, setup, experiments, answers) == {
+        'left_out': ['c2'],
+        'differing': ['k1'],
+        }
+    page = plot_placer(FigurePage(), PagePlot('P9', 0, 0, roles={}))
+    assert response_checks_lister(page, setup, experiments, answers) == {
+        'left_out': [],
+        'differing': [],
+        }
+
+    # ---- 3 A row per haem ticked -----------------------------------------------------
+    experiments = _region_haems_adder(_region_experiments_maker())
+    found = response_numbers_lister(setup,
+                                    {'response_of': 'haems'},
+                                    experiments,
+                                    answers,
+                                    )
+    assert [(row['trace'], row['label']) for row in found['rows']] == [
+        ('haem_cytbh', 'Cyt $b_H$ ΔD (mOD)'),
+        ('haem_cytcc', 'Cyt cc ΔD (mOD)'),
+        ]
+    assert found['rows'][0]['sets'][0]['regions'][1] == [-4.0, -5.0, -6.0]
+    assert found['rows'][1]['sets'][0]['regions'][1] == [2.0, 2.5, 3.0]
+    assert len(found['statistics']['tests']) == 4
+    assert len(found['statistics']['columns']) == 4
+    for row in found['rows']:
+        after = row['statistics']['tests'][1]
+        assert after['p_corrected'] == pytest.approx(4.0 * after['p'])
+        assert after['p_corrected'] == pytest.approx(0.0322, abs=1e-4)
+    roles = {'response_of': 'haems', 'panel_haem_cytbh': 'no'}
+    found = response_numbers_lister(setup, roles, experiments, answers)
+    assert [row['trace'] for row in found['rows']] == ['haem_cytcc']
+    # a run without haems shows the OCR whatever the plot kept
+    found = response_numbers_lister(setup,
+                                    {'response_of': 'haems'},
+                                    experiments,
+                                    _answers_maker(decompose=False),
+                                    )
+    assert [row['trace'] for row in found['rows']] == ['vo2']
+
+
+# ---- test_a_response_by_region_drawn -------------------------------------------------
+def test_a_response_by_region_drawn() -> None:
+    """
+    ---- Summary ----
+    Main function to check a Response by region as drawn: a named line per set
+    through its means, the sets side by side at each region; one bracket with its
+    mark, at the region where two sets differ; the y axis of the OCR from 0, that
+    of a change from baseline and of a haem following the numbers; the names of
+    the regions; its small legend; everything inside its cells; a row per haem
+    with the names under the last only; and the sentence of a plot with nothing to
+    show.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    BLUE, GREEN, ORANGE; NO_RESPONSE (imported).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    Three sets sit at -0.2, 0 and +0.2 of their region. Everything drawn runs from
+    4 to 20, so the bracket sits 0.07 x 16 = 1.12 above the highest thing under it
+    after the addition (the knockdown at 10): at 11.12, its ends down to 10.56,
+    from x = 0.8 to x = 1. The corrected p is 0.0161: *.
+
+    ---- Helpers ----
+    _region_drawer
+    _region_experiments_maker
+    _region_haems_adder
+    """
+
+    # ---- 1 The lines, the bracket and the axes ---------------------------------------
+    fig, ax = _region_drawer('P11', {'vo2_value': 'raw'})
+    named = [line for line in ax.lines if not line.get_label().startswith('_')]
+    assert [(line.get_label(), line.get_color()) for line in named] == [
+        ('control', BLUE),
+        ('knockdown', ORANGE),
+        ('single', GREEN),
+        ]
+    assert [list(line.get_xdata()) for line in named] == [pytest.approx([-0.2, 0.8]),
+                                                          pytest.approx([0.0, 1.0]),
+                                                          pytest.approx([0.2, 1.2]),
+                                                          ]
+    assert [list(line.get_ydata()) for line in named] == [[12.0, 5.0],
+                                                          [11.0, 9.0],
+                                                          [20.0, 10.0],
+                                                          ]
+    dots = [group
+            for group in ax.collections
+            if isinstance(group, matplotlib.collections.PathCollection)
+            ]
+    assert len(dots) == 6
+    assert sorted(dots[0].get_offsets()[:, 1].tolist()) == [10.0, 12.0, 14.0]
+    (bracket,) = [line for line in ax.lines if getattr(line, 'is_bracket', False)]
+    assert bracket.get_xdata().tolist() == pytest.approx([0.8, 0.8, 1.0, 1.0])
+    assert bracket.get_ydata().tolist() == pytest.approx([10.56, 11.12, 11.12, 10.56])
+    assert [text.get_text() for text in ax.texts] == ['*']
+    low, high = ax.get_ylim()
+    assert low == 0.0 and high > 20.0
+    assert [label.get_text() for label in ax.get_xticklabels()] == ['Baseline', 'KCN']
+    assert ax.get_ylabel() == 'OCR (µM min$^{-1}$)'
+    assert ax.get_legend() is not None
+    tight = ax.get_tightbbox(fig._get_renderer()).transformed(
+        fig.transFigure.inverted(),
+        )
+    assert 0.0 <= tight.x0 and tight.x1 <= 0.5
+    assert 0.5 <= tight.y0 and tight.y1 <= 1.0
+
+    # ---- 2 A change from baseline follows the numbers --------------------------------
+    _, ax = _region_drawer('P11', {'vo2_value': 'change'})
+    low, high = ax.get_ylim()
+    assert low < -10.0 and 0.0 < high < 5.0
+
+    # ---- 3 A row per haem ------------------------------------------------------------
+    experiments = _region_haems_adder(_region_experiments_maker())
+    fig, _ = _region_drawer('P11', {'response_of': 'haems'}, experiments=experiments)
+    top, bottom = [ax for ax in fig.axes if ax.axison]
+    assert top.get_position().y0 > bottom.get_position().y1
+    assert (top.get_ylabel(), bottom.get_ylabel()) == ('Cyt $b_H$ ΔD (mOD)',
+                                                       'Cyt cc ΔD (mOD)',
+                                                       )
+    assert top.get_legend() is None and bottom.get_legend() is not None
+    low, high = top.get_ylim()
+    assert low < -20.0 and high < 0.0  # bH is below 0: its axis does not start at 0
+    assert bottom.get_ylim()[0] > 0.0
+    assert not top.xaxis.get_tick_params()['labelbottom']
+    assert [label.get_text() for label in bottom.get_xticklabels()] == ['Baseline',
+                                                                        'KCN',
+                                                                        ]
+    assert [text.get_text() for text in top.texts] == ['*']
+    assert [text.get_text() for text in bottom.texts] == ['*']
+    for ax in (top, bottom):
+        tight = ax.get_tightbbox(fig._get_renderer()).transformed(
+            fig.transFigure.inverted(),
+            )
+        assert 0.0 <= tight.x0 and tight.x1 <= 0.5
+        assert 0.5 <= tight.y0 and tight.y1 <= 1.0
+
+    # ---- 4 Nothing to show -----------------------------------------------------------
+    _, ax = _region_drawer('P11', {'response_of': 'haems'})
+    assert not ax.axison
+    assert ' '.join(ax.texts[0].get_text().split()) == NO_RESPONSE
+
+
+# ---- test_a_time_points --------------------------------------------------------------
+def test_a_time_points() -> None:
+    """
+    ---- Summary ----
+    Main function to check a Time points, worked out by hand: its sets by group,
+    each experiment at its time point; time points that are numbers in the order
+    and at the place of their number, others evenly in the order of the table; the
+    one test, at the time point where both sets have two experiments; as drawn,
+    the lines, the bracket, the axes and the text; and the sentence of a plot with
+    nothing to show.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    BLUE, ORANGE; NO_POINTS (imported).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Equations ----
+    After the addition, at 24 h: controls 4, 5 (mean 4.5), knockdowns 8, 9 (mean
+    8.5), SD sqrt(0.5) each: t = -4 / sqrt(0.5) = -5.66, df = 2, p = 1 - 5.66 /
+    sqrt(5.66² + 2) = 0.030 (*). At 2 h: one control (6) and one knockdown (10).
+    The time points are 22 apart, so the two sets sit at -4.4 and +4.4 of each.
+    Everything drawn runs from 4 to 10, so the bracket sits 0.07 x 6 = 0.42 above
+    the knockdowns at 24 h (9): at 9.42.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Helpers ----
+    _answers_maker
+    _region_drawer
+    _region_experiments_maker
+    _region_points_setup_maker
+    """
+
+    # ---- 1 The numbers, with time points that are numbers ----------------------------
+    setup = _region_points_setup_maker('2 h', '24 h')
+    experiments = _region_experiments_maker()
+    answers = _answers_maker()
+    roles = {'vo2_value': 'raw', 'time_point': 'Only label 1'}
+    found = time_points_numbers_lister(setup, roles, experiments, answers)
+    assert [(one['name'], one['values'], one['points']) for one in found['sets']] == [
+        ('control', [4.0, 5.0, 6.0], ['24 h', '24 h', '2 h']),
+        ('knockdown', [8.0, 9.0, 10.0], ['24 h', '24 h', '2 h']),
+        ]
+    assert (found['time_points'], found['places'], found['unit']) == (['2 h', '24 h'],
+                                                                      [2.0, 24.0],
+                                                                      22.0,
+                                                                      )
+    assert (found['ticks'], found['title']) == (['2', '24'], 'Time point (h)')
+    early, late = found['statistics']['columns']
+    assert [(one['name'], one['n'], one['mean']) for one in early['sets']] == [
+        ('control', 1, 6.0),
+        ('knockdown', 1, 10.0),
+        ]
+    assert [(one['n'], one['mean']) for one in late['sets']] == [(2, 4.5), (2, 8.5)]
+    (result,) = found['statistics']['tests']
+    assert (result['column'], result['df']) == (1, 2.0)
+    assert result['t'] == pytest.approx(-4.0 / np.sqrt(0.5))
+    assert result['p_corrected'] == pytest.approx(1.0 - np.sqrt(32.0 / 34.0))
+    assert (found['region'], found['label']) == ('After addition 1',
+                                                 'OCR (µM min$^{-1}$)',
+                                                 )
+
+    # ---- 2 Time points that are not numbers ------------------------------------------
+    words = _region_points_setup_maker('late', 'early')
+    found = time_points_numbers_lister(words,
+                                       {'vo2_value': 'raw'},
+                                       experiments,
+                                       answers,
+                                       )
+    assert (found['time_points'], found['places'], found['unit']) == (['early', 'late'],
+                                                                      [0.0, 1.0],
+                                                                      1.0,
+                                                                      )
+    assert (found['ticks'], found['title']) == (['early', 'late'], 'Time point')
+    mixed = _region_points_setup_maker('2 h', '1 day')
+    found = time_points_numbers_lister(mixed,
+                                       {'vo2_value': 'raw'},
+                                       experiments,
+                                       answers,
+                                       )
+    assert (found['time_points'], found['places']) == (['1 day', '2 h'], [0.0, 1.0])
+
+    # ---- 3 As drawn ------------------------------------------------------------------
+    fig, ax = _region_drawer('P12', {'vo2_value': 'raw'}, setup=setup)
+    named = [line for line in ax.lines if not line.get_label().startswith('_')]
+    assert [(line.get_label(), line.get_color()) for line in named] == [
+        ('control', BLUE),
+        ('knockdown', ORANGE),
+        ]
+    assert [list(line.get_xdata()) for line in named] == [pytest.approx([-2.4, 19.6]),
+                                                          pytest.approx([6.4, 28.4]),
+                                                          ]
+    assert [list(line.get_ydata()) for line in named] == [[6.0, 4.5], [10.0, 8.5]]
+    (bracket,) = [line for line in ax.lines if getattr(line, 'is_bracket', False)]
+    assert bracket.get_xdata().tolist() == pytest.approx([19.6, 19.6, 28.4, 28.4])
+    assert bracket.get_ydata().tolist() == pytest.approx([9.21, 9.42, 9.42, 9.21])
+    assert [text.get_text() for text in ax.texts] == ['*']
+    assert ax.get_xlim() == pytest.approx((-9.0, 35.0))
+    assert ax.get_xticks().tolist() == [2.0, 24.0]
+    assert [label.get_text() for label in ax.get_xticklabels()] == ['2', '24']
+    assert ax.get_xlabel() == 'Time point (h)'
+    assert ax.get_ylabel() == 'OCR (µM min$^{-1}$)'
+    low, high = ax.get_ylim()
+    assert low == 0.0 and high > 10.0
+    assert ax.get_legend() is not None
+    tight = ax.get_tightbbox(fig._get_renderer()).transformed(
+        fig.transFigure.inverted(),
+        )
+    assert 0.0 <= tight.x0 and tight.x1 <= 0.5
+    assert 0.5 <= tight.y0 and tight.y1 <= 1.0
+
+    # ---- 4 Nothing to show: no time point in the set-up ------------------------------
+    _, ax = _region_drawer('P12', {'vo2_value': 'raw'})
+    assert not ax.axison
+    assert ' '.join(ax.texts[0].get_text().split()) == NO_POINTS
+
+
+# ---- test_a_response_and_a_time_points_add_their_sentences_to_the_caption ------------
+def test_a_response_and_a_time_points_add_their_sentences_to_the_caption() -> None:
+    """
+    ---- Summary ----
+    Main function to check the caption line of a Response by region and of a Time
+    points: its letter, the region of a Time points, what is drawn, n of each set
+    (a range when it differs between columns), the sets of one experiment, the
+    test, the correction when there is more than one test, and the marks.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    The Response by region has two tests (one per region); the Time points one (at
+    24 h).
+
+    ---- Helpers ----
+    _answers_maker
+    _region_experiments_maker
+    _region_points_setup_maker
+    """
+
+    setup = _region_points_setup_maker('2 h', '24 h')
+    experiments, answers = _region_experiments_maker(), _answers_maker()
+    page = plot_placer(FigurePage(), PagePlot('P11', 0, 0, roles={'vo2_value': 'raw'}))
+    page = plot_placer(page, PagePlot('P12', 1, 0, roles={'vo2_value': 'raw'}))
+    marks = ('* p < 0.05, ** p < 0.01, *** p < 0.001; a comparison without a mark gave '
+             'p ≥ 0.05.')
+    assert caption_lines_builder(page, setup, experiments, answers)[1:] == [
+        'a: Each dot is one experiment, and the bars are the mean ± SEM of each set '
+        '(control n = 3, knockdown n = 3, single n = 1). single has one experiment in '
+        'a region, so it has no bar and was not tested. The sets were compared with '
+        "Student's t-test (two-tailed, unpaired), with the Holm correction across the "
+        f'2 tests of the plot: {marks}',
+        'b: Region: after addition 1. Each dot is one experiment, and the bars are '
+        'the mean ± SEM of each set (control n = 1 to 2, knockdown n = 1 to 2). '
+        'control and knockdown each have one experiment in a region, so they have no '
+        "bar and were not tested. The sets were compared with Student's t-test "
+        f'(two-tailed, unpaired): {marks}',
+        ]

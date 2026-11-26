@@ -1,6 +1,6 @@
 # Portimao maths
 
-How Portimao works out its haem numbers (and, in section 8, the concentration of each addition; in section 9, the difference spectrum, its haem bands and the waterfall; in section 10, the traces over time lined up on their additions and averaged), written so that the maths can be checked without reading the code. Each quantity has its equation, what every letter in it is (with its unit), a worked example in numbers, and the test that checks it. The numbers of each example are the numbers of its test, so the example and the program cannot drift apart: the tests are in the `tests/` folder of the development copy and are run each time the program is changed.
+How Portimao works out its haem numbers (and, in section 8, the concentration of each addition; in section 9, the difference spectrum, its haem bands and the waterfall; in section 10, the traces over time lined up on their additions and averaged; in section 11, the numbers per region of a dataset figure and their statistics), written so that the maths can be checked without reading the code. Each quantity has its equation, what every letter in it is (with its unit), a worked example in numbers, and the test that checks it. The numbers of each example are the numbers of its test, so the example and the program cannot drift apart: the tests are in the `tests/` folder of the development copy and are run each time the program is changed.
 
 The equations are written as a textbook writes them, which GitHub and VS Code's preview show typeset.
 
@@ -683,3 +683,114 @@ A set of one experiment has a line and no band. Where an experiment has no value
 Example: three experiments read 4, 6 and 8. The mean is $\dfrac{4 + 6 + 8}{3} = 6$; the SD is $\sqrt{\dfrac{(-2)^2 + 0^2 + 2^2}{2}} = 2$; the SEM is $\dfrac{2}{\sqrt{3}} = 1.15$. The line is at 6 and its band from 4.85 to 7.15.
 
 Checked by: `test_the_mean_and_the_band` in `tests/test_trace_alignment.py`, and `test_the_lines_of_a_mean_trace` and `test_a_mean_trace_drawn` in `tests/test_page_plots.py`.
+
+---
+
+## 11. Numbers per region, and their statistics
+
+On a dataset figure, a plot per region (a Bar chart, Before and after, Response by region, Time points) shows one number per experiment for each averaging region (section 7), with the mean of each set of experiments, and tests whether the sets differ. The code is in `utils_shared/region_statistics.py`.
+
+### 11.1 The value of an experiment in a region
+
+$$v = \frac{y_1 + y_2 + \dots + y_k}{k}$$
+
+- $y_1, \dots, y_k$: the trace, in the value picked in the form of the plot (10.1), at the $k$ times inside the region that have a number
+- $v$: the value of the experiment in that region, in the unit of the value picked
+
+So $v$ is the average of 7.3, and for the OCR its change from baseline and its % of baseline are the difference and the $p$ of 7.3. A haem is shown as $\Delta D$, absorbance or % oxidised, never as % of baseline or as a change from baseline (7.3). An experiment has no value in a region it does not have (fewer additions, a region that does not fit or was left out), and is then not counted in its set there.
+
+Example: an OCR that is 10 µM min⁻¹ in the baseline, 4 in the quick region of the first addition and 6 in its settled region. In the settled region $v = 6$ µM min⁻¹ as measured, $6 - 10 = -4$ µM min⁻¹ as the change from baseline and $\dfrac{6}{10} \times 100 = 60$ % of baseline; in the quick region, 40 % of baseline. A $\Delta\psi$ of 130 mV in the baseline and 118 and 118 mV in the settled region gives $v = 118$ mV, or $118 - 130 = -12$ mV as the change from baseline.
+
+Checked by: `test_the_value_of_an_experiment_in_a_region` in `tests/test_region_statistics.py`.
+
+### 11.2 The mean, SD and SEM of a set
+
+The equations of 10.3, with $y_1, \dots, y_n$ the values $v$ of the $n$ experiments of the set in one region. The bars of a plot run from mean − SEM to mean + SEM (or SD, as picked in the form). A set of one experiment has its dot and no bar.
+
+Example, used in the rest of this section: the control experiments give 10, 11 and 12, and the knockdown experiments 20, 25 and 30.
+
+- control: mean $\dfrac{10 + 11 + 12}{3} = 11$; SD $\sqrt{\dfrac{(-1)^2 + 0^2 + 1^2}{2}} = 1$; SEM $\dfrac{1}{\sqrt{3}} = 0.577$
+- knockdown: mean 25; SD $\sqrt{\dfrac{(-5)^2 + 0^2 + 5^2}{2}} = 5$; SEM $\dfrac{5}{\sqrt{3}} = 2.887$
+
+Checked by: `test_the_mean_sd_and_sem_of_a_set` in `tests/test_region_statistics.py`.
+
+### 11.3 The t-test between two sets
+
+Both tests compare the difference between the two means with how uncertain that difference is:
+
+$$t = \frac{m_1 - m_2}{e}$$
+
+- $m_1$, $m_2$: the means of the two sets
+- $e$: the standard error of their difference, worked out in one of the two ways below
+- $t$: how many standard errors apart the two means are; the further from 0, the smaller $p$
+
+**Student's t-test** (the one a plot starts with) takes the two sets to scatter equally, and pools their two spreads into one:
+
+$$s_p^2 = \frac{(n_1 - 1)\, s_1^2 + (n_2 - 1)\, s_2^2}{n_1 + n_2 - 2} \qquad e = \sqrt{s_p^2 \left( \frac{1}{n_1} + \frac{1}{n_2} \right)} \qquad \mathrm{df} = n_1 + n_2 - 2$$
+
+**Welch's t-test** (the other choice in the form) keeps each set's own spread, and has fewer degrees of freedom the more the two spreads differ:
+
+$$e = \sqrt{\frac{s_1^2}{n_1} + \frac{s_2^2}{n_2}} \qquad \mathrm{df} = \frac{\left( \dfrac{s_1^2}{n_1} + \dfrac{s_2^2}{n_2} \right)^2}{\dfrac{(s_1^2 / n_1)^2}{n_1 - 1} + \dfrac{(s_2^2 / n_2)^2}{n_2 - 1}}$$
+
+- $n_1$, $n_2$: the number of experiments of each set
+- $s_1$, $s_2$: the SD of each set (11.2)
+- df: the degrees of freedom of the test
+- $p$: the chance of a $t$ at least that far from 0, on either side (two-tailed), if the two sets really had the same mean; read from the t distribution with df degrees of freedom. In Excel, `=T.DIST.2T(ABS(t), df)` for Student's, and `=T.TEST(set 1, set 2, 2, 2)` (Student's) or `=T.TEST(set 1, set 2, 2, 3)` (Welch's) from the values themselves.
+
+Notes:
+
+- With the same number of experiments in both sets, the two tests give the same $t$, and differ only in df, so in $p$.
+- A set of one experiment is not tested, as it has no SD. Nor are two sets that both have an SD of 0.
+- With more than two sets, each pair of sets is tested.
+
+Example: the control and knockdown sets of 11.2 ($m_1 = 11$, $s_1 = 1$, $m_2 = 25$, $s_2 = 5$, $n_1 = n_2 = 3$).
+
+- Student's: $s_p^2 = \dfrac{2 \times 1 + 2 \times 25}{4} = 13$; $e = \sqrt{13 \times \dfrac{2}{3}} = 2.944$; $t = \dfrac{11 - 25}{2.944} = -4.756$; df $= 4$; $p = 0.0089$.
+- Welch's: $e = \sqrt{\dfrac{1}{3} + \dfrac{25}{3}} = 2.944$, so the same $t = -4.756$; df $= \dfrac{8.667^2}{\dfrac{0.333^2}{2} + \dfrac{8.333^2}{2}} = \dfrac{75.11}{34.78} = 2.16$; $p = 0.0356$.
+
+The knockdown set scatters five times more than the control, so Welch's trusts the difference less.
+
+Checked by: `test_the_two_tests_between_sets` in `tests/test_region_statistics.py`, by hand and against the t-tests of the scipy library.
+
+### 11.4 The paired t-test of Before and after
+
+A Before and after plot compares two regions inside one set. Each experiment is compared with itself:
+
+$$d_i = \text{after}_i - \text{before}_i \qquad t = \frac{\bar{d}}{s_d / \sqrt{n}} \qquad \mathrm{df} = n - 1$$
+
+- $d_i$: the change of experiment $i$ from the first region to the second
+- $\bar{d}$, $s_d$: the mean and the SD of those changes
+- $n$: the number of experiments with a value in both regions
+- $p$: read from $t$ and df as in 11.3; in Excel, `=T.TEST(before, after, 2, 1)`
+
+A set with fewer than two such experiments is not tested.
+
+Example: three experiments give 10, 12 and 14 before and 7, 8 and 12 after. The changes are −3, −4 and −2: $\bar{d} = -3$, $s_d = 1$, so $t = \dfrac{-3}{1 / \sqrt{3}} = -5.196$, df $= 2$ and $p = 0.0351$.
+
+Checked by: `test_the_paired_test_of_before_and_after` in `tests/test_region_statistics.py`.
+
+### 11.5 The Holm correction
+
+Each test has a 1 in 20 chance of giving $p < 0.05$ by luck, so a plot with many tests would often have a mark that means nothing. The $p$ values of every test of one plot (every pair of sets in every region) are therefore corrected together. With the $m$ values sorted smallest first, $p_{(1)} \le p_{(2)} \le \dots \le p_{(m)}$:
+
+$$p'_{(i)} = \min\left(1,\; \max\left(p'_{(i-1)},\; (m - i + 1) \times p_{(i)}\right)\right)$$
+
+- $m$: the number of tests of the plot
+- $p_{(i)}$: the $i$-th smallest $p$ value
+- $p'_{(i)}$: its corrected value: the smallest is multiplied by $m$, the next by $m - 1$, and so on down to 1; a corrected value is never smaller than the one before it, and never above 1
+
+A plot with one test is not changed by it. The marks are drawn from the corrected values.
+
+Example 1: three tests give 0.01, 0.04 and 0.03. Sorted: 0.01, 0.03, 0.04. Corrected: $0.01 \times 3 = 0.03$; $0.03 \times 2 = 0.06$; $0.04 \times 1 = 0.04$, which is under the 0.06 before it, so 0.06. Only the first stays under 0.05.
+
+Example 2: the control (10, 11, 12), knockdown (20, 25, 30) and rescue (11, 12, 13) sets in one region, by Student's t-test: control and knockdown $p = 0.0089$, knockdown and rescue 0.0115, control and rescue 0.2879. Corrected: $0.0089 \times 3 = 0.0268$; $0.0115 \times 2 = 0.0231$, raised to 0.0268; $0.2879 \times 1 = 0.2879$.
+
+Checked by: `test_the_holm_correction` and `test_each_pair_of_sets_is_tested` in `tests/test_region_statistics.py`.
+
+### 11.6 The marks
+
+A comparison is marked only where its corrected $p$ is under 0.05: with stars (\* under 0.05, \*\* under 0.01, \*\*\* under 0.001) or with the value itself ("p = 0.018"; "p < 0.001" under 0.001), as picked in the form. A comparison that is not under 0.05, or was not tested, has no mark; "ns" is never written. The legend sentence under the page says what the bars are, how many experiments each set has, which set has only one, which test was used and how many tests the correction counted.
+
+Example: corrected values of 0.0005, 0.005, 0.03 and 0.2 are marked \*\*\*, \*\*, \* and nothing.
+
+Checked by: `test_the_marks` and `test_a_set_of_one_is_drawn_but_not_tested` in `tests/test_region_statistics.py`.

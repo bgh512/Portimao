@@ -35,7 +35,7 @@ from utils_shared.figure_page import (figure_file_namer,
                                       template_saver,
                                       )
 from utils_shared.journal_files import STANDARD_SPEC
-from utils_shared.page_plots import NO_MEAN, NOT_THERE
+from utils_shared.page_plots import NO_MEAN, NO_VALUES, NOT_THERE
 from utils_shared.run_logging import details_place_setter
 
 
@@ -268,10 +268,10 @@ def test_letters_in_reading_order() -> None:
 def test_the_page_drawn_off_screen() -> None:
     """
     ---- Summary ----
-    Main function to check the page as drawn: a grey stand-in named by its plot type
-    over the cells of each plot whose plot type is not built yet, one sentence over
-    those of a standard experiment and of a mean trace with no experiment to show, a
-    Space for a
+    Main function to check the page as drawn: one sentence over the cells of a bar
+    chart, of a standard experiment and of a mean trace with no experiment to show,
+    a grey stand-in named by its plot type over those of a plot whose plot type is
+    not built yet, a Space for a
     drawing left empty, and the letters bold at the journal's size, at the top left
     of their plots, lower case for Nature and upper case for a journal that asks for
     it.
@@ -301,9 +301,12 @@ def test_the_page_drawn_off_screen() -> None:
     fig, axes = figure_page_drawer(page, STANDARD_SPEC)
     assert set(axes) == {0, 1, 2, 3}
     names = [' '.join(axes[i].texts[0].get_text().split()) for i in range(1, 4)]
-    # the standard experiment and the mean trace are built: with no experiment to
-    # show, each says so
-    assert names == ['Bar chart', NOT_THERE, NO_MEAN]
+    # with no experiment to show, each plot says so
+    assert names == [NO_VALUES, NOT_THERE, NO_MEAN]
+    # a plot type that is not built yet is a grey stand-in with its name
+    later = plot_placer(FigurePage(), PagePlot('P14', row=0, column=0))
+    _, stand_ins = figure_page_drawer(later, STANDARD_SPEC)
+    assert stand_ins[0].texts[0].get_text() == 'Scatter of two numbers'
     # the space for a drawing draws nothing: no box, no text, only its letter
     assert not axes[0].axison and not axes[0].texts and not axes[0].lines
     box = axes[2].get_position()

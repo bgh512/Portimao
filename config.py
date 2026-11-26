@@ -6,7 +6,8 @@ Settings and defaults of Portimao: figure styles, journal sizes and colours.
 from typing import Dict, List, Optional, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.figure_layout import (figure_size_calculator,
+from utils_shared.figure_layout import (FALLBACK_FONTS,
+                                        figure_size_calculator,
                                         font_family_lister,
                                         figure_style_builder,
                                         figure_style_checker,
@@ -371,7 +372,8 @@ class Config:
 
         ---- Globals read ----
         DEFAULT_ANSWERS, JOURNAL_SPECS, BASE_FONT_PT, SPACING, LINE_WIDTH_PT (module
-        constants); make_style, check_style, figure_size_inches (imported).
+        constants); make_style, check_style, figure_size_inches, FALLBACK_FONTS
+        (imported).
 
         ---- Outputs ----
         None
@@ -409,7 +411,7 @@ class Config:
 
         # ---- 3 Build the matplotlib settings -----------------------------------------
         style, fonts, spec = self.STYLE, self.FONTS, self.SPEC
-        fallback_fonts = ['Liberation Sans', 'DejaVu Sans']
+        fallback_fonts = list(FALLBACK_FONTS)
         # The fonts are named one by one, those on this computer only: text is drawn
         # in the first, and a character it lacks (Arial has no subscripts and no
         # raised minus) in the next that has it. Under the one name 'sans-serif' such
