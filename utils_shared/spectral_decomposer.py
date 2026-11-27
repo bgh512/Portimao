@@ -772,8 +772,8 @@ def answers_fit_loader(fits_folder: Path,
     if fit_file != OWN_HAEMS_NAME:
         return fit_loader(fits_folder, fit_file)
     if not haem_files:
-        raise ValueError('No haem is ticked under Build a fit. Tick at least one haem, '
-                         'or choose a preset.',
+        raise ValueError('No haem is ticked under "Build a fit". Tick at least one '
+                         'haem, or choose a preset.',
                          )
     return haem_files_combiner([fits_folder / HAEMS_FOLDER_NAME / name
                                 for name in haem_files
@@ -948,9 +948,11 @@ def built_fit_saver(fits_folder: Path, name: str, haem_files: Sequence[str]) -> 
                                default='',
                                )
     if not stem:
-        raise ValueError('Type a name for the fit in the box beside Save fit.')
+        raise ValueError('Type a name for the fit in the box beside "Save fit".')
     if not haem_files:
-        raise ValueError('Tick the haems of the fit under Build a fit, then save it.')
+        raise ValueError('Tick the haems of the fit under "Build a fit", then save '
+                         'it.',
+                         )
     path = fits_folder / f'{stem}.csv'
     if (fits_folder / PRESETS_FOLDER_NAME / path.name).is_file():
         raise ValueError(f'{path.name} is the name of a preset. Type another name.')

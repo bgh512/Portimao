@@ -55,7 +55,7 @@ OD_COLUMNS = (('OD', 'OD', ABOVE_ZERO_OR_EMPTY),
 LABEL_COLUMNS = (('added_uL', 'Volume added (µL)', ABOVE_ZERO_OR_EMPTY),
                  ('stock_uM', 'Stock (mM)', STOCK),
                  ('label', 'Chemical', LABEL),
-                 ('concentration_uM', 'In the chamber (µM)', CHAMBER),
+                 ('concentration_uM', 'Concentration (µM)', CHAMBER),
                  )
 # The columns of the labels table shown and not typed in: (name, heading).
 LABEL_SHOWN_COLUMNS = (('text', 'Text in the file'),)

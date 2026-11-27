@@ -125,7 +125,7 @@ def _run_name_sorter(name: str) -> list:
     """
     ---- Summary ----
     Helper function to give the key that sorts run names with their numbers in order,
-    so run_2 comes before run_10.
+    so processing_2 comes before processing_10.
 
     ---- Inputs ----
     name : str

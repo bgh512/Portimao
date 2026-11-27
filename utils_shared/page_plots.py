@@ -3937,6 +3937,64 @@ def response_plot_drawer(fig: Figure,
     return axes + [span]
 
 
+# ---- shown_fields_lister -------------------------------------------------------------
+def shown_fields_lister(fields: List[dict],
+                        measured: Optional[str] = None,
+                        ) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to list the fields of a form that are shown for the measurement
+    picked in it: of the "shown as" drop-downs only the one that fits it (the OCR's
+    for the OCR, the haems' for a haem, Δψ's for Δψ, none for the oxygen or a
+    difference spectrum), and the haem ticks only for the haems. A form without a
+    measurement shows every field.
+
+    ---- Inputs ----
+    fields : List[dict]
+        The fields of the form (form_field, DATA_FORMAT.md).
+    measured : Optional[str]
+        The role picked in the measurement drop-down; None for the one the form
+        starts at.
+
+    ---- Globals read ----
+    HAEM_KEY_START, HAEMS_ROLE, PSI_VALUE_KEY, RESPONSE_KEY, TRACE_KEY, VIEW_KEY,
+    VO2_VALUE_KEY; HAEM_TRACE_START, PSI_TRACE, VO2_TRACE (imported).
+
+    ---- Outputs ----
+    List[str]
+        The key of each field shown, in the order of the form.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    keys = [field['key'] for field in fields]
+    measurement = next((field for field in fields
+                        if field['key'] in (TRACE_KEY, RESPONSE_KEY)
+                        ),
+                       None,
+                       )
+    if measurement is None:
+        return keys
+    role = measurement['value'] if measured is None else measured
+    is_haems = role == HAEMS_ROLE or role.startswith(HAEM_TRACE_START)
+    fitting = {VO2_VALUE_KEY: role == VO2_TRACE,
+               VIEW_KEY: is_haems,
+               PSI_VALUE_KEY: role == PSI_TRACE,
+               }
+    return [key
+            for key in keys
+            if fitting.get(key, True)
+            and (is_haems or not key.startswith(HAEM_KEY_START))
+            ]
+
+
 # ---- standard_form_maker -------------------------------------------------------------
 def standard_form_maker(setup: dict,
                         roles: Dict[str, str],

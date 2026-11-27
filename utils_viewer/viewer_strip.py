@@ -47,17 +47,24 @@ PSI_KEPT_ANSWERS = (tuple(settings.DELTA_PSI_MIDPOINT_ANSWERS.values()) +
                     tuple(PSI_MORE_ANSWERS.values())
                     )
 # The formula of Δψ as a textbook writes it (MATHS.md section 6), shown in the guide
-# when the Δψ step opens, and the line under it saying what its letters are.
+# when the Δψ step opens, and the lines under it saying what each letter is.
 PSI_FORMULA = (r'$\Delta\psi = \dfrac{E_\mathrm{H} - E_\mathrm{L}}{\beta}$'
                '\n'
                r'$E_\mathrm{H} = M_\mathrm{H1} - \dfrac{RT}{F}\,\ln\dfrac{h}{n}'
                r'\qquad E_\mathrm{L} = M_\mathrm{L1} - \dfrac{RT}{F}\,\ln\dfrac{l}{n}$'
                )
-PSI_FORMULA_NOTE = ('M_H1, M_L1: the midpoints of bH and bL, in the Δψ box (mV); h, l, '
-                    'n: the share of the pairs of haems with only bH, only bL or '
-                    'neither reduced, from how oxidised each haem is; β: the share of '
-                    'the membrane potential between them (0.5); T: the temperature (K); '
-                    'R, F: the gas and Faraday constants.')
+PSI_FORMULA_NOTES = ('M_H1 = the midpoint of bH, in the Δψ box (mV)',
+                     'M_L1 = the midpoint of bL, in the Δψ box (mV)',
+                     'h = the share of the pairs of haems with only bH reduced',
+                     'l = the share of the pairs of haems with only bL reduced',
+                     'n = the share of the pairs of haems with neither reduced',
+                     'β = the share of the membrane potential between the two haems '
+                     '(0.5)',
+                     'T = the temperature (K)',
+                     'R = the gas constant',
+                     'F = the Faraday constant',
+                     'h, l and n come from how oxidised each haem is.',
+                     )
 # The tick boxes of the library haems under Build a fit: at most this many on a line,
 # so the box stays narrow enough for the five boxes to fit across a 1920 px screen.
 LIBRARY_TICKS_PER_LINE = 3
@@ -2850,7 +2857,8 @@ class SettingsStrip:
         """
         ---- Summary ----
         Method to take a tab of the Time regions box pressed: its edges go on the plot.
-        The tab already pressed passes nothing on.
+        The tab already pressed is unpressed, which takes its edges off the plot
+        (told as an empty tab); the step that waits at its own tab presses it again.
 
         ---- Inputs ----
         tab : str
@@ -2874,10 +2882,10 @@ class SettingsStrip:
         _size_refresher
         """
 
-        if not self._is_enabled or self._values['time_tab'] == tab:
+        if not self._is_enabled:
             return
         before = dict(self._values)
-        self._values['time_tab'] = tab
+        self._values['time_tab'] = '' if self._values['time_tab'] == tab else tab
         self._size_refresher()
         self._change_reporter(before)
 

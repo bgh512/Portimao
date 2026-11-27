@@ -501,7 +501,7 @@ $$a = \frac{s\,v}{V} \qquad c = c_{\mathrm{before}} + a$$
 - An addition with no stock and volume can have its concentration in the chamber typed by hand (in µM). It then counts as $c$, and $a = c - c_{\mathrm{before}}$.
 - An event left out (labelled IGNORE) holds nothing and changes nothing.
 - Each file is worked out on its own.
-- The labels on the plots show $c$ ("In the chamber", the standard) or $v$ and $s$ ("What was added"), chosen with **Labels as** in the strip. On a label $c$ and $s$ are each written in the unit (nM, µM, mM or M) that gives a number from 1 to under 1000, to four significant figures: 1200 µM is written 1.2 mM, 0.5 µM is 500 nM, and a 1 M stock is 1 M. The labels table keeps $s$ in mM and $c$ in µM.
+- The labels on the plots show $c$ ("Concentration", the standard) or $v$ and $s$ ("Addition"), chosen with **Labels as** in the strip. On a label $c$ and $s$ are each written in the unit (nM, µM, mM or M) that gives a number from 1 to under 1000, to four significant figures: 1200 µM is written 1.2 mM, 0.5 µM is 500 nM, and a 1 M stock is 1 M. The labels table keeps $s$ in mM and $c$ in µM.
 - Each experiment's workbook gives $s$ (in mM), $v$, $a$ and $c$ in its Events sheet.
 
 Example 1: 10 µL of a 200 mM KCN stock. $s = 200$ mM $= 200\,000$ µM, so

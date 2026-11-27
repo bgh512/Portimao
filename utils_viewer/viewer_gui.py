@@ -99,17 +99,20 @@ TERMINAL_TEXT = '#d4d4d4'
 ANSWER_COLOUR = '#9cdcfe'
 ERROR_COLOUR = '#ff7b86'
 ICON_PATH = Path(__file__).resolve().parent.parent / 'assets' / 'icon.png'
-CLICK_HINT = 'Click an answer. Enter gives the highlighted one.'
+CLICK_HINT = 'Click an answer.'
 # a box is shown only for a number or a name: every other answer is a button
 NUMBER_HINT = 'Type a number, then click CONTINUE or press Enter.'
 NAME_HINT = 'Type it in the box, then click CONTINUE or press Enter.'
-FOLDER_HINT = ('Click a folder, then CONTINUE. Under Other folder…, type a full path '
+FOLDER_HINT = ('Click a folder, then CONTINUE. Under "Other folder…", type a full '
+               'path '
                'or click BROWSE….')
 # The clicks in the boxes that ask questions of their own while a question waits.
 ASKING_CHANGES = ('edit_ods', 'edit_labels', 'export_csv', 'do_pca')
 EDGES_HINT = ('Drag the edges on the plot, or type the times in the Time regions box '
               'above it, then click CONTINUE.')
-OWN_VALUES_MARK = '  (own times)'  # after a file in the drop-down whose edges differ
+OWN_VALUES_MARK = ' *'  # after a file in the drop-down whose edges differ
+# under the plot, while a file of the drop-down is marked
+OWN_VALUES_KEY = '* = a file whose times differ from those of the other files'
 SPAN_HINT = ('Drag across the plot to fill in the answer, or type it, then click '
              'CONTINUE.')
 TABLE_HINT = ('Click a cell and type; Tab moves across, Enter moves down. Press '
@@ -1862,8 +1865,8 @@ class ViewerGui:
         self._table_step_follower()
         self._guide_panel.rows_drawer(self._guide.row_lister())
         card = self._guide.card_teller()
-        if card['note']:
-            self._guide_note.configure(text=f"{card['note']}\n\n{card['help']}")
+        if card['back']:
+            self._guide_note.configure(text=card['help'])
             self._guide_note.pack(side='top',
                                   fill='x',
                                   padx=10,
@@ -2723,6 +2726,8 @@ class ViewerGui:
         key = [line[len(KEY_PREFIX):] for line in lines if line.startswith(KEY_PREFIX)]
         if is_edged and self._edges.key_teller():
             key.append(self._edges.key_teller())
+        if any(text.endswith(OWN_VALUES_MARK) for text in self._display_name_lister()):
+            key.append(OWN_VALUES_KEY)
         note = '\n'.join(line for line in lines if not line.startswith(KEY_PREFIX))
         self._status.configure(text=note)
         self._help.configure(text='\n'.join([self._help_base] + key))

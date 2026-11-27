@@ -25,7 +25,7 @@ UNIT_FACTORS_UM = {'nm': 0.001,
 TYPED_CONCENTRATION_PATTERN = re.compile(r'\s*(.*?)\s*([nuµμm]?m)?\s*')
 # How the event labels show the concentration: what is in the chamber after the
 # addition ("400 µM KCN"), or what was added ("10 µL of 200 mM KCN").
-LABEL_MODES = {'chamber': 'In the chamber', 'added': 'What was added'}
+LABEL_MODES = {'chamber': 'Concentration', 'added': 'Addition'}
 UL_PER_ML = 1000.0
 # In the labels table a stock is always written in mM and a concentration in the
 # chamber in µM: {unit key of UNIT_FACTORS_UM: unit written}. On a label each is
