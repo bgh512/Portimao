@@ -14,14 +14,6 @@ from matplotlib.figure import Figure
 from utils_shared.pca_fitter import TYPE_NAMES
 
 
-# ---- CONSTANTS -----------------------------------------------------------------------
-# Usual reduced-minus-oxidised peaks (nm) of each haem type, drawn as guide lines
-REFERENCE_PEAKS = {'a': (604.0, 444.0),
-                   'b': (563.0, 430.0),
-                   'c': (551.0, 418.0),
-                   }
-
-
 # ---- PLOTTER HELPERS -----------------------------------------------------------------
 
 
@@ -33,6 +25,7 @@ def _example_drawer(main: Axes,
                     heading: str,
                     names: List[str],
                     colours: List[str],
+                    style: dict,
                     ) -> None:
     """
     ---- Summary ----
@@ -54,6 +47,8 @@ def _example_drawer(main: Axes,
         Name of each component.
     colours : List[str]
         Colour of each component.
+    style : dict
+        Greys and line widths of the figure (config.COMPONENT_FIGURE_STYLE).
 
     ---- Globals read ----
     None.
@@ -74,32 +69,32 @@ def _example_drawer(main: Axes,
 
     main.plot(wavelengths,
               example['spectrum'],
-              color='0.65',
-              linewidth=2.6,
+              color=style['measured_colour'],
+              linewidth=style['measured_line_width'],
               label='Measured spectrum',
               )
     for i, name in enumerate(names):
         main.plot(wavelengths,
                   example['contributions'][:, i],
                   color=colours[i],
-                  linewidth=1.2,
+                  linewidth=style['part_line_width'],
                   label=name,
                   )
     main.plot(wavelengths,
               example['background'],
-              color='0.55',
+              color=style['background_colour'],
               linestyle=':',
-              linewidth=1.2,
+              linewidth=style['part_line_width'],
               label='Offset and scatter',
               )
     main.plot(wavelengths,
               example['fitted'],
-              color='black',
+              color=style['fitted_colour'],
               linestyle='--',
-              linewidth=1.0,
+              linewidth=style['fitted_line_width'],
               label='Sum of the fit',
               )
-    main.axhline(0, color='0.75', linewidth=0.5)
+    main.axhline(0, color=style['zero_colour'], linewidth=style['zero_line_width'])
     when = (f", {example['time_min']:.1f} min" if np.isfinite(example['time_min'])
             else '')
     main.set_title(f"{heading}: {example['name']}{when} (residual RMS "
@@ -109,8 +104,12 @@ def _example_drawer(main: Axes,
                    )
     main.set_ylabel('Attenuation (OD)')
     main.tick_params(labelbottom=False)
-    lower.plot(wavelengths, example['residual'], color='0.3', linewidth=1.0)
-    lower.axhline(0, color='0.75', linewidth=0.5)
+    lower.plot(wavelengths,
+               example['residual'],
+               color=style['residual_colour'],
+               linewidth=style['residual_line_width'],
+               )
+    lower.axhline(0, color=style['zero_colour'], linewidth=style['zero_line_width'])
     lower.set_ylabel('Residual (OD)')
 
 
@@ -118,6 +117,8 @@ def _example_drawer(main: Axes,
 def _reference_line_drawer(ax: Axes,
                            window: tuple,
                            colours: dict,
+                           peaks_nm: dict,
+                           style: dict,
                            is_labelled: bool,
                            ) -> None:
     """
@@ -132,11 +133,15 @@ def _reference_line_drawer(ax: Axes,
         (start, end) of the wavelengths shown (nm).
     colours : dict
         {haem type: colour} of the lines.
+    peaks_nm : dict
+        {haem type: usual peaks (nm)} (config.HAEM_USUAL_PEAKS_NM).
+    style : dict
+        Line width and transparency of the lines (config.COMPONENT_FIGURE_STYLE).
     is_labelled : bool
         True to write the haem type above each line.
 
     ---- Globals read ----
-    REFERENCE_PEAKS (module constant).
+    None.
 
     ---- Outputs ----
     None
@@ -153,14 +158,14 @@ def _reference_line_drawer(ax: Axes,
     """
 
     shown = []
-    for kind, peaks in REFERENCE_PEAKS.items():
+    for kind, peaks in peaks_nm.items():
         for peak in peaks:
             if window[0] <= peak <= window[1]:
                 ax.axvline(peak,
                            color=colours[kind],
                            linestyle='--',
-                           linewidth=0.7,
-                           alpha=0.45,
+                           linewidth=style['peak_line_width'],
+                           alpha=style['peak_alpha'],
                            zorder=0,
                            )
                 shown.append((peak, kind))
@@ -182,6 +187,7 @@ def _reference_line_drawer(ax: Axes,
 def pca_example_figure_builder(examples: dict,
                                names: List[str],
                                colours: List[str],
+                               style: dict,
                                fig: Optional[Figure] = None,
                                ) -> Figure:
     """
@@ -197,6 +203,8 @@ def pca_example_figure_builder(examples: dict,
         Name of each component.
     colours : List[str]
         Colour of each component.
+    style : dict
+        Greys and line widths of the figure (config.COMPONENT_FIGURE_STYLE).
     fig : Optional[Figure]
         Figure to draw in; None makes a new one.
 
@@ -235,6 +243,7 @@ def pca_example_figure_builder(examples: dict,
                     'Smallest residual',
                     names,
                     colours,
+                    style,
                     )
     _example_drawer(worst_main,
                     worst_lower,
@@ -243,6 +252,7 @@ def pca_example_figure_builder(examples: dict,
                     'Largest residual',
                     names,
                     colours,
+                    style,
                     )
     best_lower.tick_params(labelbottom=False)
     worst_lower.set_xlabel('Wavelength (nm)')
@@ -269,6 +279,8 @@ def pca_figure_builder(analysis: dict,
                        types: List[str],
                        colours: List[str],
                        type_colours: dict,
+                       peaks_nm: dict,
+                       style: dict,
                        fig: Optional[Figure] = None,
                        ) -> Figure:
     """
@@ -290,6 +302,10 @@ def pca_figure_builder(analysis: dict,
         Colour of each component.
     type_colours : dict
         {'a', 'b', 'c': colour} of the guide lines.
+    peaks_nm : dict
+        {haem type: usual peaks (nm)} of the guide lines (config.HAEM_USUAL_PEAKS_NM).
+    style : dict
+        Greys and line widths of the figure (config.COMPONENT_FIGURE_STYLE).
     fig : Optional[Figure]
         Figure to draw in; None makes a new one.
 
@@ -320,12 +336,18 @@ def pca_figure_builder(analysis: dict,
 
     # ---- 2 Draw each component -------------------------------------------------------
     for i, ax in enumerate(axes):
-        _reference_line_drawer(ax, window, type_colours, is_labelled=i == 0)
-        ax.axhline(0, color='0.75', linewidth=0.5)
+        _reference_line_drawer(ax,
+                               window,
+                               type_colours,
+                               peaks_nm,
+                               style,
+                               is_labelled=i == 0,
+                               )
+        ax.axhline(0, color=style['zero_colour'], linewidth=style['zero_line_width'])
         ax.plot(wavelengths,
                 result['components'][:, i],
                 color=colours[i],
-                linewidth=1.5,
+                linewidth=style['component_line_width'],
                 )
         ax.set_title(f"{names[i]}: {TYPE_NAMES[types[i]]}, largest peak "
                      f"{result['peaks'][i]:.0f} nm, "

@@ -29,8 +29,7 @@ from utils_viewer.viewer_gui import (active_gui_getter,
                                      ViewerGui,
                                      window_opener,
                                      )
-from utils_viewer.viewer_preview import (PREVIEW_DPI,
-                                         preview_figure_builder,
+from utils_viewer.viewer_preview import (preview_figure_builder,
                                          PreviewSpec,
                                          ViewerSession,
                                          )
@@ -214,8 +213,8 @@ def _preview_shower(report: Callable[[str], None], log_folder: Path) -> int:
         written to it).
 
     ---- Globals read ----
-    settings.DEFAULT_ANSWERS; DRAWN_WAIT_S, PREVIEW_DPI, SHOW_S, SHOWN_MARK (module
-    constants).
+    settings.DEFAULT_ANSWERS, settings.PREVIEW_DPI; DRAWN_WAIT_S, SHOW_S, SHOWN_MARK
+    (module constants).
 
     ---- Outputs ----
     int
@@ -258,8 +257,8 @@ def _preview_shower(report: Callable[[str], None], log_folder: Path) -> int:
             report(f'Self-test failed: the made-up preview was not drawn. {notes}')
             return 1
         buffer = io.BytesIO()
-        figure.savefig(buffer, format='png', dpi=PREVIEW_DPI)
-        width, height = (round(inches * PREVIEW_DPI)
+        figure.savefig(buffer, format='png', dpi=settings.PREVIEW_DPI)
+        width, height = (round(inches * settings.PREVIEW_DPI)
                          for inches in figure.get_size_inches()
                          )
         report(f'Made-up preview drawn ({width} x {height} pixels).')

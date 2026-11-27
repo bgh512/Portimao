@@ -1,0 +1,18 @@
+{
+    "name": "PLOS ONE",
+    "widths_mm": {"1": 132, "2": 190.5},
+    "tallest_figure_mm": 222.3,
+    "smallest_text_pt": 8,
+    "largest_text_pt": 12,
+    "panel_letter_pt": 12,
+    "panel_letter_case": "lower",
+    "fonts": ["Arial"],
+    "thinnest_line_pt": null,
+    "thickest_line_pt": null,
+    "picture_dpi": 300,
+    "page_mm": [215.9, 279.4],
+    "read_at": ["https://journals.plos.org/plosone/s/figures",
+                "two example papers (PLOS ONE, PLOS Biology)"],
+    "confirmed": "2026-11-23, by hand from the guide: the text column (13.2 cm) as 1 column and the widest figure (19.05 cm) as 2, the tallest figure (22.23 cm), text of 8 to 12 pt in Arial, Times or Symbol and 300 to 600 dpi. 2026-11-25, from two example papers: the page of 215.9 x 279.4 mm (US Letter) in both.",
+    "notes": "The guide shows panel letters as (A) or (a) and gives no size: small letters, as wherever a journal leaves the choice, and 12 pt, bold, are our own. PLOS takes only TIFF or EPS files."
+}

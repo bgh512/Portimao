@@ -3,7 +3,6 @@ Plot of one experiment: oxygen, OCR and haem panels.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-import re
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
@@ -18,8 +17,15 @@ from matplotlib.legend import Legend
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.figure_layout import figure_canvas_fitter
-from utils_shared.helpers import concentration_formatter, figure_saver, name_simplifier
+from utils_shared.delta_psi import DELTA_PSI_COLUMN
+from utils_shared.event_concentrations import event_text_writer
+from utils_shared.figure_layout import figure_canvas_fitter, MM_PER_INCH
+from utils_shared.helpers import (figure_saver,
+                                  haem_order_finder,
+                                  HAEM_PANEL_PREFIX,
+                                  name_simplifier,
+                                  panel_order_placer,
+                                  )
 from utils_shared.schema import (HAEM_KEYS,
                                  measurement_column_finder,
                                  source_resolver,
@@ -27,6 +33,7 @@ from utils_shared.schema import (HAEM_KEYS,
                                  value_getter,
                                  VO2_KEYS,
                                  )
+from utils_shared.user_notices import warning_shower
 
 
 # ---- _HideTopTickLabels --------------------------------------------------------------
@@ -151,9 +158,8 @@ def _axes_legend_drawer(ax: Axes,
         Legend location; None uses config["LEGEND_LOCATION"].
 
     ---- Globals read ----
-    config keys LEGEND_LOCATION, LEGEND_COLUMNS, LEGEND_FRAME, LEGEND_FONT_SIZE,
-    LEGEND_FRAME_LINE_WIDTH and LEGENDS_OUTSIDE (legend in the white space right of
-    the axes).
+    config keys LEGEND_LOCATION, LEGEND_COLUMNS, LEGEND_FRAME, LEGEND_FONT_SIZE and
+    LEGEND_FRAME_LINE_WIDTH.
 
     ---- Outputs ----
     Legend
@@ -179,8 +185,6 @@ def _axes_legend_drawer(ax: Axes,
     # ---- 2 Draw the legend -----------------------------------------------------------
     if text_only:
         options.update(handlelength=0, handletextpad=0)
-    if config.get('LEGENDS_OUTSIDE', False):
-        options.update(loc='center left', bbox_to_anchor=(1.02, 0.5), borderaxespad=0)
     legend = ax.legend(**options)
     if config['LEGEND_FRAME']:
         legend.get_frame().set_linewidth(config.get('LEGEND_FRAME_LINE_WIDTH', 0.4))
@@ -245,13 +249,14 @@ def _haem_data_selector(experiment: dict,
         source is missing from the experiment (a warning is printed).
 
     ---- Globals mutated ----
-    None. Prints a warning when the source is missing (side effect).
+    None. Shows a warning when the source is missing (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     source_resolver
+    warning_shower
     """
 
     # ---- 1 Read the settings ---------------------------------------------------------
@@ -262,10 +267,12 @@ def _haem_data_selector(experiment: dict,
     # ---- 2 Select the data -----------------------------------------------------------
     try:
         _, haem_data = source_resolver(experiment, source, HAEM_KEYS, 'haem')
-    except ValueError as exc:
+    except ValueError:
         if source not in HAEM_KEYS:
             raise
-        print(f'  Warning: {exc} Haem panels will be skipped.')
+        warning_shower('  Warning: the haems are not on this plot, as they could not '
+                       'be worked out for this file.',
+                       )
         return None, source
     return haem_data, source
 
@@ -278,7 +285,7 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
 
     ---- Inputs ----
     panels : List[dict]
-        Panel specifications; each has a "type" of oxygen, vo2 or haem.
+        Panel specifications; each has a "type" of oxygen, vo2, haem or delta_psi.
     config : dict
         Individual-experiment plot settings, as built by Config.plot_config in
         config.py.
@@ -295,7 +302,7 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
     None.
 
     ---- Equations ----
-    ratio = weight for oxygen and vo2 panels; HAEM_PANEL_WEIGHT for each haem panel if
+    ratio = weight for oxygen, vo2 and delta psi panels; HAEM_PANEL_WEIGHT for each haem panel if
     set, else weight / n_haem; 1 for every panel when EQUAL_PANEL_HEIGHTS is set.
 
     ---- Helpers ----
@@ -365,8 +372,10 @@ def _panel_builder(experiment: dict,
                    ) -> List[dict]:
     """
     ---- Summary ----
-    Helper function to list the panels to draw: oxygen, VO2, then one for each
-    configured haem panel with matching data.
+    Helper function to list the panels to draw. The standard order is oxygen, OCR, one
+    for each configured haem panel with matching data (every a haem, then every b, then
+    every c, whatever the order they were configured in), then delta psi for a file
+    that has it; the panels the user moved are in the order they were given.
 
     ---- Inputs ----
     experiment : dict
@@ -378,58 +387,84 @@ def _panel_builder(experiment: dict,
         Haem data frame, or None.
 
     ---- Globals read ----
-    config keys PLOT_SET_AND_MEASURED_O2, PLOT_VO2, O2_PANEL_TITLE, VO2_PANEL_TITLE and
-    HAEM_PANELS.
+    config keys PLOT_SET_AND_MEASURED_O2, PLOT_VO2, HAEM_PANELS, PLOT_DELTA_PSI,
+    DELTA_PSI_AXIS_LABEL and PANEL_ORDER (the keys of the panels in the order the user
+    gave them; missing or empty for the standard order); HAEM_PANEL_PREFIX.
 
     ---- Outputs ----
     List[dict]
-        Panel specifications {type, title, haems}. Raises ValueError when no panel is
-        selected.
+        Panel specifications {type, key, title, haems}, top first; type is oxygen,
+        vo2, haem or delta_psi (the last only when PLOT_DELTA_PSI is set and the
+        experiment has a delta_psi table), and key tells the panels apart: the type,
+        or for a haem panel HAEM_PANEL_PREFIX then the name of its first haem as
+        configured. Only haem and delta_psi panels have a title (their axis label) and
+        only haem panels have haems. Raises ValueError when no panel is selected.
 
     ---- Globals mutated ----
-    None. Prints a warning for haems missing from the data (side effect).
+    None. Shows a warning for haems missing from the data (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    haem_order_finder
     measurement_column_finder
     name_simplifier
+    panel_order_placer
+    warning_shower
     """
 
-    # ---- 1 Add the panels ------------------------------------------------------------
+    # ---- 1 Add the panels, in the standard order -------------------------------------
     panels = []
     if config['PLOT_SET_AND_MEASURED_O2']:
-        panels.append({'type': 'oxygen', 'title': config['O2_PANEL_TITLE']})
+        panels.append({'type': 'oxygen', 'key': 'oxygen'})
     if config['PLOT_VO2']:
-        panels.append({'type': 'vo2', 'title': config['VO2_PANEL_TITLE']})
+        panels.append({'type': 'vo2', 'key': 'vo2'})
     if haem_data is not None:
         lookup = {name_simplifier(column): column
                   for column in measurement_column_finder(haem_data)
                   }
-        for spec in config['HAEM_PANELS']:
+        specs = [spec for spec in config['HAEM_PANELS'] if spec['haems']]
+        order = haem_order_finder([spec['haems'][0] for spec in specs])
+        missing = []
+        for spec in (specs[i] for i in order):
             matched = [lookup[name_simplifier(h)]
                        for h in spec['haems']
                        if name_simplifier(h) in lookup
                        ]
-            missing = [h for h in spec['haems'] if name_simplifier(h) not in lookup]
-            if missing:
-                print(f"  Warning: haem panel {spec['label']!r} could not find: "
-                      f'{missing}',
-                      )
+            missing += [h for h in spec['haems'] if name_simplifier(h) not in lookup]
             if matched:
                 panels.append({'type': 'haem',
+                               'key': f"{HAEM_PANEL_PREFIX}{spec['haems'][0]}",
                                'title': spec['label'],
                                'haems': matched,
                                },
                               )
+        if missing:  # one sentence for the file, not one per panel
+            warning_shower(f"  Warning: {', '.join(missing)} "
+                           f"{'is' if len(missing) == 1 else 'are'} not among the "
+                           f'haems worked out for this file, so '
+                           f"{'it is' if len(missing) == 1 else 'they are'} not on "
+                           f'the plot.',
+                           )
+    if config.get('PLOT_DELTA_PSI') and 'delta_psi' in experiment:
+        panels.append({'type': 'delta_psi',
+                       'key': 'delta_psi',
+                       'title': config['DELTA_PSI_AXIS_LABEL'],
+                       },
+                      )
 
     # ---- 2 Check there is something to plot ------------------------------------------
     if not panels:
-        raise ValueError('No panels selected. Enable an oxygen/VO2 panel or configure '
-                         'matching haem panels.',
+        raise ValueError('there is nothing to plot for this file: the oxygen and the '
+                         'OCR are not shown, and it has none of the haems to show.',
                          )
-    return panels
+
+    # ---- 3 Put them in the order the user gave them ----------------------------------
+    order = panel_order_placer([panel['key'] for panel in panels],
+                               config.get('PANEL_ORDER', []),
+                               )
+    return [panels[place] for place in order]
 
 
 # ---- _vo2_ymax_calculator ------------------------------------------------------------
@@ -485,7 +520,7 @@ def _vo2_ymax_calculator(y: np.ndarray,
 
 
 # ---- _skipped_window_drawer ----------------------------------------------------------
-def _skipped_window_drawer(axes: List[Axes], window_name: str, window: dict) -> None:
+def _skipped_window_drawer(axes: List[Axes], window: dict, colour: str) -> None:
     """
     ---- Summary ----
     Helper function to draw an averaging window that could not be calculated: a red
@@ -494,10 +529,10 @@ def _skipped_window_drawer(axes: List[Axes], window_name: str, window: dict) -> 
     ---- Inputs ----
     axes : List[Axes]
         Axes of the experiment, top to bottom.
-    window_name : str
-        Window name, for example 'average3'.
     window : dict
         {start_time, end_time, reason} of the skipped window.
+    colour : str
+        Colour of the band and of the warning sign.
 
     ---- Globals read ----
     None.
@@ -518,8 +553,14 @@ def _skipped_window_drawer(axes: List[Axes], window_name: str, window: dict) -> 
 
     start, end = window['start_time'], window['end_time']
     for ax in axes:
-        ax.axvspan(start, end, facecolor='#d62728', alpha=0.18, edgecolor='#d62728',
-                   linewidth=0.8, linestyle='--', zorder=0,
+        ax.axvspan(start,
+                   end,
+                   facecolor=colour,
+                   alpha=0.18,
+                   edgecolor=colour,
+                   linewidth=0.8,
+                   linestyle='--',
+                   zorder=0,
                    )
     axes[0].text((start + end) / 2,
                  1.0,
@@ -529,7 +570,7 @@ def _skipped_window_drawer(axes: List[Axes], window_name: str, window: dict) -> 
                  va='bottom',
                  fontsize=12,
                  fontfamily='DejaVu Sans',
-                 color='#d62728',
+                 color=colour,
                  clip_on=False,
                  zorder=3,
                  )
@@ -539,7 +580,8 @@ def _skipped_window_drawer(axes: List[Axes], window_name: str, window: dict) -> 
 def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
     """
     ---- Summary ----
-    Helper function to draw the averaging windows behind the data on every axis.
+    Helper function to draw the averaging windows behind the data on every axis, the
+    baseline in its own colour with its name above the top axis.
 
     ---- Inputs ----
     axes : List[Axes]
@@ -551,21 +593,23 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
         config.py.
 
     ---- Globals read ----
-    config keys PLOT_AVERAGING_WINDOWS and the AVERAGING_WINDOW_* appearance settings.
+    config keys PLOT_AVERAGING_WINDOWS, the AVERAGING_WINDOW_* appearance settings,
+    the QUICK_WINDOW_* colours of the quick windows, the BASELINE_WINDOW_* colours
+    and name of the baseline, SHOW_SKIPPED_WINDOWS and
+    SKIPPED_WINDOW_COLOUR.
 
     ---- Outputs ----
     None
         Nothing.
 
     ---- Globals mutated ----
-    None. Adds shaded spans and labels to the axes (side effect).
+    None. Adds shaded spans to the axes (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
     _skipped_window_drawer
-    _window_label_builder
     """
 
     # ---- 1 Check there are windows to draw -------------------------------------------
@@ -574,73 +618,45 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
         return
 
     # ---- 2 Draw the windows that could not be calculated, when asked -----------------
+    # a window the user left out is not drawn: its place is left as a gap
     if config.get('SHOW_SKIPPED_WINDOWS'):
-        for window_name, window in averages.get('skipped', {}).items():
-            _skipped_window_drawer(axes, window_name, window)
+        for window in averages.get('skipped', {}).values():
+            if not window.get('left_out'):
+                _skipped_window_drawer(axes, window, config['SKIPPED_WINDOW_COLOUR'])
 
     # ---- 3 Draw each window ----------------------------------------------------------
-    for window_name, window in averages['windows'].items():
+    for name, window in averages['windows'].items():
         start, end = window['start_time'], window['end_time']
         if end <= start:
             continue
+        # a quick window (starting after its addition) is green, the baseline (before
+        # the first addition) gold with its name above it, the others blue
+        kind = window.get('kind', 'baseline' if name == 'average0' else 'settled')
+        prefix = {'quick': 'QUICK_WINDOW', 'baseline': 'BASELINE_WINDOW'}.get(kind)
+        face = config.get(f'{prefix}_COLOUR') if prefix else None
+        edge = config.get(f'{prefix}_EDGE_COLOUR') if prefix else None
+        edge = edge or config['AVERAGING_WINDOW_EDGE_COLOUR']
+        if kind == 'baseline' and config.get('BASELINE_WINDOW_LABEL'):
+            axes[0].text((start + end) / 2,
+                         1.0,
+                         config['BASELINE_WINDOW_LABEL'],
+                         transform=axes[0].get_xaxis_transform(),
+                         ha='center',
+                         va='bottom',
+                         fontsize=config.get('BASELINE_WINDOW_LABEL_FONTSIZE'),
+                         color=edge,
+                         clip_on=False,
+                         zorder=3,
+                         )
         for ax in axes:
             ax.axvspan(start,
                        end,
-                       facecolor=config['AVERAGING_WINDOW_COLOUR'],
+                       facecolor=face or config['AVERAGING_WINDOW_COLOUR'],
                        alpha=config['AVERAGING_WINDOW_ALPHA'],
-                       edgecolor=config['AVERAGING_WINDOW_EDGE_COLOUR'],
+                       edgecolor=edge,
                        linewidth=config.get('AVERAGING_WINDOW_EDGE_LINE_WIDTH', 0.8),
                        zorder=0,
                        )
-        text = _window_label_builder(window_name, config)
-        if text:
-            axes[0].text((start + end) / 2,
-                         0.98,
-                         text,
-                         transform=axes[0].get_xaxis_transform(),
-                         ha='center',
-                         va='top',
-                         fontsize=config['AVERAGING_WINDOW_LABEL_FONT_SIZE'],
-                         color=config['AVERAGING_WINDOW_EDGE_COLOUR'],
-                         zorder=2,
-                         )
-
-
-# ---- _window_label_builder -----------------------------------------------------------
-def _window_label_builder(window_name: str, config: dict) -> str:
-    """
-    ---- Summary ----
-    Helper function to build the text of an averaging window from
-    AVERAGING_WINDOW_LABEL_FORMAT.
-
-    ---- Inputs ----
-    window_name : str
-        Window name, for example 'average3'.
-    config : dict
-        Individual-experiment plot settings, as built by Config.plot_config in
-        config.py.
-
-    ---- Globals read ----
-    config key AVERAGING_WINDOW_LABEL_FORMAT ({n} is the number, {name} the window
-    name).
-
-    ---- Outputs ----
-    str
-        Label text; empty when the format is empty.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    match = re.search(r'(\d+)$', window_name)
-    number = int(match.group(1)) if match else window_name
-    return config['AVERAGING_WINDOW_LABEL_FORMAT'].format(n=number, name=window_name)
 
 
 # ---- _ylim_calculator ----------------------------------------------------------------
@@ -708,7 +724,8 @@ def experiment_drawer(fig: Figure,
     """
     ---- Summary ----
     Main function to draw one experiment's stacked panels into a cell of an existing
-    figure. It adds no title, adjusts no margins and saves nothing; event labels hang
+    figure: the oxygen, the OCR, the haems and, for a file that has it, delta psi as
+    one line with gaps where it cannot be given. It adds no title, adjusts no margins and saves nothing; event labels hang
     below the lowest axis, so room is needed underneath the cell.
 
     ---- Inputs ----
@@ -746,7 +763,8 @@ def experiment_drawer(fig: Figure,
     _vo2_ymax_calculator
     _window_drawer
     _ylim_calculator
-    concentration_formatter
+    event_text_writer
+    haem_ylim_sharer
     name_simplifier
     source_resolver
     time_getter
@@ -790,8 +808,10 @@ def experiment_drawer(fig: Figure,
     _window_drawer(axes, experiment, config)
 
     # ---- 4 Draw each panel -----------------------------------------------------------
-    # Draw each panel.
+    # The y limits each haem panel would have alone, so the panels can share one scale.
+    haem_limits: List[Tuple[Axes, Tuple[float, float]]] = []
     for ax, panel in zip(axes, panels):
+        ax.panel_key = panel['key']  # so the window can tell which panel is where
         if panel['type'] == 'oxygen':
             # Set and measured O2 differ in line style as well as colour (dashed /
             # solid), so they stay distinguishable in grey scale
@@ -853,6 +873,32 @@ def experiment_drawer(fig: Figure,
                                              config['VO2_Y_HEADROOM'],
                                              )
             ax.set_ylim(config['VO2_Y_MIN'], y_max)
+            ax.is_ocr = True  # so the shared legend can leave the OCR out
+        elif panel['type'] == 'delta_psi':
+            # Empty values (bH or bL outside the limits) leave gaps in the line.
+            table = experiment['delta_psi']
+            t = time_getter(table)
+            y = np.asarray(value_getter(table, DELTA_PSI_COLUMN), dtype=float)
+            ax.plot(t,
+                    y,
+                    label=panel['title'],
+                    color=config['DELTA_PSI_COLOUR'],
+                    linewidth=config['LINE_WIDTH'],
+                    zorder=3,
+                    )
+            ax.set_ylabel(panel['title'],
+                          labelpad=config['Y_LABEL_PAD'],
+                          multialignment='center',
+                          )
+            ax.is_delta_psi = True  # so a kept delta psi can be drawn over it
+            ignore_last = config.get('Y_SCALE_IGNORE_LAST_MINUTES', 0.0)
+            limits = _ylim_calculator(t,
+                                      [y],
+                                      config['Y_SCALE_IGNORE_FIRST_MINUTES'],
+                                      ignore_last_minutes=ignore_last,
+                                      )
+            if limits:
+                ax.set_ylim(*limits)
         else:  # haem
             t = time_getter(haem_data)
             for haem in panel['haems']:
@@ -878,6 +924,7 @@ def experiment_drawer(fig: Figure,
                                           )
                 if limits:
                     ax.set_ylim(*limits)
+                    haem_limits.append((ax, limits))
         if config['SHOW_LEGENDS'].get(panel['type'], True):
             # A haem panel's legend is just the word when it holds a single trace
             # (HAEM_LEGEND_TEXT_ONLY).
@@ -892,21 +939,33 @@ def experiment_drawer(fig: Figure,
                                                     ).get(panel['type']),
                                 )
 
+    # ---- 4.1 One scale for the haem panels -------------------------------------------
+    # A haem that hardly changes then looks small beside the others. In % oxidised each
+    # haem runs over its own 0 to 100 %, so each panel keeps its own range.
+    if haem_source != 'percent' and len(haem_limits) > 1:
+        shared = haem_ylim_sharer([limits for _, limits in haem_limits],
+                                  str(haem_source).startswith('delta'),
+                                  )
+        for (ax, _), limits in zip(haem_limits, shared):
+            ax.set_ylim(*limits)
+
     # ---- 5 Format the axes -----------------------------------------------------------
-    # Format axes; x limits default to the span of the plotted data. Only the lowest
-    # axis shows x tick labels.
+    # Format axes. The panels share one time axis, so its limits default to the span
+    # of the lines of every panel: a panel covering less time (the haems, delta psi)
+    # must not cut the ends off the others. Only the lowest axis shows x tick labels.
     for ax in axes:
         ax.tick_params(axis='both', labelsize=config['TICK_FONT_SIZE'], direction='in')
         ax.spines['top'].set_visible(config['AXES_TOP_SPINE'])
         ax.spines['right'].set_visible(config['AXES_RIGHT_SPINE'])
-        x_data = np.concatenate([line.get_xdata()
-                                 for line in ax.get_lines()
-                                 if len(line.get_xdata())
-                                 ],
-                                )
-        left = config['X_MIN'] if config['X_MIN'] is not None else np.nanmin(x_data)
-        right = config['X_MAX'] if config['X_MAX'] is not None else np.nanmax(x_data)
-        ax.set_xlim(left=left, right=right)
+    x_data = np.concatenate([np.asarray(line.get_xdata(), dtype=float)
+                             for ax in axes
+                             for line in ax.get_lines()
+                             if len(line.get_xdata())
+                             ],
+                            )
+    left = config['X_MIN'] if config['X_MIN'] is not None else np.nanmin(x_data)
+    right = config['X_MAX'] if config['X_MAX'] is not None else np.nanmax(x_data)
+    axes[0].set_xlim(left=left, right=right)
     for ax in axes[:-1]:
         ax.tick_params(axis='x', labelbottom=False)
     max_ticks = config.get('HAEM_Y_MAX_TICKS')
@@ -954,12 +1013,11 @@ def experiment_drawer(fig: Figure,
             label_ax = axes[0] if on_top else axes[-1]
             y_edge, sign, vertical = (1, 1, 'bottom') if on_top else (0, -1, 'top')
             for event in events:
-                conc = event.get('concentration_uM')
-                text = (f"{concentration_formatter(conc)} "
-                        f"{event.get('label', '')}".strip()
-                        if conc is not None
-                        else str(event.get('label', ''))
-                        )
+                text = event_text_writer(event,
+                                         config.get('EVENT_LABEL_MODE',
+                                                    'chamber',
+                                                    ),
+                                         )
                 label_ax.annotate(text,
                                   xy=(event['time'], y_edge),
                                   xycoords=label_ax.get_xaxis_transform(),
@@ -1017,8 +1075,8 @@ def experiment_plotter(experiment: dict,
                        ) -> Tuple[Figure, List[Axes]]:
     """
     ---- Summary ----
-    Main function to plot one experiment in its own figure, optionally save it as svg
-    and png, then show or close it.
+    Main function to plot one experiment in its own figure with its name as a faint
+    note in the corner, optionally save it as svg and png, then close it.
 
     ---- Inputs ----
     experiment : dict
@@ -1033,14 +1091,12 @@ def experiment_plotter(experiment: dict,
         window). It is left open. None makes a new figure.
 
     ---- Globals read ----
-    config keys FIGURE_SIZE, FIGURE_DPI, TITLE_STYLE, LAYOUT_PAD_PT, FIT_MARGINS,
-    TITLE_GAP_PT, SAVE_FIGURES, TIGHT_BBOX, SHOW_INDIVIDUAL_FIGURES and the title
+    config keys FIGURE_SIZE, FIGURE_DPI, LAYOUT_PAD_PT, SAVE_FIGURES and the title
     settings.
 
     ---- Outputs ----
     Tuple[Figure, List[Axes]]
-        The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set or a figure was
-        given) and its axes.
+        The figure (already closed unless a figure was given) and its axes.
 
     ---- Globals mutated ----
     None. Writes <export_root>/<name>/<name>.svg and .png and prints a message (side
@@ -1066,46 +1122,30 @@ def experiment_plotter(experiment: dict,
         fig.set_size_inches(*config['FIGURE_SIZE'])
     else:
         fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
-    axes, panels = experiment_drawer(fig,
-                                     fig.add_gridspec(1, 1)[0, 0],
-                                     experiment,
-                                     config,
-                                     )
-    if any(panel['type'] == 'haem' for panel in panels):
-        print(f"    Haem data selected: {config['HAEM_PLOT_VALUES']}")
-
-    # ---- 2 Add the title -------------------------------------------------------------
-    suptitle = None
-    if config.get('TITLE_STYLE', 'heading') == 'watermark':
-        # Faint run name in the top-left corner, outside the layout, so it takes none of
-        # the figure's height.
-        width_pt, height_pt = (v * 72.0 for v in config['FIGURE_SIZE'])
-        pad = config.get('LAYOUT_PAD_PT', 3.0)
-        mark = fig.text(pad / width_pt,
-                        1.0 - pad / height_pt,
-                        experiment_title_builder(experiment, config),
-                        ha='left',
-                        va='top',
-                        **watermark_style_builder(config),
-                        )
-        mark.set_in_layout(False)
-    else:
-        suptitle = fig.suptitle(experiment_title_builder(experiment, config),
-                                fontsize=config['TITLE_FONT_SIZE'],
-                                fontweight='bold',
+    axes, _ = experiment_drawer(fig,
+                                fig.add_gridspec(1, 1)[0, 0],
+                                experiment,
+                                config,
                                 )
 
+    # ---- 2 Add the title -------------------------------------------------------------
+    # Faint run name in the top-left corner, outside the layout, so it takes none of
+    # the figure's height.
+    width_pt, height_pt = (v * 72.0 for v in config['FIGURE_SIZE'])
+    pad = config['LAYOUT_PAD_PT']
+    mark = fig.text(pad / width_pt,
+                    1.0 - pad / height_pt,
+                    experiment_title_builder(experiment, config),
+                    ha='left',
+                    va='top',
+                    **watermark_style_builder(config),
+                    )
+    mark.set_in_layout(False)
+
     # ---- 3 Fit the margins -----------------------------------------------------------
-    if config.get('FIT_MARGINS', False):
-        # Margins fitted to the drawn labels, so nothing is cut off or overlaps at any
-        # figure or font size.
-        figure_canvas_fitter(fig,
-                             config['LAYOUT_PAD_PT'],
-                             suptitle,
-                             config['TITLE_GAP_PT'],
-                             )
-    else:
-        fig.subplots_adjust(bottom=config['FIGURE_BOTTOM_MARGIN'])
+    # Margins fitted to the drawn labels, so nothing is cut off or overlaps at any
+    # figure or font size.
+    figure_canvas_fitter(fig, pad, line_limits_pt=config.get('LINE_LIMITS_PT'))
 
     # ---- 4 Save the figure -----------------------------------------------------------
     if config['SAVE_FIGURES']:
@@ -1116,20 +1156,14 @@ def experiment_plotter(experiment: dict,
                      ('svg', 'png'),
                      config['FIGURE_SIZE'],
                      config['FIGURE_DPI'],
-                     tight=config['TIGHT_BBOX'],
                      )
-        print(f"    Figure saved at {width:g} x {height:g} in, {config['FIGURE_DPI']} "
-              f'dpi '
-              f"({round(width * config['FIGURE_DPI'])} x "
-              f"{round(height * config['FIGURE_DPI'])} px): {export_root.name}/{name}/",
+        print(f'    Figure saved at {width * MM_PER_INCH:.0f} x '
+              f"{height * MM_PER_INCH:.0f} mm, {config['FIGURE_DPI']} dpi: "
+              f'{export_root.name}/{name}/',
               )
 
-    # ---- 5 Show the figure -----------------------------------------------------------
-    if is_given:
-        pass  # the caller keeps the figure open
-    elif config['SHOW_INDIVIDUAL_FIGURES']:
-        plt.show()
-    else:
+    # ---- 5 Close the figure ----------------------------------------------------------
+    if not is_given:  # the caller keeps a figure it gave open
         plt.close(fig)
     return fig, axes
 
@@ -1165,6 +1199,54 @@ def experiment_title_builder(experiment: dict, config: dict) -> str:
     """
 
     return config['FIGURE_TITLE'].format(experiment_name=experiment['experiment_name'])
+
+
+# ---- haem_ylim_sharer ----------------------------------------------------------------
+def haem_ylim_sharer(limits: List[Tuple[float, float]],
+                     is_aligned: bool,
+                     ) -> List[Tuple[float, float]]:
+    """
+    ---- Summary ----
+    Main function to put the haem panels on one scale, so the size of a change can be
+    compared between them: the same y range on every panel for ΔD, where every haem
+    starts at 0; for absorbance, whose haems sit at different levels, the same height
+    of range on every panel, each around its own haem.
+
+    ---- Inputs ----
+    limits : List[Tuple[float, float]]
+        (low, high) each panel would have alone, in mOD (or mOD OD⁻¹).
+    is_aligned : bool
+        True for ΔD (the same range on every panel), False for absorbance (the same
+        height of range, around each panel's own middle).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Tuple[float, float]]
+        (low, high) of each panel, in the order given.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    ΔD: low = smallest of the lows, high = largest of the highs, on every panel.
+    Absorbance: height = largest (high - low); middle = (low + high) / 2 of each
+    panel; limits = middle - height / 2 and middle + height / 2.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if not limits:
+        return []
+    if is_aligned:
+        shared = (min(low for low, _ in limits), max(high for _, high in limits))
+        return [shared for _ in limits]
+    height = max(high - low for low, high in limits)
+    return [((low + high) / 2 - height / 2, (low + high) / 2 + height / 2)
+            for low, high in limits
+            ]
 
 
 # ---- watermark_style_builder ---------------------------------------------------------

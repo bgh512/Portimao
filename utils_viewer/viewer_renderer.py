@@ -3,15 +3,16 @@ The background thread of the experiment browser window that draws the previews.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-import io
 import threading
 from typing import Callable, List, Optional, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_viewer.viewer_preview import (PREVIEW_DPI,
+import config as settings
+from utils_shared.user_notices import problem_teller
+from utils_viewer.viewer_preview import (kept_file_lister,
                                          PreviewSpec,
                                          preview_figure_builder,
-                                         time_axis_finder,
+                                         preview_picture_maker,
                                          TimeAxis,
                                          ViewerSession,
                                          )
@@ -21,15 +22,17 @@ from utils_viewer.viewer_preview import (PREVIEW_DPI,
 class PreviewRenderer(threading.Thread):
     """
     ---- Summary ----
-    Thread that draws the preview of every file with the latest settings, the file being
-    looked at first and then its neighbours, so the files can be flicked through while a
-    question waits. A newer request makes it drop the work for the older one.
+    Thread that draws the previews with the latest settings: the file being looked at
+    first, then the ones beside it (the files the window keeps read), so the arrows lead
+    to a drawn file. Any other file is drawn when it is looked at, so a big dataset is
+    not read from disk again after every answer. A newer request makes it drop the work
+    for the older one.
 
     ---- Attributes ----
     None public.
 
     ---- Globals read ----
-    PREVIEW_DPI (imported constant).
+    settings.WINDOW_KEPT_FILES.
 
     ---- Methods ----
     __init__
@@ -94,17 +97,18 @@ class PreviewRenderer(threading.Thread):
         """
         ---- Summary ----
         Method to pick the file to draw next: the nearest one to the file being looked
-        at that has not been drawn with the current settings. The caller holds the lock.
+        at, among the files the window keeps read, that has not been drawn with the
+        current settings. The caller holds the lock.
 
         ---- Inputs ----
         None.
 
         ---- Globals read ----
-        None.
+        settings.WINDOW_KEPT_FILES.
 
         ---- Outputs ----
         Optional[str]
-            File name, or None when every file is drawn.
+            File name, or None when those files are drawn.
 
         ---- Globals mutated ----
         None.
@@ -113,22 +117,19 @@ class PreviewRenderer(threading.Thread):
         None.
 
         ---- Helpers ----
-        None.
+        kept_file_lister
         """
 
-        total = len(self._names)
-        remaining = [i for i in range(total) if self._names[i] not in self._done]
-        if not remaining:
-            return None
-        # distance around the loop, forward first on a tie
-        best = min(remaining,
-                   key=lambda i: (min((i - self._wanted) % total,
-                                      (self._wanted - i) % total,
-                                      ),
-                                  (i - self._wanted) % total,
-                                  ),
-                   )
-        return self._names[best]
+        nearest = kept_file_lister(self._wanted,
+                                   len(self._names),
+                                   settings.WINDOW_KEPT_FILES,
+                                   )
+        return next((self._names[i]
+                     for i in nearest
+                     if self._names[i] not in self._done
+                     ),
+                    None,
+                    )
 
     # ---- _picture_maker --------------------------------------------------------------
     def _picture_maker(self,
@@ -146,37 +147,35 @@ class PreviewRenderer(threading.Thread):
             Name of the file.
 
         ---- Globals read ----
-        PREVIEW_DPI (imported constant).
+        None.
 
         ---- Outputs ----
         Tuple[Optional[bytes], str, Optional[TimeAxis]]
             (PNG bytes, notes, time axis); the bytes are None when the preview could
-            not be drawn and the notes then say why. The time axis says where the
-            shared time axis sits in the picture, and is None when there is none.
+            not be drawn and the notes then say why in one sentence. The time axis says
+            where the shared time axis sits in the picture, and is None when there is
+            none.
 
         ---- Globals mutated ----
-        None.
+        None. The details of a problem go to the log (side effect).
 
         ---- Equations ----
         None.
 
         ---- Helpers ----
         preview_figure_builder
-        time_axis_finder
+        preview_picture_maker
+        problem_teller
         """
 
         try:
             figure, notes = preview_figure_builder(self._session, spec, name)
             if figure is None:
                 return None, notes, None
-            buffer = io.BytesIO()
-            figure.savefig(buffer, format='png', dpi=PREVIEW_DPI)
-            return buffer.getvalue(), notes, time_axis_finder(figure)
+            picture, time_axis = preview_picture_maker(figure)
+            return picture, notes, time_axis
         except Exception as exc:  # a preview problem must never stop the questions
-            return (None,
-                    f'Preview not drawn for {name}: {type(exc).__name__}: {exc}',
-                    None,
-                    )
+            return None, problem_teller(f'Preview not drawn for {name}', exc), None
 
     # ---- MAIN METHODS ----------------------------------------------------------------
 
@@ -184,7 +183,8 @@ class PreviewRenderer(threading.Thread):
     def request_setter(self, spec: PreviewSpec, version: int, wanted: int) -> None:
         """
         ---- Summary ----
-        Method to ask for every file to be drawn again with new settings.
+        Method to ask for the files to be drawn again with new settings: the file being
+        looked at and the ones beside it now, any other when it is looked at.
 
         ---- Inputs ----
         spec : PreviewSpec
@@ -298,7 +298,8 @@ class PreviewRenderer(threading.Thread):
     def wanted_setter(self, wanted: int) -> None:
         """
         ---- Summary ----
-        Method to say which file is being looked at, so it is drawn next.
+        Method to say which file is being looked at, so it and the ones beside it are
+        drawn next if they have not been drawn with the current settings.
 
         ---- Inputs ----
         wanted : int

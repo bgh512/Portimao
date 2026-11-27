@@ -26,11 +26,11 @@ MIN_COMPARED_POINTS = 100  # fewer points than this cannot be compared
 # part -> (largest allowed difference, unit); set from the 33 sample files on
 # 2026-11-20, about three times the worst seen (sum and pressure 0.0001, typical fall
 # 0.87 and leak 0.55 µM/min, size of the fall 11 % and of the leak 1.6 %)
-MARGINS = {'sum': (0.001, 'µM/min'),
+MARGINS = {'sum': (0.001, 'µM min⁻¹'),
            'pressure': (0.001, 'mmHg'),
-           'fall': (3.0, 'µM/min'),
+           'fall': (3.0, 'µM min⁻¹'),
            'fall_size': (35.0, '%'),
-           'leak': (2.0, 'µM/min'),
+           'leak': (2.0, 'µM min⁻¹'),
            'leak_size': (5.0, '%'),
            }
 # part -> what a disagreement means, for the warning

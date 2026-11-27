@@ -1,0 +1,19 @@
+{
+    "name": "PNAS",
+    "widths_mm": {"1": 87, "1.5": 114, "2": 178},
+    "tallest_figure_mm": 225,
+    "smallest_text_pt": 6,
+    "largest_text_pt": 12,
+    "panel_letter_pt": 8,
+    "panel_letter_case": "upper",
+    "fonts": ["Arial", "Helvetica"],
+    "thinnest_line_pt": 0.25,
+    "thickest_line_pt": null,
+    "picture_dpi": 600,
+    "page_mm": [206.3, 276.2],
+    "read_at": ["https://www.pnas.org/author-center/submitting-your-manuscript",
+                "the PNAS Digital Art Guidelines linked from that page",
+                "two example papers (Di Trani et al. 2023, Moe et al. 2023)"],
+    "confirmed": "2026-11-23, by hand from the author page and the Digital Art Guidelines: the widths, the tallest figure, text no smaller than 6 pt and no larger than 12 pt, the fonts, lines of at least 0.25 pt and 600 to 900 dpi for pictures with text. 2026-11-25, from two example papers: the page of 206.3 x 276.2 mm in both, and capital panel letters in both.",
+    "notes": "The art guidelines also say to size text to 'at least 6 to 8 points'. Not confirmed: the size and weight of the panel letters (8 pt, bold; the example papers print them plain at 12 to 14 pt, as their authors made them)."
+}

@@ -14,7 +14,13 @@ import numpy as np
 import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
-from utils_shared.reference_level import (reference_level_finder,
+from utils_shared.helpers import (file_name_sanitiser,
+                                  haem_order_finder,
+                                  haem_type_finder,
+                                  HAEM_TYPE_ORDER,
+                                  name_simplifier,
+                                  )
+from utils_shared.reference_level import (start_level_finder,
                                           window_seconds_calculator,
                                           )
 from utils_shared.schema import (measurement_column_finder,
@@ -35,6 +41,15 @@ FIT_LARGE_SCALE = 1_000_000.0
 # of that layout this reader knows (written in the second cell as 'format 1').
 FIT_FILE_MARK = 'Portimao fit file'
 FIT_FILE_FORMAT = 1
+# The haem library: one fit file per haem, each at the size its source fit gives it, in
+# this folder of the fits folder; and the presets, each a list of library files (with
+# the haems per protein of each beside it, for the reader only), in the other. Only cells
+# are measured, so a shape's size never changes the absorbance, delta D or %. A preset's
+# first cell is PRESET_FILE_MARK, its second the format.
+HAEMS_FOLDER_NAME = 'haems'
+PRESETS_FOLDER_NAME = 'presets'
+PRESET_FILE_MARK = 'Portimao preset'
+PRESET_FILE_FORMAT = 1
 # The units a fit file may give its shapes in, each with what its values are divided by
 # to reach the standard scale (OD/mM/cm divided by a million, the instrument's own).
 # 'relative' is for components found from data, scaled to a largest point of 1.
@@ -60,14 +75,46 @@ FIT_NAMES_TEXT = ('In the figures the haem letters are in italics and a capital 
 # a capital letter or a number written below the line (bH, a605, cc, aa3).
 HAEM_NAME_WORD = re.compile(r'([abcdo]{1,3})([A-Z]|[0-9]+)?')
 # The backgrounds a decomposition can fit under the haems, by name, with the words the
-# messages use; HAEM_BACKGROUND in config.py names the standard one. The Valencia one is
-# the shape of the instrument's own fit file, which follows 1/wavelength^2 exactly.
-BACKGROUND_LABELS = {'scatter_1': 'flat + 1/wavelength',
-                     'scatter_2': 'flat + 1/wavelength + 1/wavelength²',
-                     'linear': 'flat + straight line',
-                     'quadratic': 'flat + straight line + curve',
-                     'valencia': 'flat + 1/wavelength² (Valencia)',
+# messages use; 'haem_background' in config.DEFAULT_ANSWERS names the standard one. The
+# Palencia one is the shape of the instrument's own fit file, which follows
+# 1/wavelength^2 exactly. Rowan scatter is the additive background of the lab's own
+# chamber scripts, term for term (tests/test_haem_decomposition.py checks it against
+# their lines).
+# The same backgrounds as short names, as the drop-down in the strip lists them, the
+# standard first.
+BACKGROUND_SHORT_NAMES = {'rowan_scatter': 'Rowan scatter',
+                          'palencia': 'Palencia',
+                          'scatter_1': 'Inverse',
+                          'scatter_2': 'Inverse²',
+                          'linear': 'Linear',
+                          }
+# Each background's formula as close to a textbook as plain text gets, for the
+# terminal and the workbooks, which cannot typeset maths (MATHS.md section 1.3).
+BACKGROUND_PLAIN_FORMULAS = {'rowan_scatter': 'B = b₀ + b₁·w + b₂·(w − w_mid)²',
+                             'palencia': 'B = b₀ + b₁ ÷ w²',
+                             'scatter_1': 'B = b₀ + b₁ ÷ w',
+                             'scatter_2': 'B = b₀ + b₁ ÷ w + b₂ ÷ w²',
+                             'linear': 'B = b₀ + b₁·w',
+                             }
+BACKGROUND_LABELS = {name: f'{short}, {BACKGROUND_PLAIN_FORMULAS[name]}'
+                     for name, short in BACKGROUND_SHORT_NAMES.items()
                      }
+# Each background's formula as a textbook writes it (matplotlib mathtext), as MATHS.md
+# section 1.3 gives it: w the wavelength (nm), w_mid the one halfway along, b0 to b2
+# found by the fit.
+BACKGROUND_FORMULAS = {
+    'rowan_scatter': r'$B = b_0 + b_1\,w + b_2\,(w - w_{\mathrm{mid}})^2$',
+    'palencia': r'$B = b_0 + \dfrac{b_1}{w^2}$',
+    'scatter_1': r'$B = b_0 + \dfrac{b_1}{w}$',
+    'scatter_2': r'$B = b_0 + \dfrac{b_1}{w} + \dfrac{b_2}{w^2}$',
+    'linear': r'$B = b_0 + b_1\,w$',
+    }
+# The heading line of a preset that gives the name the Fit list shows for it.
+PRESET_TITLE_LABEL = 'Name'
+# The fit name of a set of library haems ticked in the strip, in place of a preset or a
+# fit file (not a file name, so it never clashes with one); the files are in the answer
+# 'haem_files'.
+OWN_HAEMS_NAME = 'Your own haems'
 
 
 # ---- SPECTRAL DECOMPOSER HELPERS -----------------------------------------------------
@@ -500,6 +547,114 @@ def _number_column_reader(column: pd.Series,
     return numbers
 
 
+# ---- _preset_reader ------------------------------------------------------------------
+def _preset_reader(path: Path) -> List[str]:
+    """
+    ---- Summary ----
+    Helper function to read the names of the library files a preset lists.
+
+    ---- Inputs ----
+    path : Path
+        Preset file (DATA_FORMAT.md, "preset csv").
+
+    ---- Globals read ----
+    PRESET_FILE_MARK, PRESET_FILE_FORMAT (module constants).
+
+    ---- Outputs ----
+    List[str]
+        The file names, in the order the preset lists them. Raises ValueError, with a
+        message for the user, when the file cannot be read, is not a preset, is of a
+        newer format, or lists no file.
+
+    ---- Globals mutated ----
+    None. Reads the file (side effect).
+
+    ---- Equations ----
+    None. The heading lines end at the first empty line; the first line after it is
+    the column name, and each line below names one file in its first cell.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Read the lines ------------------------------------------------------------
+    label = path.name
+    try:
+        rows = list(csv.reader(path.read_text(encoding='utf-8-sig').splitlines()))
+    except (OSError, UnicodeDecodeError, csv.Error):
+        raise ValueError(f'The preset {label} could not be read. Open it to check it, '
+                         'or choose another fit.',
+                         ) from None
+
+    # ---- 2 Check the first line ------------------------------------------------------
+    first = [cell.strip() for cell in rows[0]] if rows else []
+    if not first or first[0].lower() != PRESET_FILE_MARK.lower():
+        raise ValueError(f'{label} is in the presets folder but its first line does '
+                         f'not say "{PRESET_FILE_MARK},format {PRESET_FILE_FORMAT}". '
+                         'Correct it, or move it out of the presets folder.',
+                         )
+    version = re.search(r'[0-9]+', ' '.join(first[1:]))
+    if version is not None and int(version.group()) > PRESET_FILE_FORMAT:
+        raise ValueError(f'{label} is a preset of format {version.group()}, newer '
+                         f'than this Portimao can read (format {PRESET_FILE_FORMAT}). '
+                         'Download Portimao again, or choose another fit.',
+                         )
+
+    # ---- 3 Read the file names under the heading lines -------------------------------
+    filled = [any(cell.strip() for cell in row) for row in rows]
+    gap = filled.index(False) if False in filled else len(rows)
+    listed = [row[0].strip() for row, is_filled in zip(rows[gap:], filled[gap:])
+              if is_filled and row[0].strip()
+              ]
+    names = listed[1:]  # the first is the column name
+    if not names:
+        raise ValueError(f'The preset {label} lists no haem file. Write one library '
+                         'file name per line under its "Haem file" line.',
+                         )
+    return names
+
+
+# ---- _preset_title_reader ------------------------------------------------------------
+def _preset_title_reader(path: Path) -> Optional[str]:
+    """
+    ---- Summary ----
+    Helper function to read the name a preset gives itself for the Fit list, from its
+    "Name" heading line.
+
+    ---- Inputs ----
+    path : Path
+        Preset file (DATA_FORMAT.md, "preset csv").
+
+    ---- Globals read ----
+    PRESET_TITLE_LABEL (module constant).
+
+    ---- Outputs ----
+    Optional[str]
+        The name, or None when the preset has no Name line or cannot be read (the
+        Fit list then shows its file name without .csv).
+
+    ---- Globals mutated ----
+    None. Reads the file (side effect).
+
+    ---- Equations ----
+    None. Only the heading lines, above the first empty line, are read.
+
+    ---- Helpers ----
+    None.
+    """
+
+    try:
+        lines = path.read_text(encoding='utf-8-sig').splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    for row in csv.reader(lines):
+        if not any(cell.strip() for cell in row):
+            break
+        if len(row) > 1 and row[0].strip().lower() == PRESET_TITLE_LABEL.lower():
+            return row[1].strip() or None
+    return None
+
+
 # ---- _unit_scaler --------------------------------------------------------------------
 def _unit_scaler(values: np.ndarray) -> np.ndarray:
     """
@@ -574,6 +729,58 @@ def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.nd
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
+# ---- answers_fit_loader --------------------------------------------------------------
+def answers_fit_loader(fits_folder: Path,
+                       fit_file: str,
+                       haem_files: Sequence[str],
+                       ) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to load the fit the answers name: the library haems ticked in the
+    strip when the fit is OWN_HAEMS_NAME, otherwise the preset or fit file of that name.
+
+    ---- Inputs ----
+    fits_folder : Path
+        The fits folder, holding the haems and presets folders and the user's own fit
+        files.
+    fit_file : str
+        The answer 'fit_file': OWN_HAEMS_NAME, or a name as fit_names_lister gives it.
+    haem_files : Sequence[str]
+        The answer 'haem_files': the library file names ticked; used only with
+        OWN_HAEMS_NAME.
+
+    ---- Globals read ----
+    HAEMS_FOLDER_NAME, OWN_HAEMS_NAME (module constants).
+
+    ---- Outputs ----
+    Dict[str, Any]
+        Fit dictionary, as fit_loader or haem_files_combiner gives it. Raises
+        ValueError, with a message for the user, when it cannot be loaded (no haem
+        ticked, a ticked file missing, or the fit unreadable).
+
+    ---- Globals mutated ----
+    None. Reads the files (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    fit_loader
+    haem_files_combiner
+    """
+
+    if fit_file != OWN_HAEMS_NAME:
+        return fit_loader(fits_folder, fit_file)
+    if not haem_files:
+        raise ValueError('No haem is ticked under Build a fit. Tick at least one haem, '
+                         'or choose a preset.',
+                         )
+    return haem_files_combiner([fits_folder / HAEMS_FOLDER_NAME / name
+                                for name in haem_files
+                                ],
+                               )
+
+
 # ---- background_builder --------------------------------------------------------------
 def background_builder(wavelengths: np.ndarray, background: str) -> np.ndarray:
     """
@@ -601,9 +808,9 @@ def background_builder(wavelengths: np.ndarray, background: str) -> np.ndarray:
 
     ---- Equations ----
     scatter_1: 1, 1/wl; scatter_2: 1, 1/wl, 1/wl^2 (scatter_background_builder);
-    linear: 1, wl; quadratic: 1, wl, (wl - centre)^2 with the centre in the middle of
-    the wavelengths; valencia: 1, 1/wl^2. Scaling a shape to run from 0 to 1 changes
-    only the size of its amount, not the fit.
+    linear: 1, wl; rowan_scatter: 1, wl, (wl - centre)^2 with the centre halfway
+    between the shortest and the longest wavelength; palencia: 1, 1/wl^2. Scaling a
+    shape to run from 0 to 1 changes only the size of its amount, not the fit.
 
     ---- Helpers ----
     _unit_scaler
@@ -625,8 +832,8 @@ def background_builder(wavelengths: np.ndarray, background: str) -> np.ndarray:
         return scatter_background_builder(wavelengths, int(background[-1]))
     line = _unit_scaler(wavelengths)
     shapes = {'linear': [line],
-              'quadratic': [line, _unit_scaler((line - 0.5) ** 2)],
-              'valencia': [_unit_scaler(1 / wavelengths ** 2)],
+              'rowan_scatter': [line, _unit_scaler((line - 0.5) ** 2)],
+              'palencia': [_unit_scaler(1 / wavelengths ** 2)],
               }[background]
     return np.column_stack([np.ones_like(wavelengths)] + shapes)
 
@@ -696,6 +903,79 @@ def basis_solver(basis: np.ndarray, spectra: np.ndarray) -> np.ndarray:
     return ((values @ u) / s) @ vt / lengths
 
 
+# ---- built_fit_saver -----------------------------------------------------------------
+def built_fit_saver(fits_folder: Path, name: str, haem_files: Sequence[str]) -> Path:
+    """
+    ---- Summary ----
+    Main function to save the haems ticked under Build a fit as a fit file of the
+    user's own in the fits folder, so it is offered in the Fit list from then on. A
+    name already used by a preset or a fit file is refused, so nothing is overwritten.
+
+    ---- Inputs ----
+    fits_folder : Path
+        The fits folder, holding the haems and presets folders and the user's own fit
+        files.
+    name : str
+        The name typed beside Save fit, with or without .csv.
+    haem_files : Sequence[str]
+        The library file names ticked (the answer 'haem_files').
+
+    ---- Globals read ----
+    FIT_UNITS, HAEMS_FOLDER_NAME, PRESETS_FOLDER_NAME (module constants).
+
+    ---- Outputs ----
+    Path
+        The file written. Raises ValueError, with a message for the user, when no
+        name is typed, no haem is ticked, the name is taken, or the haems cannot be
+        joined (haem_files_combiner).
+
+    ---- Globals mutated ----
+    None. Writes the file (side effect).
+
+    ---- Equations ----
+    None. The values are written in the unit the library files give them in, the
+    shapes oxidised minus reduced, as the decomposition uses them.
+
+    ---- Helpers ----
+    file_name_sanitiser
+    fit_file_writer
+    haem_files_combiner
+    """
+
+    # ---- 1 Check the name and the haems ----------------------------------------------
+    typed = name.strip()
+    stem = file_name_sanitiser(typed[:-4] if typed.lower().endswith('.csv') else typed,
+                               default='',
+                               )
+    if not stem:
+        raise ValueError('Type a name for the fit in the box beside Save fit.')
+    if not haem_files:
+        raise ValueError('Tick the haems of the fit under Build a fit, then save it.')
+    path = fits_folder / f'{stem}.csv'
+    if (fits_folder / PRESETS_FOLDER_NAME / path.name).is_file():
+        raise ValueError(f'{path.name} is the name of a preset. Type another name.')
+    if path.exists():
+        raise ValueError(f'There is already a fit called {path.name} in the fits '
+                         'folder. Type another name.',
+                         )
+
+    # ---- 2 Join the haems and write them ---------------------------------------------
+    fit = haem_files_combiner([fits_folder / HAEMS_FOLDER_NAME / file
+                               for file in haem_files
+                               ],
+                              )
+    unit = next((unit for unit, divisor in FIT_UNITS.items()
+                 if divisor == fit['scale_divisor']
+                 ),
+                'OD/mM/cm',
+                )
+    holds = ('Haems of the haem library, joined by Portimao: '
+             f"{', '.join(Path(file).stem for file in fit['haem_files'])}"
+             )
+    fits_folder.mkdir(parents=True, exist_ok=True)
+    return fit_file_writer(fit, path, unit, holds, 'oxidised minus reduced')
+
+
 # ---- data_filterer -------------------------------------------------------------------
 def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.ndarray:
     """
@@ -729,6 +1009,73 @@ def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.n
     return experimental_data[_wavelength_masker(experimental_data[:, 0], fit_data)]
 
 
+# ---- decomposition_gap_calculator ----------------------------------------------------
+def decomposition_gap_calculator(new: pd.DataFrame,
+                                 kept: pd.DataFrame,
+                                 ) -> Dict[str, Tuple[float, float]]:
+    """
+    ---- Summary ----
+    Main function to say how far apart the haem traces of two decompositions of the
+    same spectra are: for each haem in both, the largest gap and the average gap. The
+    spectra are matched by their index, and a haem is matched by its plain name, so
+    "Cyt cc" and "cyt c c" are the same haem.
+
+    ---- Inputs ----
+    new : pd.DataFrame
+        Haem table of the decomposition in use (DATA_FORMAT.md, 'haem_conc' or any
+        table made from it), with SPECTRUM_INDEX_COLUMN.
+    kept : pd.DataFrame
+        Haem table of the kept decomposition, of the same kind and units.
+
+    ---- Globals read ----
+    SPECTRUM_INDEX_COLUMN.
+
+    ---- Outputs ----
+    Dict[str, Tuple[float, float]]
+        {haem name as in ``new``: (largest gap, average gap)}, in the units of the
+        tables, in the order of ``new``. A haem with no spectrum where both have a
+        value is left out. Raises KeyError when a table has no spectrum index.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    gap_i = new_i - kept_i at each spectrum i found in both
+    largest gap = max |gap_i|
+    average gap = mean |gap_i|
+
+    ---- Helpers ----
+    measurement_column_finder
+    name_simplifier
+    value_getter
+    """
+
+    # ---- 1 Match the spectra ---------------------------------------------------------
+    for table in (new, kept):
+        if SPECTRUM_INDEX_COLUMN not in table.columns:
+            raise KeyError(f'A haem table has no {SPECTRUM_INDEX_COLUMN!r} column, so '
+                           'its spectra cannot be matched.',
+                           )
+    kept_columns = {name_simplifier(column): column
+                    for column in measurement_column_finder(kept)
+                    }
+    kept_rows = kept.set_index(SPECTRUM_INDEX_COLUMN)
+
+    # ---- 2 The gaps of each haem in both ---------------------------------------------
+    gaps: Dict[str, Tuple[float, float]] = {}
+    for column in measurement_column_finder(new):
+        partner = kept_columns.get(name_simplifier(column))
+        if partner is None:
+            continue
+        kept_values = pd.to_numeric(kept_rows[partner], errors='coerce')
+        matched = kept_values.reindex(new[SPECTRUM_INDEX_COLUMN]).to_numpy(dtype=float)
+        sizes = np.abs(value_getter(new, column) - matched)
+        sizes = sizes[np.isfinite(sizes)]
+        if sizes.size:
+            gaps[column] = (float(sizes.max()), float(sizes.mean()))
+    return gaps
+
+
 # ---- delta_abs_calculator ------------------------------------------------------------
 def delta_abs_calculator(haem_abs: pd.DataFrame,
                          exclude_first_minutes: float,
@@ -738,10 +1085,9 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
                          ) -> pd.DataFrame:
     """
     ---- Summary ----
-    Main function to shift each haem absorbance so that its reference level is 0, giving
-    a change in absorbance (mOD). The reference level of each haem is the median of its
-    highest points in a row (for example the fully oxidised point), wherever they occur
-    in the run outside the ignored start and end.
+    Main function to shift each haem absorbance so that it is 0 where the haem starts,
+    giving delta D, the change from the start (mOD). The start of each haem is the
+    median of its first spectra after the ignored start, so one spike does not set it.
 
     ---- Inputs ----
     haem_abs : pd.DataFrame
@@ -749,11 +1095,12 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
     exclude_first_minutes : float
         Minutes after the first measurement that are ignored at the start.
     window_points : int
-        Number of spectra in a row that make the reference window (>= 1).
+        Number of spectra the start is taken from (>= 1).
     label : str
         Name used in error messages.
     exclude_last_minutes : float
-        Minutes before the last measurement that are ignored at the end.
+        Minutes before the last measurement that are ignored at the end; the start is
+        never taken from them.
 
     ---- Globals read ----
     None.
@@ -762,22 +1109,22 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
     pd.DataFrame
         Shifted copy; result.attrs["delta_abs_baseline"] holds {'level_by_haem': the
         level subtracted from each haem (mOD), 'window_by_haem': the (first, last)
-        time of each haem's window (min), 'window_points', 'window_seconds': the
-        length of such a window}. Raises ValueError, with a message for the user, for
-        invalid settings or when fewer than window_points spectra are left after the
-        ignored parts.
+        time of the spectra each haem's start was taken from (min), 'window_points',
+        'window_seconds': how long that many spectra last}. Raises ValueError, with a
+        message for the user, for invalid settings or when fewer than window_points
+        spectra are left after the ignored parts.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    delta_abs = abs - max over windows of median(abs inside the window), per haem
-    (reference_level_finder). Only a constant is subtracted, so differences between
-    points are unchanged.
+    delta D = D - D_start, per haem, with D_start = median(D of the first
+    window_points spectra with a value after the ignored start) (start_level_finder).
+    Only a constant is subtracted, so differences between points are unchanged.
 
     ---- Helpers ----
     measurement_column_finder
-    reference_level_finder
+    start_level_finder
     time_getter
     value_getter
     window_seconds_calculator
@@ -795,25 +1142,25 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
     finite_times = times[np.isfinite(times)]
     if not columns or finite_times.size == 0:
         raise ValueError(f'{label}: there are no haems, or no times, to find the zero '
-                         'of delta A from. Check that the fit file holds haems and '
-                         'that the file was read fully.',
+                         'of ΔD from. Check that the fit file holds haems and that '
+                         'the file was read fully.',
                          )
     start = float(finite_times.min()) + exclude_first_minutes
     stop = float(finite_times.max()) - exclude_last_minutes
 
-    # ---- 3 Subtract the highest window of each haem ----------------------------------
+    # ---- 3 Subtract the start of each haem -------------------------------------------
     result = haem_abs.copy()
     reference: Dict[str, float] = {}
     windows: Dict[str, Tuple[float, float]] = {}
     for column in columns:
         values = value_getter(haem_abs, column)
-        found = reference_level_finder(times, values, start, stop, window_points)
+        found = start_level_finder(times, values, start, stop, window_points)
         if found is None:
             raise ValueError(f'{label}: fewer than {window_points} {column} values '
                              f'are left between {start:.2f} and {stop:.2f} min, too '
-                             'few to find the zero of delta A (the median of the '
-                             f'highest {window_points} points in a row). Ignore less '
-                             'of the start or the end of the run.',
+                             'few to find the zero of ΔD (the median of the first '
+                             f'{window_points} spectra after the ignored start). '
+                             'Ignore less of the start or the end of the run.',
                              )
         reference[str(column)] = found['level']
         windows[str(column)] = (found['start_time'], found['end_time'])
@@ -856,15 +1203,16 @@ def experiment_decomposer(experiment: dict,
     haemfactor : float
         Scale factor applied to the haem basis spectra.
     delta_exclude_first_minutes : float
-        Minutes after the first spectrum that are ignored when finding the delta
-        absorbance reference.
+        Minutes after the first spectrum that are ignored when finding where each
+        haem starts, the 0 of delta D.
     delta_window_points : int
-        Number of spectra in a row that make the delta absorbance reference window.
+        Number of spectra after the ignored start that each haem's start is taken
+        from.
     spectrum_type : str
         Field of the dataset to decompose, e.g. 'attenuation'.
     delta_exclude_last_minutes : float
-        Minutes before the last spectrum that are ignored when finding the delta
-        absorbance reference.
+        Minutes before the last spectrum that are ignored; the start is never taken
+        from them.
     is_change_from_first : bool
         True fits the change of every spectrum from the first one (the first kept, in
         a trimmed run), as the instrument does; False fits the spectra themselves.
@@ -890,9 +1238,9 @@ def experiment_decomposer(experiment: dict,
     a = each spectrum, or each spectrum - the first spectrum; c = the least-squares
     amounts of the basis S in a (basis_solver); haem_abs = c x peak amplitude of the
     haem basis spectrum x 1000 (OD to mOD); haem_delta_abs = haem_abs - median of the
-    highest points in a row. The fit is linear, so with the same basis the change
-    from the first spectrum gives each amount minus that of the first spectrum, and
-    the same haem_delta_abs.
+    haem's first spectra after the ignored start. The fit is linear, so with the same
+    basis the change from the first spectrum gives each amount minus that of the first
+    spectrum, and the same haem_delta_abs.
 
     ---- Helpers ----
     _wavelength_masker
@@ -991,6 +1339,41 @@ def experiment_decomposer(experiment: dict,
     experiment['haem_abs'] = haem_abs
     experiment['haem_delta_abs'] = haem_delta_abs
     return experiment
+
+
+# ---- fit_describer -------------------------------------------------------------------
+def fit_describer(fit_file: str, haem_files: Sequence[str]) -> str:
+    """
+    ---- Summary ----
+    Main function to name the fit in use in words, for the messages and the workbook:
+    the preset or fit file as it is, or the library haems ticked under Build a fit.
+
+    ---- Inputs ----
+    fit_file : str
+        The answer 'fit_file'.
+    haem_files : Sequence[str]
+        The answer 'haem_files'; used only when fit_file is OWN_HAEMS_NAME.
+
+    ---- Globals read ----
+    OWN_HAEMS_NAME (module constant).
+
+    ---- Outputs ----
+    str
+        fit_file, or 'Your own haems: c1_myco, bH_bswitch' (the files without .csv).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if fit_file != OWN_HAEMS_NAME:
+        return str(fit_file)
+    return f"{OWN_HAEMS_NAME}: {', '.join(Path(name).stem for name in haem_files)}"
 
 
 # ---- fit_file_writer -----------------------------------------------------------------
@@ -1105,7 +1488,7 @@ def fit_haem_selector(fit: Dict[str, Any], haems: List[str]) -> Dict[str, Any]:
     ---- Outputs ----
     Dict[str, Any]
         A new fit dictionary with the same keys: 'haem_list' and 'data' hold only the
-        kept haems, in the order of the file, without the rows that are blank in all of
+        kept haems, in the order of the fit, without the rows that are blank in all of
         them. The fit given is not changed. Raises ValueError, with a message for the
         user, when no haem is named or a name is not in the fit.
 
@@ -1155,8 +1538,9 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
 
     ---- Outputs ----
     Dict[str, Any]
-        {'haem_list': haem names in file order, 'data': the cleaned table
-        (_fit_table_cleaner) on the standard scale, 'scale_divisor': what the values
+        {'haem_list': haem names, the a haems first, then the b, then the c
+        (haem_order_finder), 'data': the cleaned table (_fit_table_cleaner) on the
+        standard scale, its column pairs in that order, 'scale_divisor': what the values
         of the file were divided by (1, 1 000 or 1 000 000), 'notes': sentences for
         the user about rows left out and the scale}. A file with heading lines gives
         its names in figure form (haem_name_typesetter); an older file gives them as
@@ -1173,6 +1557,7 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
     _fit_table_cleaner
     _headed_fit_reader
     fit_scale_standardiser
+    haem_order_finder
     """
 
     # ---- 1 Read the text -------------------------------------------------------------
@@ -1198,11 +1583,179 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
         cleaned, notes = _fit_table_cleaner(raw, label)
         data, divisor, scale_notes = fit_scale_standardiser(cleaned, label)
         notes = notes + scale_notes
-    return {'haem_list': [str(name) for name in data.columns[::2]],
+
+    # ---- 3 Put the haems in order: the a haems, then the b, then the c ---------------
+    # every list, figure and workbook follows this order, whatever the file's own
+    names = [str(name) for name in data.columns[::2]]
+    order = haem_order_finder(names)
+    data = data.iloc[:, [column for i in order for column in (2 * i, 2 * i + 1)]]
+    return {'haem_list': [names[i] for i in order],
             'data': data,
             'scale_divisor': divisor,
             'notes': notes,
             }
+
+
+# ---- fit_loader ----------------------------------------------------------------------
+def fit_loader(fits_folder: Path, name: str) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to load a fit by the name the fit list and the answers give it: the
+    preset of that name, otherwise the fit file of that name in the fits folder.
+
+    ---- Inputs ----
+    fits_folder : Path
+        The fits folder, holding the haems and presets folders and the user's own fit
+        files.
+    name : str
+        File name of the fit, as fit_names_lister gives it ('<name>.csv').
+
+    ---- Globals read ----
+    HAEMS_FOLDER_NAME, PRESETS_FOLDER_NAME (module constants).
+
+    ---- Outputs ----
+    Dict[str, Any]
+        Fit dictionary, as fit_importer gives it (with 'haem_files' for a preset).
+        Raises ValueError, with a message for the user, when there is no such fit or
+        it cannot be read.
+
+    ---- Globals mutated ----
+    None. Reads the files (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    fit_importer
+    preset_importer
+    """
+
+    preset = fits_folder / PRESETS_FOLDER_NAME / name
+    if preset.is_file():
+        return preset_importer(preset, fits_folder / HAEMS_FOLDER_NAME)
+    own = fits_folder / name
+    if own.is_file():
+        return fit_importer(own)
+    raise ValueError(f'There is no preset or fit file called {name} in {fits_folder}. '
+                     'Choose another fit.',
+                     )
+
+
+# ---- fit_names_lister ----------------------------------------------------------------
+def fit_names_lister(fits_folder: Path) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to list the fits offered in the fit question and the settings strip:
+    the presets, then the user's own fit files.
+
+    ---- Inputs ----
+    fits_folder : Path
+        The fits folder.
+
+    ---- Globals read ----
+    PRESETS_FOLDER_NAME (module constant).
+
+    ---- Outputs ----
+    List[str]
+        File names ('<name>.csv'): the presets, then the .csv files of the fits folder
+        itself, each group sorted without regard to case. A file of the fits folder
+        with a preset's name is left out, as the preset is what that name loads (an
+        old copy of the fit, kept in the Mac app's Portimao folder). Empty when there
+        is nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    def name_sorter(folder: Path) -> List[str]:
+        return sorted((path.name for path in folder.glob('*.csv')), key=str.lower)
+    presets = name_sorter(fits_folder / PRESETS_FOLDER_NAME)
+    taken = {name.lower() for name in presets}
+    return presets + [name for name in name_sorter(fits_folder)
+                      if name.lower() not in taken
+                      ]
+
+
+# ---- fit_titles_lister ---------------------------------------------------------------
+def fit_titles_lister(fits_folder: Path) -> Dict[str, str]:
+    """
+    ---- Summary ----
+    Main function to give each fit of the Fit list the name it is shown by: a
+    preset's own Name line, or else its file name without .csv.
+
+    ---- Inputs ----
+    fits_folder : Path
+        The fits folder.
+
+    ---- Globals read ----
+    PRESETS_FOLDER_NAME (module constant).
+
+    ---- Outputs ----
+    Dict[str, str]
+        {file name: name shown}, in the order of fit_names_lister.
+
+    ---- Globals mutated ----
+    None. Reads the presets (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _preset_title_reader
+    fit_names_lister
+    fit_title_maker
+    """
+
+    presets = Path(fits_folder) / PRESETS_FOLDER_NAME
+    titles = {}
+    for name in fit_names_lister(Path(fits_folder)):
+        path = presets / name
+        titles[name] = ((_preset_title_reader(path) if path.is_file() else None) or
+                        fit_title_maker(name, {})
+                        )
+    return titles
+
+
+# ---- fit_title_maker -----------------------------------------------------------------
+def fit_title_maker(fit_file: str, titles: Dict[str, str]) -> str:
+    """
+    ---- Summary ----
+    Main function to give the name a fit is shown by in the Fit list.
+
+    ---- Inputs ----
+    fit_file : str
+        The answer 'fit_file': a file name, OWN_HAEMS_NAME or the description of
+        components found from the data.
+    titles : Dict[str, str]
+        {file name: name shown}, as fit_titles_lister gives it.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        Its name in ``titles``, else the file name without .csv, else fit_file.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if fit_file in titles:
+        return titles[fit_file]
+    text = str(fit_file)
+    return text[:-4] if text.lower().endswith('.csv') else text
 
 
 # ---- fit_range_finder ----------------------------------------------------------------
@@ -1302,6 +1855,88 @@ def fit_scale_standardiser(data: pd.DataFrame,
         ]
 
 
+# ---- haem_files_combiner -------------------------------------------------------------
+def haem_files_combiner(paths: Sequence[Path]) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to join library files, one haem each, into one fit, so a
+    decomposition can use any set of haems of the library.
+
+    ---- Inputs ----
+    paths : Sequence[Path]
+        The library files (fit csv, one haem each), in any order.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, Any]
+        Fit dictionary with the keys of fit_importer ('haem_list', 'data',
+        'scale_divisor', 'notes') and 'haem_files': the file name of each haem, in the
+        order of 'haem_list' (the a haems, then the b, then the c). Raises ValueError,
+        with a message for the user, when no file is given, a file is missing, cannot
+        be read or holds more than one haem, two haems have the same name, or the files
+        are on different scales.
+
+    ---- Globals mutated ----
+    None. Reads the files (side effect).
+
+    ---- Equations ----
+    None. Each haem keeps its own rows; shorter haems end in blanks.
+
+    ---- Helpers ----
+    fit_importer
+    haem_name_plainer
+    haem_order_finder
+    """
+
+    # ---- 1 Read each file ------------------------------------------------------------
+    if not paths:
+        raise ValueError('No haem file was chosen. Choose at least one haem.')
+    fits = []
+    for path in paths:
+        path = Path(path)
+        if not path.is_file():
+            raise ValueError(f'The haem file {path.name} is not in {path.parent}. Put '
+                             'it back, or choose other haems.',
+                             )
+        fit = fit_importer(path)
+        if len(fit['haem_list']) != 1:
+            raise ValueError(f'{path.name} holds {len(fit["haem_list"])} haems, but a '
+                             'file of the haem library holds one. Split it into one '
+                             'file per haem, or move it to the fits folder itself.',
+                             )
+        fits.append((path.name, fit))
+
+    # ---- 2 Check the names and the scales --------------------------------------------
+    names = [str(fit['haem_list'][0]) for _, fit in fits]
+    plain = [haem_name_plainer(name) for name in names]
+    twice = sorted({name for name in plain if plain.count(name) > 1})
+    if twice:
+        raise ValueError(f"Two of the chosen haems are both called {', '.join(twice)}, "
+                         'so they could not be told apart in the figures. Choose only '
+                         'one of them.',
+                         )
+    divisors = {fit['scale_divisor'] for _, fit in fits}
+    if len(divisors) > 1:
+        raise ValueError('The chosen haem files give their shapes in different units, '
+                         'so their amounts could not be compared. Check their Unit '
+                         'lines.',
+                         )
+
+    # ---- 3 Join the tables in the order a, b, c --------------------------------------
+    order = haem_order_finder(names)
+    data = pd.concat([fits[i][1]['data'].reset_index(drop=True) for i in order],
+                     axis=1,
+                     )
+    return {'haem_list': [names[i] for i in order],
+            'data': data,
+            'scale_divisor': divisors.pop(),
+            'notes': [note for _, fit in fits for note in fit['notes']],
+            'haem_files': [fits[i][0] for i in order],
+            }
+
+
 # ---- haem_name_plainer ---------------------------------------------------------------
 def haem_name_plainer(name: str) -> str:
     """
@@ -1383,6 +2018,99 @@ def haem_name_typesetter(name: str) -> str:
         else:
             words.append(f'${letters}_{{{below}}}$')
     return ' '.join(words)
+
+
+# ---- library_haems_lister ------------------------------------------------------------
+def library_haems_lister(fits_folder: Path) -> List[Dict[str, str]]:
+    """
+    ---- Summary ----
+    Main function to list the haems of the library, for the tick boxes of Build a fit
+    in the strip, reading only the top of each file.
+
+    ---- Inputs ----
+    fits_folder : Path
+        The fits folder, holding the haems folder.
+
+    ---- Globals read ----
+    HAEMS_FOLDER_NAME (module constant); helpers.HAEM_TYPE_ORDER.
+
+    ---- Outputs ----
+    List[Dict[str, str]]
+        [{'file': file name, 'haem': plain haem name, 'type': 'a', 'b', 'c' or
+        'other'}], in the order a, b, c, then by file name ignoring case. A file whose
+        top cannot be read is listed under its own name, type 'other', so ticking it
+        says what is wrong. Empty when there is no haems folder.
+
+    ---- Globals mutated ----
+    None. Reads the files (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _fit_heading_reader
+    haem_name_plainer
+    haem_type_finder
+    """
+
+    listed = []
+    for path in (fits_folder / HAEMS_FOLDER_NAME).glob('*.csv'):
+        try:
+            lines = path.read_text(encoding='utf-8-sig').splitlines()
+            _, names_at = _fit_heading_reader(lines, path.name)
+            cells = next(csv.reader([lines[names_at]]), [])
+            haem = haem_name_plainer(next(cell.strip() for cell in cells
+                                          if cell.strip()
+                                          ),
+                                     )
+            kind = haem_type_finder(haem)
+        except (OSError, UnicodeDecodeError, ValueError, StopIteration, csv.Error):
+            haem, kind = path.stem, 'other'
+        listed.append({'file': path.name, 'haem': haem, 'type': kind})
+    ranks = HAEM_TYPE_ORDER + ('other',)
+    return sorted(listed,
+                  key=lambda item: (ranks.index(item['type']), item['file'].lower()),
+                  )
+
+
+# ---- preset_importer -----------------------------------------------------------------
+def preset_importer(path: Path, haems_folder: Path) -> Dict[str, Any]:
+    """
+    ---- Summary ----
+    Main function to load a preset: the haem library files it lists, joined into one
+    fit.
+
+    ---- Inputs ----
+    path : Path
+        Preset file (DATA_FORMAT.md, "preset csv").
+    haems_folder : Path
+        The haem library folder the listed files are in.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, Any]
+        Fit dictionary, as haem_files_combiner gives it. Raises ValueError, with a
+        message for the user, when the preset or one of its files cannot be used.
+
+    ---- Globals mutated ----
+    None. Reads the files (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _preset_reader
+    haem_files_combiner
+    """
+
+    names = _preset_reader(Path(path))
+    try:
+        return haem_files_combiner([haems_folder / name for name in names])
+    except ValueError as exc:
+        raise ValueError(f'The preset {Path(path).name} cannot be used: {exc}',
+                         ) from None
 
 
 # ---- s_array_generator ---------------------------------------------------------------

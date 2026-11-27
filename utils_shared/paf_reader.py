@@ -18,6 +18,7 @@ import pandas as pd
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.ocr_checking import ocr_check_describer, ocr_checker, OCR_TRACES
 from utils_shared.schema import TIME_COLUMN
+from utils_shared.user_notices import warning_shower
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -1399,11 +1400,12 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
 
     ---- Outputs ----
     dict
-        {'name' (file stem), 'duration_min', 'frames', 'datasets', 'events' (the
-        additions inside the recording, each with 'time' in minutes), 'traces',
-        'ocr_check' (ocr_check in DATA_FORMAT.md)}. Raises PafError if the VoO2 trace
-        is missing, so a file that cannot be processed is refused before any question
-        is asked about it.
+        {'name' (file stem), 'duration_min', 'frames', 'datasets', 'spectra_shapes'
+        ({dataset: [number of spectra, number of wavelengths]}, from the headers),
+        'events' (the additions inside the recording, each with 'time' in minutes),
+        'traces', 'ocr_check' (ocr_check in DATA_FORMAT.md)}. Raises PafError if the
+        VoO2 trace is missing, so a file that cannot be processed is refused before any
+        question is asked about it.
 
     ---- Globals mutated ----
     None. Prints a warning for each addition outside the recording, and one when the
@@ -1414,6 +1416,7 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
 
     ---- Helpers ----
     _event_time_adder
+    acquisition_reader
     dataset_name_lister
     duration_finder
     events_reader
@@ -1456,6 +1459,12 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
                 'duration_min': paf.duration_finder,
                 'frames': paf.frame_counter,
                 'datasets': paf.dataset_name_lister(),
+                # for the size of the spectra csv files the export question gives
+                'spectra_shapes': {acquisition['dataset']: [acquisition['frames'],
+                                                            acquisition['wavelengths'],
+                                                            ]
+                                   for acquisition in paf.acquisition_reader()
+                                   },
                 'events': events,
                 'traces': paf.stream_name_lister(),
                 'ocr_check': check,
@@ -1947,7 +1956,8 @@ def u32_reader(buf: Union[bytes, mmap.mmap], off: int) -> int:
 def warning_printer(msg: str, file_name: str = '') -> None:
     """
     ---- Summary ----
-    Main function to print a reader warning.
+    Main function to show a reader warning, in the terminal and, while a preview is
+    drawn, under the plot.
 
     ---- Inputs ----
     msg : str
@@ -1964,13 +1974,13 @@ def warning_printer(msg: str, file_name: str = '') -> None:
         Nothing.
 
     ---- Globals mutated ----
-    None. Prints to the terminal (side effect).
+    None. Shows the warning (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    None.
+    warning_shower
     """
 
-    print(f"  WARNING: {file_name + ': ' if file_name else ''}{msg}")
+    warning_shower(f"  WARNING: {file_name + ': ' if file_name else ''}{msg}")

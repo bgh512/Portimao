@@ -522,7 +522,7 @@ def component_finder(spectra_sets: List[dict],
     # ---- 1 Find the wavelengths to analyse -------------------------------------------
     start, end = float(window[0]), float(window[1])
     if end <= start:
-        raise ValueError('The end of the window must be above its start.')
+        raise ValueError('The end of the spectral range must be above its start.')
     usable = [s for s in spectra_sets if len(s['spectra']) >= 2]
     if not usable:
         raise ValueError('There are no spectra to analyse (a file needs at least two '
@@ -531,14 +531,14 @@ def component_finder(spectra_sets: List[dict],
     first = np.asarray(usable[0]['wavelengths'], dtype=float)
     grid = first[(first >= start) & (first <= end)]
     if len(grid) < degree_of_scatter + 6:
-        raise ValueError('The window holds too few wavelengths; widen it.')
+        raise ValueError('The spectral range holds too few wavelengths; widen it.')
     low = max(np.min(s['wavelengths']) for s in usable)
     high = min(np.max(s['wavelengths']) for s in usable)
     if grid[0] < low or grid[-1] > high:
         grid = grid[(grid >= low) & (grid <= high)]
         if len(grid) < degree_of_scatter + 6:
             raise ValueError(f'The files only share {low:g} to {high:g} nm; choose a '
-                             f'window inside that.',
+                             f'spectral range inside that.',
                              )
 
     # ---- 2 Clean the spectra and add up the covariance -------------------------------
@@ -558,14 +558,14 @@ def component_finder(spectra_sets: List[dict],
         gram += data.T @ data
         counts[entry['name']] = len(data)
     if not counts:
-        raise ValueError('No file had usable spectra inside the window.')
+        raise ValueError('No file had usable spectra inside the spectral range.')
 
     # ---- 3 Find the components -------------------------------------------------------
     values, vectors = np.linalg.eigh(gram)
     values, vectors = values[::-1], vectors[:, ::-1]
     total = float(np.sum(np.clip(values, 0.0, None)))
     if total <= 0:
-        raise ValueError('The spectra do not change inside the window.')
+        raise ValueError('The spectra do not change inside the spectral range.')
     keep = min(max_components, len(grid) - degree_of_scatter - 2)
     n_spectra = sum(counts.values())
     return {'wavelengths': grid,

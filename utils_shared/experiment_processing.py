@@ -5,20 +5,89 @@ Reading and processing of one experiment (everything before the figure and the e
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from typing import List, Optional
 
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import numpy as np
+
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.attenuation import experiment_attenuation_adder
-from utils_shared.averaging import experiment_averages_calculator
+from utils_shared.averaging import (baseline_percent_adder,
+                                    experiment_averages_calculator,
+                                    window_plan_finder,
+                                    )
+from utils_shared.delta_psi import delta_psi_table_builder
 from utils_shared.normalisation import experiment_normaliser, percent_converter
 from utils_shared.paf_reader import experiment_paf_loader, PafError
+from utils_shared.redox_regions import haem_levels_finder, percent_oxidised_calculator
+from utils_shared.schema import time_getter
 from utils_shared.spectral_decomposer import (BACKGROUND_LABELS,
                                               experiment_decomposer,
                                               fit_range_finder,
                                               )
 from utils_shared.trimming import experiment_trimmer
+from utils_shared.user_notices import problem_shower, warning_shower
+
+
+# ---- CONSTANTS -----------------------------------------------------------------------
+# the unit of the OCR a file keeps when it cannot be shown as % of baseline
+OCR_UNIT_TEXTS = {'raw': 'µM min⁻¹', 'od': 'µM min⁻¹ OD⁻¹'}
 
 
 # ---- EXPERIMENT PROCESSING HELPERS ---------------------------------------------------
+
+
+# ---- _decomposition_teller -----------------------------------------------------------
+def _decomposition_teller(experiment: dict,
+                          answers: dict,
+                          fit: dict,
+                          window_points: int,
+                          ) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the user how a file was decomposed into haems: the fit,
+    the background, where the zero of ΔD was taken for each haem, and the notes of
+    the fit file.
+
+    ---- Inputs ----
+    experiment : dict
+        Experiment dictionary, as defined in DATA_FORMAT.md, already decomposed (it
+        has haem_delta_abs with attrs['delta_abs_baseline']).
+    answers : dict
+        The answers of the run (fit_file, haem_background).
+    fit : dict
+        Fit dictionary; its 'notes', when it has any, are shown as warnings.
+    window_points : int
+        Number of spectra the zero of ΔD is the median of.
+
+    ---- Globals read ----
+    BACKGROUND_LABELS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Prints the sentence and shows the notes (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    warning_shower
+    """
+
+    reference = experiment['haem_delta_abs'].attrs['delta_abs_baseline']
+    spans = ', '.join(f'{haem} {first:.2f}-{last:.2f} min'
+                      for haem, (first, last) in reference['window_by_haem'].items()
+                      )
+    print(f"  Decomposed with {answers['fit_file']} and the background "
+          f"{BACKGROUND_LABELS[answers['haem_background']]}; the zero "
+          f'of ΔD is where each haem starts, the median of its first '
+          f"{window_points} spectra ({reference['window_seconds']:.3g} s) "
+          f'after the ignored start: {spans}',
+          )
+    for note in fit.get('notes', []):
+        warning_shower(f'  {note}')
 
 
 # ---- _skip_reporter ------------------------------------------------------------------
@@ -32,35 +101,30 @@ def _skip_reporter(step: str, error: Exception) -> None:
     step : str
         The step in plain words, to complete "Warning: ... was skipped".
     error : Exception
-        The error that stopped the step. The ValueError and PafError messages of the
-        processing steps are written for the user and are shown as they are; a
-        KeyError or TypeError is a fault in the program, whose raw text is not shown.
+        The error that stopped the step. The messages the processing steps write for
+        the user are shown as they are; Python's own error text never is.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    None. Prints the warning (side effect).
+    None
+        Nothing.
 
     ---- Globals mutated ----
-    None.
+    None. Shows the warning; the details go to the log (side effects).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    None.
+    problem_shower
     """
 
-    if isinstance(error, (KeyError, TypeError)):
-        reason = ('A fault in the program stopped this step; please report it, with '
-                  'this file.'
-                  )
-    else:
-        reason = str(error)
-    print(f'  Warning: {step} was skipped for this file; the rest carries on without '
-          f'it. {reason}',
-          )
+    problem_shower(f'  Warning: {step} was skipped for this file; the rest carries on '
+                   f'without it',
+                   error,
+                   )
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -70,14 +134,16 @@ def _skip_reporter(step: str, error: Exception) -> None:
 def event_settings_merger(experiment: dict, events: List[dict]) -> None:
     """
     ---- Summary ----
-    Main function to copy the label, concentration and ignored flag entered for each
-    event onto the experiment, and to move ignored events out of the working event list.
+    Main function to copy the label, stock, volume added, concentrations and ignored
+    flag entered for each event onto the experiment, and to move ignored events out of
+    the working event list.
 
     ---- Inputs ----
     experiment : dict
         Experiment dictionary, as defined in DATA_FORMAT.md.
     events : List[dict]
-        Entered events: {datapoint, label, concentration_uM, ignored}.
+        Entered events: {datapoint, label, stock_uM, added_uL, addition_uM,
+        concentration_uM, ignored}; the numbers may be missing.
 
     ---- Globals read ----
     None.
@@ -103,7 +169,8 @@ def event_settings_merger(experiment: dict, events: List[dict]) -> None:
         item = entered.get(event['datapoint'])
         if item:
             event['label'] = item['label'] or event['text']
-            event['concentration_uM'] = item['concentration_uM']
+            for key in ('stock_uM', 'added_uL', 'addition_uM', 'concentration_uM'):
+                event[key] = item.get(key)
             event['ignored'] = bool(item.get('ignored', False))
 
     # ---- 2 Separate the ignored events -----------------------------------------------
@@ -124,13 +191,17 @@ def experiment_data_processor(info: dict,
     """
     ---- Summary ----
     Main function to read (or take) one experiment and process its data: trim, decompose
-    into haems, scale by OD, convert to percentages, choose the plotted sources and
-    average around the events. It draws and saves nothing.
+    into haems, find each haem's oxidised and reduced level and its % oxidised (a file
+    with both regions), work out delta psi from bH and bL (when switched on), scale by
+    OD, put the OCR on its % of the range, choose the plotted sources, average
+    around the events and put the OCR on its % of baseline (a file with a baseline).
+    It draws and saves nothing.
 
     ---- Inputs ----
     info : dict
         Per-file information from everything_asker: path, name, trim and ignore times,
-        OD values and events.
+        OD values, events and, when kept for the file, 'regions' (the four edges of
+        its oxidised and reduced region, as times on the original recording, min).
     cfg : settings.Config
         Figure style and settings derived from the answers (config.py).
     fit : Optional[dict]
@@ -141,13 +212,24 @@ def experiment_data_processor(info: dict,
         so the file is not read again). It is processed in place. None reads the file.
 
     ---- Globals read ----
-    settings.HAEM_BACKGROUND, settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
-    settings.BASELINE_MINIMUM_SECONDS; BACKGROUND_LABELS.
+    settings.HAEM_FACTOR, settings.REFERENCE_WINDOW_POINTS,
+    settings.REGION_MINIMUM_POINTS, settings.BASELINE_MINIMUM_SECONDS,
+    settings.DELTA_PSI_MIDPOINT_ANSWERS, settings.DELTA_PSI_LIMIT_ANSWERS;
+    BACKGROUND_LABELS, OCR_UNIT_TEXTS.
 
     ---- Outputs ----
     dict
-        {experiment, od_available, vo2_source, haem_source}. Prints progress and the
-        reason when a step is skipped (side effect).
+        {experiment, od_available, vo2_source, haem_source, plotted_haem_source}.
+        plotted_haem_source is the haem source when this file's haems are drawn (the
+        haems are plotted and the file was decomposed), otherwise None: every plot of
+        the file takes it from here. A file with both regions
+        has experiment['haem_levels'] and experiment['haem_percent'] (DATA_FORMAT.md);
+        when % oxidised is asked for a file without them, its haem source is
+        'delta_abs'. A file with a baseline window has experiment['VoO2_baseline'];
+        when the OCR is asked for as % of baseline for a file without one, its OCR
+        source is 'od' (with OD values) or 'raw'. With delta psi switched on, a file with % oxidised, one bH and
+        one bL has experiment['delta_psi']. Prints progress and the reason when a step is skipped (side
+        effect).
 
     ---- Globals mutated ----
     None. Processes the experiment dictionary in place (side effect).
@@ -156,7 +238,10 @@ def experiment_data_processor(info: dict,
     None.
 
     ---- Helpers ----
+    _decomposition_teller
     _skip_reporter
+    baseline_percent_adder
+    delta_psi_table_builder
     event_settings_merger
     experiment_attenuation_adder
     experiment_averages_calculator
@@ -165,9 +250,15 @@ def experiment_data_processor(info: dict,
     experiment_paf_loader
     experiment_trimmer
     fit_range_finder
+    haem_levels_finder
     percent_converter
     percent_need_checker
+    percent_oxidised_calculator
+    problem_shower
     source_chooser
+    time_getter
+    warning_shower
+    window_plan_finder
     """
 
     # ---- 1 Set up the run ------------------------------------------------------------
@@ -215,13 +306,15 @@ def experiment_data_processor(info: dict,
     if a['normalise_od']:
         od_available = all(metadata.get(k) for k in ('OD', 'volume', 'dilution_factor'))
         if not od_available:
-            print('  Warning: OD, volume or dilution factor is missing, so this file '
-                  'is not scaled by OD (raw values are used instead).',
-                  )
+            warning_shower('  Warning: OD, volume or dilution factor is missing, so '
+                           'this file is not scaled by OD (raw values are used '
+                           'instead).',
+                           )
 
     # ---- 4.2 Decompose into haems ----------------------------------------------------
     # Attenuation and decomposition into haems.
     if a['decompose']:
+        is_decomposed = False
         try:
             attenuation_datasets = (None
                                     if a['export_spectra']
@@ -241,31 +334,95 @@ def experiment_data_processor(info: dict,
                                   fit,
                                   dataset_name=a['decomposition_dataset'],
                                   spectrum_type='attenuation',
-                                  background=settings.HAEM_BACKGROUND,
+                                  background=a['haem_background'],
                                   haemfactor=settings.HAEM_FACTOR,
                                   delta_exclude_first_minutes=ignore_first,
                                   delta_window_points=window_points,
                                   delta_exclude_last_minutes=ignore_last,
                                   )
-            reference = experiment['haem_delta_abs'].attrs['delta_abs_baseline']
-            spans = ', '.join(f'{haem} {first:.2f}-{last:.2f} min'
-                              for haem, (first, last)
-                              in reference['window_by_haem'].items()
-                              )
-            print(f"  Decomposed with {a['fit_file']} and a "
-                  f'{BACKGROUND_LABELS[settings.HAEM_BACKGROUND]} background; delta A '
-                  f'zero is the median of the highest {window_points} points in a row '
-                  f"({reference['window_seconds']:.3g} s) of each haem: {spans}",
-                  )
-            for note in fit.get('notes', []):
-                print(f'  {note}')
+            is_decomposed = True
         except (KeyError, ValueError, PafError) as exc:
             _skip_reporter('the decomposition into haems', exc)
+        # Told outside the catch above: a sentence that cannot be written must never
+        # be reported as a decomposition that was skipped.
+        if is_decomposed:
+            try:
+                _decomposition_teller(experiment, a, fit, window_points)
+            except (KeyError, ValueError) as exc:
+                problem_shower('  Warning: how the haems were worked out could not be '
+                               'written here; the haems themselves are not affected',
+                               exc,
+                               )
     elif a['export_spectra']:
         experiment_attenuation_adder(experiment)
 
-    # ---- 4.3 Normalise by OD ---------------------------------------------------------
-    # OD scaling and relative (%) scaling.
+    # ---- 4.3 Find each haem's two levels and its % oxidised --------------------------
+    # Only for a file with both regions; any other has no % oxidised.
+    if 'haem_abs' in experiment:
+        try:
+            times = time_getter(experiment['haem_abs'])
+            last = float(np.nanmax(times)) - ignore_last
+            levels = haem_levels_finder(experiment['haem_abs'],
+                                        info.get('regions'),
+                                        info.get('trim_start') or 0.0,
+                                        (ignore_first, max(last, ignore_first)),
+                                        settings.REGION_MINIMUM_POINTS,
+                                        label=info['name'],
+                                        )
+            if levels is not None:
+                experiment['haem_levels'] = levels
+                experiment['haem_percent'] = percent_oxidised_calculator(
+                    experiment['haem_abs'],
+                    levels['oxidised'],
+                    levels['reduced'],
+                    )
+                spans = ', '.join(f'{region} {start:.2f}-{end:.2f} min'
+                                  for region, (start, end)
+                                  in (('oxidised', levels['oxidised_region']),
+                                      ('reduced', levels['reduced_region']),
+                                      )
+                                  )
+                print(f"  Each haem's oxidised and reduced level is its median in "
+                      f'the regions: {spans}',
+                      )
+        except (KeyError, ValueError, TypeError) as exc:
+            _skip_reporter('the % oxidised of the haems', exc)
+
+    # ---- 4.4 Work out delta psi from bH and bL ---------------------------------------
+    # Only when switched on, and for a file with % oxidised: it needs both regions.
+    if a['delta_psi'] and 'haem_percent' in experiment:
+        try:
+            midpoints = {key: a[answer]
+                         for key, answer in settings.DELTA_PSI_MIDPOINT_ANSWERS.items()
+                         }
+            table = delta_psi_table_builder(experiment['haem_percent'],
+                                            midpoints,
+                                            a['psi_share'],
+                                            a['temperature_c'],
+                                            tuple(a[answer]
+                                                  for answer
+                                                  in settings.DELTA_PSI_LIMIT_ANSWERS
+                                                  ),
+                                            )
+            if table is None:
+                warning_shower('  Warning: Δψ needs one bH and one bL among the '
+                               'haems, and this fit does not have them, so this file '
+                               'has no Δψ. Choose a fit with both.',
+                               )
+            else:
+                experiment['delta_psi'] = table
+                used = table.attrs['delta_psi']
+                lowest, highest = used['limits_percent']
+                print(f"  Δψ worked out from {used['bH']} and {used['bL']} at "
+                      f"{used['temperature_c']:g} °C: "
+                      f"{used['spectra_with_value']} of {len(table)} spectra have a "
+                      f'value (both haems between {lowest:g} and {highest:g} % '
+                      f'reduced)',
+                      )
+        except (KeyError, ValueError, TypeError) as exc:
+            _skip_reporter('Δψ', exc)
+
+    # ---- 4.5 Normalise by OD ---------------------------------------------------------
     if od_available:
         try:
             experiment_normaliser(experiment)
@@ -276,69 +433,110 @@ def experiment_data_processor(info: dict,
             od_available = False
             _skip_reporter('the scaling by OD', exc)
 
-    # ---- 4.4 Convert to percentages --------------------------------------------------
-    percent_vo2, percent_haem = cfg.percent_need_checker()
-    for needed, source_key, target_key, what in (
-        (percent_haem, 'haem_conc', 'haem_percent', 'the haems'),
-        (percent_vo2, 'VoO2', 'VoO2_percent', 'the oxygen consumption'),
-        ):
-        if needed and source_key in experiment:
-            try:
-                percent_converter(experiment,
-                                  source_key,
-                                  target_key,
-                                  exclude_first_minutes=ignore_first,
-                                  exclude_last_minutes=ignore_last,
-                                  window_points=window_points,
-                                  )
-            except (KeyError, ValueError, TypeError) as exc:
-                _skip_reporter(f'the % scale of {what}', exc)
+    # ---- 4.6 Put the OCR on its % of the range ---------------------------------------
+    if cfg.percent_need_checker() and 'VoO2' in experiment:
+        try:
+            percent_converter(experiment,
+                              'VoO2',
+                              'VoO2_percent',
+                              exclude_first_minutes=ignore_first,
+                              exclude_last_minutes=ignore_last,
+                              window_points=window_points,
+                              )
+        except (KeyError, ValueError, TypeError) as exc:
+            _skip_reporter('the % scale of the oxygen consumption', exc)
 
     # ---- 5 Choose the sources and average --------------------------------------------
     vo2_source, haem_source = cfg.source_chooser(od_available)
+    # The % of baseline is worked out from the baseline window, so the averages are
+    # taken in the OCR's own unit, and the view is put on once they are there.
+    is_baseline_view = vo2_source == 'baseline'
+    plain_vo2_source = 'od' if a['normalise_od'] and od_available else 'raw'
+    if is_baseline_view:
+        vo2_source = plain_vo2_source
+    experiment.pop('VoO2_baseline', None)
     if haem_source is not None and not (a['plot_haems'] or a['averaging']):
         haem_source = None
+    # A file without both regions has no % oxidised, so its haems stay in delta D.
+    if haem_source == 'percent' and 'haem_percent' not in experiment:
+        haem_source = 'delta_abs'
+        if 'haem_delta_abs' in experiment:
+            print('  This file has no oxidised and reduced region, so its haems are '
+                  'shown as ΔD.',
+                  )
     # Event-window averages.
+    has_baseline = False
     if a['averaging']:
         if not metadata['events']:
-            print('  Averaging skipped: this file has no events.')
+            warning_shower('  Averaging skipped: this file has no events.')
         else:
             try:
                 average_haem_source = (haem_source
                                        if 'haem_conc' in experiment
                                        else None
                                        )
-                final_gap = a['final_gap_minutes']
+                plan = window_plan_finder(a, experiment['experiment_name'])
                 minimum_seconds = settings.BASELINE_MINIMUM_SECONDS
                 experiment_averages_calculator(experiment,
-                                               window_minutes=a['window_minutes'],
-                                               gap_minutes=a['gap_minutes'],
-                                               final_window_gap_minutes=final_gap,
+                                               window_minutes=plan['window_minutes'],
+                                               gap_minutes=plan['gap_minutes'],
+                                               final_window_gap_minutes=plan[
+                                                   'final_gap_minutes'
+                                               ],
                                                vo2_source=vo2_source,
                                                haem_source=average_haem_source,
                                                baseline_minimum_seconds=minimum_seconds,
+                                               quick_minutes=plan['quick_minutes']
+                                               if a['quick_windows']
+                                               else None,
+                                               delay_minutes=plan['delay_minutes'],
+                                               is_settled=a['settled_windows'],
+                                               each_window=plan['each_window'],
+                                               haem_views=cfg.haem_view_lister(
+                                                   od_available,
+                                                   )
+                                               if 'haem_conc' in experiment
+                                               else None,
                                                )
                 print(f"  Calculated {len(experiment['averages']['windows'])} event "
                       f'averages',
                       )
-                skipped = dict(experiment['averages']['skipped'])
+                # a window the user left out is not a problem to warn of
+                skipped = {name: window
+                           for name, window in experiment['averages']['skipped'].items()
+                           if not window.get('left_out')
+                           }
                 if skipped.pop('average0', None):
-                    print(f'  Warning: there is less than {minimum_seconds:g} s of '
-                          'data before the first addition, so this run has no '
-                          'baseline and its changes from baseline are left empty. '
-                          'Trim less of the start, or shorten the gap before the '
-                          'additions.',
-                          )
+                    warning_shower(f'  Warning: there is less than {minimum_seconds:g} '
+                                   's of data before the first addition, so this run '
+                                   'has no baseline and its changes from baseline are '
+                                   'left empty. Trim less of the start, or shorten the '
+                                   'gap before the additions.',
+                                   )
                 if skipped:
-                    print(f"  Warning: averaging skipped for {', '.join(skipped)} "
-                          '(not enough time for the window and gap)',
-                          )
+                    warning_shower(f'  Warning: averaging skipped for '
+                                   f"{', '.join(skipped)} (not enough time for the "
+                                   f'region and gap)',
+                                   )
+                has_baseline = baseline_percent_adder(experiment)
             except (KeyError, ValueError, TypeError) as exc:
                 _skip_reporter('the averaging around the additions', exc)
+    # A file without a baseline keeps its usual OCR, as its axis says. Nothing is
+    # said while no windows are set up: every file is then without one.
+    if is_baseline_view and has_baseline:
+        vo2_source = 'baseline'
+    elif is_baseline_view and a['averaging']:
+        print(f'  This file has no baseline, so its OCR is shown as '
+              f'{OCR_UNIT_TEXTS[plain_vo2_source]}, not as % of baseline.',
+              )
 
     # ---- 6 Return the processed experiment -------------------------------------------
+    # The one place that says whether this file's haems are drawn: the run, the
+    # window's plot and the previews of several files all read it.
+    has_haem_panels = bool(a['plot_haems'] and 'haem_conc' in experiment)
     return {'experiment': experiment,
             'od_available': od_available,
             'vo2_source': vo2_source,
             'haem_source': haem_source,
+            'plotted_haem_source': haem_source if has_haem_panels else None,
             }

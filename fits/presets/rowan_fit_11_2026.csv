@@ -1,0 +1,11 @@
+﻿Portimao preset,format 1
+Name,Rowan fit 11-2026
+Holds,"The haems of the Rowan fit of November 2026 (once temp_fit_037v), each at the size that fit gives it"
+
+Haem file,Haems per protein
+c1_037v.csv,2
+b557_037v.csv,1
+bH_037v.csv,1
+bL_037v.csv,1
+a605_037v.csv,1
+a3_037v.csv,1

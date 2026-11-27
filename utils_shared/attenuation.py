@@ -8,6 +8,9 @@ from typing import Optional, Sequence, Tuple, Union
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.user_notices import warning_shower
+
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
@@ -85,7 +88,7 @@ def experiment_attenuation_adder(experiment: dict,
 
     ---- Globals mutated ----
     experiment: adds raw_spectra[dataset]["attenuation"] (n_spectra x n_wavelengths) for
-    each converted dataset; prints a warning with the number of blank values inside
+    each converted dataset; shows a warning with the number of blank values inside
     checked_range_nm (side effect).
 
     ---- Equations ----
@@ -93,6 +96,7 @@ def experiment_attenuation_adder(experiment: dict,
 
     ---- Helpers ----
     attenuation_converter
+    warning_shower
     """
 
     # ---- 1 Add the attenuation to each raw spectrum ----------------------------------
@@ -122,8 +126,8 @@ def experiment_attenuation_adder(experiment: dict,
         n_bad = int(np.count_nonzero(blank))
         if n_bad:
             rows = int(np.count_nonzero(blank.any(axis=1)))
-            print(f'  Warning: {dataset_name}: {n_bad} transmission values{where} '
-                  'were zero, negative or missing '
-                  f'({rows} spectra affected); they are left blank.',
-                  )
+            warning_shower(f'  Warning: {dataset_name}: {n_bad} transmission '
+                           f'values{where} were zero, negative or missing ({rows} '
+                           f'spectra affected); they are left blank.',
+                           )
     return experiment

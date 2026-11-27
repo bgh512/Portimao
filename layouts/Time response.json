@@ -1,0 +1,44 @@
+{
+  "kind": "Portimao figure template",
+  "version": 1,
+  "journal": "nature",
+  "columns": 2,
+  "height": 1.0,
+  "plots": [
+    {
+      "type": "P3",
+      "cells": {"row": 0, "column": 0, "rows": 2, "columns": 2},
+      "roles": {"group_1": "Only label 1", "time_point": "Split", "haem_bands": "yes"}
+    },
+    {
+      "type": "P1",
+      "cells": {"row": 0, "column": 2, "rows": 2, "columns": 4},
+      "roles": {"panel_vo2": "no", "regions_shaded": "yes"}
+    },
+    {
+      "type": "P3",
+      "cells": {"row": 2, "column": 0, "rows": 2, "columns": 2},
+      "roles": {"group_1": "Only label 2", "time_point": "Split", "haem_bands": "yes"}
+    },
+    {
+      "type": "P1",
+      "cells": {"row": 2, "column": 2, "rows": 2, "columns": 4},
+      "roles": {"panel_vo2": "no", "regions_shaded": "yes"}
+    },
+    {
+      "type": "P2",
+      "cells": {"row": 4, "column": 0, "rows": 2, "columns": 2},
+      "roles": {"haem_bands": "yes"}
+    },
+    {
+      "type": "P2",
+      "cells": {"row": 4, "column": 2, "rows": 2, "columns": 2},
+      "roles": {"haem_bands": "yes"}
+    },
+    {
+      "type": "P2",
+      "cells": {"row": 4, "column": 4, "rows": 2, "columns": 2},
+      "roles": {"haem_bands": "yes"}
+    }
+  ]
+}
