@@ -1,5 +1,5 @@
 """
-Tests of the guide on the left of the window: its steps, the step open and the previous processing question.
+Tests of the guide on the left of the window: its steps, the step open, the previous settings question and the run name question.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -20,7 +20,7 @@ from utils_shared.questions import (answer_request_setter,
                                     number_asker,
                                     yes_no_asker,
                                     )
-from utils_shared.survey import previous_processing_asker
+from utils_shared.survey import previous_settings_asker, run_folder_asker
 from utils_viewer.viewer_guide import (GUIDE_KEYS,
                                        GUIDE_STAGES,
                                        GUIDE_STEPS,
@@ -37,8 +37,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CODE_FOLDERS = ('utils_shared', 'utils_viewer')
 # The first question of each step in QUESTION_FLOW.md, in the order of the guide.
 FIRST_QUESTIONS = {'data_folder': '1.1',
-                   'results_folder': '1.2',
-                   'previous': '1.3',
+                   'previous': '1.2',
+                   'run_name': '1.3',
                    'trim': '2.1',
                    'temperature': '3.1',
                    'od_scaling': '3.2',
@@ -297,7 +297,7 @@ def test_steps_move_on_and_fold() -> None:
     """
 
     state = _state_maker(['data_folder',
-                          'results_folder',
+                          'run_name',
                           'trim',
                           'temperature',
                           'od_scaling',
@@ -406,7 +406,7 @@ def test_hints_under_the_answers() -> None:
     from utils_viewer.viewer_gui import _hint_chooser
     assert _hint_chooser('number', None).startswith('Type a number,')
     assert _hint_chooser('text', None).startswith('Type it in the box,')
-    assert _hint_chooser('folder', None).startswith('Click a folder, then Continue.')
+    assert _hint_chooser('folder', None).startswith('Click a folder, then CONTINUE.')
     for kind in ('continue', 'yesno', 'choice', 'multi', 'folder', 'confirm', None):
         assert 'Type the answer' not in _hint_chooser(kind, None)
         assert not _hint_chooser(kind, None).startswith('Type')
@@ -467,8 +467,8 @@ def test_change_opens_earlier_step() -> None:
     assert state.change_opener({'time_tab': 'trim'})
     assert state.shown == GUIDE_KEYS.index('trim')
     assert [words for _, words in state.card_teller()['extra']] == [
-        'Export full + trimmed csv',
-        'Export trimmed csv',
+        'EXPORT full + trimmed CSV',
+        'EXPORT trimmed CSV',
         ]
     state.back_taker()
 
@@ -549,12 +549,14 @@ def test_changes_that_open_nothing() -> None:
     assert not state.is_back()
 
 
-# ---- test_previous_processing_question -----------------------------------------------
-def test_previous_processing_question(monkeypatch: pytest.MonkeyPatch) -> None:
+# ---- test_previous_settings_question -------------------------------------------------
+def test_previous_settings_question(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     ---- Summary ----
-    Main function to check question 1.3: Yes, and Enter, load what was saved with
-    the dataset; No starts it fresh, as a dataset never opened.
+    Main function to check question 1.2. With one earlier run: Yes, and Enter, load
+    its settings; No starts fresh. With several: the number of a run loads its
+    settings, the last number (START FRESH) starts fresh, and Enter alone is not an
+    answer.
 
     ---- Inputs ----
     monkeypatch : pytest.MonkeyPatch
@@ -577,15 +579,81 @@ def test_previous_processing_question(monkeypatch: pytest.MonkeyPatch) -> None:
     None.
     """
 
-    saved = {'limits': {'run1': {'trim_start': 2.0}}, 'fit_file': 'my_fit.csv'}
+    # ---- 1 One earlier run -----------------------------------------------------------
+    first = {'answers': {'fit_file': 'my_fit.csv'}}
+    second = {'answers': {'fit_file': 'other_fit.csv'}}
     typed = ['y', '', 'n']
     monkeypatch.setattr(questions,
                         '_input_reader',
                         lambda text, indent='': typed.pop(0),
                         )
-    assert previous_processing_asker(saved) is saved
-    assert previous_processing_asker(saved) is saved
-    assert previous_processing_asker(saved) == {}
+    one = [('export', first)]
+    assert previous_settings_asker(one) is first
+    assert previous_settings_asker(one) is first
+    assert previous_settings_asker(one) == {}
+
+    # ---- 2 Several earlier runs ------------------------------------------------------
+    several = [('export', first), ('run_1', second)]
+    typed.extend(['1', '2', '', '3'])
+    assert previous_settings_asker(several) is first
+    assert previous_settings_asker(several) is second
+    assert previous_settings_asker(several) == {}
+    assert typed == []
+
+
+# ---- test_run_name_question ----------------------------------------------------------
+def test_run_name_question(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check question 1.3: Enter takes the name offered; a name already
+    there is taken only after Yes at 1.3.1, and No asks for the name again; a data
+    folder that cannot be saved to stops the program with one sentence.
+
+    ---- Inputs ----
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the reading of the answers.
+    tmp_path : Path
+        Empty folder from pytest, standing in for the data folder.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The name offered, and a name already there --------------------------------
+    export = tmp_path / 'export'
+    typed = ['']
+    monkeypatch.setattr(questions,
+                        '_input_reader',
+                        lambda text, indent='': typed.pop(0),
+                        )
+    assert run_folder_asker(export) == export / 'run_1'
+    assert not export.exists()
+    (export / 'run_1').mkdir(parents=True)
+    (export / 'trimmed less').mkdir()
+    typed.extend(['trimmed less', 'n', ' run_1 ', 'y'])
+    assert run_folder_asker(export) == export / 'run_1'
+    typed.extend(['trimmed less', '', 'a/b', ''])
+    assert run_folder_asker(export) == export / 'run_2'
+    assert typed == []
+
+    # ---- 2 A data folder that cannot be saved to -------------------------------------
+    (tmp_path / 'notes.txt').write_text('')
+    with pytest.raises(SystemExit) as stopped:
+        run_folder_asker(tmp_path / 'notes.txt' / 'export')
+    assert str(stopped.value).startswith('The results cannot be saved in ')
 
 
 # ---- test_answers_told_to_the_window -------------------------------------------------
@@ -651,7 +719,7 @@ def test_answers_told_to_the_window(monkeypatch: pytest.MonkeyPatch,
     printed = re.sub(r'\x1b\[[0-9;]*m', '', capsys.readouterr().out)
     assert '(y/N)' not in printed and '[120]' not in printed
     assert '1) First' not in printed
-    assert 'Tick one or more, then click Continue.' in printed
+    assert 'Tick one or more, then click CONTINUE.' in printed
 
 
 # ---- test_folder_question ------------------------------------------------------------
@@ -700,14 +768,14 @@ def test_folder_question(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
         return None if text in (first, second) else 'Choose a folder that exists.'
     answer_request_setter(told.append)
     try:
-        assert folder_asker('Choose the folder, then press Continue.',
+        assert folder_asker('Choose the folder, then press CONTINUE.',
                             folders,
                             default=first,
                             typed=first,
                             checker=checker,
                             number='1.1',
                             ) == second
-        assert folder_asker('Choose the folder, then press Continue.',
+        assert folder_asker('Choose the folder, then press CONTINUE.',
                             folders,
                             default=first,
                             number='1.1',

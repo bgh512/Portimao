@@ -1,11 +1,12 @@
 """
-The settings kept with a dataset: read from and written to a file in its folder.
+The settings kept with each run of a dataset: read from and written to a file in the run's folder.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import json
+import re
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.dataset_setup import saved_setup_reader
@@ -119,26 +120,23 @@ def _export_folder_resolver(folder: Path, text: Optional[str]) -> Optional[Path]
     return path if Path(path.anchor).exists() else None
 
 
-# ---- _export_folder_shortener --------------------------------------------------------
-def _export_folder_shortener(folder: Path, export_root: Path) -> str:
+# ---- _run_name_sorter ----------------------------------------------------------------
+def _run_name_sorter(name: str) -> list:
     """
     ---- Summary ----
-    Helper function to write the results folder relative to the dataset folder when it
-    is inside it, so the settings still hold after the dataset is copied elsewhere.
+    Helper function to give the key that sorts run names with their numbers in order,
+    so run_2 comes before run_10.
 
     ---- Inputs ----
-    folder : Path
-        The dataset folder.
-    export_root : Path
-        The results folder.
+    name : str
+        The name of a run's folder.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    str
-        The path from the dataset folder with forward slashes ('results'), or the full
-        path when the results folder is somewhere else.
+    list
+        The name split into text (lower case) and whole numbers.
 
     ---- Globals mutated ----
     None.
@@ -150,11 +148,10 @@ def _export_folder_shortener(folder: Path, export_root: Path) -> str:
     None.
     """
 
-    try:
-        return Path(export_root).resolve().relative_to(Path(folder).resolve(),
-                                                       ).as_posix()
-    except ValueError:  # not inside the dataset folder
-        return str(Path(export_root).resolve())
+    return [(1, int(part), '') if part.isdigit() else (0, 0, part.lower())
+            for part in re.split(r'(\d+)', name)
+            if part
+            ]
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
@@ -164,12 +161,14 @@ def _export_folder_shortener(folder: Path, export_root: Path) -> str:
 def dataset_settings_reader(folder: Path) -> dict:
     """
     ---- Summary ----
-    Main function to read the settings last saved for a dataset from the file in its
-    folder.
+    Main function to read the settings saved in a folder: those of a run, from the
+    file in the run's own folder, or those saved beside the data before each run had
+    its own folder, from the file in the data folder.
 
     ---- Inputs ----
     folder : Path
-        The dataset folder (the folder of the .paf files).
+        The folder that holds the settings file: the folder of a run, or the data
+        folder (the folder of the .paf files).
 
     ---- Globals read ----
     SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RENAMED_ANSWERS, RETIRED_ANSWER_NAMES,
@@ -178,10 +177,11 @@ def dataset_settings_reader(folder: Path) -> dict:
     ---- Outputs ----
     dict
         {'export_folder': Optional[Path], 'files': dict, 'answers': dict, 'setup':
-        dict, 'page': Any} (DATA_FORMAT.md, dataset_settings); the set-up is empty
-        for a dataset never set up, and the page is as the file holds it, unchecked
-        (None for none). An empty dict when the dataset was never
-        saved or its file cannot be read, so the standard settings are used. A haem
+        dict, 'page': Any} (DATA_FORMAT.md, dataset_settings); the results folder is
+        only in a file saved beside the data (None in the file of a run), the set-up
+        is empty for a dataset never set up, and the page is as the file holds it,
+        unchecked (None for none). An empty dict when the folder holds no settings
+        file or it cannot be read, so the standard settings are used. A haem
         way of showing no longer offered (RETIRED_HAEM_MODES) is given as its
         successor, an answer saved under an old name (RENAMED_ANSWERS) under its
         new one, and the answers of the fixed figures that are no longer made
@@ -238,8 +238,7 @@ def dataset_settings_reader(folder: Path) -> dict:
 
 
 # ---- dataset_settings_saver ----------------------------------------------------------
-def dataset_settings_saver(folder: Path,
-                           export_root: Path,
+def dataset_settings_saver(run_folder: Path,
                            files: dict,
                            answers: dict,
                            setup: Optional[dict] = None,
@@ -247,14 +246,12 @@ def dataset_settings_saver(folder: Path,
                            ) -> bool:
     """
     ---- Summary ----
-    Main function to save the settings of a dataset in a file in its folder, so the
-    dataset opens with them next time, on this computer or another.
+    Main function to save the settings of a run in a file in the run's own folder, so
+    the data can be processed again with them, on this computer or another.
 
     ---- Inputs ----
-    folder : Path
-        The dataset folder (the folder of the .paf files).
-    export_root : Path
-        The results folder.
+    run_folder : Path
+        The folder of the run (export/<name> inside the data folder), already made.
     files : dict
         {file name: limits in minutes, OD values and events} as file_settings_merger
         builds it.
@@ -281,24 +278,80 @@ def dataset_settings_saver(folder: Path,
     None.
 
     ---- Helpers ----
-    _export_folder_shortener
+    None.
     """
 
-    values = {'export_folder': _export_folder_shortener(Path(folder), export_root),
-              'files': files,
-              'answers': answers,
-              }
+    values = {'files': files, 'answers': answers}
     if setup:
         values['setup'] = setup
     if page and page.get('plots'):
         values['page'] = page
     try:
-        (Path(folder) / SETTINGS_FILE_NAME).write_text(json.dumps(values, indent=2),
-                                                       encoding='utf-8',
-                                                       )
+        (Path(run_folder) / SETTINGS_FILE_NAME).write_text(json.dumps(values, indent=2),
+                                                           encoding='utf-8',
+                                                           )
     except OSError:
         return False
     return True
+
+
+# ---- earlier_runs_lister -------------------------------------------------------------
+def earlier_runs_lister(folder: Path, export_name: str) -> List[Tuple[str, dict]]:
+    """
+    ---- Summary ----
+    Main function to list the earlier runs of a data folder whose settings can be
+    loaded: the settings saved beside the data before each run had its own folder,
+    as one run named after the results folder they used, then every folder inside the
+    export folder that holds a settings file, in the order of their names.
+
+    ---- Inputs ----
+    folder : Path
+        The data folder (the folder of the .paf files).
+    export_name : str
+        The name of the folder inside the data folder that holds the runs (export).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Tuple[str, dict]]
+        (name, settings as dataset_settings_reader gives them) of each earlier run;
+        empty for data never processed. A folder whose settings file cannot be read
+        is left out.
+
+    ---- Globals mutated ----
+    None. Reads the files (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _run_name_sorter
+    dataset_settings_reader
+    """
+
+    # ---- 1 The settings saved beside the data ----------------------------------------
+    runs = []
+    beside = dataset_settings_reader(Path(folder))
+    if beside:
+        used = beside.get('export_folder')
+        runs.append((used.name if used is not None else export_name, beside))
+
+    # ---- 2 The runs in the export folder ---------------------------------------------
+    try:
+        inside = sorted((path
+                         for path in (Path(folder) / export_name).iterdir()
+                         if path.is_dir()
+                         ),
+                        key=lambda path: _run_name_sorter(path.name),
+                        )
+    except OSError:  # no export folder yet, or one that cannot be read
+        inside = []
+    for path in inside:
+        saved = dataset_settings_reader(path)
+        if saved:
+            runs.append((path.name, saved))
+    return runs
 
 
 # ---- file_settings_merger ------------------------------------------------------------

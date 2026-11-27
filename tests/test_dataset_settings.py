@@ -1,6 +1,6 @@
 """
-Tests of the settings kept with a dataset, the results folder check and the list of data
-folders.
+Tests of the settings kept with each run of a dataset, the earlier runs offered, the name
+of a run and the list of data folders.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -13,6 +13,7 @@ import numpy as np
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.dataset_settings import (dataset_settings_reader,
                                            dataset_settings_saver,
+                                           earlier_runs_lister,
                                            file_settings_merger,
                                            SETTINGS_FILE_NAME,
                                            )
@@ -24,12 +25,10 @@ from utils_shared.figure_page import (FigurePage,
                                       )
 from utils_shared.survey import (data_folder_lister,
                                  data_folder_resolver,
-                                 free_folder_finder,
                                  haem_form_option_builder,
-                                 results_counter,
-                                 results_folder_checker,
-                                 results_folder_lister,
-                                 results_folder_resolver,
+                                 run_name_checker,
+                                 run_name_finder,
+                                 save_place_checker,
                                  saved_values_reader,
                                  )
 
@@ -149,6 +148,10 @@ def test_data_folders_are_listed(tmp_path: Path) -> None:
     """
 
     _program_folder_maker(tmp_path)
+    # the run the tests check the reading against is never offered as a dataset
+    hidden = tmp_path / 'data_instrument_check'
+    hidden.mkdir()
+    (hidden / 'example.paf').write_bytes(b'')
     assert [p.name for p in data_folder_lister(tmp_path)] == ['data_2hours',
                                                               'data_10hours',
                                                               ]
@@ -291,7 +294,7 @@ def test_od_values_and_labels_are_kept(tmp_path: Path) -> None:
     assert files['old_run'] == {'trim_start': None, 'OD': 0.7}
 
     # ---- 3 Saved, read back and offered ----------------------------------------------
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', files, ANSWERS)
+    assert dataset_settings_saver(tmp_path,files, ANSWERS)
     saved = dataset_settings_reader(tmp_path)['files']
     offered = saved_values_reader([{'name': 'run1'}, {'name': 'new_run'}],
                                   saved,
@@ -317,20 +320,23 @@ def test_od_values_and_labels_are_kept(tmp_path: Path) -> None:
     assert files['run1']['events'] == []
 
 
-# ---- test_results_folder_inside_is_kept_relative -------------------------------------
-def test_results_folder_inside_is_kept_relative(tmp_path: Path) -> None:
+# ---- test_earlier_runs_are_listed ----------------------------------------------------
+def test_earlier_runs_are_listed(tmp_path: Path) -> None:
     """
     ---- Summary ----
-    Main function to check that a results folder inside the dataset folder is written
-    relative to it, so the settings still hold after the dataset is copied: the copy
-    gives the results folder inside the copy.
+    Main function to check the earlier runs offered at 1.2: none for data never
+    processed; every folder in the export folder that holds a settings file, in the
+    order of their names with the numbers counted (run_2 before run_10); a folder
+    without a settings file, or with one that cannot be read, left out; and the
+    settings saved beside the data first, as one run named after the results folder
+    they used, or after the export folder when they name none.
 
     ---- Inputs ----
     tmp_path : Path
         Empty folder from pytest.
 
     ---- Globals read ----
-    SETTINGS_FILE_NAME (imported).
+    FILES, ANSWERS, SETTINGS_FILE_NAME.
 
     ---- Outputs ----
     None.
@@ -345,23 +351,146 @@ def test_results_folder_inside_is_kept_relative(tmp_path: Path) -> None:
     None.
     """
 
-    first, copy = tmp_path / 'first', tmp_path / 'copy'
-    first.mkdir()
-    copy.mkdir()
-    assert dataset_settings_saver(first, first / 'results' / 'run', FILES, ANSWERS)
-    text = (first / SETTINGS_FILE_NAME).read_text(encoding='utf-8')
-    assert json.loads(text)['export_folder'] == 'results/run'
-    (copy / SETTINGS_FILE_NAME).write_text(text, encoding='utf-8')
-    assert dataset_settings_reader(copy)['export_folder'] == copy / 'results' / 'run'
+    # ---- 1 Data never processed ------------------------------------------------------
+    data = tmp_path / 'data'
+    data.mkdir()
+    assert earlier_runs_lister(data, 'export') == []
+    (data / 'export' / 'loose_results').mkdir(parents=True)
+    assert earlier_runs_lister(data, 'export') == []
+
+    # ---- 2 The runs in the export folder ---------------------------------------------
+    for name, fit in (('run_10', 'ten.csv'),
+                      ('run_2', 'two.csv'),
+                      ('Trimmed', 't.csv'),
+                      ):
+        (data / 'export' / name).mkdir()
+        assert dataset_settings_saver(data / 'export' / name,
+                                      FILES,
+                                      dict(ANSWERS, fit_file=fit),
+                                      )
+    (data / 'export' / 'broken').mkdir()
+    (data / 'export' / 'broken' / SETTINGS_FILE_NAME).write_text('{not json')
+    (data / 'export' / 'notes.txt').write_text('')
+    runs = earlier_runs_lister(data, 'export')
+    assert [name for name, _ in runs] == ['run_2', 'run_10', 'Trimmed']
+    assert [saved['answers']['fit_file'] for _, saved in runs] == ['two.csv',
+                                                                   'ten.csv',
+                                                                   't.csv',
+                                                                   ]
+    assert runs[0][1]['files'] == FILES
+    assert runs[0][1]['export_folder'] is None
+
+    # ---- 3 The settings saved beside the data come first -----------------------------
+    beside = {'export_folder': 'old_results', 'files': FILES, 'answers': ANSWERS}
+    (data / SETTINGS_FILE_NAME).write_text(json.dumps(beside), encoding='utf-8')
+    runs = earlier_runs_lister(data, 'export')
+    assert [name for name, _ in runs] == ['old_results', 'run_2', 'run_10', 'Trimmed']
+    assert runs[0][1]['answers'] == ANSWERS
+    del beside['export_folder']
+    (data / SETTINGS_FILE_NAME).write_text(json.dumps(beside), encoding='utf-8')
+    assert earlier_runs_lister(data, 'export')[0][0] == 'export'
 
 
-# ---- test_results_folder_is_checked --------------------------------------------------
-def test_results_folder_is_checked(tmp_path: Path) -> None:
+# ---- test_results_folder_beside_the_data_is_read -------------------------------------
+def test_results_folder_beside_the_data_is_read(tmp_path: Path) -> None:
     """
     ---- Summary ----
-    Main function to check the results folder answer: a file, or a folder under a file,
-    is refused with one sentence; an existing folder and one not made yet are accepted,
-    and checking leaves nothing behind.
+    Main function to check the results folder named in a settings file saved beside
+    the data: a path without a drive or root is taken inside the data folder, so it
+    still holds after the data is copied; a full path is given as it is; and the file
+    of a run names none.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    FILES, ANSWERS, SETTINGS_FILE_NAME.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    values = {'export_folder': 'results/run', 'files': FILES, 'answers': ANSWERS}
+    (tmp_path / SETTINGS_FILE_NAME).write_text(json.dumps(values), encoding='utf-8')
+    assert dataset_settings_reader(tmp_path)['export_folder'] == (
+        tmp_path / 'results' / 'run')
+    outside = (tmp_path / 'paper').resolve()
+    values['export_folder'] = str(outside)
+    (tmp_path / SETTINGS_FILE_NAME).write_text(json.dumps(values), encoding='utf-8')
+    assert dataset_settings_reader(tmp_path)['export_folder'] == outside
+    assert dataset_settings_saver(tmp_path, FILES, ANSWERS)
+    written = json.loads((tmp_path / SETTINGS_FILE_NAME).read_text('utf-8'))
+    assert 'export_folder' not in written
+    assert dataset_settings_reader(tmp_path)['export_folder'] is None
+
+
+# ---- test_run_name_is_checked --------------------------------------------------------
+def test_run_name_is_checked(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check the name of a run (1.3): the name offered is the first of
+    run_1, run_2 and so on that is not there; a name of letters, digits, spaces, -
+    and _ is accepted, also one already there as a folder; an empty name, a path, a
+    name with other characters and the name of a file there are refused with one
+    sentence each.
+
+    ---- Inputs ----
+    tmp_path : Path
+        Empty folder from pytest.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 The name offered ----------------------------------------------------------
+    export = tmp_path / 'export'
+    assert run_name_finder(export) == 'run_1'
+    (export / 'run_1').mkdir(parents=True)
+    (export / 'run_2').write_text('')
+    (export / 'run_4').mkdir()
+    assert run_name_finder(export) == 'run_3'
+
+    # ---- 2 The names accepted and refused --------------------------------------------
+    plain = 'Type a name of letters, digits, spaces, - and _ only.'
+    for name in ('run_1', 'run_3', ' trimmed less ', 'KCN-first 2', 'après'):
+        assert run_name_checker(name, export) is None
+    for name in ('', '   ', None):
+        assert run_name_checker(name, export) == 'Type a name.'
+    for name in ('a/b', 'a\\b', '..', 'run.1', 'C:', 'what?', str(tmp_path)):
+        assert run_name_checker(name, export) == plain
+    assert run_name_checker('run_2', export) == ('A file with this name is already '
+                                                 'there. Type another name.')
+
+
+# ---- test_save_place_is_checked ------------------------------------------------------
+def test_save_place_is_checked(tmp_path: Path) -> None:
+    """
+    ---- Summary ----
+    Main function to check whether a folder can be saved to: a folder there and one
+    not made yet can; a file, and a folder under a file, cannot; and checking leaves
+    nothing behind.
 
     ---- Inputs ----
     tmp_path : Path
@@ -385,161 +514,11 @@ def test_results_folder_is_checked(tmp_path: Path) -> None:
 
     a_file = tmp_path / 'notes.txt'
     a_file.write_text('')
-    not_a_file = 'Choose a folder, not a file.'
-    assert results_folder_checker(str(a_file)) == not_a_file
-    assert results_folder_checker(f'"{a_file / "results"}"') == not_a_file
-    assert results_folder_checker('') == 'Choose a folder.'
-    assert results_folder_checker(str(tmp_path)) is None
-    assert results_folder_checker(str(tmp_path / 'new' / 'results')) is None
+    assert save_place_checker(tmp_path)
+    assert save_place_checker(tmp_path / 'new' / 'export')
+    assert not save_place_checker(a_file)
+    assert not save_place_checker(a_file / 'export')
     assert [p.name for p in tmp_path.iterdir()] == ['notes.txt']
-
-
-# ---- test_results_folder_names_and_old_results ---------------------------------------
-def test_results_folder_names_and_old_results(tmp_path: Path) -> None:
-    """
-    ---- Summary ----
-    Main function to check the results folder answer against the data folder: a name
-    without a path is taken inside the data folder and a full path as it is; the files
-    that already have results there are counted (an empty folder of one does not
-    count); and the free name offered beside a folder skips the names already used.
-
-    ---- Inputs ----
-    tmp_path : Path
-        Empty folder from pytest.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    # ---- 1 A plain name goes inside the data folder ----------------------------------
-    data = tmp_path / 'data'
-    data.mkdir()
-    elsewhere = tmp_path / 'elsewhere'
-    assert results_folder_resolver('quadratic_scatter_results', data) == (
-        data / 'quadratic_scatter_results')
-    assert results_folder_resolver(f'"{elsewhere}"', data) == elsewhere
-    assert results_folder_checker('quadratic_scatter_results', data) is None
-    (data / 'notes.txt').write_text('')
-    assert results_folder_checker('notes.txt', data) == 'Choose a folder, not a file.'
-
-    # ---- 2 Count the files with results ----------------------------------------------
-    results = data / 'results'
-    summaries = [{'name': 'run1'}, {'name': 'run2'}, {'name': 'run3'}]
-    assert results_counter(results, summaries) == 0
-    (results / 'run1').mkdir(parents=True)
-    (results / 'run1' / 'run1.xlsx').write_text('')
-    (results / 'run2').mkdir()
-    (results / 'logs').mkdir()
-    (results / 'logs' / 'run.log').write_text('')
-    assert results_counter(results, summaries) == 1
-
-    # ---- 3 A free name beside the folder ---------------------------------------------
-    assert free_folder_finder(results) == data / 'results_2'
-    (data / 'results_2').mkdir()
-    assert free_folder_finder(results) == data / 'results_3'
-
-
-# ---- test_results_folders_offered ----------------------------------------------------
-def test_results_folders_offered(tmp_path: Path) -> None:
-    """
-    ---- Summary ----
-    Main function to check the folders offered as buttons for the results (1.2): every
-    folder inside the data folder in name order, each with what it holds, and the
-    folder offered first only when it does not exist yet or is outside the data folder.
-
-    ---- Inputs ----
-    tmp_path : Path
-        Empty folder from pytest.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    # ---- 1 The folders inside the data folder ----------------------------------------
-    data = tmp_path / 'data'
-    (data / 'results' / 'run1').mkdir(parents=True)
-    (data / 'results' / 'run1' / 'run1.xlsx').write_text('')
-    (data / 'old_exports').mkdir()
-    (data / '_hidden').mkdir()
-    (data / 'run1.paf').write_text('')
-    summaries = [{'name': 'run1'}, {'name': 'run2'}]
-    results = str(data / 'results')
-    old = str(data / 'old_exports')
-    assert results_folder_lister(data, data / 'results', summaries) == [
-        (old, 'old_exports', 'no results'),
-        (results, 'results', 'holds results of 1 of 2 files'),
-        ]
-
-    # ---- 2 A free name, and a folder outside, come first -----------------------------
-    free = data / 'results_2'
-    assert results_folder_lister(data, free, summaries)[0] == (str(free),
-                                                               'results_2',
-                                                               'new folder',
-                                                               )
-    outside = tmp_path / 'paper'
-    outside.mkdir()
-    assert results_folder_lister(data, outside, summaries)[0] == (str(outside),
-                                                                  'paper',
-                                                                  'no results',
-                                                                  )
-    assert len(results_folder_lister(data, outside, summaries)) == 3
-
-
-# ---- test_results_folder_outside_is_kept_whole ---------------------------------------
-def test_results_folder_outside_is_kept_whole(tmp_path: Path) -> None:
-    """
-    ---- Summary ----
-    Main function to check that a results folder outside the dataset folder is written
-    and read back as its full path.
-
-    ---- Inputs ----
-    tmp_path : Path
-        Empty folder from pytest.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    dataset, results = tmp_path / 'dataset', tmp_path / 'results'
-    dataset.mkdir()
-    assert dataset_settings_saver(dataset, results, FILES, ANSWERS)
-    assert dataset_settings_reader(dataset)['export_folder'] == results.resolve()
 
 
 # ---- test_regions_are_kept_with_the_dataset ------------------------------------------
@@ -607,7 +586,7 @@ def test_regions_are_kept_with_the_dataset(tmp_path: Path) -> None:
     assert files['old_run']['regions'] == old
 
     # ---- 3 Saved and read back -------------------------------------------------------
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', files, ANSWERS)
+    assert dataset_settings_saver(tmp_path,files, ANSWERS)
     saved = dataset_settings_reader(tmp_path)['files']
     assert saved['run1']['regions'] == both
     assert 'regions' not in saved['run2']
@@ -655,7 +634,7 @@ def test_saved_haem_amounts_open_as_delta_d(tmp_path: Path) -> None:
     assert labels['delta'].startswith('ΔD (mOD)')
     assert labels['percent'].startswith('% oxidised')
     old = dict(ANSWERS, haem_mode='conc')
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, old)
+    assert dataset_settings_saver(tmp_path,FILES, old)
     answers = dataset_settings_reader(tmp_path)['answers']
     assert answers == dict(ANSWERS, haem_mode='delta')
 
@@ -705,7 +684,7 @@ def test_saved_old_figure_answers_are_left_out(tmp_path: Path) -> None:
                ho_haems=['Cyt bH'],
                ho_haem_mode='conc',
                )
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, old)
+    assert dataset_settings_saver(tmp_path,FILES, old)
     assert dataset_settings_reader(tmp_path)['answers'] == kept
 
 
@@ -738,14 +717,14 @@ def test_saved_old_names_open_with_the_new_ones(tmp_path: Path) -> None:
     """
 
     old = dict(ANSWERS, haem_background='valencia', fit_file='temp_fit_037v.csv')
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, old)
+    assert dataset_settings_saver(tmp_path,FILES, old)
     answers = dataset_settings_reader(tmp_path)['answers']
     assert answers == dict(ANSWERS,
                            haem_background='palencia',
                            fit_file='rowan_fit_11_2026.csv',
                            )
     kept = dict(ANSWERS, haem_background='linear', fit_file='OGfit.csv')
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, kept)
+    assert dataset_settings_saver(tmp_path,FILES, kept)
     assert dataset_settings_reader(tmp_path)['answers'] == kept
 
 
@@ -776,7 +755,7 @@ def test_settings_are_read_back(tmp_path: Path) -> None:
     None.
     """
 
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', FILES, ANSWERS)
+    assert dataset_settings_saver(tmp_path,FILES, ANSWERS)
     saved = dataset_settings_reader(tmp_path)
     assert saved['files'] == FILES
     assert saved['answers'] == ANSWERS
@@ -817,7 +796,6 @@ def test_the_page_is_kept_with_the_dataset(tmp_path: Path) -> None:
                        )
     page = plot_placer(page, PagePlot('P9', 2, 0, 2, 2, roles={'group_1': 'Split'}))
     assert dataset_settings_saver(tmp_path,
-                                  tmp_path / 'results',
                                   FILES,
                                   ANSWERS,
                                   None,
@@ -832,7 +810,6 @@ def test_the_page_is_kept_with_the_dataset(tmp_path: Path) -> None:
     # ---- 2 No plot, or no page: none written -----------------------------------------
     for empty in (page_plainer(FigurePage()), None):
         assert dataset_settings_saver(tmp_path,
-                                      tmp_path / 'results',
                                       FILES,
                                       ANSWERS,
                                       None,
@@ -871,4 +848,4 @@ def test_unwritable_folder_is_reported(tmp_path: Path) -> None:
     """
 
     missing = tmp_path / 'not_there'
-    assert not dataset_settings_saver(missing, missing / 'results', FILES, ANSWERS)
+    assert not dataset_settings_saver(missing, FILES, ANSWERS)

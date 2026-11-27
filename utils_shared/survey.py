@@ -13,15 +13,15 @@ import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
-from utils_shared.dataset_settings import dataset_settings_reader, SAVED_VALUE_KEYS
+from utils_shared.dataset_settings import earlier_runs_lister, SAVED_VALUE_KEYS
 from utils_shared.delta_psi import b_haem_column_finder
 from utils_shared.event_concentrations import (event_amount_writer,
                                                event_concentration_filler,
                                                event_text_reader,
                                                )
-from utils_shared.helpers import file_name_sanitiser
 from utils_shared.paf_reader import experiment_summary_reader, PafError
-from utils_shared.questions import (enter_waiter,
+from utils_shared.questions import (choice_asker,
+                                    enter_waiter,
                                     folder_asker,
                                     guide_step_starter,
                                     info_printer,
@@ -29,12 +29,19 @@ from utils_shared.questions import (enter_waiter,
                                     path_cleaner,
                                     progress_clearer,
                                     progress_printer,
+                                    text_asker,
                                     text_italiser,
                                     yes_no_asker,
                                     )
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+# the answer of START FRESH among the earlier runs (1.2), which are answered by their
+# place in the list
+FRESH_KEY = 'fresh'
+# data folders never offered at 1.1: the run the tests check the reading against is
+# not a dataset to process (it can still be reached through Other folder…)
+HIDDEN_DATA_FOLDERS = ('data_instrument_check',)
 # the label that leaves an event out, typed in any capitals; datasets saved before it
 # was written in capitals say 'ignore', which is read the same
 IGNORE_LABEL = 'IGNORE'
@@ -48,7 +55,7 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
 # other (µM min⁻¹, % of baseline, none saved) becomes per OD
 OCR_KEPT_KEYS = ('od', 'percent')
 OCR_VIEW_NUDGE = ('Change the OCR and the haems in the View box above the plot, then '
-                  'press Continue.')
+                  'press CONTINUE.')
 # The OD values of a file, in the order of the OD table, with their plain names.
 OD_VALUE_NAMES = {'OD': 'OD', 'volume': 'volume', 'dilution_factor': 'dilution'}
 # raised form of the characters of an exponent typed as -1 or ^2
@@ -476,13 +483,13 @@ def data_folder_lister(root: Path) -> List[Path]:
         Folder to look in (the user's own folder, UserPlaces.own_folder).
 
     ---- Globals read ----
-    None.
+    HIDDEN_DATA_FOLDERS (module constant).
 
     ---- Outputs ----
     List[Path]
         The folders with at least one .paf file directly inside, in natural name
-        order. Folders whose name starts with a dot or an underscore, and folders that
-        cannot be read, are left out.
+        order. Folders whose name starts with a dot or an underscore, the folders of
+        HIDDEN_DATA_FOLDERS and folders that cannot be read are left out.
 
     ---- Globals mutated ----
     None.
@@ -498,6 +505,8 @@ def data_folder_lister(root: Path) -> List[Path]:
     found = []
     for path in Path(root).iterdir():
         if not path.is_dir() or path.name.startswith(('.', '_')):
+            continue
+        if path.name in HIDDEN_DATA_FOLDERS:
             continue
         try:
             if paf_finder(path):
@@ -793,13 +802,10 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     """
     ---- Summary ----
     Main function to ask for the folder of .paf files (1.1), offering the data folders
-    found in the user's own folder as buttons, and the results folder (1.2), offering
-    the folders inside the data folder, and to read a summary of every file and the
-    settings saved with the dataset. A results folder named without a path is made
-    inside the data folder; one that already holds results of these files is taken
-    only once the user agrees to write over them (1.2.1), and otherwise asked again
-    with a free name offered first. For a dataset opened before, it asks whether its
-    previous processing is loaded (1.3). It starts the first three steps of the guide.
+    found in the user's own folder as buttons, to read a summary of every file, to ask
+    for data processed before which earlier settings are loaded (1.2), and to ask for
+    the name of this run (1.3), whose results go in a folder of that name inside the
+    export folder of the data folder. It starts the first three steps of the guide.
 
     ---- Inputs ----
     last : dict
@@ -814,10 +820,10 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
 
     ---- Outputs ----
     Tuple[Path, List[dict], Path, dict]
-        (data folder, summary of each readable file, results folder, settings saved
-        with the dataset). Each summary has name, path, duration_min, events and
-        datasets; the settings are those of dataset_settings_reader, empty for a
-        dataset never saved or one started fresh at 1.3 (DATA_FORMAT.md).
+        (data folder, summary of each readable file, results folder of this run,
+        settings loaded). Each summary has name, path, duration_min, events and
+        datasets; the settings are those of dataset_settings_reader, empty for data
+        never processed or started fresh at 1.2 (DATA_FORMAT.md).
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect).
@@ -828,21 +834,16 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
     ---- Helpers ----
     data_folder_lister
     data_folder_resolver
-    dataset_settings_reader
+    earlier_runs_lister
     experiment_summary_reader
     folder_asker
-    free_folder_finder
     guide_step_starter
     info_printer
     paf_finder
-    previous_processing_asker
+    previous_settings_asker
     progress_clearer
     progress_printer
-    results_counter
-    results_folder_checker
-    results_folder_lister
-    results_folder_resolver
-    yes_no_asker
+    run_folder_asker
     """
 
     # ---- 1 Ask for the .paf folder ---------------------------------------------------
@@ -868,7 +869,7 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
             return 'Choose a folder with .paf files directly inside it.'
         return None
     last_folder = last.get('data_folder')
-    text = folder_asker('Choose the folder with the .paf files, then press Continue.',
+    text = folder_asker('Choose the folder with the .paf files, then press CONTINUE.',
                         offered,
                         default=last_folder,
                         typed=last_folder or '',
@@ -896,81 +897,21 @@ def files_asker(last: dict, own_folder: Path) -> Tuple[Path, List[dict], Path, d
         raise SystemExit('None of the .paf files could be read (the reason for each is '
                          'above). Open Portimao again and choose another folder.',
                          )
-    info_printer(f'\nFound {len(summaries)} readable file(s):')
-    for summary in summaries:
-        info_printer(f"  {summary['name']}: {summary['duration_min']:.1f} min, "
-                     f"{len(summary['events'])} event(s)",
-                     )
+    # one line: the files are listed in the drop-down above the plot, and a file
+    # that could not be read has its own line above
+    info_printer(f"\n{len(summaries)} file{'' if len(summaries) == 1 else 's'} found.")
 
-    # ---- 3 Ask for the results folder ------------------------------------------------
-    guide_step_starter('results_folder')
-    saved = dataset_settings_reader(folder)
-    if saved:
-        info_printer('This dataset was opened before: the results folder it used is '
-                     'highlighted.',
-                     )
-    offered = Path(saved.get('export_folder') or folder / settings.RESULTS_FOLDER_NAME)
-    while True:
-        text = folder_asker('Choose the folder for the results, then press Continue.',
-                            results_folder_lister(folder, offered, summaries),
-                            default=str(offered),
-                            typed=str(offered),
-                            checker=lambda typed: results_folder_checker(typed, folder),
-                            number='1.2',
-                            )
-        export_root = results_folder_resolver(text, folder)
-
-        # ---- 3.1 Warn before results already there are written over ------------------
-        count = results_counter(export_root, summaries)
-        if not count:
-            break
-        info_printer(f'{export_root.name} already holds results of {count} of these '
-                     f'{len(summaries)} files.',
-                     )
-        if yes_no_asker('Do you want to write over them?', False, number='1.2.1'):
-            break
-        offered = free_folder_finder(export_root)
-        info_printer(f'Choose another folder, or the new folder {offered.name}.')
-
-    # ---- 4 Ask whether the previous processing is loaded -----------------------------
-    if saved:
+    # ---- 3 Ask which earlier settings are loaded -------------------------------------
+    saved = {}
+    runs = earlier_runs_lister(folder, settings.RESULTS_FOLDER_NAME)
+    if runs:
         guide_step_starter('previous')
-        saved = previous_processing_asker(saved)
+        saved = previous_settings_asker(runs)
+
+    # ---- 4 Ask for the name of this run ----------------------------------------------
+    guide_step_starter('run_name')
+    export_root = run_folder_asker(folder / settings.RESULTS_FOLDER_NAME)
     return folder, summaries, export_root, saved
-
-
-# ---- free_folder_finder --------------------------------------------------------------
-def free_folder_finder(folder: Path) -> Path:
-    """
-    ---- Summary ----
-    Main function to find a folder name beside the one given that is not used yet, by
-    adding _2, _3 and so on, to offer when the user keeps the results already there.
-
-    ---- Inputs ----
-    folder : Path
-        The folder whose name is taken (results).
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    Path
-        The first of <folder>_2, <folder>_3, ... that does not exist.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    number = 2
-    while (folder.parent / f'{folder.name}_{number}').exists():
-        number += 1
-    return folder.parent / f'{folder.name}_{number}'
 
 
 # ---- haem_form_option_builder --------------------------------------------------------
@@ -1183,7 +1124,7 @@ def ocr_view_teller(answers: dict,
     ---- Summary ----
     Main function to show the OCR per OD once the OD values are in, unless the dataset
     was saved with the OCR as % of the range, and point to the View box, where it and
-    the haems can be shown per OD or not at any time; the step waits for Continue
+    the haems can be shown per OD or not at any time; the step waits for CONTINUE
     (3.2.2).
 
     ---- Inputs ----
@@ -1376,26 +1317,83 @@ def paf_finder(folder: Path) -> List[Path]:
     return sorted(files, key=lambda p: _natural_sorter(p.name))
 
 
-# ---- previous_processing_asker -------------------------------------------------------
-def previous_processing_asker(saved: dict) -> dict:
+# ---- previous_settings_asker ---------------------------------------------------------
+def previous_settings_asker(runs: List[Tuple[str, dict]]) -> dict:
     """
     ---- Summary ----
-    Main function to ask, for a dataset opened before, whether its previous processing
-    is loaded (1.3). Yes offers every answer saved with it as the default; No starts
-    the dataset fresh, as one never opened: the standard settings, no OD values and the
-    labels as written in the files. The settings file itself is only written again when
-    the run starts.
+    Main function to ask, for data processed before, which earlier settings are
+    loaded (1.2). With one earlier run it is a yes or no; with several, a button per
+    run, named after its folder, and START FRESH. The settings loaded are offered as
+    the defaults from here on; starting fresh gives the standard settings, no OD
+    values and the labels as written in the files. No earlier run is changed: this
+    run is saved in a folder of its own.
 
     ---- Inputs ----
-    saved : dict
-        The settings saved with the dataset (dataset_settings_reader), not empty.
+    runs : List[Tuple[str, dict]]
+        (name, settings) of each earlier run (earlier_runs_lister), not empty.
+
+    ---- Globals read ----
+    FRESH_KEY (module constant).
+
+    ---- Outputs ----
+    dict
+        The settings of the run chosen, or an empty dict to start fresh.
+
+    ---- Globals mutated ----
+    None. Reads from and prints to the terminal (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    choice_asker
+    info_printer
+    yes_no_asker
+    """
+
+    # ---- 1 One earlier run: yes or no ------------------------------------------------
+    if len(runs) == 1:
+        info_printer('This data has been processed before.', tight=True)
+        if yes_no_asker('Do you want to load the previous settings?',
+                        True,
+                        number='1.2',
+                        ):
+            return runs[0][1]
+        info_printer('The data starts from the standard settings.')
+        return {}
+
+    # ---- 2 Several: a button for each, and one to start fresh ------------------------
+    info_printer('This data has been processed several times before.', tight=True)
+    options = [(str(place), name) for place, (name, _) in enumerate(runs)]
+    chosen = choice_asker('Choose the settings to load, or START FRESH.',
+                          options + [(FRESH_KEY, 'START FRESH')],
+                          number='1.2',
+                          )
+    if chosen == FRESH_KEY:
+        info_printer('The data starts from the standard settings.')
+        return {}
+    return runs[int(chosen)][1]
+
+
+# ---- run_folder_asker ----------------------------------------------------------------
+def run_folder_asker(export_folder: Path) -> Path:
+    """
+    ---- Summary ----
+    Main function to ask for the name of this run (1.3) and give the folder its
+    results go in, a folder of that name inside the export folder. The name offered
+    is the next free of run_1, run_2 and so on. A name already there is used only
+    once the user agrees to write over it (1.3.1); otherwise the name is asked again.
+
+    ---- Inputs ----
+    export_folder : Path
+        The folder inside the data folder that holds the runs; it may not exist yet.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    dict
-        ``saved`` for yes, an empty dict for no.
+    Path
+        The folder of this run; it may not exist yet.
 
     ---- Globals mutated ----
     None. Reads from and prints to the terminal (side effect).
@@ -1405,46 +1403,61 @@ def previous_processing_asker(saved: dict) -> dict:
 
     ---- Helpers ----
     info_printer
+    run_name_checker
+    run_name_finder
+    save_place_checker
+    text_asker
     yes_no_asker
     """
 
-    info_printer(
-        'Its trim and ignore edges, OD values, labels, fit, regions, Δψ, '
-        'averaging regions and figure were saved with it. No starts it fresh, as a '
-        'dataset never opened.',
-        tight=True,
-        )
-    if yes_no_asker('Do you want to load the previous processing?',
-                    True,
-                    number='1.3',
-                    ):
-        return saved
-    info_printer(
-        'The dataset starts from the standard settings. What was saved with it '
-        'is replaced only when you start the run.',
-        )
-    return {}
+    # ---- 1 Stop when nothing can be saved beside the data ----------------------------
+    if not save_place_checker(export_folder):
+        raise SystemExit(f'The results cannot be saved in {export_folder.parent} (the '
+                         f'folder cannot be written to). Copy the data folder to a '
+                         f'place you can save to, then open Portimao again and choose '
+                         f'the copy.',
+                         )
+
+    # ---- 2 Ask for the name until it can be used -------------------------------------
+    info_printer(f'The results of this run are saved in a folder with this name, in '
+                 f'{export_folder}.',
+                 tight=True,
+                 )
+    while True:
+        name = text_asker('What should this run be called?',
+                          run_name_finder(export_folder),
+                          checker=lambda typed: run_name_checker(typed, export_folder),
+                          number='1.3',
+                          ).strip()
+        run_folder = export_folder / name
+        if not run_folder.exists():
+            return run_folder
+        info_printer('A folder with this name already exists.', tight=True)
+        if yes_no_asker('Do you want to write over it?', False, number='1.3.1'):
+            return run_folder
 
 
-# ---- results_counter -----------------------------------------------------------------
-def results_counter(export_root: Path, summaries: List[dict]) -> int:
+# ---- run_name_checker ----------------------------------------------------------------
+def run_name_checker(text: Optional[str], export_folder: Path) -> Optional[str]:
     """
     ---- Summary ----
-    Main function to count the files that already have results in a results folder:
-    their own folder there (named as the export names it) holds something.
+    Main function to check the name typed for a run as soon as it is given: a plain
+    name of letters, digits, spaces, - and _, that is not the name of a file already
+    in the export folder.
 
     ---- Inputs ----
-    export_root : Path
-        The results folder; it may not exist yet.
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md); uses 'name'.
+    text : Optional[str]
+        The name as typed; spaces at its ends do not count.
+    export_folder : Path
+        The folder inside the data folder that holds the runs; it may not exist yet.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    int
-        How many of the files have results there.
+    Optional[str]
+        None when the name can be used, otherwise the one sentence saying what to
+        type instead.
 
     ---- Globals mutated ----
     None.
@@ -1453,41 +1466,72 @@ def results_counter(export_root: Path, summaries: List[dict]) -> int:
     None.
 
     ---- Helpers ----
-    file_name_sanitiser
+    None.
     """
 
-    count = 0
-    for summary in summaries:
-        own = Path(export_root) / file_name_sanitiser(summary['name'])
-        if own.is_dir() and any(own.iterdir()):
-            count += 1
-    return count
+    name = (text or '').strip()
+    if not name:
+        return 'Type a name.'
+    if not re.fullmatch(r'[\w \-]+', name):
+        return 'Type a name of letters, digits, spaces, - and _ only.'
+    if (Path(export_folder) / name).is_file():
+        return 'A file with this name is already there. Type another name.'
+    return None
 
 
-# ---- results_folder_checker ----------------------------------------------------------
-def results_folder_checker(text: Optional[str],
-                           data_folder: Optional[Path] = None,
-                           ) -> Optional[str]:
+# ---- run_name_finder -----------------------------------------------------------------
+def run_name_finder(export_folder: Path) -> str:
     """
     ---- Summary ----
-    Main function to check the results folder as soon as it is given: it must not be a
-    file, and it must be a folder that can be saved to. A folder that does not exist yet
-    is checked at the nearest folder above it that does; nothing is left behind.
+    Main function to find the name offered for a run: the first of run_1, run_2 and
+    so on that is not in the export folder yet.
 
     ---- Inputs ----
-    text : Optional[str]
-        The answer as typed or dragged in (quotes and a leading ~ are allowed).
-    data_folder : Optional[Path]
-        The data folder a name without a path is made in; None for the folder the
-        program runs in.
+    export_folder : Path
+        The folder inside the data folder that holds the runs; it may not exist yet.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    Optional[str]
-        None when the folder can be used, otherwise the one sentence saying what to
-        type instead.
+    str
+        The first of 'run_1', 'run_2', ... that is neither a folder nor a file there.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    number = 1
+    while (Path(export_folder) / f'run_{number}').exists():
+        number += 1
+    return f'run_{number}'
+
+
+# ---- save_place_checker --------------------------------------------------------------
+def save_place_checker(folder: Path) -> bool:
+    """
+    ---- Summary ----
+    Main function to check that a folder can be saved to. A folder that does not
+    exist yet is checked at the nearest folder above it that does; nothing is left
+    behind.
+
+    ---- Inputs ----
+    folder : Path
+        The folder; it may not exist yet.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when a file can be written there; False for a file, a place that is not
+        there, or a folder that is read-only or not allowed.
 
     ---- Globals mutated ----
     None. Makes and removes a temporary file in the nearest existing folder (side
@@ -1497,128 +1541,22 @@ def results_folder_checker(text: Optional[str],
     None.
 
     ---- Helpers ----
-    results_folder_resolver
+    None.
     """
 
-    # ---- 1 Find the nearest folder that exists ---------------------------------------
-    if not text:
-        return 'Choose a folder.'
-    nearest = results_folder_resolver(text, data_folder)
+    nearest = Path(folder)
     while not nearest.exists():
         if nearest.parent == nearest:  # a drive or root that is not there
-            return 'Choose a folder you can save to.'
+            return False
         nearest = nearest.parent
     if not nearest.is_dir():
-        return 'Choose a folder, not a file.'
-
-    # ---- 2 Try to save in it ---------------------------------------------------------
+        return False
     try:
         with tempfile.TemporaryFile(dir=nearest):
             pass
     except OSError:  # read-only, or not allowed: the run's log could not start there
-        return 'Choose a folder you can save to.'
-    return None
-
-
-# ---- results_folder_lister -----------------------------------------------------------
-def results_folder_lister(data_folder: Path,
-                          offered: Path,
-                          summaries: List[dict],
-                          ) -> List[Tuple[str, str, str]]:
-    """
-    ---- Summary ----
-    Main function to list the folders offered for the results (1.2): the folder
-    offered first when it is not inside the data folder or does not exist yet, then
-    every folder directly inside the data folder, each with what it holds.
-
-    ---- Inputs ----
-    data_folder : Path
-        The data folder.
-    offered : Path
-        The results folder offered (the one used last, or the free name).
-    summaries : List[dict]
-        File summaries (DATA_FORMAT.md); uses 'name'.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    List[Tuple[str, str, str]]
-        (full path, name, note) of each folder; the note is 'new folder', 'no results'
-        or 'holds results of 12 of 12 files'. Folders whose name starts with a dot or
-        an underscore, and folders that cannot be read, are left out.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    _natural_sorter
-    results_counter
-    """
-
-    def noted(folder: Path) -> Tuple[str, str, str]:
-        if not folder.is_dir():
-            return (str(folder), folder.name, 'new folder')
-        count = results_counter(folder, summaries)
-        note = (f'holds results of {count} of {len(summaries)} files'
-                if count
-                else 'no results'
-                )
-        return (str(folder), folder.name, note)
-
-    inside = []
-    for path in Path(data_folder).iterdir():
-        if not path.is_dir() or path.name.startswith(('.', '_')):
-            continue
-        try:
-            inside.append(noted(path))
-        except OSError:  # a folder that cannot be read is not offered
-            continue
-    inside.sort(key=lambda row: _natural_sorter(row[1]))
-    offered = Path(offered)
-    if any(Path(row[0]) == offered for row in inside):
-        return inside
-    return [noted(offered)] + inside
-
-
-# ---- results_folder_resolver ---------------------------------------------------------
-def results_folder_resolver(text: str, data_folder: Optional[Path] = None) -> Path:
-    """
-    ---- Summary ----
-    Main function to turn the results folder answer into its path: a name or path
-    without a drive or root (quadratic_scatter_results) is taken inside the data
-    folder, so a second set of results sits beside the first.
-
-    ---- Inputs ----
-    text : str
-        The answer as typed or dragged in (quotes and a leading ~ are allowed).
-    data_folder : Optional[Path]
-        The data folder; None leaves such a name to the folder the program runs in.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    Path
-        The results folder.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    path_cleaner
-    """
-
-    path = Path(path_cleaner(text)).expanduser()
-    if data_folder is not None and not path.is_absolute():
-        return Path(data_folder) / path
-    return path
+        return False
+    return True
 
 
 # ---- saved_values_reader -------------------------------------------------------------

@@ -1,7 +1,7 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.38
+- **Version:** V2.39
 - **Date:** 26/11/2026
 
 ## Contents
@@ -114,11 +114,10 @@
     - [`test_folder_answer_is_resolved`](#test_folder_answer_is_resolved)
     - [`test_missing_settings_file_gives_nothing`](#test_missing_settings_file_gives_nothing)
     - [`test_od_values_and_labels_are_kept`](#test_od_values_and_labels_are_kept)
-    - [`test_results_folder_inside_is_kept_relative`](#test_results_folder_inside_is_kept_relative)
-    - [`test_results_folder_is_checked`](#test_results_folder_is_checked)
-    - [`test_results_folder_names_and_old_results`](#test_results_folder_names_and_old_results)
-    - [`test_results_folders_offered`](#test_results_folders_offered)
-    - [`test_results_folder_outside_is_kept_whole`](#test_results_folder_outside_is_kept_whole)
+    - [`test_earlier_runs_are_listed`](#test_earlier_runs_are_listed)
+    - [`test_results_folder_beside_the_data_is_read`](#test_results_folder_beside_the_data_is_read)
+    - [`test_run_name_is_checked`](#test_run_name_is_checked)
+    - [`test_save_place_is_checked`](#test_save_place_is_checked)
     - [`test_regions_are_kept_with_the_dataset`](#test_regions_are_kept_with_the_dataset)
     - [`test_saved_haem_amounts_open_as_delta_d`](#test_saved_haem_amounts_open_as_delta_d)
     - [`test_saved_old_figure_answers_are_left_out`](#test_saved_old_figure_answers_are_left_out)
@@ -272,7 +271,8 @@
     - [`test_hints_under_the_answers`](#test_hints_under_the_answers)
     - [`test_change_opens_earlier_step`](#test_change_opens_earlier_step)
     - [`test_changes_that_open_nothing`](#test_changes_that_open_nothing)
-    - [`test_previous_processing_question`](#test_previous_processing_question)
+    - [`test_previous_settings_question`](#test_previous_settings_question)
+    - [`test_run_name_question`](#test_run_name_question)
     - [`test_answers_told_to_the_window`](#test_answers_told_to_the_window)
     - [`test_folder_question`](#test_folder_question)
 - [`tests/test_haem_decomposition.py`](#teststest_haem_decompositionpy)
@@ -791,9 +791,10 @@
 - [`utils_shared/dataset_settings.py`](#utils_shareddataset_settingspy)
     - [`_event_plainer`](#_event_plainer)
     - [`_export_folder_resolver`](#_export_folder_resolver)
-    - [`_export_folder_shortener`](#_export_folder_shortener)
+    - [`_run_name_sorter`](#_run_name_sorter)
     - [`dataset_settings_reader`](#dataset_settings_reader)
     - [`dataset_settings_saver`](#dataset_settings_saver)
+    - [`earlier_runs_lister`](#earlier_runs_lister)
     - [`file_settings_merger`](#file_settings_merger)
 - [`utils_shared/dataset_setup.py`](#utils_shareddataset_setuppy)
     - [`_label_matcher`](#_label_matcher)
@@ -1263,7 +1264,6 @@
     - [`event_asker`](#event_asker)
     - [`event_entries_builder`](#event_entries_builder)
     - [`files_asker`](#files_asker)
-    - [`free_folder_finder`](#free_folder_finder)
     - [`haem_form_option_builder`](#haem_form_option_builder)
     - [`haem_name_formatter`](#haem_name_formatter)
     - [`label_tidier`](#label_tidier)
@@ -1273,11 +1273,11 @@
     - [`od_gaps_finder`](#od_gaps_finder)
     - [`od_scaling_asker`](#od_scaling_asker)
     - [`paf_finder`](#paf_finder)
-    - [`previous_processing_asker`](#previous_processing_asker)
-    - [`results_counter`](#results_counter)
-    - [`results_folder_checker`](#results_folder_checker)
-    - [`results_folder_lister`](#results_folder_lister)
-    - [`results_folder_resolver`](#results_folder_resolver)
+    - [`previous_settings_asker`](#previous_settings_asker)
+    - [`run_folder_asker`](#run_folder_asker)
+    - [`run_name_checker`](#run_name_checker)
+    - [`run_name_finder`](#run_name_finder)
+    - [`save_place_checker`](#save_place_checker)
     - [`saved_values_reader`](#saved_values_reader)
     - [`temperature_asker`](#temperature_asker)
     - [`trim_layout_finder`](#trim_layout_finder)
@@ -3105,7 +3105,8 @@ the run is cancelled or the window closed part way.
 None.
 
 ---- Globals read ----
-PLACES, PROGRAM_TITLE (written to the log), UPDATE_NOTE (module constants).
+PLACES, PROGRAM_TITLE (written to the log; the window shows it on its title
+bar), UPDATE_NOTE (module constants).
 
 ---- Outputs ----
 int
@@ -4733,7 +4734,7 @@ None.
 
 ## `tests/test_dataset_settings.py`
 
-Tests of the settings kept with a dataset, the results folder check and the list of data
+Tests of the settings kept with each run of a dataset, the earlier runs offered, the name
 
 ### HELPERS
 
@@ -4904,20 +4905,23 @@ None.
 None.
 ```
 
-#### `test_results_folder_inside_is_kept_relative`
+#### `test_earlier_runs_are_listed`
 
 ```text
 ---- Summary ----
-Main function to check that a results folder inside the dataset folder is written
-relative to it, so the settings still hold after the dataset is copied: the copy
-gives the results folder inside the copy.
+Main function to check the earlier runs offered at 1.2: none for data never
+processed; every folder in the export folder that holds a settings file, in the
+order of their names with the numbers counted (run_2 before run_10); a folder
+without a settings file, or with one that cannot be read, left out; and the
+settings saved beside the data first, as one run named after the results folder
+they used, or after the export folder when they name none.
 
 ---- Inputs ----
 tmp_path : Path
     Empty folder from pytest.
 
 ---- Globals read ----
-SETTINGS_FILE_NAME (imported).
+FILES, ANSWERS, SETTINGS_FILE_NAME.
 
 ---- Outputs ----
 None.
@@ -4932,20 +4936,21 @@ None.
 None.
 ```
 
-#### `test_results_folder_is_checked`
+#### `test_results_folder_beside_the_data_is_read`
 
 ```text
 ---- Summary ----
-Main function to check the results folder answer: a file, or a folder under a file,
-is refused with one sentence; an existing folder and one not made yet are accepted,
-and checking leaves nothing behind.
+Main function to check the results folder named in a settings file saved beside
+the data: a path without a drive or root is taken inside the data folder, so it
+still holds after the data is copied; a full path is given as it is; and the file
+of a run names none.
 
 ---- Inputs ----
 tmp_path : Path
     Empty folder from pytest.
 
 ---- Globals read ----
-None.
+FILES, ANSWERS, SETTINGS_FILE_NAME.
 
 ---- Outputs ----
 None.
@@ -4960,42 +4965,15 @@ None.
 None.
 ```
 
-#### `test_results_folder_names_and_old_results`
+#### `test_run_name_is_checked`
 
 ```text
 ---- Summary ----
-Main function to check the results folder answer against the data folder: a name
-without a path is taken inside the data folder and a full path as it is; the files
-that already have results there are counted (an empty folder of one does not
-count); and the free name offered beside a folder skips the names already used.
-
----- Inputs ----
-tmp_path : Path
-    Empty folder from pytest.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `test_results_folders_offered`
-
-```text
----- Summary ----
-Main function to check the folders offered as buttons for the results (1.2): every
-folder inside the data folder in name order, each with what it holds, and the
-folder offered first only when it does not exist yet or is outside the data folder.
+Main function to check the name of a run (1.3): the name offered is the first of
+run_1, run_2 and so on that is not there; a name of letters, digits, spaces, -
+and _ is accepted, also one already there as a folder; an empty name, a path, a
+name with other characters and the name of a file there are refused with one
+sentence each.
 
 ---- Inputs ----
 tmp_path : Path
@@ -5017,12 +4995,13 @@ None.
 None.
 ```
 
-#### `test_results_folder_outside_is_kept_whole`
+#### `test_save_place_is_checked`
 
 ```text
 ---- Summary ----
-Main function to check that a results folder outside the dataset folder is written
-and read back as its full path.
+Main function to check whether a folder can be saved to: a folder there and one
+not made yet can; a file, and a folder under a file, cannot; and checking leaves
+nothing behind.
 
 ---- Inputs ----
 tmp_path : Path
@@ -9102,7 +9081,7 @@ None.
 
 ## `tests/test_guide_steps.py`
 
-Tests of the guide on the left of the window: its steps, the step open and the previous processing question.
+Tests of the guide on the left of the window: its steps, the step open, the previous settings question and the run name question.
 
 ### HELPERS
 
@@ -9394,16 +9373,49 @@ None.
 _state_maker
 ```
 
-#### `test_previous_processing_question`
+#### `test_previous_settings_question`
 
 ```text
 ---- Summary ----
-Main function to check question 1.3: Yes, and Enter, load what was saved with
-the dataset; No starts it fresh, as a dataset never opened.
+Main function to check question 1.2. With one earlier run: Yes, and Enter, load
+its settings; No starts fresh. With several: the number of a run loads its
+settings, the last number (START FRESH) starts fresh, and Enter alone is not an
+answer.
 
 ---- Inputs ----
 monkeypatch : pytest.MonkeyPatch
     Replaces the reading of the answers.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `test_run_name_question`
+
+```text
+---- Summary ----
+Main function to check question 1.3: Enter takes the name offered; a name already
+there is taken only after Yes at 1.3.1, and No asks for the name again; a data
+folder that cannot be saved to stops the program with one sentence.
+
+---- Inputs ----
+monkeypatch : pytest.MonkeyPatch
+    Replaces the reading of the answers.
+tmp_path : Path
+    Empty folder from pytest, standing in for the data folder.
 
 ---- Globals read ----
 None.
@@ -20104,7 +20116,7 @@ None.
 
 ## `tests/test_time_regions.py`
 
-Tests of the boxes above the plot that the program runs: the tabs of the Time regions box, the export buttons of the trim step and the figure step that asks only Continue.
+Tests of the boxes above the plot that the program runs: the tabs of the Time regions box, the export buttons of the trim step and the figure step that asks only CONTINUE.
 
 ### CLASSES
 
@@ -20433,8 +20445,8 @@ _kits_maker
 ```text
 ---- Summary ----
 Main function to check the two export buttons of the trim step: they are offered
-above Continue, each writes the files with the edges as they are (Export full +
-trimmed csv with the whole recordings too), and the step waits again; Continue
+above CONTINUE, each writes the files with the edges as they are (Export full +
+trimmed csv with the whole recordings too), and the step waits again; CONTINUE
 then gives the limits of the edges. Without an exporter there are no buttons. The
 plot, the edges and the questions are stood in for.
 
@@ -21900,7 +21912,7 @@ None.
 ```text
 ---- Summary ----
 Main function to check the haem step of the processing: one instruction, 4.1,
-answered with Continue, and no question about the fit. With no haems shown and
+answered with CONTINUE, and no question about the fit. With no haems shown and
 Haem decomposition left unticked the run goes on without haems; a click on Do PCA
 while it waits makes the components of the whole dataset the fit in use; Do PCA
 is only carried out while the step waits. The plot, the later steps of the
@@ -21933,7 +21945,7 @@ None.
 ---- Summary ----
 Main function to check the Δψ step of the processing: after Yes to 4.5, a line,
 the formula of Δψ drawn in the guide and the line saying what its letters are,
-then one instruction, 4.5.1, answered with Continue; after No, no formula and no
+then one instruction, 4.5.1, answered with CONTINUE; after No, no formula and no
 4.5.1. The plot, the regions, the averaging and the questions are stood in for.
 
 ---- Inputs ----
@@ -24385,7 +24397,7 @@ None.
 
 ## `utils_shared/dataset_settings.py`
 
-The settings kept with a dataset: read from and written to a file in its folder.
+The settings kept with each run of a dataset: read from and written to a file in the run's folder.
 
 ### HELPERS
 
@@ -24452,26 +24464,23 @@ None.
 None.
 ```
 
-#### `_export_folder_shortener`
+#### `_run_name_sorter`
 
 ```text
 ---- Summary ----
-Helper function to write the results folder relative to the dataset folder when it
-is inside it, so the settings still hold after the dataset is copied elsewhere.
+Helper function to give the key that sorts run names with their numbers in order,
+so run_2 comes before run_10.
 
 ---- Inputs ----
-folder : Path
-    The dataset folder.
-export_root : Path
-    The results folder.
+name : str
+    The name of a run's folder.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-str
-    The path from the dataset folder with forward slashes ('results'), or the full
-    path when the results folder is somewhere else.
+list
+    The name split into text (lower case) and whole numbers.
 
 ---- Globals mutated ----
 None.
@@ -24489,12 +24498,14 @@ None.
 
 ```text
 ---- Summary ----
-Main function to read the settings last saved for a dataset from the file in its
-folder.
+Main function to read the settings saved in a folder: those of a run, from the
+file in the run's own folder, or those saved beside the data before each run had
+its own folder, from the file in the data folder.
 
 ---- Inputs ----
 folder : Path
-    The dataset folder (the folder of the .paf files).
+    The folder that holds the settings file: the folder of a run, or the data
+    folder (the folder of the .paf files).
 
 ---- Globals read ----
 SETTINGS_FILE_NAME, RETIRED_HAEM_MODES, RENAMED_ANSWERS, RETIRED_ANSWER_NAMES,
@@ -24503,10 +24514,11 @@ RETIRED_ANSWER_STARTS (module constants).
 ---- Outputs ----
 dict
     {'export_folder': Optional[Path], 'files': dict, 'answers': dict, 'setup':
-    dict, 'page': Any} (DATA_FORMAT.md, dataset_settings); the set-up is empty
-    for a dataset never set up, and the page is as the file holds it, unchecked
-    (None for none). An empty dict when the dataset was never
-    saved or its file cannot be read, so the standard settings are used. A haem
+    dict, 'page': Any} (DATA_FORMAT.md, dataset_settings); the results folder is
+    only in a file saved beside the data (None in the file of a run), the set-up
+    is empty for a dataset never set up, and the page is as the file holds it,
+    unchecked (None for none). An empty dict when the folder holds no settings
+    file or it cannot be read, so the standard settings are used. A haem
     way of showing no longer offered (RETIRED_HAEM_MODES) is given as its
     successor, an answer saved under an old name (RENAMED_ANSWERS) under its
     new one, and the answers of the fixed figures that are no longer made
@@ -24527,14 +24539,12 @@ saved_setup_reader
 
 ```text
 ---- Summary ----
-Main function to save the settings of a dataset in a file in its folder, so the
-dataset opens with them next time, on this computer or another.
+Main function to save the settings of a run in a file in the run's own folder, so
+the data can be processed again with them, on this computer or another.
 
 ---- Inputs ----
-folder : Path
-    The dataset folder (the folder of the .paf files).
-export_root : Path
-    The results folder.
+run_folder : Path
+    The folder of the run (export/<name> inside the data folder), already made.
 files : dict
     {file name: limits in minutes, OD values and events} as file_settings_merger
     builds it.
@@ -24561,7 +24571,42 @@ None. Writes the file (side effect).
 None.
 
 ---- Helpers ----
-_export_folder_shortener
+None.
+```
+
+#### `earlier_runs_lister`
+
+```text
+---- Summary ----
+Main function to list the earlier runs of a data folder whose settings can be
+loaded: the settings saved beside the data before each run had its own folder,
+as one run named after the results folder they used, then every folder inside the
+export folder that holds a settings file, in the order of their names.
+
+---- Inputs ----
+folder : Path
+    The data folder (the folder of the .paf files).
+export_name : str
+    The name of the folder inside the data folder that holds the runs (export).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+List[Tuple[str, dict]]
+    (name, settings as dataset_settings_reader gives them) of each earlier run;
+    empty for data never processed. A folder whose settings file cannot be read
+    is left out.
+
+---- Globals mutated ----
+None. Reads the files (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_run_name_sorter
+dataset_settings_reader
 ```
 
 #### `file_settings_merger`
@@ -36056,7 +36101,7 @@ default : object
     the choices ticked at first; the folder highlighted at first; None for none.
 value : Optional[str]
     What the typing box starts with ('number', 'text', 'folder'), or the words of
-    the button that goes on ('continue'; None for Continue).
+    the button that goes on ('continue'; None for CONTINUE).
 
 ---- Globals read ----
 _answer_requester (module state).
@@ -36639,7 +36684,7 @@ retry_teller
 ```text
 ---- Summary ----
 Main function to give a numbered instruction that is carried out in the window (on
-the plot or in the boxes above it) and wait until Continue (Enter with the answer
+the plot or in the boxes above it) and wait until CONTINUE (Enter with the answer
 box empty), or the button named in its place, or one of the extra buttons is
 clicked. Anything else typed is answered with ``nudge`` and the instruction goes
 on waiting.
@@ -36655,17 +36700,17 @@ number : Optional[str]
     The instruction's own number from QUESTION_FLOW.md, such as '2.1'; None to
     number it in the order asked.
 extras : Sequence[Tuple[str, str]]
-    (answer, words) of each button shown above Continue, such as ('export',
-    'Export trimmed csv'); empty for Continue alone.
+    (answer, words) of each button shown above CONTINUE, such as ('export',
+    'EXPORT trimmed CSV'); empty for CONTINUE alone.
 go_words : Optional[str]
-    The words of the button that goes on, such as 'Export'; None for Continue.
+    The words of the button that goes on, such as 'EXPORT'; None for CONTINUE.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
 str
-    '' for Continue (or the button in its place), or the answer of the extra
+    '' for CONTINUE (or the button in its place), or the answer of the extra
     button clicked.
 
 ---- Globals mutated ----
@@ -36689,7 +36734,7 @@ retry_teller
 ---- Summary ----
 Main function to ask for a folder. In the window each folder offered is a button
 that a click highlights, "Other folder…" opens a box for a full path with Browse…
-beside it, and Continue gives the folder highlighted; in the terminal the path is
+beside it, and CONTINUE gives the folder highlighted; in the terminal the path is
 typed. An answer the checker refuses gets its one sentence of what to do, and the
 question waits for the next answer.
 
@@ -40752,13 +40797,13 @@ root : Path
     Folder to look in (the user's own folder, UserPlaces.own_folder).
 
 ---- Globals read ----
-None.
+HIDDEN_DATA_FOLDERS (module constant).
 
 ---- Outputs ----
 List[Path]
     The folders with at least one .paf file directly inside, in natural name
-    order. Folders whose name starts with a dot or an underscore, and folders that
-    cannot be read, are left out.
+    order. Folders whose name starts with a dot or an underscore, the folders of
+    HIDDEN_DATA_FOLDERS and folders that cannot be read are left out.
 
 ---- Globals mutated ----
 None.
@@ -40952,13 +40997,10 @@ label_tidier
 ```text
 ---- Summary ----
 Main function to ask for the folder of .paf files (1.1), offering the data folders
-found in the user's own folder as buttons, and the results folder (1.2), offering
-the folders inside the data folder, and to read a summary of every file and the
-settings saved with the dataset. A results folder named without a path is made
-inside the data folder; one that already holds results of these files is taken
-only once the user agrees to write over them (1.2.1), and otherwise asked again
-with a free name offered first. For a dataset opened before, it asks whether its
-previous processing is loaded (1.3). It starts the first three steps of the guide.
+found in the user's own folder as buttons, to read a summary of every file, to ask
+for data processed before which earlier settings are loaded (1.2), and to ask for
+the name of this run (1.3), whose results go in a folder of that name inside the
+export folder of the data folder. It starts the first three steps of the guide.
 
 ---- Inputs ----
 last : dict
@@ -40973,10 +41015,10 @@ None.
 
 ---- Outputs ----
 Tuple[Path, List[dict], Path, dict]
-    (data folder, summary of each readable file, results folder, settings saved
-    with the dataset). Each summary has name, path, duration_min, events and
-    datasets; the settings are those of dataset_settings_reader, empty for a
-    dataset never saved or one started fresh at 1.3 (DATA_FORMAT.md).
+    (data folder, summary of each readable file, results folder of this run,
+    settings loaded). Each summary has name, path, duration_min, events and
+    datasets; the settings are those of dataset_settings_reader, empty for data
+    never processed or started fresh at 1.2 (DATA_FORMAT.md).
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect).
@@ -40987,49 +41029,16 @@ None.
 ---- Helpers ----
 data_folder_lister
 data_folder_resolver
-dataset_settings_reader
+earlier_runs_lister
 experiment_summary_reader
 folder_asker
-free_folder_finder
 guide_step_starter
 info_printer
 paf_finder
-previous_processing_asker
+previous_settings_asker
 progress_clearer
 progress_printer
-results_counter
-results_folder_checker
-results_folder_lister
-results_folder_resolver
-yes_no_asker
-```
-
-#### `free_folder_finder`
-
-```text
----- Summary ----
-Main function to find a folder name beside the one given that is not used yet, by
-adding _2, _3 and so on, to offer when the user keeps the results already there.
-
----- Inputs ----
-folder : Path
-    The folder whose name is taken (results).
-
----- Globals read ----
-None.
-
----- Outputs ----
-Path
-    The first of <folder>_2, <folder>_3, ... that does not exist.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
+run_folder_asker
 ```
 
 #### `haem_form_option_builder`
@@ -41190,7 +41199,7 @@ None.
 ---- Summary ----
 Main function to show the OCR per OD once the OD values are in, unless the dataset
 was saved with the OCR as % of the range, and point to the View box, where it and
-the haems can be shown per OD or not at any time; the step waits for Continue
+the haems can be shown per OD or not at any time; the step waits for CONTINUE
 (3.2.2).
 
 ---- Inputs ----
@@ -41321,26 +41330,59 @@ None.
 _natural_sorter
 ```
 
-#### `previous_processing_asker`
+#### `previous_settings_asker`
 
 ```text
 ---- Summary ----
-Main function to ask, for a dataset opened before, whether its previous processing
-is loaded (1.3). Yes offers every answer saved with it as the default; No starts
-the dataset fresh, as one never opened: the standard settings, no OD values and the
-labels as written in the files. The settings file itself is only written again when
-the run starts.
+Main function to ask, for data processed before, which earlier settings are
+loaded (1.2). With one earlier run it is a yes or no; with several, a button per
+run, named after its folder, and START FRESH. The settings loaded are offered as
+the defaults from here on; starting fresh gives the standard settings, no OD
+values and the labels as written in the files. No earlier run is changed: this
+run is saved in a folder of its own.
 
 ---- Inputs ----
-saved : dict
-    The settings saved with the dataset (dataset_settings_reader), not empty.
+runs : List[Tuple[str, dict]]
+    (name, settings) of each earlier run (earlier_runs_lister), not empty.
+
+---- Globals read ----
+FRESH_KEY (module constant).
+
+---- Outputs ----
+dict
+    The settings of the run chosen, or an empty dict to start fresh.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+info_printer
+yes_no_asker
+```
+
+#### `run_folder_asker`
+
+```text
+---- Summary ----
+Main function to ask for the name of this run (1.3) and give the folder its
+results go in, a folder of that name inside the export folder. The name offered
+is the next free of run_1, run_2 and so on. A name already there is used only
+once the user agrees to write over it (1.3.1); otherwise the name is asked again.
+
+---- Inputs ----
+export_folder : Path
+    The folder inside the data folder that holds the runs; it may not exist yet.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-dict
-    ``saved`` for yes, an empty dict for no.
+Path
+    The folder of this run; it may not exist yet.
 
 ---- Globals mutated ----
 None. Reads from and prints to the terminal (side effect).
@@ -41350,28 +41392,34 @@ None.
 
 ---- Helpers ----
 info_printer
+run_name_checker
+run_name_finder
+save_place_checker
+text_asker
 yes_no_asker
 ```
 
-#### `results_counter`
+#### `run_name_checker`
 
 ```text
 ---- Summary ----
-Main function to count the files that already have results in a results folder:
-their own folder there (named as the export names it) holds something.
+Main function to check the name typed for a run as soon as it is given: a plain
+name of letters, digits, spaces, - and _, that is not the name of a file already
+in the export folder.
 
 ---- Inputs ----
-export_root : Path
-    The results folder; it may not exist yet.
-summaries : List[dict]
-    File summaries (DATA_FORMAT.md); uses 'name'.
+text : Optional[str]
+    The name as typed; spaces at its ends do not count.
+export_folder : Path
+    The folder inside the data folder that holds the runs; it may not exist yet.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-int
-    How many of the files have results there.
+Optional[str]
+    None when the name can be used, otherwise the one sentence saying what to
+    type instead.
 
 ---- Globals mutated ----
 None.
@@ -41380,31 +41428,56 @@ None.
 None.
 
 ---- Helpers ----
-file_name_sanitiser
+None.
 ```
 
-#### `results_folder_checker`
+#### `run_name_finder`
 
 ```text
 ---- Summary ----
-Main function to check the results folder as soon as it is given: it must not be a
-file, and it must be a folder that can be saved to. A folder that does not exist yet
-is checked at the nearest folder above it that does; nothing is left behind.
+Main function to find the name offered for a run: the first of run_1, run_2 and
+so on that is not in the export folder yet.
 
 ---- Inputs ----
-text : Optional[str]
-    The answer as typed or dragged in (quotes and a leading ~ are allowed).
-data_folder : Optional[Path]
-    The data folder a name without a path is made in; None for the folder the
-    program runs in.
+export_folder : Path
+    The folder inside the data folder that holds the runs; it may not exist yet.
 
 ---- Globals read ----
 None.
 
 ---- Outputs ----
-Optional[str]
-    None when the folder can be used, otherwise the one sentence saying what to
-    type instead.
+str
+    The first of 'run_1', 'run_2', ... that is neither a folder nor a file there.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `save_place_checker`
+
+```text
+---- Summary ----
+Main function to check that a folder can be saved to. A folder that does not
+exist yet is checked at the nearest folder above it that does; nothing is left
+behind.
+
+---- Inputs ----
+folder : Path
+    The folder; it may not exist yet.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when a file can be written there; False for a file, a place that is not
+    there, or a folder that is read-only or not allowed.
 
 ---- Globals mutated ----
 None. Makes and removes a temporary file in the nearest existing folder (side
@@ -41414,74 +41487,7 @@ effect).
 None.
 
 ---- Helpers ----
-results_folder_resolver
-```
-
-#### `results_folder_lister`
-
-```text
----- Summary ----
-Main function to list the folders offered for the results (1.2): the folder
-offered first when it is not inside the data folder or does not exist yet, then
-every folder directly inside the data folder, each with what it holds.
-
----- Inputs ----
-data_folder : Path
-    The data folder.
-offered : Path
-    The results folder offered (the one used last, or the free name).
-summaries : List[dict]
-    File summaries (DATA_FORMAT.md); uses 'name'.
-
----- Globals read ----
 None.
-
----- Outputs ----
-List[Tuple[str, str, str]]
-    (full path, name, note) of each folder; the note is 'new folder', 'no results'
-    or 'holds results of 12 of 12 files'. Folders whose name starts with a dot or
-    an underscore, and folders that cannot be read, are left out.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-_natural_sorter
-results_counter
-```
-
-#### `results_folder_resolver`
-
-```text
----- Summary ----
-Main function to turn the results folder answer into its path: a name or path
-without a drive or root (quadratic_scatter_results) is taken inside the data
-folder, so a second set of results sits beside the first.
-
----- Inputs ----
-text : str
-    The answer as typed or dragged in (quotes and a leading ~ are allowed).
-data_folder : Optional[Path]
-    The data folder; None leaves such a name to the folder the program runs in.
-
----- Globals read ----
-None.
-
----- Outputs ----
-Path
-    The results folder.
-
----- Globals mutated ----
-None.
-
----- Equations ----
-None.
-
----- Helpers ----
-path_cleaner
 ```
 
 #### `saved_values_reader`
@@ -43497,8 +43503,8 @@ The developer's Flag button: a picture of the window, a comment and the log so f
 ```text
 ---- Summary ----
 The small box that takes the comment of a flag, above the window but not blocking
-it: Save (or Ctrl+Enter) writes the note and the log into the flag's folder, Cancel
-(or closing the box) removes the folder.
+it: Save (or Enter; Shift+Enter gives a new line) writes the note and the log into
+the flag's folder, Cancel (or closing the box) removes the folder.
 
 ---- Attributes ----
 folder : Path
@@ -43605,7 +43611,7 @@ None.
 
 ---- Outputs ----
 str
-    'break', so Ctrl+Enter adds no new line to the text area.
+    'break', so Enter adds no new line to the text area.
 
 ---- Globals mutated ----
 None. Writes the flag's files and closes the box (side effects).
@@ -44068,7 +44074,7 @@ _widgets_builder
 ```text
 ---- Summary ----
 Method to pass the answer typed in the box to the question that is waiting for
-it (Continue under the box, or Enter in it).
+it (CONTINUE under the box, or Enter in it).
 
 ---- Inputs ----
 event : Any
@@ -47675,11 +47681,11 @@ None.
 
 ```text
 ---- Summary ----
-The answers of the question waiting, under its card: one big Continue button for
+The answers of the question waiting, under its card: one big CONTINUE button for
 something done on the plot or in the strip; Yes and No one above the other; a
-button for each choice; tick buttons and Continue for several choices; a box with
-Continue only for a number or a name to type; folder buttons, Other folder… with a
-box for a full path and Browse…, and Continue for a folder; Confirm for a table;
+button for each choice; tick buttons and CONTINUE for several choices; a box with
+CONTINUE only for a number or a name to type; folder buttons, Other folder… with a
+box for a full path and Browse…, and CONTINUE for a folder; Confirm for a table;
 or, while an earlier step is open, the button back to the step waited at. The
 answer the program gives with Enter is the highlighted button, which holds the
 keyboard. Every method runs on the window thread.
@@ -47733,7 +47739,7 @@ colours : Dict[str, str]
 on_click : Callable[[str, str], None]
     Called with (answer, words shown) when a button gives the answer.
 on_typed : Callable[[], None]
-    Called when the answer typed in the box is sent (Continue or Enter).
+    Called when the answer typed in the box is sent (CONTINUE or Enter).
 on_confirm : Callable[[], Any]
     Called when Confirm is clicked.
 
@@ -47902,7 +47908,7 @@ folder_words_builder
 
 ```text
 ---- Summary ----
-Helper method to give the folder highlighted (Continue): the path of its
+Helper method to give the folder highlighted (CONTINUE): the path of its
 button, or the path in the box under Other folder…; an empty box gives nothing.
 
 ---- Inputs ----
@@ -47931,7 +47937,7 @@ None.
 ---- Summary ----
 Helper method to show the answers of a folder question: a button for each
 folder offered, Other folder… with its row (the box for a full path and
-Browse…, shown when it is highlighted), and Continue.
+Browse…, shown when it is highlighted), and CONTINUE.
 
 ---- Inputs ----
 request : Dict[str, Any]
@@ -47992,7 +47998,7 @@ None.
 
 ```text
 ---- Summary ----
-Helper method to tick or untick one choice of several; Continue is greyed
+Helper method to tick or untick one choice of several; CONTINUE is greyed
 while none is ticked.
 
 ---- Inputs ----
@@ -51662,7 +51668,7 @@ text_colourer
 ---- Summary ----
 Helper function to write the spectra of each file as csv files now, from one of the
 two export buttons of the trim step: those of the trimmed data, with those of the
-whole recording of each trimmed file too from "Export full + trimmed csv". No
+whole recording of each trimmed file too from "EXPORT full + trimmed CSV". No
 workbook is written and nothing is asked; one line gives the size first. The
 choice and the limits exported are kept in the session; the guide stays where it
 is.
@@ -52184,7 +52190,7 @@ None.
 ---- Summary ----
 Helper function to run the regions step on the plot of every file: the oxidised and
 the reduced region are dragged out on the plot or typed in the Time regions box
-above it, under the key of their colours, and Continue accepts them. With "Apply to
+above it, under the key of their colours, and CONTINUE accepts them. With "Apply to
 all" ticked, an edge set on the file shown is copied to every file at the same
 distance from its nearest addition, or from the end when it lies after the last
 addition. A file without both regions stays in delta D. The regions are then
@@ -52823,8 +52829,8 @@ one window picked with the buttons beside it changes, on the file shown only; th
 others are grey and have no edges, and Apply to all is greyed. The two values are
 also typed in the Time regions box, under its Averaging windows tick box (unticked
 there are no windows) and a numbered tick per window to leave it out (grey).
-Continue accepts. The windows that do not fit are shaded red and named in a
-warning after Continue. The quick windows are hidden for now. When no file has an
+CONTINUE accepts. The windows that do not fit are shaded red and named in a
+warning after CONTINUE. The quick windows are hidden for now. When no file has an
 addition, nothing is asked and nothing is averaged.
 
 ---- Inputs ----
@@ -53073,7 +53079,7 @@ temperature_asker
 Main function to build the page of a dataset figure in the window (Build a figure,
 6.2): the page starts as it was saved with the dataset, or empty; plots are placed
 by dragging across its grid, each drawn from the experiments once its form is
-done, and a template can be loaded or saved; Continue ends the step, after the
+done, and a template can be loaded or saved; CONTINUE ends the step, after the
 offer to save a page that was changed as a template.
 
 ---- Inputs ----
@@ -53236,16 +53242,16 @@ region_files_lister
 ```text
 ---- Summary ----
 Main function to talk the user through the processing, with the plot redrawn after
-each answer: first the haem fit, set in the Haem decomposition box until Continue
+each answer: first the haem fit, set in the Haem decomposition box until CONTINUE
 (its Do PCA button asks the questions that find the components from the whole
 dataset, with the boxes greyed out meanwhile), then the oxidised and the reduced
 region of every file (when the haems are shown), then whether to plot Δψ (when it
-can be; on Yes, its formula and a wait for Continue while its numbers are set in
+can be; on Yes, its formula and a wait for CONTINUE while its numbers are set in
 the Δψ box), and last the averaging windows, dragged on the plot (they are drawn in
 the plot only once that step is answered). The trim and ignore edges stay movable
 under Trim / Ignore in the Time regions box. A line says which fit the haems are
 worked out with at the start, and another points to % oxidised once a file has
-both regions. Haem decomposition unticked at Continue goes on without haems.
+both regions. Haem decomposition unticked at CONTINUE goes on without haems.
 
 ---- Inputs ----
 session : ViewerSession
@@ -53344,7 +53350,7 @@ region_span_reader
 ---- Summary ----
 Main function to have the dataset set-up table filled in in the window (Dataset
 set-up, 6.1): one row per experiment, as saved with the dataset or filled in
-from the file names, corrected by the user; Continue ends the step.
+from the file names, corrected by the user; CONTINUE ends the step.
 
 ---- Inputs ----
 names : List[str]
@@ -53382,9 +53388,9 @@ setup_builder
 ---- Summary ----
 Main function to run the trimming step on the standard plot of the whole recording
 of every file: the trimmed and ignored edges are dragged on the plot or typed in
-the Time regions box above it, under the key of their colours, and Continue
+the Time regions box above it, under the key of their colours, and CONTINUE
 accepts them; the two export buttons write the spectra as csv files with the edges
-as they are (Export full + trimmed csv with the whole recording of each trimmed
+as they are (EXPORT full + trimmed CSV with the whole recording of each trimmed
 file too), and
 the step waits again. When the step is
 opened again, the limits it had stay on the plot as red dashed lines. The limits
@@ -53404,7 +53410,7 @@ previous : Optional[Dict[str, dict]]
     dragged; None for none.
 exporter : Optional[Callable[[Dict[str, dict], bool], None]]
     Called with the limits of the edges as they are when an export button is
-    clicked, and True for Export full + trimmed csv; None for no export buttons.
+    clicked, and True for EXPORT full + trimmed CSV; None for no export buttons.
 
 ---- Globals read ----
 TRIM_KEY_LINES, TRIM_NUDGE (module constants); EXPORT_BUTTONS,

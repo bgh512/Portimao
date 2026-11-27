@@ -24,26 +24,33 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
         'Portimao and open it again.',
         ),
     (
-        'results_folder',
+        'previous',
         'Import',
-        'Results folder',
-        'The results folder is chosen when Portimao opens: to use another, close Portimao '
-        'and open it again.',
+        'Previous settings',
+        'The settings of an earlier run are loaded, or not, when Portimao opens: to '
+        'choose again, close Portimao and open it again.',
         ),
-    ('previous', 'Import', 'Previous processing', 'Whether the previous processing is loaded is chosen when Portimao opens.'),
+    ('run_name',
+     'Import',
+     'Save as',
+     'The name of this run is typed when Portimao opens; its results are in the '
+     'folder of that name, in the export folder of the data folder. To use another, '
+     'close Portimao and open it again.',
+     ),
     ('trim',
      'Import',
      'Trim and ignore',
      'Drag the bars on the plot, or type the times under Trim / Ignore in the Time '
-     'regions box above it. Click Export full + trimmed csv or Export trimmed csv to '
+     'regions box above it. Click EXPORT full + trimmed CSV or EXPORT trimmed CSV to '
      'write the csv files with the bars as they are.',
      ),
-    ('temperature',
-     'Set-up',
-     'Temperature',
-     'The temperature of the runs was typed here. It can also be changed in the Δψ box, '
-     'under More options.',
-     ),
+    (
+        'temperature',
+        'Set-up',
+        'Temperature',
+        'The temperature of the runs was typed here. It can also be changed in the Δψ box, '
+        'under More options.',
+        ),
     ('od_scaling',
      'Set-up',
      'OD values or not',
@@ -72,7 +79,7 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
      'Haems',
      'Change the spectra, the scatter, the fit and the haems shown in the Haem '
      'decomposition box above the plot: the plot is redrawn after each change. To '
-     'compare two, click Keep to compare first. Press Continue when ready.',
+     'compare two, click Keep to compare first. Press CONTINUE when ready.',
      ),
     ('regions',
      'Experiment processing',
@@ -158,9 +165,9 @@ CHANGE_STEPS = {'edit_ods': 'od_values',
 # told as, its words). A click is told as {change: True}, as a change in the boxes is.
 # The trim step's two export buttons write the spectra of the trimmed data as csv files,
 # or those and the whole recording's of each trimmed file.
-EXPORT_FULL_TEXT = 'Export full + trimmed csv'
+EXPORT_FULL_TEXT = 'EXPORT full + trimmed CSV'
 EXPORT_FULL_CHANGE = 'export_full'
-EXPORT_TRIMMED_TEXT = 'Export trimmed csv'
+EXPORT_TRIMMED_TEXT = 'EXPORT trimmed CSV'
 EXPORT_TRIMMED_CHANGE = 'export_trimmed'
 EXPORT_BUTTONS = ((EXPORT_FULL_CHANGE, EXPORT_FULL_TEXT),
                   (EXPORT_TRIMMED_CHANGE, EXPORT_TRIMMED_TEXT),
@@ -199,12 +206,12 @@ FOCUS_COLOUR = '#9cdcfe'
 ONE_COLUMN_MOST = 6
 TICKED = '☑'
 UNTICKED = '☐'
-# The folder buttons: the one highlighted is what Continue gives.
+# The folder buttons: the one highlighted is what CONTINUE gives.
 PICKED_BACKGROUND = '#1b3a57'
 PICKED_MARK = '●'
 UNPICKED_MARK = '○'
 OTHER_FOLDER_TEXT = 'Other folder…'
-BROWSE_TEXT = 'Browse…'
+BROWSE_TEXT = 'BROWSE…'
 
 
 # ---- GuideState ----------------------------------------------------------------------
@@ -761,11 +768,11 @@ class GuidePanel:
 class AnswerArea:
     """
     ---- Summary ----
-    The answers of the question waiting, under its card: one big Continue button for
+    The answers of the question waiting, under its card: one big CONTINUE button for
     something done on the plot or in the strip; Yes and No one above the other; a
-    button for each choice; tick buttons and Continue for several choices; a box with
-    Continue only for a number or a name to type; folder buttons, Other folder… with a
-    box for a full path and Browse…, and Continue for a folder; Confirm for a table;
+    button for each choice; tick buttons and CONTINUE for several choices; a box with
+    CONTINUE only for a number or a name to type; folder buttons, Other folder… with a
+    box for a full path and Browse…, and CONTINUE for a folder; Confirm for a table;
     or, while an earlier step is open, the button back to the step waited at. The
     answer the program gives with Enter is the highlighted button, which holds the
     keyboard. Every method runs on the window thread.
@@ -828,7 +835,7 @@ class AnswerArea:
         on_click : Callable[[str, str], None]
             Called with (answer, words shown) when a button gives the answer.
         on_typed : Callable[[], None]
-            Called when the answer typed in the box is sent (Continue or Enter).
+            Called when the answer typed in the box is sent (CONTINUE or Enter).
         on_confirm : Callable[[], Any]
             Called when Confirm is clicked.
 
@@ -876,7 +883,7 @@ class AnswerArea:
                               highlightbackground='#3c3c3c',
                               highlightcolor=FOCUS_COLOUR,
                               )
-        self.confirm = self._button_maker('Confirm', lambda: on_confirm(), True)
+        self.confirm = self._button_maker('CONFIRM',lambda: on_confirm(), True)
 
     # ---- _button_maker ---------------------------------------------------------------
     def _button_maker(self,
@@ -1128,7 +1135,7 @@ class AnswerArea:
     def _folder_sender(self) -> None:
         """
         ---- Summary ----
-        Helper method to give the folder highlighted (Continue): the path of its
+        Helper method to give the folder highlighted (CONTINUE): the path of its
         button, or the path in the box under Other folder…; an empty box gives nothing.
 
         ---- Inputs ----
@@ -1165,7 +1172,7 @@ class AnswerArea:
         ---- Summary ----
         Helper method to show the answers of a folder question: a button for each
         folder offered, Other folder… with its row (the box for a full path and
-        Browse…, shown when it is highlighted), and Continue.
+        Browse…, shown when it is highlighted), and CONTINUE.
 
         ---- Inputs ----
         request : Dict[str, Any]
@@ -1226,8 +1233,8 @@ class AnswerArea:
         self.entry.delete(0, 'end')
         self.entry.insert(0, request['value'] or '')
 
-        # ---- 2 Continue, and the folder highlighted at first -------------------------
-        go = self._button_maker('Continue', self._folder_sender, True)
+        # ---- 2 CONTINUE, and the folder highlighted at first -------------------------
+        go = self._button_maker('CONTINUE', self._folder_sender, True)
         go.pack(side='top', fill='x', pady=(6, 2))
         self._widgets.append(go)
         self._default = go
@@ -1275,7 +1282,7 @@ class AnswerArea:
     def _ticker(self, number: int) -> None:
         """
         ---- Summary ----
-        Helper method to tick or untick one choice of several; Continue is greyed
+        Helper method to tick or untick one choice of several; CONTINUE is greyed
         while none is ticked.
 
         ---- Inputs ----
@@ -1454,14 +1461,14 @@ class AnswerArea:
 
         # ---- 2 Show the answers of this one ------------------------------------------
         if kind == 'continue':
-            # the extra buttons of the step (the two export buttons) sit above Continue
+            # the extra buttons of the step (the two export buttons) sit above CONTINUE
             for answer, words in request['options'] or []:
                 made(words, answer, words, False).pack(side='top', fill='x', pady=2)
             # a step may name its button for what it does (Export)
-            words = request.get('value') or 'Continue'
+            words = request.get('value') or 'CONTINUE'
             made(words, '', words, True).pack(side='top', fill='x', pady=2)
         elif kind == 'yesno':
-            for answer, words in (('y', 'Yes'), ('n', 'No')):
+            for answer, words in (('y', 'YES'), ('n', 'NO')):
                 made(words, answer, words, request['default'] == answer).pack(
                     side='top',
                     fill='x',
@@ -1489,7 +1496,7 @@ class AnswerArea:
             self._choices_placer(self._ticks)
             for number in request['default'] or []:
                 self._ticker(number)
-            self._multi_go = self._button_maker('Continue', self._multi_sender, True)
+            self._multi_go = self._button_maker('CONTINUE', self._multi_sender, True)
             self._multi_go.configure(fg=BUTTON_TEXT if self._ticked else OFF_TEXT)
             self._multi_go.pack(side='top', fill='x', pady=(6, 2))
             self._widgets.append(self._multi_go)
@@ -1500,7 +1507,7 @@ class AnswerArea:
             self.entry.delete(0, 'end')
             self.entry.insert(0, request['value'] or '')
             self.entry.pack(side='top', fill='x', pady=(6, 2), ipady=5)
-            go = self._button_maker('Continue', self._on_typed, True)
+            go = self._button_maker('CONTINUE', self._on_typed, True)
             go.pack(side='top', fill='x', pady=2)
             self._widgets.append(go)
             self._default = go

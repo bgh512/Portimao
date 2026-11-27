@@ -389,7 +389,7 @@ def test_the_order_is_saved_with_the_dataset(tmp_path: Path) -> None:
 
     order = ['vo2', 'oxygen', 'haem:Cyt bH']
     answers = dict(settings.DEFAULT_ANSWERS, panel_order=order)
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', {}, answers) is True
+    assert dataset_settings_saver(tmp_path,{}, answers) is True
     assert dataset_settings_reader(tmp_path)['answers']['panel_order'] == order
 
 

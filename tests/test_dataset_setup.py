@@ -494,7 +494,7 @@ def test_the_setup_saved_and_read_back(tmp_path: Path) -> None:
                                },
                      }
 
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', {}, {}, plain)
+    assert dataset_settings_saver(tmp_path,{}, {}, plain)
     read = dataset_settings_reader(tmp_path)['setup']
     assert read == plain
     again = setup_builder(names, read)
@@ -534,7 +534,7 @@ def test_a_settings_file_without_a_usable_setup(tmp_path: Path) -> None:
     None.
     """
 
-    assert dataset_settings_saver(tmp_path, tmp_path / 'results', {}, {})
+    assert dataset_settings_saver(tmp_path,{}, {})
     written = json.loads((tmp_path / SETTINGS_FILE_NAME).read_text('utf-8'))
     assert 'setup' not in written
     assert dataset_settings_reader(tmp_path)['setup'] == {}

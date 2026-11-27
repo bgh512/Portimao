@@ -28,8 +28,8 @@ STANDARD_FIT = 'bswitch_no2_mycobl_b557.csv'
 # The volume of the instrument's chamber (mL), always the same: the concentration of an
 # addition is worked out from its stock and the volume added into it.
 CHAMBER_VOLUME_ML = 5.0
-# the results folder offered, inside the data folder, for a dataset never run before
-RESULTS_FOLDER_NAME = 'results'
+# the folder inside the data folder that holds the runs, each in a folder of its own
+RESULTS_FOLDER_NAME = 'export'
 DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ranges
                    # the same at the end of the recording
                    'ignore_last_minutes': 0.0,

@@ -387,8 +387,8 @@ def everything_asker(folder: Path,
     """
 
     # ---- 1 Load the settings of the dataset ------------------------------------------
-    # A dataset never saved starts from the standard settings (config.py); a dataset
-    # saved before starts from the settings kept in its own folder.
+    # Data never processed, or started fresh, starts from the standard settings
+    # (config.py); otherwise from the settings of the earlier run chosen.
     names = [s['name'] for s in summaries]
     # A journal or a width saved with the dataset that the journals folder no longer
     # has is moved to one it has, and the user is told.
@@ -589,8 +589,7 @@ def everything_asker(folder: Path,
 
     # ---- 6 Remember the answers ------------------------------------------------------
     last_answers_saver({'data_folder': str(folder.resolve())})
-    if not dataset_settings_saver(folder,
-                                  export_root,
+    if not dataset_settings_saver(export_root,
                                   file_settings_merger(remembered,
                                                        limits,
                                                        details,
@@ -603,9 +602,9 @@ def everything_asker(folder: Path,
                                   setup_plainer(setup, saved.get('setup')),
                                   page_plainer(page),
                                   ):
-        print(f'  The settings could not be saved in {folder} (the folder cannot be '
-              f'written to), so this dataset will start from the standard settings '
-              f'next time.',
+        print(f'  The settings could not be saved in {export_root} (the folder cannot '
+              f'be written to), so the settings of this run cannot be loaded next '
+              f'time.',
               )
     return answers, experiments, fit, page
 
@@ -1171,7 +1170,8 @@ def program_runner() -> int:
     None.
 
     ---- Globals read ----
-    PLACES, PROGRAM_TITLE (written to the log), UPDATE_NOTE (module constants).
+    PLACES, PROGRAM_TITLE (written to the log; the window shows it on its title
+    bar), UPDATE_NOTE (module constants).
 
     ---- Outputs ----
     int
@@ -1210,7 +1210,7 @@ def program_runner() -> int:
             pass
 
     # ---- 2 Ask for the files ---------------------------------------------------------
-    print(PROGRAM_TITLE)
+    # the version is on the window's title bar, so the guide does not repeat it
     if UPDATE_NOTE:
         print(UPDATE_NOTE)
     for problem in settings.JOURNAL_PROBLEMS:  # a journal file that cannot be used
