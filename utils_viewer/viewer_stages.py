@@ -183,11 +183,11 @@ OD_KEY_LINES = ('OD          = measured OD of the sample',
                 'Dilution    = any dilution factor after additions',
                 )
 HAEM_NUDGE = ('Change the fit, the scatter or the spectra in the Haem decomposition '
-              'box above the plot; press Continue when the haems look right.')
-PSI_NUDGE = ('Type the numbers in the Δψ box above the plot; press Continue when Δψ '
+              'box above the plot; press CONTINUE when the haems look right.')
+PSI_NUDGE = ('Type the numbers in the Δψ box above the plot; press CONTINUE when Δψ '
              'looks right.')
 TRIM_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
-              'bars; press Continue when every experiment looks right.')
+              'bars; press CONTINUE when every experiment looks right.')
 # The boxes of the regions step, in the order of redox_regions.REGION_KEYS.
 REGION_FIELDS = [('oxidised_start', 'Oxidised from'),
                  ('oxidised_end', 'to'),
@@ -202,7 +202,7 @@ REGION_KEY_LINES = ("OXIDISED (red) = haems fully oxidised: each haem's level he
                     '0 %',
                     )
 REGION_NUDGE = ('Type the times in the Time regions box above the plot, or drag the '
-                'regions out on the plot; press Continue when every experiment looks '
+                'regions out on the plot; press CONTINUE when every experiment looks '
                 'right.')
 # The boxes of the window step, and its tick box (averaging.WINDOW_KEYS): the settled
 # windows only. The quick windows are hidden for now; their boxes and tick box stay
@@ -219,7 +219,7 @@ WINDOW_OPTIONS = [('each_is_on', 'Adjust region manually')]
 WINDOW_KEY_TEXT = ('gold = baseline, blue = averaging region, grey = left out or not '
                    'picked, red hatched = a region that does not fit')
 FIGURE_NUDGE = ('Change the figure in the boxes above the plot, or the order of the '
-                'panels with the arrows; click Export when it looks right.')
+                'panels with the arrows; click EXPORT when it looks right.')
 # The answers of the Export step (5.9): the summary is the plot and the workbook of each
 # file; the csv files are the spectra, of the trimmed data and of the whole recording
 # of each trimmed file ('full', offered only when a file is trimmed).
@@ -227,16 +227,16 @@ EXPORT_CHOICES = (('summary', 'Export the summary'),
                   ('trimmed', 'Export the summary and the trimmed csv'),
                   ('full', 'Export the summary and the trimmed and full csv'),
                   )
-PAGE_NUDGE = ('Build the figure on the page on the right; click Continue when it is '
+PAGE_NUDGE = ('Build the figure on the page on the right; click CONTINUE when it is '
               'ready.')
 SAVED_PAGE_NOTE = ('The page is as you left it the last time this dataset was run: '
-                   'change it, or click Continue to keep it.')
+                   'change it, or click CONTINUE to keep it.')
 SAVED_PAGE_PROBLEM = ('The figure page saved with this dataset cannot be read, so Build '
                       'a figure starts with an empty page.')
-SETUP_NUDGE = ('Fill in the table on the right; click Continue when it says which '
+SETUP_NUDGE = ('Fill in the table on the right; click CONTINUE when it says which '
                'experiment is which.')
 WINDOW_NUDGE = ('Type the numbers of the averaging regions in the Time regions box '
-                'above the plot, or drag the edges of a region; press Continue when '
+                'above the plot, or drag the edges of a region; press CONTINUE when '
                 'the regions look right.')
 
 
@@ -699,7 +699,7 @@ def _quick_exporter(session: ViewerSession,
     ---- Summary ----
     Helper function to write the spectra of each file as csv files now, from one of the
     two export buttons of the trim step: those of the trimmed data, with those of the
-    whole recording of each trimmed file too from "Export full + trimmed csv". No
+    whole recording of each trimmed file too from "EXPORT full + trimmed CSV". No
     workbook is written and nothing is asked; one line gives the size first. The
     choice and the limits exported are kept in the session; the guide stays where it
     is.
@@ -745,8 +745,8 @@ def _quick_exporter(session: ViewerSession,
                          for own in limits.values()
                          )
     if with_full and not is_any_trimmed:
-        info_printer('No file is trimmed, so this writes the same as Export trimmed '
-                     'csv.',
+        info_printer('No file is trimmed, so this writes the same as EXPORT trimmed '
+                     'CSV.',
                      )
     sizes = f'the trimmed {trimmed}' + (f', the full {full}'
                                         if with_full and is_any_trimmed
@@ -1587,7 +1587,7 @@ def _regions_chooser(session: ViewerSession,
     ---- Summary ----
     Helper function to run the regions step on the plot of every file: the oxidised and
     the reduced region are dragged out on the plot or typed in the Time regions box
-    above it, under the key of their colours, and Continue accepts them. With "Apply to
+    above it, under the key of their colours, and CONTINUE accepts them. With "Apply to
     all" ticked, an edge set on the file shown is copied to every file at the same
     distance from its nearest addition, or from the end when it lies after the last
     addition. A file without both regions stays in delta D. The regions are then
@@ -1644,7 +1644,7 @@ def _regions_chooser(session: ViewerSession,
                                                        remembered,
                                                        )
 
-    # ---- 2 Pull out or type the regions until Continue -------------------------------
+    # ---- 2 Pull out or type the regions until CONTINUE -------------------------------
     guide_step_starter('regions')
     info_printer(REGION_KEY_LINES[0])
     info_printer(REGION_KEY_LINES[1], tight=True)
@@ -1661,7 +1661,7 @@ def _regions_chooser(session: ViewerSession,
     session.is_choosing_regions = True
     try:
         enter_waiter('Drag the regions out on the plot, or type the times in the Time '
-                     'regions box. Check each experiment, then press Continue.',
+                     'regions box. Check each experiment, then press CONTINUE.',
                      REGION_NUDGE,
                      number='4.4',
                      )
@@ -2932,8 +2932,8 @@ def _windows_chooser(session: ViewerSession,
     others are grey and have no edges, and Apply to all is greyed. The two values are
     also typed in the Time regions box, under its Averaging windows tick box (unticked
     there are no windows) and a numbered tick per window to leave it out (grey).
-    Continue accepts. The windows that do not fit are shaded red and named in a
-    warning after Continue. The quick windows are hidden for now. When no file has an
+    CONTINUE accepts. The windows that do not fit are shaded red and named in a
+    warning after CONTINUE. The quick windows are hidden for now. When no file has an
     addition, nothing is asked and nothing is averaged.
 
     ---- Inputs ----
@@ -2985,7 +2985,7 @@ def _windows_chooser(session: ViewerSession,
     choice, context = built
     final_gap = context['final_gap']
 
-    # ---- 2 Drag or type the windows until Continue -----------------------------------
+    # ---- 2 Drag or type the windows until CONTINUE -----------------------------------
     guide_step_starter('windows')
     info_printer('AVERAGING REGIONS = the stretches before each addition that its '
                  'averages are taken over.',
@@ -3015,7 +3015,7 @@ def _windows_chooser(session: ViewerSession,
     _step_edges_shower(session, 'windows', choice)
     try:
         enter_waiter('Drag the averaging regions on the plot, or type their numbers in '
-                     'the Time regions box, press Continue when ready.',
+                     'the Time regions box, press CONTINUE when ready.',
                      WINDOW_NUDGE,
                      number='4.6',
                      )
@@ -3490,7 +3490,7 @@ def page_stage_runner(layouts_folder: Path,
     Main function to build the page of a dataset figure in the window (Build a figure,
     6.2): the page starts as it was saved with the dataset, or empty; plots are placed
     by dragging across its grid, each drawn from the experiments once its form is
-    done, and a template can be loaded or saved; Continue ends the step, after the
+    done, and a template can be loaded or saved; CONTINUE ends the step, after the
     offer to save a page that was changed as a template.
 
     ---- Inputs ----
@@ -3559,7 +3559,7 @@ def page_stage_runner(layouts_folder: Path,
         info_printer(SAVED_PAGE_NOTE)
     window.page_shower(start, layouts_folder, setup, experiments, answers)
     enter_waiter('Drag across the grid to place each plot. When the page is ready, '
-                 'click Continue.',
+                 'click CONTINUE.',
                  PAGE_NUDGE,
                  number='6.2',
                  )
@@ -3904,13 +3904,13 @@ def plots_stage_runner(session: ViewerSession,
                          )
     session.master_exporter = master_exporter
 
-    # ---- 2 Change the figure in the boxes until Continue -----------------------------
+    # ---- 2 Change the figure in the boxes until CONTINUE -----------------------------
     redraw()
     enter_waiter('Use the arrows to change the order of the panels, or change earlier '
-                 'settings. When ready, click Export to choose which files to export.',
+                 'settings. When ready, click EXPORT to choose which files to export.',
                  FIGURE_NUDGE,
                  number='5.1',
-                 go_words='Export',
+                 go_words='EXPORT',
                  )
     return is_plotted()
 
@@ -3927,16 +3927,16 @@ def processing_stage_runner(session: ViewerSession,
     """
     ---- Summary ----
     Main function to talk the user through the processing, with the plot redrawn after
-    each answer: first the haem fit, set in the Haem decomposition box until Continue
+    each answer: first the haem fit, set in the Haem decomposition box until CONTINUE
     (its Do PCA button asks the questions that find the components from the whole
     dataset, with the boxes greyed out meanwhile), then the oxidised and the reduced
     region of every file (when the haems are shown), then whether to plot Δψ (when it
-    can be; on Yes, its formula and a wait for Continue while its numbers are set in
+    can be; on Yes, its formula and a wait for CONTINUE while its numbers are set in
     the Δψ box), and last the averaging windows, dragged on the plot (they are drawn in
     the plot only once that step is answered). The trim and ignore edges stay movable
     under Trim / Ignore in the Time regions box. A line says which fit the haems are
     worked out with at the start, and another points to % oxidised once a file has
-    both regions. Haem decomposition unticked at Continue goes on without haems.
+    both regions. Haem decomposition unticked at CONTINUE goes on without haems.
 
     ---- Inputs ----
     session : ViewerSession
@@ -4069,7 +4069,7 @@ def processing_stage_runner(session: ViewerSession,
     session.pca_runner = pca_finder
     try:
         enter_waiter('Edit the haem decomposition using the Haem decomposition box, '
-                     'press Continue when ready.',
+                     'press CONTINUE when ready.',
                      HAEM_NUDGE,
                      number='4.1',
                      )
@@ -4114,7 +4114,7 @@ def processing_stage_runner(session: ViewerSession,
         if is_on != was_on:
             redraw()
         if is_on:
-            # Like the haem step: the line with the formula, then Continue while the
+            # Like the haem step: the line with the formula, then CONTINUE while the
             # numbers are set in the Δψ box.
             lowest, highest = (answers[answer]
                                for answer in settings.DELTA_PSI_LIMIT_ANSWERS
@@ -4130,7 +4130,7 @@ def processing_stage_runner(session: ViewerSession,
                          'numbers, click Keep to compare first.',
                          )
             enter_waiter('Set the midpoints of bH and bL and the shift in the Δψ box, '
-                         'press Continue when ready.',
+                         'press CONTINUE when ready.',
                          PSI_NUDGE,
                          number='4.5.1',
                          )
@@ -4224,7 +4224,7 @@ def setup_stage_runner(names: List[str], saved: Optional[dict] = None) -> dict:
     ---- Summary ----
     Main function to have the dataset set-up table filled in in the window (Dataset
     set-up, 6.1): one row per experiment, as saved with the dataset or filled in
-    from the file names, corrected by the user; Continue ends the step.
+    from the file names, corrected by the user; CONTINUE ends the step.
 
     ---- Inputs ----
     names : List[str]
@@ -4271,7 +4271,7 @@ def setup_stage_runner(names: List[str], saved: Optional[dict] = None) -> dict:
                  )
     window.setup_shower(setup)
     enter_waiter('Check which experiment is which in the table. When it is right, '
-                 'click Continue.',
+                 'click CONTINUE.',
                  SETUP_NUDGE,
                  number='6.1',
                  )
@@ -4291,9 +4291,9 @@ def trim_stage_runner(session: ViewerSession,
     ---- Summary ----
     Main function to run the trimming step on the standard plot of the whole recording
     of every file: the trimmed and ignored edges are dragged on the plot or typed in
-    the Time regions box above it, under the key of their colours, and Continue
+    the Time regions box above it, under the key of their colours, and CONTINUE
     accepts them; the two export buttons write the spectra as csv files with the edges
-    as they are (Export full + trimmed csv with the whole recording of each trimmed
+    as they are (EXPORT full + trimmed CSV with the whole recording of each trimmed
     file too), and
     the step waits again. When the step is
     opened again, the limits it had stay on the plot as red dashed lines. The limits
@@ -4313,7 +4313,7 @@ def trim_stage_runner(session: ViewerSession,
         dragged; None for none.
     exporter : Optional[Callable[[Dict[str, dict], bool], None]]
         Called with the limits of the edges as they are when an export button is
-        clicked, and True for Export full + trimmed csv; None for no export buttons.
+        clicked, and True for EXPORT full + trimmed CSV; None for no export buttons.
 
     ---- Globals read ----
     TRIM_KEY_LINES, TRIM_NUDGE (module constants); EXPORT_BUTTONS,
@@ -4359,7 +4359,7 @@ def trim_stage_runner(session: ViewerSession,
     session.redraw = draw
     draw()
 
-    # ---- 2 Drag or type the edges until Continue -------------------------------------
+    # ---- 2 Drag or type the edges until CONTINUE -------------------------------------
     # An export button writes the files with the edges as they are, and the step waits
     # again.
     choice = _trim_choice_builder(session, remembered, previous)
@@ -4371,7 +4371,7 @@ def trim_stage_runner(session: ViewerSession,
                  )
     if exporter is not None:
         info_printer('The export buttons write the spectra of every experiment as csv '
-                     'files with these times; Continue skips them.',
+                     'files with these times; CONTINUE skips them.',
                      tight=True,
                      )
     _step_edges_shower(session, 'trim', choice)
@@ -4380,7 +4380,7 @@ def trim_stage_runner(session: ViewerSession,
             clicked = enter_waiter(
                 'Drag the bars on the plot, or type the times in the '
                 'Time regions box. Check each experiment, then '
-                'press Continue.',
+                'press CONTINUE.',
                 TRIM_NUDGE,
                 number='2.1',
                 extras=EXPORT_BUTTONS if exporter is not None else (),

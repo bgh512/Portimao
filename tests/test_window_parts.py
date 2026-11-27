@@ -1064,7 +1064,7 @@ def test_haem_step_is_one_line_and_continue(monkeypatch: pytest.MonkeyPatch) -> 
     """
     ---- Summary ----
     Main function to check the haem step of the processing: one instruction, 4.1,
-    answered with Continue, and no question about the fit. With no haems shown and
+    answered with CONTINUE, and no question about the fit. With no haems shown and
     Haem decomposition left unticked the run goes on without haems; a click on Do PCA
     while it waits makes the components of the whole dataset the fit in use; Do PCA
     is only carried out while the step waits. The plot, the later steps of the
@@ -1136,7 +1136,7 @@ def test_haem_step_is_one_line_and_continue(monkeypatch: pytest.MonkeyPatch) -> 
                                           {},
                                           )
     assert asked == [('Edit the haem decomposition using the Haem decomposition box, '
-                      'press Continue when ready.',
+                      'press CONTINUE when ready.',
                       '4.1',
                       ),
                      ]
@@ -1175,7 +1175,7 @@ def test_delta_psi_step_is_like_the_haem_step(monkeypatch: pytest.MonkeyPatch) -
     ---- Summary ----
     Main function to check the Δψ step of the processing: after Yes to 4.5, a line,
     the formula of Δψ drawn in the guide and the line saying what its letters are,
-    then one instruction, 4.5.1, answered with Continue; after No, no formula and no
+    then one instruction, 4.5.1, answered with CONTINUE; after No, no formula and no
     4.5.1. The plot, the regions, the averaging and the questions are stood in for.
 
     ---- Inputs ----

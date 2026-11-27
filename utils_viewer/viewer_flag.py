@@ -24,8 +24,9 @@ FLAG_PREFIX = 'flag_'
 SCREEN_NAME = 'screen.png'
 NOTE_NAME = 'note.md'
 LOG_NAME = 'log.txt'
-FLAG_BUTTON_TEXT = 'Flag'
-BOX_HEADING = 'Flag saved: type or paste what is wrong.'
+FLAG_BUTTON_TEXT = 'FLAG'
+BOX_HEADING = ('Flag saved: type or paste what is wrong, then press Enter '
+               '(Shift+Enter for a new line).')
 NO_PICTURE_SENTENCE = ('No picture of the window could be taken; the comment and the '
                        'log are still saved.'
                        )
@@ -39,8 +40,8 @@ class FlagBox:
     """
     ---- Summary ----
     The small box that takes the comment of a flag, above the window but not blocking
-    it: Save (or Ctrl+Enter) writes the note and the log into the flag's folder, Cancel
-    (or closing the box) removes the folder.
+    it: Save (or Enter; Shift+Enter gives a new line) writes the note and the log into
+    the flag's folder, Cancel (or closing the box) removes the folder.
 
     ---- Attributes ----
     folder : Path
@@ -139,6 +140,9 @@ class FlagBox:
         tk.Button(buttons, text='Save', command=self._saver).pack(side='right', padx=6)
         buttons.pack(fill='x', padx=10, pady=(0, 8))
         self.text.bind('<Control-Return>', self._saver)
+        # Enter alone saves too, as in the answer box; Shift+Enter keeps its new line
+        self.text.bind('<Return>', self._saver)
+        self.text.bind('<Shift-Return>', lambda event: None)
         self.window = window
         self.text.focus_set()
 
@@ -187,7 +191,7 @@ class FlagBox:
 
         ---- Outputs ----
         str
-            'break', so Ctrl+Enter adds no new line to the text area.
+            'break', so Enter adds no new line to the text area.
 
         ---- Globals mutated ----
         None. Writes the flag's files and closes the box (side effects).

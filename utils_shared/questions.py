@@ -40,7 +40,7 @@ _answer_requester: Optional[Callable[[dict], None]] = None
 # What is told which step of the guide starts; None while no window is open.
 _step_teller: Optional[Callable[[str], None]] = None
 _current_step: Optional[str] = None
-CLICK_MULTI_NOTE = 'Tick one or more, then click Continue.'
+CLICK_MULTI_NOTE = 'Tick one or more, then click CONTINUE.'
 
 
 # ---- UserQuitError -------------------------------------------------------------------
@@ -87,7 +87,7 @@ def _answer_announcer(kind: str,
         the choices ticked at first; the folder highlighted at first; None for none.
     value : Optional[str]
         What the typing box starts with ('number', 'text', 'folder'), or the words of
-        the button that goes on ('continue'; None for Continue).
+        the button that goes on ('continue'; None for CONTINUE).
 
     ---- Globals read ----
     _answer_requester (module state).
@@ -892,7 +892,7 @@ def enter_waiter(question: str,
     """
     ---- Summary ----
     Main function to give a numbered instruction that is carried out in the window (on
-    the plot or in the boxes above it) and wait until Continue (Enter with the answer
+    the plot or in the boxes above it) and wait until CONTINUE (Enter with the answer
     box empty), or the button named in its place, or one of the extra buttons is
     clicked. Anything else typed is answered with ``nudge`` and the instruction goes
     on waiting.
@@ -908,17 +908,17 @@ def enter_waiter(question: str,
         The instruction's own number from QUESTION_FLOW.md, such as '2.1'; None to
         number it in the order asked.
     extras : Sequence[Tuple[str, str]]
-        (answer, words) of each button shown above Continue, such as ('export',
-        'Export trimmed csv'); empty for Continue alone.
+        (answer, words) of each button shown above CONTINUE, such as ('export',
+        'EXPORT trimmed CSV'); empty for CONTINUE alone.
     go_words : Optional[str]
-        The words of the button that goes on, such as 'Export'; None for Continue.
+        The words of the button that goes on, such as 'EXPORT'; None for CONTINUE.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     str
-        '' for Continue (or the button in its place), or the answer of the extra
+        '' for CONTINUE (or the button in its place), or the answer of the extra
         button clicked.
 
     ---- Globals mutated ----
@@ -960,7 +960,7 @@ def folder_asker(question: str,
     ---- Summary ----
     Main function to ask for a folder. In the window each folder offered is a button
     that a click highlights, "Other folder…" opens a box for a full path with Browse…
-    beside it, and Continue gives the folder highlighted; in the terminal the path is
+    beside it, and CONTINUE gives the folder highlighted; in the terminal the path is
     typed. An answer the checker refuses gets its one sentence of what to do, and the
     question waits for the next answer.
 

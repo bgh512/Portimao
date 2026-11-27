@@ -1,5 +1,5 @@
 """
-Tests of the boxes above the plot that the program runs: the tabs of the Time regions box, the export buttons of the trim step and the figure step that asks only Continue.
+Tests of the boxes above the plot that the program runs: the tabs of the Time regions box, the export buttons of the trim step and the figure step that asks only CONTINUE.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -422,8 +422,8 @@ def test_export_csv_in_the_trim_step(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     ---- Summary ----
     Main function to check the two export buttons of the trim step: they are offered
-    above Continue, each writes the files with the edges as they are (Export full +
-    trimmed csv with the whole recordings too), and the step waits again; Continue
+    above CONTINUE, each writes the files with the edges as they are (Export full +
+    trimmed csv with the whole recordings too), and the step waits again; CONTINUE
     then gives the limits of the edges. Without an exporter there are no buttons. The
     plot, the edges and the questions are stood in for.
 
@@ -472,7 +472,7 @@ def test_export_csv_in_the_trim_step(monkeypatch: pytest.MonkeyPatch) -> None:
     window = FakeWindow()
     session = ViewerSession([], Path('.'), window)
 
-    # ---- 2 Both export buttons, then Continue ----------------------------------------
+    # ---- 2 Both export buttons, then CONTINUE ----------------------------------------
     standard = dict(settings.DEFAULT_ANSWERS)
     limits = viewer_stages.trim_stage_runner(
         session,
@@ -481,8 +481,8 @@ def test_export_csv_in_the_trim_step(monkeypatch: pytest.MonkeyPatch) -> None:
         None,
         lambda limits, with_full: exported.append((limits, with_full)),
         )
-    buttons = (('export_full', 'Export full + trimmed csv'),
-               ('export_trimmed', 'Export trimmed csv'),
+    buttons = (('export_full', 'EXPORT full + trimmed CSV'),
+               ('export_trimmed', 'EXPORT trimmed CSV'),
                )
     assert [tuple(own) for own in offered] == [buttons] * 3
     built = {'run1': {'trim_start': 1.0, 'built': True}}
@@ -557,10 +557,10 @@ def test_the_figure_step_asks_only_continue(monkeypatch: pytest.MonkeyPatch) -> 
     assert viewer_stages.plots_stage_runner(session, answers, defaults, {}, {})
     assert asked == [(
         'Use the arrows to change the order of the panels, or change '
-        'earlier settings. When ready, click Export to choose which files '
+        'earlier settings. When ready, click EXPORT to choose which files '
         'to export.',
         '5.1',
-        'Export',
+        'EXPORT',
         ),
                      ]
     assert answers['plot_o2'] and answers['plot_ocr'] and answers['plot_haems']

@@ -101,19 +101,19 @@ ERROR_COLOUR = '#ff7b86'
 ICON_PATH = Path(__file__).resolve().parent.parent / 'assets' / 'icon.png'
 CLICK_HINT = 'Click an answer. Enter gives the highlighted one.'
 # a box is shown only for a number or a name: every other answer is a button
-NUMBER_HINT = 'Type a number, then click Continue or press Enter.'
-NAME_HINT = 'Type it in the box, then click Continue or press Enter.'
-FOLDER_HINT = ('Click a folder, then Continue. Under Other folder…, type a full path '
-               'or click Browse….')
+NUMBER_HINT = 'Type a number, then click CONTINUE or press Enter.'
+NAME_HINT = 'Type it in the box, then click CONTINUE or press Enter.'
+FOLDER_HINT = ('Click a folder, then CONTINUE. Under Other folder…, type a full path '
+               'or click BROWSE….')
 # The clicks in the boxes that ask questions of their own while a question waits.
 ASKING_CHANGES = ('edit_ods', 'edit_labels', 'export_csv', 'do_pca')
 EDGES_HINT = ('Drag the edges on the plot, or type the times in the Time regions box '
-              'above it, then click Continue.')
+              'above it, then click CONTINUE.')
 OWN_VALUES_MARK = '  (own times)'  # after a file in the drop-down whose edges differ
 SPAN_HINT = ('Drag across the plot to fill in the answer, or type it, then click '
-             'Continue.')
+             'CONTINUE.')
 TABLE_HINT = ('Click a cell and type; Tab moves across, Enter moves down. Press '
-              'Confirm when the table is filled in.')
+              'CONFIRM when the table is filled in.')
 # While a table is open it fills the open step under this many lines of text; without
 # one the text takes the room the guide leaves, at least this many lines.
 TABLE_TERMINAL_LINES = 5
@@ -452,7 +452,7 @@ class ViewerGui:
         """
         ---- Summary ----
         Method to pass the answer typed in the box to the question that is waiting for
-        it (Continue under the box, or Enter in it).
+        it (CONTINUE under the box, or Enter in it).
 
         ---- Inputs ----
         event : Any
@@ -484,7 +484,7 @@ class ViewerGui:
         self._history_position = len(self._history)
         self._drag_start = None
         self._canvas.delete('band')
-        self._clicked_answer_sender(answer, answer.strip() or 'Continue')
+        self._clicked_answer_sender(answer, answer.strip() or 'CONTINUE')
 
     # ---- _answer_writer --------------------------------------------------------------
     def _answer_writer(self, value: Optional[float]) -> None:
@@ -879,7 +879,7 @@ class ViewerGui:
             return 'break'
         self._is_waiting = False
         self._hint.configure(text='Working ...')
-        self._pane_writer('→ Confirm\n', 'answer')
+        self._pane_writer('→ CONFIRM\n', 'answer')
         self._text.mark_set('since', 'end-1c')
         self._answers.put('')
         self._click_sign_starter()
@@ -3785,7 +3785,7 @@ class ViewerGui:
         self._hint.pack(fill='x', padx=10, pady=(4, 0))
         row = tk.Frame(bottom, bg=CARD_BACKGROUND)
         # greyed out until the Help box is made
-        self._help_button = ttk.Button(row, text='Help', width=6, state='disabled')
+        self._help_button = ttk.Button(row, text='HELP', width=6, state='disabled')
         self._help_button.pack(side='right', padx=(0, 10))
         if dev_copy_checker(user_places_finder().program_folder):
             ttk.Button(row,
