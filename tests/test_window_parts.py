@@ -52,7 +52,7 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        psi_answers_builder,
                                        psi_change_describer,
                                        PSI_FORMULA,
-                                       PSI_FORMULA_NOTE,
+                                       PSI_FORMULA_NOTES,
                                        psi_number_checker,
                                        psi_seconds_filler,
                                        psi_summary_writer,
@@ -322,7 +322,7 @@ def test_rows_of_the_labels_table() -> None:
     assert [heading for _, heading, _ in table['columns']] == ['Volume added (µL)',
                                                                'Stock (mM)',
                                                                'Chemical',
-                                                               'In the chamber (µM)',
+                                                               'Concentration (µM)',
                                                                ]
     assert table['rows'][0]['cells'] == {'label': '100 µM KCN',
                                          'stock_uM': '',
@@ -1247,7 +1247,10 @@ def test_delta_psi_step_is_like_the_haem_step(monkeypatch: pytest.MonkeyPatch) -
     assert any(text.startswith('Δψ (mV) is worked out from the bH and bL haems')
                for text in said
                )
-    assert PSI_FORMULA_NOTE in said
+    # what each letter is, on a line each, in the order written
+    assert [line for line in said if line in PSI_FORMULA_NOTES] == list(
+        PSI_FORMULA_NOTES,
+        )
 
     # ---- 3 No: neither ---------------------------------------------------------------
     asked.clear()

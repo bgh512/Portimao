@@ -132,7 +132,7 @@ from utils_viewer.viewer_strip import (BACK_CHANGE,
                                        psi_answers_builder,
                                        psi_change_describer,
                                        PSI_FORMULA,
-                                       PSI_FORMULA_NOTE,
+                                       PSI_FORMULA_NOTES,
                                        SAVE_FIT_CHANGE,
                                        size_answers_builder,
                                        strip_values_builder,
@@ -1069,7 +1069,7 @@ def _label_table_filler(session: ViewerSession,
     values = _table_filler(session,
                            table,
                            question='Fill the table in with the details of the '
-                           'additions, then press Confirm.',
+                           'additions, then press CONFIRM.',
                            note=f'Type {IGNORE_LABEL} as a label to not show it.',
                            number='3.3',
                            )
@@ -1234,7 +1234,7 @@ def _od_gaps_teller(details: Dict[str, dict]) -> None:
                       ) + (f' and {len(gaps) - 5} more' if len(gaps) > 5 else '')
     warning_shower(
         f'OD values are missing for: {shown}. The OD scaling stays off until '
-        f'every file has its values: Edit ODs in the View box fills them in.',
+        f'every file has its values: "Edit ODs" in the View box fills them in.',
         )
 
 
@@ -1324,7 +1324,7 @@ def _od_table_filler(session: ViewerSession,
         info_printer(line, tight=True)
     values = _table_filler(session,
                            table,
-                           question='Fill in the table, then press Confirm.',
+                           question='Fill in the table, then press CONFIRM.',
                            note='',
                            number='3.2.1',
                            )
@@ -1648,8 +1648,8 @@ def _regions_chooser(session: ViewerSession,
     guide_step_starter('regions')
     info_printer(REGION_KEY_LINES[0])
     info_printer(REGION_KEY_LINES[1], tight=True)
-    info_printer('Ticking Apply to all copies the regions of the experiment shown to '
-                 'every experiment; it unticks itself when the next one is shown.',
+    info_printer('Ticking "Apply to all" copies the regions of the experiment shown '
+                 'to every experiment; it unticks itself when the next one is shown.',
                  )
     info_printer('With no regions the haems cannot be shown in % oxidised; everything '
                  'else is the same.',
@@ -2452,7 +2452,14 @@ def _strip_change_applier(session: ViewerSession,
                          )
         return
     if TIME_TAB_CHANGE in changes:
-        if session.tab_switcher is not None:
+        is_own = (not changes[TIME_TAB_CHANGE]
+                  and session.step_tab
+                  and session.time_tab == session.step_tab
+                  )
+        if is_own:
+            # the step that waits needs its edges on the plot: its tab stays pressed
+            session.window.strip_setter({TIME_TAB_CHANGE: session.time_tab})
+        elif session.tab_switcher is not None:
             session.tab_switcher(changes[TIME_TAB_CHANGE])
         else:
             session.window.strip_setter({TIME_TAB_CHANGE: session.time_tab})
@@ -2599,7 +2606,8 @@ def _strip_change_applier(session: ViewerSession,
         info_printer(f"Kept {in_use['text']} to compare: change the haems, the "
                      'scatter, the regions or the Δψ numbers, and '
                      f"{COMPARE_LAYOUT_WORDS[layout]}. Then click "
-                     'Keep new to carry on with the change, or Keep old to undo it.'
+                     '"Keep new" to carry on with the change, or "Keep old" to undo '
+                     'it.'
                      if changes['compare']
                      else f"Carrying on with {in_use['text']}. The one kept to "
                           'compare is no longer shown.',
@@ -2737,7 +2745,7 @@ def _table_filler(session: ViewerSession,
     table : dict
         The table to show (table_rows, DATA_FORMAT.md).
     question : str
-        The instruction, ending "then press Confirm.".
+        The instruction, ending "then press CONFIRM.".
     note : str
         What the table needs, said above the instruction in the quieter colour.
     number : str
@@ -2854,7 +2862,7 @@ def _template_offer_asker(page: FigurePage,
             info_printer(problem_teller('The template could not be saved', exc))
             return None
         info_printer(f'Saved the template {saved.stem} in {layouts_folder}. It is in '
-                     f'the list beside Load template from now on.',
+                     f'the list beside "Load template" from now on.',
                      )
         return saved
 
@@ -3001,15 +3009,15 @@ def _windows_chooser(session: ViewerSession,
                  tight=True,
                  )
     info_printer(
-        'A change moves every region, on the file shown; ticking Apply to all '
+        'A change moves every region, on the file shown; ticking "Apply to all" '
         'copies its regions to every file, and it unticks itself when the next '
-        'file is shown. Untick a number under Use to leave that region out '
-        '(grey), or untick Averaging regions for none.',
+        'file is shown. Untick a number under "Use" to leave that region out '
+        '(grey), or untick "Averaging regions" for none.',
         tight=True,
         )
-    info_printer('Tick Adjust region manually to change one region of one file: pick '
-                 'it with the buttons beside it, then drag its edges or type its '
-                 'numbers; the other regions are grey until picked.',
+    info_printer('Tick "Adjust region manually" to change one region of one file: '
+                 'pick it with the buttons beside it, then drag its edges or type '
+                 'its numbers; the other regions are grey until picked.',
                  tight=True,
                  )
     _step_edges_shower(session, 'windows', choice)
@@ -3259,7 +3267,7 @@ def _windows_keeper(session: ViewerSession,
     if told:
         info_printer(told, tight=True)
     if answers['file_windows']:
-        info_printer('Regions of their own (changed with Apply to all unticked): '
+        info_printer('Regions of their own (changed with "Apply to all" unticked): '
                      f"{', '.join(answers['file_windows'])}.",
                      tight=True,
                      )
@@ -3552,8 +3560,8 @@ def page_stage_runner(layouts_folder: Path,
                  'a grid of 6 × 6 cells. Pick a plot type in the strip above it, then '
                  'drag across the cells it should take; its form opens here.',
                  )
-    info_printer('Load template puts a layout saved before on the page; Save template '
-                 'keeps this one for later.',
+    info_printer('"Load template" puts a layout saved before on the page; "Save '
+                 'template" keeps this one for later.',
                  )
     if start.plots:
         info_printer(SAVED_PAGE_NOTE)
@@ -3961,7 +3969,7 @@ def processing_stage_runner(session: ViewerSession,
 
     ---- Globals read ----
     settings.DELTA_PSI_LIMIT_ANSWERS, HAEM_NUDGE, PSI_NUDGE, PSI_FORMULA,
-    PSI_FORMULA_NOTE.
+    PSI_FORMULA_NOTES.
 
     ---- Outputs ----
     Optional[Dict[str, Dict[str, float]]]
@@ -4092,7 +4100,7 @@ def processing_stage_runner(session: ViewerSession,
                                answers.get('decomposition_dataset'),
                                ):
             info_printer('The haems can now be shown in % oxidised: choose it under '
-                         'Haems as in the View box above the plot.',
+                         '"Haems as" in the View box above the plot.',
                          )
 
     # ---- 3 Delta psi -----------------------------------------------------------------
@@ -4124,10 +4132,11 @@ def processing_stage_runner(session: ViewerSession,
                          tight=True,
                          )
             session.window.formula_sender(PSI_FORMULA)
-            info_printer(PSI_FORMULA_NOTE, tight=True)
+            for line in PSI_FORMULA_NOTES:
+                info_printer(line, tight=True)
             info_printer(f'It has gaps where bH or bL is less than {lowest:g} % or '
                          f'more than {highest:g} % reduced. To compare two sets of '
-                         'numbers, click Keep to compare first.',
+                         'numbers, click "Keep to compare" first.',
                          )
             enter_waiter('Set the midpoints of bH and bL and the shift in the Δψ box, '
                          'press CONTINUE when ready.',
@@ -4261,14 +4270,6 @@ def setup_stage_runner(names: List[str], saved: Optional[dict] = None) -> dict:
     window = active_gui_getter()
     if window is None:  # the table is filled in only in the window
         return setup
-    info_printer('The table on the right says which experiment is which, filled in '
-                 'from the file names: check it, and type over what is wrong. The '
-                 'dataset figures split the experiments into sets by Group 1, Group '
-                 '2 and the time point, and untick Use to leave an experiment out.',
-                 )
-    info_printer('The replicates are numbered for you: the experiments with the same '
-                 'Group 1, Group 2 and time point count 1, 2, 3.',
-                 )
     window.setup_shower(setup)
     enter_waiter('Check which experiment is which in the table. When it is right, '
                  'click CONTINUE.',
@@ -4366,7 +4367,7 @@ def trim_stage_runner(session: ViewerSession,
     guide_step_starter('trim')
     info_printer(TRIM_KEY_LINES[0])
     info_printer(TRIM_KEY_LINES[1], tight=True)
-    info_printer('Ticking Apply to all copies the times of the experiment shown to '
+    info_printer('Ticking "Apply to all" copies the times of the experiment shown to '
                  'every experiment; it unticks itself when the next one is shown.',
                  )
     if exporter is not None:

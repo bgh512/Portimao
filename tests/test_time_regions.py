@@ -417,6 +417,50 @@ def test_a_tab_pressed_while_no_step_has_edges() -> None:
     assert window.shown[-1] is None
 
 
+# ---- test_a_tab_unpressed ------------------------------------------------------------
+def test_a_tab_unpressed() -> None:
+    """
+    ---- Summary ----
+    Main function to check a pressed tab that is pressed again (told as an empty
+    tab): away from its step its edges are taken off the plot; the tab of the step
+    that waits stays pressed, as the step asks for its edges.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    settings.DEFAULT_ANSWERS.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    window, switched = FakeWindow(), []
+    session = ViewerSession([], Path('.'), window)
+    session.tab_switcher = switched.append
+    answers = dict(settings.DEFAULT_ANSWERS)
+
+    # ---- 1 Away from its step: the empty tab is passed on ----------------------------
+    session.time_tab = 'trim'
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {'time_tab': ''})
+    assert switched == [''] and window.tabs == []
+
+    # ---- 2 The tab of the step that waits is pressed again ---------------------------
+    session.step_tab = session.time_tab = 'regions'
+    viewer_stages._strip_change_applier(session, answers, Path('.'), {'time_tab': ''})
+    assert switched == [''] and window.tabs == ['regions']
+
+
 # ---- test_export_csv_in_the_trim_step ------------------------------------------------
 def test_export_csv_in_the_trim_step(monkeypatch: pytest.MonkeyPatch) -> None:
     """

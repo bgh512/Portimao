@@ -330,7 +330,7 @@ def test_steps_move_on_and_fold() -> None:
     assert tags['od_values'] == tags['ocr_view'] == 'not needed this run'
     assert tags['temperature'] == tags['labels'] == ''
     assert not state.is_back()
-    assert state.card_teller() == {'note': '', 'help': '', 'back': '', 'extra': ()}
+    assert state.card_teller() == {'help': '', 'back': '', 'extra': ()}
     with pytest.raises(ValueError):
         state.step_starter('not_a_step')
 
@@ -452,9 +452,8 @@ def test_change_opens_earlier_step() -> None:
     assert here['mark'] == '→' and here['tag'] == 'you were here'
     card = state.card_teller()
     assert card['back'] == 'Back to Δψ'
-    assert card['note'] == ('This is step 10, Haems. When you are done here, go back '
-                            'to step 12, Δψ, where you were.')
-    assert 'Keep to compare' in card['help'] and card['extra'] == ()
+    assert 'note' not in card
+    assert '"Keep to compare"' in card['help'] and card['extra'] == ()
     state.back_taker()
     assert not state.is_back() and _status_reader(state)['delta_psi'] == 'open'
 
@@ -639,14 +638,14 @@ def test_run_name_question(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
                         '_input_reader',
                         lambda text, indent='': typed.pop(0),
                         )
-    assert run_folder_asker(export) == export / 'run_1'
+    assert run_folder_asker(export) == export / 'processing_1'
     assert not export.exists()
-    (export / 'run_1').mkdir(parents=True)
+    (export / 'processing_1').mkdir(parents=True)
     (export / 'trimmed less').mkdir()
-    typed.extend(['trimmed less', 'n', ' run_1 ', 'y'])
-    assert run_folder_asker(export) == export / 'run_1'
+    typed.extend(['trimmed less', 'n', ' processing_1 ', 'y'])
+    assert run_folder_asker(export) == export / 'processing_1'
     typed.extend(['trimmed less', '', 'a/b', ''])
-    assert run_folder_asker(export) == export / 'run_2'
+    assert run_folder_asker(export) == export / 'processing_2'
     assert typed == []
 
     # ---- 2 A data folder that cannot be saved to -------------------------------------

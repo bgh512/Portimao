@@ -40,7 +40,7 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
     ('trim',
      'Import',
      'Trim and ignore',
-     'Drag the bars on the plot, or type the times under Trim / Ignore in the Time '
+     'Drag the bars on the plot, or type the times under "Trim / Ignore" in the Time '
      'regions box above it. Click EXPORT full + trimmed CSV or EXPORT trimmed CSV to '
      'write the csv files with the bars as they are.',
      ),
@@ -49,54 +49,55 @@ GUIDE_STEPS: Tuple[Tuple[str, str, str, str], ...] = (
         'Set-up',
         'Temperature',
         'The temperature of the runs was typed here. It can also be changed in the Δψ box, '
-        'under More options.',
+        'under "More options".',
         ),
     ('od_scaling',
      'Set-up',
      'OD values or not',
-     'Whether OD values are given was chosen here. Click Edit ODs in the View box to '
-     'give them at any time.',
+     'Whether OD values are given was chosen here. Click "Edit ODs" in the View box '
+     'to give them at any time.',
      ),
     ('od_values',
      'Set-up',
      'OD values',
-     'The OD, volume and dilution of each file were typed here. Click Edit ODs in the '
-     'View box to change them.',
+     'The OD, volume and dilution of each file were typed here. Click "Edit ODs" in '
+     'the View box to change them.',
      ),
     ('ocr_view',
      'Set-up',
      'OCR view',
-     'The OCR was set to per OD here. Change it under OCR as in the View box.',
+     'The OCR was set to per OD here. Change it under "OCR as" in the View '
+     'box.',
      ),
     ('labels',
      'Set-up',
      'Event labels',
-     'The event labels were typed here. Click Edit labels in the View box to change '
-     'them.',
+     'The event labels were typed here. Click "Edit labels" in the View box to '
+     'change them.',
      ),
     ('haems',
      'Experiment processing',
      'Haems',
      'Change the spectra, the scatter, the fit and the haems shown in the Haem '
      'decomposition box above the plot: the plot is redrawn after each change. To '
-     'compare two, click Keep to compare first. Press CONTINUE when ready.',
+     'compare two, click "Keep to compare" first. Press CONTINUE when ready.',
      ),
     ('regions',
      'Experiment processing',
      'Oxidised and reduced',
-     'Pull the oxidised and reduced regions out on the plot, or type them under Ox / '
-     'Red in the Time regions box above it.',
+     'Pull the oxidised and reduced regions out on the plot, or type them under "Ox / '
+     'Red" in the Time regions box above it.',
      ),
     ('delta_psi',
      'Experiment processing',
      'Δψ',
-     'Tick Δψ in its box above the plot to work it out, and change its numbers there: '
+     'Tick "Δψ" in its box above the plot to work it out, and change its numbers there: '
      'the Δψ panel is redrawn at once.',
      ),
     ('windows',
      'Experiment processing',
      'Averaging regions',
-     'Drag the averaging regions on the plot, or type them under Averaging in the Time '
+     'Drag the averaging regions on the plot, or type them under "Averaging" in the Time '
      'regions box above it.',
      ),
     ('figure',
@@ -310,9 +311,9 @@ class GuideState:
         """
         ---- Summary ----
         Method to give what the open step says above its messages when it is an
-        earlier step: the note on where you were, the step's help, the words of the
-        button that goes back and the step's own buttons (the two export buttons of
-        the trim step), if it has any.
+        earlier step: the step's help, the words of the button that goes back (which
+        names the step waited at) and the step's own buttons (the two export buttons
+        of the trim step), if it has any.
 
         ---- Inputs ----
         None.
@@ -322,7 +323,7 @@ class GuideState:
 
         ---- Outputs ----
         Dict[str, Any]
-            {'note', 'help', 'back': str, 'extra': tuple of (change, words)}; each
+            {'help', 'back': str, 'extra': tuple of (change, words)}; each
             empty while the step open is the one the program waits at, and 'extra'
             empty for a step without buttons of its own.
 
@@ -337,14 +338,10 @@ class GuideState:
         """
 
         if not self.is_back():
-            return {'note': '', 'help': '', 'back': '', 'extra': ()}
-        key, _, name, help_text = GUIDE_STEPS[self.shown]
+            return {'help': '', 'back': '', 'extra': ()}
+        key, _, _, help_text = GUIDE_STEPS[self.shown]
         _, _, here, _ = GUIDE_STEPS[self.current]
-        return {'note': (f'This is step {self.shown + 1}, {name}. When you are done '
-                         f'here, go back to step {self.current + 1}, {here}, where you '
-                         f'were.'
-                         ),
-                'help': help_text,
+        return {'help': help_text,
                 'back': f'Back to {here}',
                 'extra': STEP_EXTRAS.get(key, ()),
                 }
@@ -863,7 +860,6 @@ class AnswerArea:
         self._on_click = on_click
         self._on_typed = on_typed
         self._widgets: List[Any] = []
-        self._default: Any = None
         self._ticked: List[int] = []
         self._ticks: List[Any] = []
         self._multi_go: Any = None
@@ -894,8 +890,9 @@ class AnswerArea:
         """
         ---- Summary ----
         Helper method to make one answer button: a label rather than a button, so it
-        looks the same on Windows, the Mac and Linux. A click, Enter or the space bar
-        on it carries out the command.
+        looks the same on Windows, the Mac and Linux. A click, or the space bar on it,
+        carries out the command; Enter does not, as it belongs to the boxes that are
+        typed in and to the dialogs.
 
         ---- Inputs ----
         text : str
@@ -903,7 +900,8 @@ class AnswerArea:
         command : Callable[[], Any]
             What a click does.
         is_main : bool
-            True for the highlighted button (the answer Enter gives).
+            True for a button that gives an answer (blue, its words in the middle);
+            False for a row that is only picked or ticked (a folder, a tick, BROWSE…).
 
         ---- Globals read ----
         BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OTHER_BACKGROUND,
@@ -947,7 +945,7 @@ class AnswerArea:
         def run(event: Any = None) -> str:
             command()
             return 'break'
-        for sequence in ('<Button-1>', '<Return>', '<KP_Enter>', '<space>'):
+        for sequence in ('<Button-1>', '<space>'):
             button.bind(sequence, run)
         button.bind('<Enter>', lambda e: button.configure(bg=hover))
         button.bind('<Leave>', lambda e: button.configure(bg=background))
@@ -1036,7 +1034,6 @@ class AnswerArea:
         self._ticks = []
         self._ticked = []
         self._multi_go = None
-        self._default = None
         self._folders = []
         self._other = None
         self._path_row = None
@@ -1129,7 +1126,7 @@ class AnswerArea:
             self.entry.icursor('end')
         else:
             self._path_row.pack_forget()
-            self._default.focus_set()
+            self.frame.focus_set()
 
     # ---- _folder_sender --------------------------------------------------------------
     def _folder_sender(self) -> None:
@@ -1237,7 +1234,6 @@ class AnswerArea:
         go = self._button_maker('CONTINUE', self._folder_sender, True)
         go.pack(side='top', fill='x', pady=(6, 2))
         self._widgets.append(go)
-        self._default = go
         self._folder_picker(folder_default_finder([answer for answer, _, _ in folders],
                                                   request['default'],
                                                   ),
@@ -1329,8 +1325,7 @@ class AnswerArea:
         ---- Summary ----
         Method to show only the button that goes back to the step waited at, while an
         earlier step is open, under the step's own buttons when it has any. While a
-        table waits (Edit ODs, Edit labels), its Confirm button stays above them, and
-        Enter gives it.
+        table waits ("Edit ODs", "Edit labels"), its CONFIRM button stays above them.
 
         ---- Inputs ----
         text : str
@@ -1362,20 +1357,20 @@ class AnswerArea:
         if is_confirm:
             self.confirm.pack(side='top', fill='x', pady=2)
         for words, on_click in extra:
-            own = self._button_maker(words, on_click, False)
+            own = self._button_maker(words, on_click, True)
             own.pack(side='top', fill='x', pady=2)
             self._widgets.append(own)
-        button = self._button_maker(text, on_back, not is_confirm)
+        button = self._button_maker(text, on_back, True)
         button.pack(side='top', fill='x', pady=2)
         self._widgets.append(button)
-        self._default = self.confirm if is_confirm else button
 
     # ---- focuser ---------------------------------------------------------------------
     def focuser(self) -> None:
         """
         ---- Summary ----
         Method to give the keyboard to the typing box when it is shown, otherwise to
-        the highlighted button, so Enter gives its answer.
+        the frame of the answers, so that Enter presses no button and a key typed
+        lands in no box above the plot.
 
         ---- Inputs ----
         None.
@@ -1402,8 +1397,8 @@ class AnswerArea:
         if self.entry.winfo_manager() and is_typed:
             self.entry.focus_set()
             self.entry.icursor('end')
-        elif self._default is not None:
-            self._default.focus_set()
+        else:
+            self.frame.focus_set()
 
     # ---- request_shower --------------------------------------------------------------
     def request_shower(self, request: Optional[Dict[str, Any]]) -> None:
@@ -1449,37 +1444,25 @@ class AnswerArea:
             return
         kind = request['kind']
         click = self._on_click
-        def made(text: str, answer: str, echo: str, is_main: bool) -> Any:
-            button = self._button_maker(text,
-                                        lambda: click(answer, echo),
-                                        is_main,
-                                        )
+        def made(text: str, answer: str, echo: str) -> Any:
+            # every answer button looks the same: none is the one Enter gives
+            button = self._button_maker(text, lambda: click(answer, echo), True)
             self._widgets.append(button)
-            if is_main:
-                self._default = button
             return button
 
         # ---- 2 Show the answers of this one ------------------------------------------
         if kind == 'continue':
             # the extra buttons of the step (the two export buttons) sit above CONTINUE
             for answer, words in request['options'] or []:
-                made(words, answer, words, False).pack(side='top', fill='x', pady=2)
+                made(words, answer, words).pack(side='top', fill='x', pady=2)
             # a step may name its button for what it does (Export)
             words = request.get('value') or 'CONTINUE'
-            made(words, '', words, True).pack(side='top', fill='x', pady=2)
+            made(words, '', words).pack(side='top', fill='x', pady=2)
         elif kind == 'yesno':
             for answer, words in (('y', 'YES'), ('n', 'NO')):
-                made(words, answer, words, request['default'] == answer).pack(
-                    side='top',
-                    fill='x',
-                    pady=2,
-                    )
+                made(words, answer, words).pack(side='top', fill='x', pady=2)
         elif kind == 'choice':
-            self._choices_placer([made(words,
-                                       str(number),
-                                       words,
-                                       number == request['default'],
-                                       )
+            self._choices_placer([made(words, str(number), words)
                                   for number, words in enumerate(request['options'],
                                                                  start=1,
                                                                  )
@@ -1500,7 +1483,6 @@ class AnswerArea:
             self._multi_go.configure(fg=BUTTON_TEXT if self._ticked else OFF_TEXT)
             self._multi_go.pack(side='top', fill='x', pady=(6, 2))
             self._widgets.append(self._multi_go)
-            self._default = self._multi_go
         elif kind == 'folder':
             self._folder_shower(request)
         elif kind in ('number', 'text'):
@@ -1510,10 +1492,8 @@ class AnswerArea:
             go = self._button_maker('CONTINUE', self._on_typed, True)
             go.pack(side='top', fill='x', pady=2)
             self._widgets.append(go)
-            self._default = go
         elif kind == 'confirm':
             self.confirm.pack(side='top', fill='x', pady=2)
-            self._default = self.confirm
 
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------

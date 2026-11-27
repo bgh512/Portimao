@@ -451,14 +451,14 @@ def test_table_instruction_waits(monkeypatch: pytest.MonkeyPatch,
 
     _typist_setter(monkeypatch, ['', ''])
     sentences = ['Fill in these empty cells: a: OD.', None]
-    confirm_waiter('Fill in the table, then press Confirm.',
+    confirm_waiter('Fill in the table, then press CONFIRM.',
                    lambda: sentences.pop(0),
                    note='One row per file.',
                    number='3.2.1',
                    )
     printed = capsys.readouterr().out
     assert _lines_reader(printed) == ['One row per file.',
-                                      '3.2.1 Fill in the table, then press Confirm.',
+                                      '3.2.1 Fill in the table, then press CONFIRM.',
                                       'Fill in these empty cells: a: OD.',
                                       ]
     assert f'{COLOUR_QUIET}One row per file.' in printed

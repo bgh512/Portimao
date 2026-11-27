@@ -41,6 +41,7 @@ from utils_shared.page_data import (caption_lines_builder,
                                     form_roles_reader,
                                     TICK_ON,
                                     )
+from utils_shared.page_plots import RESPONSE_KEY, shown_fields_lister, TRACE_KEY
 from utils_viewer.viewer_edges import photo_maker
 from utils_viewer.viewer_guide import CARD_BACKGROUND
 from utils_viewer.viewer_strip import height_checker, width_choices_lister
@@ -74,7 +75,8 @@ UNPICKED_RELIEF = 'raised'
 TYPES_PER_ROW = 6
 NO_TEMPLATES = '(no templates yet)'
 PAGE_HINT = ('Drag across the grid to place a plot, then fill in its form on the left. '
-             f'{EDIT_MARK} changes a plot, {REMOVE_MARK} removes it.')
+             f'{EDIT_MARK} changes a plot, {REMOVE_MARK} removes it; a right click or '
+             'Esc cancels.')
 # the line under the page while no plot on it has colours or line styles to explain
 NO_CAPTION = ('For the caption: what each colour and line style means is written here '
               'once a plot on the page uses them.')
@@ -114,10 +116,12 @@ class PageBuilder:
     _canvas_drawer
     _caption_copier
     _caption_setter
+    _drag_canceller
     _form_clearer
     _form_closer
     _form_opener
     _form_roles_reader
+    _form_rows_shower
     _height_taker
     _journal_taker
     _load_form_shower
@@ -192,6 +196,7 @@ class PageBuilder:
 
         ---- Helpers ----
         _caption_copier
+        _drag_canceller
         _height_taker
         _journal_taker
         _load_taker
@@ -232,6 +237,7 @@ class PageBuilder:
         # what the plot type asks, and the drop-down or the tick of each field
         self._form_fields: List[dict] = []
         self._form_inputs: Dict[str, Any] = {}
+        self._form_rows: Dict[str, List[Any]] = {}  # the widgets of each field
         # the set-up table and the slim copy of each experiment the plots are drawn from
         self._setup: Optional[dict] = None
         self._experiments: Dict[str, dict] = {}
@@ -239,9 +245,14 @@ class PageBuilder:
         self._caption_text = ''
 
         # ---- 2 The strip: the page size and the templates ----------------------------
+        # Each group sits in a box with its name, as the boxes above the plot of a file.
         self.strip = tk.Frame(right, bg=background)
-        sizes = tk.Frame(self.strip, bg=background)
-        sizes.pack(side='top', anchor='w', pady=(0, 4))
+        top = tk.Frame(self.strip, bg=background)
+        top.pack(side='top', anchor='w', pady=(0, 4))
+        def box_maker(holder: Any, title: str) -> Any:
+            return tk.LabelFrame(holder, text=title, bg=background, padx=4, pady=2)
+        sizes = box_maker(top, 'Figure')
+        sizes.pack(side='left', anchor='n', padx=(0, 6))
         tk.Label(sizes, text='Journal', bg=background).pack(side='left', padx=(0, 4))
         self._journal_box = ttk.Combobox(sizes,
                                          state='readonly',
@@ -260,27 +271,24 @@ class PageBuilder:
         self._height_box.bind('<Return>', lambda e: self._height_taker())
         self._height_box.bind('<FocusOut>', lambda e: self._height_taker())
         self._height_words = tk.Label(sizes, text='', bg=background, fg=NOTE_COLOUR)
-        self._height_words.pack(side='left', padx=(4, 16))
-        tk.Label(sizes, text='Template', bg=background).pack(side='left', padx=(0, 4))
-        self._template_box = ttk.Combobox(sizes, state='readonly', width=18)
+        self._height_words.pack(side='left', padx=(4, 0))
+        templates = box_maker(top, 'Template')
+        templates.pack(side='left', anchor='n')
+        self._template_box = ttk.Combobox(templates, state='readonly', width=18)
         self._template_box.pack(side='left', padx=(0, 4))
-        self._load_button = ttk.Button(sizes,
+        self._load_button = ttk.Button(templates,
                                        text='Load template',
                                        command=self._load_taker,
                                        )
         self._load_button.pack(side='left', padx=(0, 4))
-        ttk.Button(sizes,
+        ttk.Button(templates,
                    text='Save template',
                    command=self._save_form_shower,
                    ).pack(side='left')
 
         # ---- 3 The strip: a button per plot type that can be used now ----------------
-        types = tk.Frame(self.strip, bg=background)
+        types = box_maker(self.strip, 'Plot types')
         types.pack(side='top', anchor='w')
-        tk.Label(types,
-                 text='Plot types',
-                 bg=background,
-                 ).grid(row=0, column=0, rowspan=2, sticky='n', padx=(0, 6))
         self._type_buttons: Dict[str, Any] = {}
         for place, key in enumerate(FIRST_TYPES):
             button = tk.Button(types,
@@ -316,6 +324,10 @@ class PageBuilder:
         self.canvas.bind('<Button-1>', self._presser)
         self.canvas.bind('<B1-Motion>', self._mover)
         self.canvas.bind('<ButtonRelease-1>', self._releaser)
+        # a right click (the second button on a Mac) or Esc cancels a drag or a change
+        for sequence in ('<Button-2>', '<Button-3>'):
+            self.canvas.bind(sequence, self._drag_canceller)
+        right.winfo_toplevel().bind('<Escape>', self._drag_canceller, add='+')
         self.caption = tk.Frame(right, bg=background)
         self._caption_button = ttk.Button(self.caption,
                                           text='Copy',
@@ -593,6 +605,45 @@ class PageBuilder:
                                        else 'disabled',
                                        )
 
+    # ---- _drag_canceller -------------------------------------------------------------
+    def _drag_canceller(self, event: Any = None) -> None:
+        """
+        ---- Summary ----
+        Method to take a right click on the page, or the Esc key while the page is
+        shown: a drag under way is dropped; otherwise the form of a plot is cancelled,
+        so a plot being changed with ✎ goes back to its cells.
+
+        ---- Inputs ----
+        event : Any
+            The Tk event; not used.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the page and the window (side effects).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _note_setter
+        _plot_cancel_taker
+        """
+
+        if not self.canvas.winfo_ismapped():
+            return
+        if self._drag_start is not None:
+            self._drag_start = None
+            self.canvas.delete('drag')
+            self._note_setter('The drag is cancelled.')
+        elif self._form_mode == 'plot':
+            self._plot_cancel_taker()
+
     # ---- _form_clearer ---------------------------------------------------------------
     def _form_clearer(self) -> None:
         """
@@ -739,6 +790,48 @@ class PageBuilder:
 
         values = {key: widget.get() for key, widget in self._form_inputs.items()}
         return form_roles_reader(self._form_fields, values)
+
+    # ---- _form_rows_shower -----------------------------------------------------------
+    def _form_rows_shower(self) -> None:
+        """
+        ---- Summary ----
+        Method to show, in the form of a plot, only the fields that fit the
+        measurement picked in it (the OCR's "shown as" for the OCR, the haems' for a
+        haem); a field put away keeps what it held.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None. Changes the window (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        _form_roles_reader
+        shown_fields_lister
+        """
+
+        roles = self._form_roles_reader()
+        measured = next(
+            (roles[key] for key in (TRACE_KEY, RESPONSE_KEY) if key in roles),
+            None,
+            )
+        shown = shown_fields_lister(self._form_fields, measured)
+        for key, widgets in self._form_rows.items():
+            for widget in widgets:
+                if key in shown:
+                    widget.grid()
+                else:
+                    widget.grid_remove()
 
     # ---- _height_taker ---------------------------------------------------------------
     def _height_taker(self) -> None:
@@ -895,7 +988,8 @@ class PageBuilder:
 
         name = self._template_box.get()
         if not name or name == NO_TEMPLATES:
-            self._note_setter('Pick a template in the list beside Load template first.',
+            self._note_setter('Pick a template in the list beside "Load template" '
+                              'first.',
                               is_problem=True,
                               )
             return
@@ -1210,34 +1304,47 @@ class PageBuilder:
                                                self._answers,
                                                )
         self._form_inputs = {}
+        self._form_rows = {}
         row = 2
         for field in self._form_fields:
             if field['kind'] == 'tick':
                 ticked = tk.BooleanVar(body, value=field['value'] == TICK_ON)
-                tk.Checkbutton(body,
-                               text=field['label'],
-                               variable=ticked,
-                               bg=CARD_BACKGROUND,
-                               fg=FORM_TEXT,
-                               activebackground=CARD_BACKGROUND,
-                               activeforeground=FORM_TEXT,
-                               selectcolor=CARD_BACKGROUND,
-                               font=(self._family, self._size),
-                               ).grid(row=row, column=0, columnspan=2, sticky='w')
+                tick = tk.Checkbutton(body,
+                                      text=field['label'],
+                                      variable=ticked,
+                                      bg=CARD_BACKGROUND,
+                                      fg=FORM_TEXT,
+                                      activebackground=CARD_BACKGROUND,
+                                      activeforeground=FORM_TEXT,
+                                      selectcolor=CARD_BACKGROUND,
+                                      font=(self._family, self._size),
+                                      )
+                tick.grid(row=row, column=0, columnspan=2, sticky='w')
                 self._form_inputs[field['key']] = ticked
+                self._form_rows[field['key']] = [tick]
             elif field['choices']:
-                tk.Label(body,
-                         text=field['label'],
-                         bg=CARD_BACKGROUND,
-                         fg=FORM_TEXT,
-                         font=(self._family, self._size),
-                         ).grid(row=row, column=0, sticky='w', pady=4)
-                words = [shown for _, shown in field['choices']]
-                picker = ttk.Combobox(body, state='readonly', width=28, values=words)
+                words = tk.Label(body,
+                                 text=field['label'],
+                                 bg=CARD_BACKGROUND,
+                                 fg=FORM_TEXT,
+                                 font=(self._family, self._size),
+                                 )
+                words.grid(row=row, column=0, sticky='w', pady=4)
+                picker = ttk.Combobox(body,
+                                      state='readonly',
+                                      width=28,
+                                      values=[shown for _, shown in field['choices']],
+                                      )
                 picker.set(dict(field['choices'])[field['value']])
                 picker.grid(row=row, column=1, sticky='w', padx=(8, 0), pady=4)
+                # the measurement picked decides which "shown as" drop-down is shown
+                picker.bind('<<ComboboxSelected>>',
+                            lambda e: self._form_rows_shower(),
+                            )
                 self._form_inputs[field['key']] = picker
+                self._form_rows[field['key']] = [words, picker]
             row += 1
+        self._form_rows_shower()
 
         # ---- 3 Done and Cancel -------------------------------------------------------
         buttons = tk.Frame(body, bg=CARD_BACKGROUND)

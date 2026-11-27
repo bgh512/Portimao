@@ -829,13 +829,13 @@ def confirm_waiter(question: str,
     """
     ---- Summary ----
     Main function to give a numbered instruction carried out in a table of the window
-    ("Fill in ..., then press Confirm.") and wait until Confirm is pressed with the
+    ("Fill in ..., then press CONFIRM.") and wait until Confirm is pressed with the
     table filled in. While the checker finds something wrong, its one sentence is said
     and the instruction goes on waiting.
 
     ---- Inputs ----
     question : str
-        The instruction, without its number, ending "then press Confirm.".
+        The instruction, without its number, ending "then press CONFIRM.".
     checker : Callable[[], Optional[str]]
         Reads the table and gives None when it can be used, or the sentence saying
         what is still wrong.

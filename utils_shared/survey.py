@@ -722,8 +722,9 @@ def event_asker(summaries: List[dict],
         info_printer(f"{summary['name']}:", depth=2)
         for event, entry in zip(summary['events'], result[summary['name']]):
             info_printer(_event_line_builder(event, entry), depth=2)
-    info_printer('Event labels saved! Edit labels in the View box above the plot '
-                 'changes them at any time.',
+    info_printer('Event labels saved! You can change them with "Edit labels", and '
+                 'their angle with "Label angle", in the View box above the plot at '
+                 'any time.',
                  )
     return result
 
@@ -1160,8 +1161,8 @@ def ocr_view_teller(answers: dict,
     answers['ocr_mode'] = saved if saved in OCR_KEPT_KEYS else 'od'
     shower()
     shown ='per OD' if answers['ocr_mode'] == 'od' else 'as % of the range'
-    info_printer(f'The OCR is now shown {shown}. You can change it under OCR as in the '
-                 'View box at any time.',
+    info_printer(f'The OCR is now shown {shown}. You can change it under "OCR as" in '
+                 'the View box at any time.',
                  )
     enter_waiter('Use the View box to show the OCR and the haems per OD.',
                  OCR_VIEW_NUDGE,
@@ -1381,7 +1382,7 @@ def run_folder_asker(export_folder: Path) -> Path:
     ---- Summary ----
     Main function to ask for the name of this run (1.3) and give the folder its
     results go in, a folder of that name inside the export folder. The name offered
-    is the next free of run_1, run_2 and so on. A name already there is used only
+    is the next free of processing_1, processing_2 and so on. A name already there is used only
     once the user agrees to write over it (1.3.1); otherwise the name is asked again.
 
     ---- Inputs ----
@@ -1419,12 +1420,12 @@ def run_folder_asker(export_folder: Path) -> Path:
                          )
 
     # ---- 2 Ask for the name until it can be used -------------------------------------
-    info_printer(f'The results of this run are saved in a folder with this name, in '
-                 f'{export_folder}.',
+    info_printer(f'The results of this processing session are saved in a folder with '
+                 f'this name, in {export_folder}.',
                  tight=True,
                  )
     while True:
-        name = text_asker('What should this run be called?',
+        name = text_asker('What should this processing session be saved as?',
                           run_name_finder(export_folder),
                           checker=lambda typed: run_name_checker(typed, export_folder),
                           number='1.3',
@@ -1483,7 +1484,7 @@ def run_name_checker(text: Optional[str], export_folder: Path) -> Optional[str]:
 def run_name_finder(export_folder: Path) -> str:
     """
     ---- Summary ----
-    Main function to find the name offered for a run: the first of run_1, run_2 and
+    Main function to find the name offered for a run: the first of processing_1, processing_2 and
     so on that is not in the export folder yet.
 
     ---- Inputs ----
@@ -1495,7 +1496,7 @@ def run_name_finder(export_folder: Path) -> str:
 
     ---- Outputs ----
     str
-        The first of 'run_1', 'run_2', ... that is neither a folder nor a file there.
+        The first of 'processing_1', 'processing_2', ... that is neither a folder nor a file there.
 
     ---- Globals mutated ----
     None.
@@ -1508,9 +1509,9 @@ def run_name_finder(export_folder: Path) -> str:
     """
 
     number = 1
-    while (Path(export_folder) / f'run_{number}').exists():
+    while (Path(export_folder) / f'processing_{number}').exists():
         number += 1
-    return f'run_{number}'
+    return f'processing_{number}'
 
 
 # ---- save_place_checker --------------------------------------------------------------

@@ -466,15 +466,16 @@ def test_run_name_is_checked(tmp_path: Path) -> None:
 
     # ---- 1 The name offered ----------------------------------------------------------
     export = tmp_path / 'export'
-    assert run_name_finder(export) == 'run_1'
-    (export / 'run_1').mkdir(parents=True)
+    assert run_name_finder(export) == 'processing_1'
+    (export / 'processing_1').mkdir(parents=True)
+    (export / 'processing_2').write_text('')
+    (export / 'processing_4').mkdir()
     (export / 'run_2').write_text('')
-    (export / 'run_4').mkdir()
-    assert run_name_finder(export) == 'run_3'
+    assert run_name_finder(export) == 'processing_3'
 
     # ---- 2 The names accepted and refused --------------------------------------------
     plain = 'Type a name of letters, digits, spaces, - and _ only.'
-    for name in ('run_1', 'run_3', ' trimmed less ', 'KCN-first 2', 'après'):
+    for name in ('processing_1', 'run_3', ' trimmed less ', 'KCN-first 2', 'après'):
         assert run_name_checker(name, export) is None
     for name in ('', '   ', None):
         assert run_name_checker(name, export) == 'Type a name.'

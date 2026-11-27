@@ -52,6 +52,7 @@ from utils_shared.page_plots import (_row_titles_splitter,
                                      NOT_THERE,
                                      response_checks_lister,
                                      response_numbers_lister,
+                                     shown_fields_lister,
                                      time_points_numbers_lister,
                                      traces_left_out_lister,
                                      waterfall_left_out_lister,
@@ -1745,6 +1746,16 @@ def test_the_forms_of_the_plots_over_time() -> None:
                                         ('addition 2', 'Addition 2'),
                                         ]
     assert len(fields[5]['choices']) == 11
+    # of the three "shown as" only the one of the trace picked is shown, and none
+    # for the oxygen
+    others = ['experiment', 'trace', 'time_zero', 'addition_labels', 'regions_shaded']
+    for trace, fitting in (('vo2', 'vo2_value'),
+                           ('haem_cytbh', 'haem_view'),
+                           ('delta_psi', 'delta_psi_value'),
+                           ('oxygen', None),
+                           ):
+        shown = shown_fields_lister(fields, trace)
+        assert sorted(shown) == sorted(others + ([fitting] if fitting else []))
     with_od = form_fields_lister('P7', setup, {}, _answers_maker(normalise_od=True))
     assert with_od[2]['choices'][-1] == ('od', 'Per OD')
     plain = form_fields_lister('P7',
@@ -2813,6 +2824,16 @@ def test_the_forms_of_a_response_by_region_and_of_a_time_points() -> None:
         ('marks', 'Marks', 'stars'),
         ]
     assert fields[0]['choices'] == [('vo2', 'OCR'), ('haems', 'Haems')]
+    # only what fits the measurement picked is shown: the OCR has no haem ticks and
+    # no "Haems shown as", the haems no "OCR shown as"
+    rest = ['group_1', 'bars', 'test', 'marks']
+    assert shown_fields_lister(fields) == ['response_of', 'vo2_value'] + rest
+    assert shown_fields_lister(fields, 'vo2') == shown_fields_lister(fields)
+    assert shown_fields_lister(fields, 'haems') == ['response_of',
+                                                    'panel_haem_cytbh',
+                                                    'panel_haem_cytcc',
+                                                    'haem_view',
+                                                    ] + rest
     kept = {'response_of': 'haems', 'panel_haem_cytcc': 'no', 'haem_view': 'percent'}
     values = {field['key']: field['value']
               for field in form_fields_lister('P11', setup, kept, _answers_maker())

@@ -1,8 +1,8 @@
 # Portimao - Function List
 
 - **Project:** Portimao
-- **Version:** V2.39
-- **Date:** 26/11/2026
+- **Version:** V2.40.1
+- **Date:** 27/11/2026
 
 ## Contents
 
@@ -660,6 +660,7 @@
     - [`_kits_maker`](#_kits_maker)
     - [`test_a_tab_pressed_away_from_its_step`](#test_a_tab_pressed_away_from_its_step)
     - [`test_a_tab_pressed_while_no_step_has_edges`](#test_a_tab_pressed_while_no_step_has_edges)
+    - [`test_a_tab_unpressed`](#test_a_tab_unpressed)
     - [`test_export_csv_in_the_trim_step`](#test_export_csv_in_the_trim_step)
     - [`test_the_figure_step_asks_only_continue`](#test_the_figure_step_asks_only_continue)
 - [`tests/test_trace_alignment.py`](#teststest_trace_alignmentpy)
@@ -1082,6 +1083,7 @@
     - [`response_form_maker`](#response_form_maker)
     - [`response_numbers_lister`](#response_numbers_lister)
     - [`response_plot_drawer`](#response_plot_drawer)
+    - [`shown_fields_lister`](#shown_fields_lister)
     - [`standard_form_maker`](#standard_form_maker)
     - [`standard_numbers_lister`](#standard_numbers_lister)
     - [`standard_plot_drawer`](#standard_plot_drawer)
@@ -20440,6 +20442,34 @@ None.
 _kits_maker
 ```
 
+#### `test_a_tab_unpressed`
+
+```text
+---- Summary ----
+Main function to check a pressed tab that is pressed again (told as an empty
+tab): away from its step its edges are taken off the plot; the tab of the step
+that waits stays pressed, as the step asks for its edges.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+settings.DEFAULT_ANSWERS.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `test_export_csv_in_the_trim_step`
 
 ```text
@@ -24469,7 +24499,7 @@ None.
 ```text
 ---- Summary ----
 Helper function to give the key that sorts run names with their numbers in order,
-so run_2 comes before run_10.
+so processing_2 comes before processing_10.
 
 ---- Inputs ----
 name : str
@@ -34680,6 +34710,41 @@ _y_range_setter
 response_numbers_lister
 ```
 
+#### `shown_fields_lister`
+
+```text
+---- Summary ----
+Main function to list the fields of a form that are shown for the measurement
+picked in it: of the "shown as" drop-downs only the one that fits it (the OCR's
+for the OCR, the haems' for a haem, Δψ's for Δψ, none for the oxygen or a
+difference spectrum), and the haem ticks only for the haems. A form without a
+measurement shows every field.
+
+---- Inputs ----
+fields : List[dict]
+    The fields of the form (form_field, DATA_FORMAT.md).
+measured : Optional[str]
+    The role picked in the measurement drop-down; None for the one the form
+    starts at.
+
+---- Globals read ----
+HAEM_KEY_START, HAEMS_ROLE, PSI_VALUE_KEY, RESPONSE_KEY, TRACE_KEY, VIEW_KEY,
+VO2_VALUE_KEY; HAEM_TRACE_START, PSI_TRACE, VO2_TRACE (imported).
+
+---- Outputs ----
+List[str]
+    The key of each field shown, in the order of the form.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `standard_form_maker`
 
 ```text
@@ -36638,13 +36703,13 @@ retry_teller
 ```text
 ---- Summary ----
 Main function to give a numbered instruction carried out in a table of the window
-("Fill in ..., then press Confirm.") and wait until Confirm is pressed with the
+("Fill in ..., then press CONFIRM.") and wait until Confirm is pressed with the
 table filled in. While the checker finds something wrong, its one sentence is said
 and the instruction goes on waiting.
 
 ---- Inputs ----
 question : str
-    The instruction, without its number, ending "then press Confirm.".
+    The instruction, without its number, ending "then press CONFIRM.".
 checker : Callable[[], Optional[str]]
     Reads the table and gives None when it can be used, or the sentence saying
     what is still wrong.
@@ -41370,7 +41435,7 @@ yes_no_asker
 ---- Summary ----
 Main function to ask for the name of this run (1.3) and give the folder its
 results go in, a folder of that name inside the export folder. The name offered
-is the next free of run_1, run_2 and so on. A name already there is used only
+is the next free of processing_1, processing_2 and so on. A name already there is used only
 once the user agrees to write over it (1.3.1); otherwise the name is asked again.
 
 ---- Inputs ----
@@ -41435,7 +41500,7 @@ None.
 
 ```text
 ---- Summary ----
-Main function to find the name offered for a run: the first of run_1, run_2 and
+Main function to find the name offered for a run: the first of processing_1, processing_2 and
 so on that is not in the export folder yet.
 
 ---- Inputs ----
@@ -41447,7 +41512,7 @@ None.
 
 ---- Outputs ----
 str
-    The first of 'run_1', 'run_2', ... that is neither a folder nor a file there.
+    The first of 'processing_1', 'processing_2', ... that is neither a folder nor a file there.
 
 ---- Globals mutated ----
 None.
@@ -47407,9 +47472,9 @@ None.
 ```text
 ---- Summary ----
 Method to give what the open step says above its messages when it is an
-earlier step: the note on where you were, the step's help, the words of the
-button that goes back and the step's own buttons (the two export buttons of
-the trim step), if it has any.
+earlier step: the step's help, the words of the button that goes back (which
+names the step waited at) and the step's own buttons (the two export buttons
+of the trim step), if it has any.
 
 ---- Inputs ----
 None.
@@ -47419,7 +47484,7 @@ GUIDE_STEPS, STEP_EXTRAS.
 
 ---- Outputs ----
 Dict[str, Any]
-    {'note', 'help', 'back': str, 'extra': tuple of (change, words)}; each
+    {'help', 'back': str, 'extra': tuple of (change, words)}; each
     empty while the step open is the one the program waits at, and 'extra'
     empty for a step without buttons of its own.
 
@@ -47765,8 +47830,9 @@ _button_maker
 ```text
 ---- Summary ----
 Helper method to make one answer button: a label rather than a button, so it
-looks the same on Windows, the Mac and Linux. A click, Enter or the space bar
-on it carries out the command.
+looks the same on Windows, the Mac and Linux. A click, or the space bar on it,
+carries out the command; Enter does not, as it belongs to the boxes that are
+typed in and to the dialogs.
 
 ---- Inputs ----
 text : str
@@ -47774,7 +47840,8 @@ text : str
 command : Callable[[], Any]
     What a click does.
 is_main : bool
-    True for the highlighted button (the answer Enter gives).
+    True for a button that gives an answer (blue, its words in the middle);
+    False for a row that is only picked or ticked (a folder, a tick, BROWSE…).
 
 ---- Globals read ----
 BUTTON_TEXT, FOCUS_COLOUR, MAIN_BACKGROUND, MAIN_HOVER, OTHER_BACKGROUND,
@@ -48028,8 +48095,7 @@ None.
 ---- Summary ----
 Method to show only the button that goes back to the step waited at, while an
 earlier step is open, under the step's own buttons when it has any. While a
-table waits (Edit ODs, Edit labels), its Confirm button stays above them, and
-Enter gives it.
+table waits ("Edit ODs", "Edit labels"), its CONFIRM button stays above them.
 
 ---- Inputs ----
 text : str
@@ -48062,7 +48128,8 @@ _clearer
 ```text
 ---- Summary ----
 Method to give the keyboard to the typing box when it is shown, otherwise to
-the highlighted button, so Enter gives its answer.
+the frame of the answers, so that Enter presses no button and a key typed
+lands in no box above the plot.
 
 ---- Inputs ----
 None.
@@ -48284,10 +48351,12 @@ _button_taker
 _canvas_drawer
 _caption_copier
 _caption_setter
+_drag_canceller
 _form_clearer
 _form_closer
 _form_opener
 _form_roles_reader
+_form_rows_shower
 _height_taker
 _journal_taker
 _load_form_shower
@@ -48354,6 +48423,7 @@ None.
 
 ---- Helpers ----
 _caption_copier
+_drag_canceller
 _height_taker
 _journal_taker
 _load_taker
@@ -48491,6 +48561,36 @@ None.
 caption_lines_builder
 ```
 
+##### `_drag_canceller`
+
+```text
+---- Summary ----
+Method to take a right click on the page, or the Esc key while the page is
+shown: a drag under way is dropped; otherwise the form of a plot is cancelled,
+so a plot being changed with ✎ goes back to its cells.
+
+---- Inputs ----
+event : Any
+    The Tk event; not used.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the page and the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_note_setter
+_plot_cancel_taker
+```
+
 ##### `_form_clearer`
 
 ```text
@@ -48599,6 +48699,35 @@ None.
 
 ---- Helpers ----
 form_roles_reader
+```
+
+##### `_form_rows_shower`
+
+```text
+---- Summary ----
+Method to show, in the form of a plot, only the fields that fit the
+measurement picked in it (the OCR's "shown as" for the OCR, the haems' for a
+haem); a field put away keeps what it held.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_form_roles_reader
+shown_fields_lister
 ```
 
 ##### `_height_taker`
@@ -52712,7 +52841,7 @@ session : ViewerSession
 table : dict
     The table to show (table_rows, DATA_FORMAT.md).
 question : str
-    The instruction, ending "then press Confirm.".
+    The instruction, ending "then press CONFIRM.".
 note : str
     What the table needs, said above the instruction in the quieter colour.
 number : str
@@ -53276,7 +53405,7 @@ regions : Optional[Dict[str, Dict[str, float]]]
 
 ---- Globals read ----
 settings.DELTA_PSI_LIMIT_ANSWERS, HAEM_NUDGE, PSI_NUDGE, PSI_FORMULA,
-PSI_FORMULA_NOTE.
+PSI_FORMULA_NOTES.
 
 ---- Outputs ----
 Optional[Dict[str, Dict[str, float]]]
@@ -55003,7 +55132,8 @@ haem_ticks_resolver
 ```text
 ---- Summary ----
 Method to take a tab of the Time regions box pressed: its edges go on the plot.
-The tab already pressed passes nothing on.
+The tab already pressed is unpressed, which takes its edges off the plot
+(told as an empty tab); the step that waits at its own tab presses it again.
 
 ---- Inputs ----
 tab : str
